@@ -44,7 +44,6 @@ describe("phLogger", () => {
     expect(mockGetFeatureFlag).toHaveBeenCalledWith(
       "agent-subagents",
       "user_123",
-      { sendFeatureFlagEvents: false },
     );
 
     mockGetFeatureFlag.mockRejectedValueOnce(new Error("unavailable"));

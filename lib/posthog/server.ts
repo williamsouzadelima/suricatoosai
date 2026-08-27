@@ -26,9 +26,7 @@ export async function getPostHogFeatureFlagValueForUser(
   const client = getClient();
   if (!client) return null;
   try {
-    const value = await client.getFeatureFlag(flagKey, userId, {
-      sendFeatureFlagEvents: false,
-    });
+    const value = await client.getFeatureFlag(flagKey, userId);
     return typeof value === "boolean" ? value : null;
   } catch {
     return null;
