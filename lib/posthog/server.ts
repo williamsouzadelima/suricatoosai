@@ -26,7 +26,9 @@ export async function getPostHogFeatureFlagValueForUser(
   const client = getClient();
   if (!client) return null;
   try {
-    const value = await client.getFeatureFlag(flagKey, userId);
+    const value = await client.getFeatureFlag(flagKey, userId, {
+      sendFeatureFlagEvents: false,
+    });
     return typeof value === "boolean" ? value : null;
   } catch {
     return null;
@@ -36,11 +38,14 @@ export async function getPostHogFeatureFlagValueForUser(
 export async function getPostHogFeatureFlagVariantForUser(
   flagKey: string,
   userId: string,
+  options?: { sendFeatureFlagEvents?: boolean },
 ): Promise<string | undefined> {
   const client = getClient();
   if (!client) return undefined;
   try {
-    const value = await client.getFeatureFlag(flagKey, userId);
+    const value = options
+      ? await client.getFeatureFlag(flagKey, userId, options)
+      : await client.getFeatureFlag(flagKey, userId);
     return typeof value === "string" ? value : undefined;
   } catch {
     return undefined;

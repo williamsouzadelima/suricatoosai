@@ -44,6 +44,7 @@ describe("phLogger", () => {
     expect(mockGetFeatureFlag).toHaveBeenCalledWith(
       "agent-subagents",
       "user_123",
+      { sendFeatureFlagEvents: false },
     );
 
     mockGetFeatureFlag.mockRejectedValueOnce(new Error("unavailable"));
@@ -69,6 +70,24 @@ describe("phLogger", () => {
     await expect(
       getPostHogFeatureFlagVariantForUser("free_usage_budget_v1", "user_123"),
     ).resolves.toBe("activation_0_10_monthly_0_15");
+    expect(mockGetFeatureFlag).toHaveBeenLastCalledWith(
+      "free_usage_budget_v1",
+      "user_123",
+    );
+
+    mockGetFeatureFlag.mockResolvedValueOnce("test");
+    await expect(
+      getPostHogFeatureFlagVariantForUser(
+        "hac46-pro-monthly-29-pricing",
+        "user_123",
+        { sendFeatureFlagEvents: false },
+      ),
+    ).resolves.toBe("test");
+    expect(mockGetFeatureFlag).toHaveBeenLastCalledWith(
+      "hac46-pro-monthly-29-pricing",
+      "user_123",
+      { sendFeatureFlagEvents: false },
+    );
 
     mockGetFeatureFlag.mockResolvedValueOnce(true);
     await expect(
