@@ -85,7 +85,7 @@ jobs:
 
           mapfile -d '' INSTALLERS < <(
             find artifacts/desktop-Windows-x64 -type f \
-              -name 'HackerAI_*_x64-setup.exe' -print0
+              -name 'Suricatoos_*_x64-setup.exe' -print0
           )
           if [[ "${#INSTALLERS[@]}" -ne 1 ]]; then
             echo "Expected exactly one Windows installer, found ${#INSTALLERS[@]}" >&2
@@ -93,7 +93,7 @@ jobs:
           fi
 
           INSTALLER_NAME="$(basename "${INSTALLERS[0]}")"
-          if [[ ! "$INSTALLER_NAME" =~ ^HackerAI_((0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))_x64-setup\.exe$ ]]; then
+          if [[ ! "$INSTALLER_NAME" =~ ^Suricatoos_((0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))_x64-setup\.exe$ ]]; then
             echo "Installer is not release-versioned: $INSTALLER_NAME" >&2
             exit 1
           fi
@@ -164,7 +164,7 @@ jobs:
           gh release create "$TAG_NAME" \
             --repo "$GH_REPO" \
             --target "$TARGET_SHA" \
-            --title "HackerAI Desktop $TAG_NAME" \
+            --title "Suricatoos Desktop $TAG_NAME" \
             --draft \
             --generate-notes \
             release-files/*
