@@ -276,7 +276,7 @@ describe("resolveAgentModelForImageToolResults", () => {
     ).toBe("model-grok-4.5");
   });
 
-  it("keeps the HackerAI Pro GLM 5.3 fallback active after image tool results", () => {
+  it("keeps the Suricatoos Pro GLM 5.3 fallback active after image tool results", () => {
     expect(
       resolveAgentModelForImageToolResults("model-glm-5.3", "agent", true),
     ).toBe("model-glm-5.3");

@@ -112,7 +112,7 @@ describe("shouldDropExpectedFrontendException", () => {
                   {
                     raw_frame: {
                       filename:
-                        "https://hackerai.co/_next/static/chunks/27au5l1vw34oq.js?dpl=dpl_2ruEPyNtAD3Yc4qkCoAN2J7ReZk7",
+                        "https://ai.suricatoos.com/_next/static/chunks/27au5l1vw34oq.js?dpl=dpl_2ruEPyNtAD3Yc4qkCoAN2J7ReZk7",
                     },
                   },
                 ],
@@ -592,7 +592,7 @@ describe("shouldDropExpectedFrontendException", () => {
     const event = enrichFrontendExceptionEvent({
       event: "$exception",
       properties: {
-        $current_url: "https://hackerai.co/c/chat-123",
+        $current_url: "https://ai.suricatoos.com/c/chat-123",
         $exception_values: [
           "Minified React error #185; visit https://react.dev/errors/185 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.",
         ],
@@ -603,7 +603,7 @@ describe("shouldDropExpectedFrontendException", () => {
                 {
                   raw_frame: {
                     filename:
-                      "https://hackerai.co/_next/static/chunks/react.js?dpl=dpl_G8NpYMgn7xvPfdr4XW6jYBmeC4yB",
+                      "https://ai.suricatoos.com/_next/static/chunks/react.js?dpl=dpl_G8NpYMgn7xvPfdr4XW6jYBmeC4yB",
                   },
                 },
               ],
@@ -644,7 +644,7 @@ describe("shouldDropExpectedFrontendException", () => {
       event: "$exception",
       properties: {
         $current_url:
-          "https://hackerai.co/auth-error?state=secret#client_redirect_key=secret",
+          "https://ai.suricatoos.com/auth-error?state=secret#client_redirect_key=secret",
         $referrer: "https://idp.example/callback?code=secret&state=secret",
         $exception_values: [
           "Request failed for https://api.example/resource?diagnostic=keep",
@@ -653,7 +653,7 @@ describe("shouldDropExpectedFrontendException", () => {
     });
 
     expect(event.properties).toEqual({
-      $current_url: "https://hackerai.co/auth-error",
+      $current_url: "https://ai.suricatoos.com/auth-error",
       $referrer: "https://idp.example/callback",
       $exception_values: [
         "Request failed for https://api.example/resource?diagnostic=keep",
@@ -665,8 +665,8 @@ describe("shouldDropExpectedFrontendException", () => {
     const event = {
       event: "custom_event",
       properties: {
-        $current_url: "https://hackerai.co/c/chat-123?tab=files",
-        $referrer: "https://hackerai.co/?source=home",
+        $current_url: "https://ai.suricatoos.com/c/chat-123?tab=files",
+        $referrer: "https://ai.suricatoos.com/?source=home",
       },
     };
 

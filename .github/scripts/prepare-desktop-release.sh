@@ -64,33 +64,33 @@ copy_one() {
 
 # Copy each versioned installer explicitly so a run with incomplete or mixed
 # artifacts cannot be promoted accidentally.
-copy_one "$ARTIFACTS_DIR/desktop-macOS-arm64" "HackerAI_${VERSION}_aarch64.dmg"
-copy_one "$ARTIFACTS_DIR/desktop-macOS-x64" "HackerAI_${VERSION}_x64.dmg"
-copy_one "$ARTIFACTS_DIR/desktop-macOS-universal" "HackerAI-universal.dmg"
-copy_one "$ARTIFACTS_DIR/desktop-Linux-x64" "HackerAI_${VERSION}_amd64.AppImage"
-copy_one "$ARTIFACTS_DIR/desktop-Linux-x64" "HackerAI_${VERSION}_amd64.AppImage.tar.gz"
-copy_one "$ARTIFACTS_DIR/desktop-Linux-x64" "HackerAI_${VERSION}_amd64.AppImage.tar.gz.sig"
-copy_one "$ARTIFACTS_DIR/desktop-Linux-x64" "HackerAI_${VERSION}_amd64.deb"
-copy_one "$ARTIFACTS_DIR/desktop-Linux-arm64" "HackerAI_${VERSION}_aarch64.AppImage"
-copy_one "$ARTIFACTS_DIR/desktop-Linux-arm64" "HackerAI_${VERSION}_aarch64.AppImage.tar.gz"
-copy_one "$ARTIFACTS_DIR/desktop-Linux-arm64" "HackerAI_${VERSION}_aarch64.AppImage.tar.gz.sig"
-copy_one "$ARTIFACTS_DIR/desktop-Linux-arm64" "HackerAI_${VERSION}_arm64.deb"
-copy_one "$ARTIFACTS_DIR/desktop-Windows-x64" "HackerAI_${VERSION}_x64-setup.exe"
-copy_one "$ARTIFACTS_DIR/desktop-Windows-x64" "HackerAI_${VERSION}_x64-setup.nsis.zip"
-copy_one "$ARTIFACTS_DIR/desktop-Windows-x64" "HackerAI_${VERSION}_x64-setup.nsis.zip.sig"
+copy_one "$ARTIFACTS_DIR/desktop-macOS-arm64" "Suricatoos_${VERSION}_aarch64.dmg"
+copy_one "$ARTIFACTS_DIR/desktop-macOS-x64" "Suricatoos_${VERSION}_x64.dmg"
+copy_one "$ARTIFACTS_DIR/desktop-macOS-universal" "Suricatoos-universal.dmg"
+copy_one "$ARTIFACTS_DIR/desktop-Linux-x64" "Suricatoos_${VERSION}_amd64.AppImage"
+copy_one "$ARTIFACTS_DIR/desktop-Linux-x64" "Suricatoos_${VERSION}_amd64.AppImage.tar.gz"
+copy_one "$ARTIFACTS_DIR/desktop-Linux-x64" "Suricatoos_${VERSION}_amd64.AppImage.tar.gz.sig"
+copy_one "$ARTIFACTS_DIR/desktop-Linux-x64" "Suricatoos_${VERSION}_amd64.deb"
+copy_one "$ARTIFACTS_DIR/desktop-Linux-arm64" "Suricatoos_${VERSION}_aarch64.AppImage"
+copy_one "$ARTIFACTS_DIR/desktop-Linux-arm64" "Suricatoos_${VERSION}_aarch64.AppImage.tar.gz"
+copy_one "$ARTIFACTS_DIR/desktop-Linux-arm64" "Suricatoos_${VERSION}_aarch64.AppImage.tar.gz.sig"
+copy_one "$ARTIFACTS_DIR/desktop-Linux-arm64" "Suricatoos_${VERSION}_arm64.deb"
+copy_one "$ARTIFACTS_DIR/desktop-Windows-x64" "Suricatoos_${VERSION}_x64-setup.exe"
+copy_one "$ARTIFACTS_DIR/desktop-Windows-x64" "Suricatoos_${VERSION}_x64-setup.nsis.zip"
+copy_one "$ARTIFACTS_DIR/desktop-Windows-x64" "Suricatoos_${VERSION}_x64-setup.nsis.zip.sig"
 
 # Tauri gives both macOS updater archives the same filename. Keep both by
 # assigning architecture-specific release names before generating latest.json.
-copy_one "$ARTIFACTS_DIR/desktop-macOS-arm64" "HackerAI.app.tar.gz" "HackerAI-aarch64.app.tar.gz"
-copy_one "$ARTIFACTS_DIR/desktop-macOS-arm64" "HackerAI.app.tar.gz.sig" "HackerAI-aarch64.app.tar.gz.sig"
-copy_one "$ARTIFACTS_DIR/desktop-macOS-x64" "HackerAI.app.tar.gz" "HackerAI-x86_64.app.tar.gz"
-copy_one "$ARTIFACTS_DIR/desktop-macOS-x64" "HackerAI.app.tar.gz.sig" "HackerAI-x86_64.app.tar.gz.sig"
+copy_one "$ARTIFACTS_DIR/desktop-macOS-arm64" "Suricatoos.app.tar.gz" "Suricatoos-aarch64.app.tar.gz"
+copy_one "$ARTIFACTS_DIR/desktop-macOS-arm64" "Suricatoos.app.tar.gz.sig" "Suricatoos-aarch64.app.tar.gz.sig"
+copy_one "$ARTIFACTS_DIR/desktop-macOS-x64" "Suricatoos.app.tar.gz" "Suricatoos-x86_64.app.tar.gz"
+copy_one "$ARTIFACTS_DIR/desktop-macOS-x64" "Suricatoos.app.tar.gz.sig" "Suricatoos-x86_64.app.tar.gz.sig"
 
-cp "$RELEASE_DIR/HackerAI_${VERSION}_amd64.AppImage" "$RELEASE_DIR/HackerAI-linux-x64.AppImage"
-cp "$RELEASE_DIR/HackerAI_${VERSION}_aarch64.AppImage" "$RELEASE_DIR/HackerAI-linux-arm64.AppImage"
-cp "$RELEASE_DIR/HackerAI_${VERSION}_amd64.deb" "$RELEASE_DIR/HackerAI-linux-x64.deb"
-cp "$RELEASE_DIR/HackerAI_${VERSION}_arm64.deb" "$RELEASE_DIR/HackerAI-linux-arm64.deb"
-cp "$RELEASE_DIR/HackerAI_${VERSION}_x64-setup.exe" "$RELEASE_DIR/HackerAI-windows-x64.exe"
+cp "$RELEASE_DIR/Suricatoos_${VERSION}_amd64.AppImage" "$RELEASE_DIR/Suricatoos-linux-x64.AppImage"
+cp "$RELEASE_DIR/Suricatoos_${VERSION}_aarch64.AppImage" "$RELEASE_DIR/Suricatoos-linux-arm64.AppImage"
+cp "$RELEASE_DIR/Suricatoos_${VERSION}_amd64.deb" "$RELEASE_DIR/Suricatoos-linux-x64.deb"
+cp "$RELEASE_DIR/Suricatoos_${VERSION}_arm64.deb" "$RELEASE_DIR/Suricatoos-linux-arm64.deb"
+cp "$RELEASE_DIR/Suricatoos_${VERSION}_x64-setup.exe" "$RELEASE_DIR/Suricatoos-windows-x64.exe"
 
 read_signature() {
   local signature_file="$1"
@@ -133,11 +133,11 @@ verify_signature() {
   rm -f "$decoded_signature"
 }
 
-MACOS_ARM_FILE="HackerAI-aarch64.app.tar.gz"
-MACOS_X64_FILE="HackerAI-x86_64.app.tar.gz"
-LINUX_X64_FILE="HackerAI_${VERSION}_amd64.AppImage.tar.gz"
-LINUX_ARM_FILE="HackerAI_${VERSION}_aarch64.AppImage.tar.gz"
-WINDOWS_FILE="HackerAI_${VERSION}_x64-setup.nsis.zip"
+MACOS_ARM_FILE="Suricatoos-aarch64.app.tar.gz"
+MACOS_X64_FILE="Suricatoos-x86_64.app.tar.gz"
+LINUX_X64_FILE="Suricatoos_${VERSION}_amd64.AppImage.tar.gz"
+LINUX_ARM_FILE="Suricatoos_${VERSION}_aarch64.AppImage.tar.gz"
+WINDOWS_FILE="Suricatoos_${VERSION}_x64-setup.nsis.zip"
 
 verify_signature "$RELEASE_DIR/$MACOS_ARM_FILE" "$RELEASE_DIR/${MACOS_ARM_FILE}.sig"
 verify_signature "$RELEASE_DIR/$MACOS_X64_FILE" "$RELEASE_DIR/${MACOS_X64_FILE}.sig"

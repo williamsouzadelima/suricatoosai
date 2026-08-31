@@ -473,8 +473,8 @@ export const ComputerSidebarBase: React.FC<ComputerSidebarProps> = ({
   const toolName = getToolName(displayContent);
   const displayTarget = getDisplayTarget(displayContent);
   const headerTitle = isProxy
-    ? "HackerAI\u2019s Proxy"
-    : "HackerAI\u2019s Computer";
+    ? "Suricatoos\u2019s Proxy"
+    : "Suricatoos\u2019s Computer";
 
   const handleClose = () => {
     closeSidebar();
@@ -539,7 +539,7 @@ export const ComputerSidebarBase: React.FC<ComputerSidebarProps> = ({
               </div>
               <div className="flex-1 flex flex-col gap-1 min-w-0">
                 <div className="text-[12px] text-muted-foreground">
-                  HackerAI is using{" "}
+                  Suricatoos is using{" "}
                   <span className="text-foreground">{toolName}</span>
                 </div>
                 <div

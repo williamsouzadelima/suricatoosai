@@ -243,7 +243,7 @@ describe("provider registry", () => {
     expect(getModelCutoffDate("agent-auto-review-model")).toBe("July 2026");
   });
 
-  it("applies Kimi rather than Anthropic provider behavior to HackerAI Max", () => {
+  it("applies Kimi rather than Anthropic provider behavior to Suricatoos Max", () => {
     expect(isKimiModel("model-opus-4.6")).toBe(true);
     expect(isAnthropicModel("model-opus-4.6")).toBe(false);
     expect(isAnthropicModel("anthropic/claude-opus-4.6")).toBe(true);

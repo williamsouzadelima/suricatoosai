@@ -52,7 +52,7 @@ describe("SidebarHeaderContent", () => {
     mockIsCheckingProPlan = false;
   });
 
-  it("shows the sidebar button instead of the HackerAI icon when collapsed", () => {
+  it("shows the sidebar button instead of the Suricatoos icon when collapsed", () => {
     render(
       <SidebarHeaderContent
         handleCloseSidebar={jest.fn()}
@@ -84,7 +84,7 @@ describe("SidebarHeaderContent", () => {
     expect(mockToggleSidebar).toHaveBeenCalledTimes(1);
   });
 
-  it("shows only the HackerAI mark for free users", () => {
+  it("shows only the Suricatoos mark for free users", () => {
     render(
       <SidebarHeaderContent
         handleCloseSidebar={jest.fn()}
@@ -92,10 +92,10 @@ describe("SidebarHeaderContent", () => {
       />,
     );
 
-    const homeLink = screen.getByRole("link", { name: "HackerAI home" });
+    const homeLink = screen.getByRole("link", { name: "Suricatoos home" });
 
     expect(homeLink).toContainElement(screen.getByTestId("hackerai-svg"));
-    expect(screen.queryByText("HackerAI")).not.toBeInTheDocument();
+    expect(screen.queryByText("Suricatoos")).not.toBeInTheDocument();
     expect(screen.queryByText("Free")).not.toBeInTheDocument();
   });
 
@@ -115,10 +115,10 @@ describe("SidebarHeaderContent", () => {
     );
 
     expect(
-      screen.getByRole("link", { name: `HackerAI ${label} home` }),
+      screen.getByRole("link", { name: `Suricatoos ${label} home` }),
     ).toBeInTheDocument();
     expect(screen.queryByTestId("hackerai-svg")).not.toBeInTheDocument();
-    expect(screen.getByText("HackerAI")).toBeInTheDocument();
+    expect(screen.getByText("Suricatoos")).toBeInTheDocument();
     expect(screen.getByText(label)).toBeInTheDocument();
   });
 
@@ -135,13 +135,13 @@ describe("SidebarHeaderContent", () => {
     );
 
     const homeLink = screen.getByRole("link", {
-      name: "HackerAI Pro home",
+      name: "Suricatoos Pro home",
     });
     const logo = screen.getByTestId("hackerai-svg");
 
     expect(homeLink).toContainElement(logo);
     expect(logo).toHaveAttribute("data-scale", "0.11");
-    expect(screen.queryByText("HackerAI")).not.toBeInTheDocument();
+    expect(screen.queryByText("Suricatoos")).not.toBeInTheDocument();
     expect(screen.queryByText("Pro")).not.toBeInTheDocument();
     expect(screen.getByTestId("sidebar-top-header")).toHaveClass(
       "h-14",

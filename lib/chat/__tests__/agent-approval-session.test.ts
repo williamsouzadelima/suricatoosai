@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 describe("sendAgentApprovalSessionInput", () => {
-  it("sends the decision to the authenticated HackerAI route", async () => {
+  it("sends the decision to the authenticated Suricatoos route", async () => {
     const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(response(200));
     global.fetch = fetchMock;
 

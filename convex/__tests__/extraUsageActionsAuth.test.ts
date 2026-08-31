@@ -136,7 +136,7 @@ async function callCreatePurchaseSession(
   const { createPurchaseSession } = await import("../extraUsageActions");
   return (createPurchaseSession as any).handler(ctx, {
     amountDollars: 15,
-    baseUrl: "https://hackerai.co/settings",
+    baseUrl: "https://ai.suricatoos.com/settings",
     ...overrides,
   });
 }
@@ -243,7 +243,7 @@ describe("extraUsageActions billing authorization", () => {
 
   it("rejects a return path that resolves outside the application origin", async () => {
     const result = await callCreatePurchaseSession(makeCtx(), {
-      baseUrl: "https://hackerai.co",
+      baseUrl: "https://ai.suricatoos.com",
       returnPath: "/\\evil.example",
     });
 
@@ -358,7 +358,7 @@ describe("extraUsageActions billing authorization", () => {
     } as never);
 
     await callCreatePurchaseSession(makeCtx("user_admin"), {
-      baseUrl: "https://hackerai.co",
+      baseUrl: "https://ai.suricatoos.com",
       returnPath: "/chat-123?view=task",
       resumeAfterPurchase: true,
       enableExtraUsageAfterPurchase: true,
@@ -367,8 +367,8 @@ describe("extraUsageActions billing authorization", () => {
     expect(mockCheckoutSessionCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         success_url:
-          "https://hackerai.co/api/extra-usage/confirm?session_id={CHECKOUT_SESSION_ID}",
-        cancel_url: "https://hackerai.co/chat-123?view=task",
+          "https://ai.suricatoos.com/api/extra-usage/confirm?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url: "https://ai.suricatoos.com/chat-123?view=task",
         metadata: expect.objectContaining({
           returnPath: "/chat-123?view=task",
           resumeAfterPurchase: "true",

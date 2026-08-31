@@ -509,7 +509,7 @@ export const calculateRawTokenCost = (
 };
 
 /**
- * Estimate raw model spend without applying HackerAI's billing multiplier.
+ * Estimate raw model spend without applying Suricatoos's billing multiplier.
  *
  * Provider usage reports cache reads/writes as subsets of input tokens. Price
  * each subset at its model-specific rate and leave unknown models at the

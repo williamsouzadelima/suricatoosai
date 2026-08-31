@@ -48,14 +48,14 @@ export const SELECTABLE_MODELS: readonly SelectedModel[] = [
 /**
  * Map of legacy ids to the current `SelectedModel` union. Covers two prior
  * shapes:
- *   1. Underlying-model ids from before the HackerAI tier rebrand.
+ *   1. Underlying-model ids from before the Suricatoos tier rebrand.
  *   2. `hackerai-lite` from the short-lived first naming of the entry tier
  *      (renamed to `hackerai-standard` because Lite mis-described the entry tier).
  * Used by `coerceSelectedModel` to migrate values on read.
  */
 export const LEGACY_MODEL_ID_MAP: Record<string, SelectedModel> = {
   // Migration only: the Sonnet provider is retired, so old browser state now
-  // resolves to HackerAI Pro's current provider route.
+  // resolves to Suricatoos Pro's current provider route.
   "sonnet-4.6": "hackerai-pro",
   "opus-4.6": "hackerai-max",
   "gemini-3-flash": "hackerai-standard",

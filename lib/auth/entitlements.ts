@@ -37,6 +37,18 @@ export function parseEntitlements(raw: unknown): string[] {
 export function resolveSubscriptionTier(
   entitlements: readonly string[],
 ): SubscriptionTier {
+  // Self-hosted override: força o tier para o dono da instância (sem Stripe/
+  // WorkOS Entitlements). Cobre Next (server+client) e Convex — todos chamam
+  // esta função. Defina NEXT_PUBLIC_SELF_HOSTED_TIER e replique no env do Convex.
+  const forced = process.env.NEXT_PUBLIC_SELF_HOSTED_TIER?.trim();
+  if (
+    forced === "pro" ||
+    forced === "pro-plus" ||
+    forced === "ultra" ||
+    forced === "team"
+  ) {
+    return forced;
+  }
   for (const { tier, slugs } of TIER_ENTITLEMENTS) {
     if (slugs.some((s) => entitlements.includes(s))) {
       return tier;

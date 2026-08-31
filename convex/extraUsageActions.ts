@@ -58,7 +58,7 @@ function canManageOrganizationBilling(membership: BillingMembership): boolean {
   return (status === undefined || status === "active") && !!hasBillingRole;
 }
 
-const DEFAULT_APPLICATION_ORIGINS = new Set(["https://hackerai.co"]);
+const DEFAULT_APPLICATION_ORIGINS = new Set(["https://ai.suricatoos.com"]);
 
 /** Restrict Stripe return URLs to exact server-configured application origins. */
 function isAllowedApplicationOrigin(url: URL): boolean {
@@ -289,7 +289,7 @@ async function createAutoReloadPayment(
           invoice: invoice.id,
           amount: amountCents,
           currency: "usd",
-          description: `HackerAI Extra Usage Auto-Reload ($${amountCents / 100})`,
+          description: `Suricatoos Extra Usage Auto-Reload ($${amountCents / 100})`,
         },
         { idempotencyKey: `${operationId}:item` },
       );
@@ -606,7 +606,7 @@ export const createPurchaseSession = action({
             price_data: {
               currency: "usd",
               product_data: {
-                name: "HackerAI Extra Usage Credits",
+                name: "Suricatoos Extra Usage Credits",
                 description: `$${args.amountDollars} in extra usage credits`,
               },
               unit_amount: amountCents,

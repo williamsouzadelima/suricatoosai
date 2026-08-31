@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { hasAuthenticatedBefore } from "@/lib/utils/client-storage";
 
 export const DESKTOP_UPDATE_URL =
-  "https://github.com/hackerai-tech/hackerai/releases/latest";
+  "https://github.com/williamsouzadelima/hackerai/releases/latest";
 
 declare global {
   interface Window {
@@ -43,7 +43,7 @@ export async function openInBrowser(url: string): Promise<boolean> {
 }
 
 async function promptDesktopUpdate(): Promise<void> {
-  toast.error("Update HackerAI Desktop to sign in", {
+  toast.error("Update Suricatoos Desktop to sign in", {
     description:
       "This version is missing the secure sign-in bridge. Opening the latest desktop download in your browser.",
   });
@@ -118,7 +118,7 @@ export async function navigateToAuth(
       }
 
       // In dev mode, pass the local auth callback port so the server
-      // redirects to localhost instead of the hackerai:// deep link
+      // redirects to localhost instead of the suricatoos:// deep link
       try {
         const port = await invoke<number>("get_dev_auth_port");
         if (port > 0) {

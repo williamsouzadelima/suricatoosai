@@ -312,7 +312,7 @@ const BuyExtraUsageDialog = ({
   onPurchase,
   isLoading,
   title = "Buy extra usage",
-  description = "Get extra usage to keep using HackerAI when you hit a limit.",
+  description = "Get extra usage to keep using Suricatoos when you hit a limit.",
   lineItemLabel = "Extra usage",
   paymentMethodMode = "personal",
   recommendedAmountDollars,

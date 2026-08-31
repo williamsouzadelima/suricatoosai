@@ -12,7 +12,7 @@ describe("first-touch acquisition attribution", () => {
   it("keeps bounded campaign metadata without URLs or search terms", () => {
     const attribution = createFirstTouchAttribution({
       url: new URL(
-        "https://hackerai.co/?utm_source=newsletter&utm_medium=email&utm_campaign=aug_launch&utm_term=private-target",
+        "https://ai.suricatoos.com/?utm_source=newsletter&utm_medium=email&utm_campaign=aug_launch&utm_term=private-target",
       ),
       referer: "https://mail.example/path?secret=value",
       capturedAt,
@@ -34,7 +34,7 @@ describe("first-touch acquisition attribution", () => {
   it("classifies organic, referral, paid, and direct entry", () => {
     expect(
       createFirstTouchAttribution({
-        url: new URL("https://hackerai.co/download"),
+        url: new URL("https://ai.suricatoos.com/download"),
         referer: "https://www.google.com/search?q=hackerai",
         capturedAt,
       }),
@@ -46,22 +46,22 @@ describe("first-touch acquisition attribution", () => {
     });
     expect(
       createFirstTouchAttribution({
-        url: new URL("https://hackerai.co/?ref=SAFE123"),
+        url: new URL("https://ai.suricatoos.com/?ref=SAFE123"),
         referer: null,
         capturedAt,
       }),
     ).toMatchObject({ source: "user_referral", medium: "referral" });
     expect(
       createFirstTouchAttribution({
-        url: new URL("https://hackerai.co/?gclid=opaque-click-id"),
+        url: new URL("https://ai.suricatoos.com/?gclid=opaque-click-id"),
         referer: null,
         capturedAt,
       }),
     ).toMatchObject({ source: "google", medium: "paid" });
     expect(
       createFirstTouchAttribution({
-        url: new URL("https://hackerai.co/"),
-        referer: "https://signin.hackerai.co/callback",
+        url: new URL("https://ai.suricatoos.com/"),
+        referer: "https://signin.ai.suricatoos.com/callback",
         capturedAt,
       }),
     ).toMatchObject({
@@ -73,7 +73,7 @@ describe("first-touch acquisition attribution", () => {
 
   it("round-trips valid values and rejects tampered cookies", () => {
     const attribution = createFirstTouchAttribution({
-      url: new URL("https://hackerai.co/?utm_source=partner"),
+      url: new URL("https://ai.suricatoos.com/?utm_source=partner"),
       referer: "https://partner.example/path",
       capturedAt,
     });
@@ -92,7 +92,7 @@ describe("first-touch acquisition attribution", () => {
 
   it("maps attribution to set-once person properties", () => {
     const attribution = createFirstTouchAttribution({
-      url: new URL("https://hackerai.co/trust?utm_source=github"),
+      url: new URL("https://ai.suricatoos.com/trust?utm_source=github"),
       referer: "https://github.com/hackerai-tech",
       capturedAt,
     });

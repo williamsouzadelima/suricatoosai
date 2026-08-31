@@ -817,7 +817,7 @@ export const attachOpenRouterStreamErrorMetadata = (
 // - Kimi requires a `reasoning` field on assistant tool-call messages when
 //   reasoning mode is enabled, but the AI SDK does not always include one.
 // - OpenRouter pins encrypted reasoning blobs to the endpoint that created
-//   them. HackerAI routes across providers between steps, so the visible
+//   them. Suricatoos routes across providers between steps, so the visible
 //   assistant text remains in the prompt while provider-private blobs are
 //   omitted from every request.
 // - xAI rejects forced tool choice while reasoning is enabled, and Grok 4.6
@@ -1072,10 +1072,10 @@ export const modelCutoffDates: Partial<Record<ModelName, string>> &
 
 export const modelDisplayNames: Record<ModelName, string> &
   Record<string, string> = {
-  "ask-model": "Auto, an intelligent model router built by HackerAI",
-  "ask-model-free": "Auto, an intelligent model router built by HackerAI",
-  "agent-model": "Auto, an intelligent model router built by HackerAI",
-  "agent-model-free": "Auto, an intelligent model router built by HackerAI",
+  "ask-model": "Auto, an intelligent model router built by Suricatoos",
+  "ask-model-free": "Auto, an intelligent model router built by Suricatoos",
+  "agent-model": "Auto, an intelligent model router built by Suricatoos",
+  "agent-model-free": "Auto, an intelligent model router built by Suricatoos",
   "model-grok-4.6": "xAI Grok 4.6",
   "model-grok-4.5": "xAI Grok 4.5",
   "model-grok-4.5-pro": "xAI Grok 4.5",
@@ -1090,8 +1090,8 @@ export const modelDisplayNames: Record<ModelName, string> &
   "model-glm-5.3-flash-pro": "Z.ai GLM 5.3 Flash",
   "model-deepseek-v4-flash-vision": "DeepSeek V4 Flash Vision",
   "model-kimi-k3": "Moonshot Kimi K3",
-  "fallback-agent-model": "Auto, an intelligent model router built by HackerAI",
-  "fallback-ask-model": "Auto, an intelligent model router built by HackerAI",
+  "fallback-agent-model": "Auto, an intelligent model router built by Suricatoos",
+  "fallback-ask-model": "Auto, an intelligent model router built by Suricatoos",
   "title-generator-model": "DeepSeek V4 Flash",
   "agent-auto-review-model": "DeepSeek V4 Flash 0731",
   "auxiliary-vision-model": "Auxiliary vision model",
@@ -1175,7 +1175,7 @@ export function supportsMultimodalToolResults(modelName?: string): boolean {
 }
 
 /**
- * Map a HackerAI tier id to the underlying provider key for a given mode.
+ * Map a Suricatoos tier id to the underlying provider key for a given mode.
  * Returns `null` for `"auto"` (the caller routes to the auto-router model
  * key instead). Standard maps to DeepSeek V4 Flash 0731, Pro to DeepSeek V4
  * Pro 0813, and Max to Grok 4.6 in both modes; media-aware promotion happens

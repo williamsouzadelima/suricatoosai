@@ -142,14 +142,14 @@ describe("PostHogProvider", () => {
     const retainedException = config.before_send({
       event: "$exception",
       properties: {
-        $current_url: "https://hackerai.co/auth-error?state=secret",
+        $current_url: "https://ai.suricatoos.com/auth-error?state=secret",
         $referrer: "https://idp.example/callback?code=secret",
         $exception_values: ["Unexpected application error"],
       },
     });
 
     expect(retainedException?.properties).toMatchObject({
-      $current_url: "https://hackerai.co/auth-error",
+      $current_url: "https://ai.suricatoos.com/auth-error",
       $referrer: "https://idp.example/callback",
     });
     expect(posthog.startSessionRecording).toHaveBeenCalledTimes(1);

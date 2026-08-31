@@ -1,6 +1,9 @@
 import { config } from "dotenv";
 import { defineConfig } from "@trigger.dev/sdk";
-import { additionalPackages } from "@trigger.dev/build/extensions/core";
+import {
+  additionalPackages,
+  syncEnvVars,
+} from "@trigger.dev/build/extensions/core";
 
 if (process.env.NODE_ENV !== "production") {
   config({ path: ".env.local" });
@@ -39,6 +42,42 @@ export default defineConfig({
     extensions: [
       additionalPackages({
         packages: ["node-pty", "sharp"],
+      }),
+      // Sincroniza as env vars das tasks (Agent Long) do .env.local para o
+      // ambiente do Trigger.dev, tanto em `trigger dev` quanto em deploy.
+      syncEnvVars(() => {
+        const KEYS = [
+          "WORKOS_API_KEY",
+          "WORKOS_CLIENT_ID",
+          "WORKOS_AUTH_DOMAIN",
+          "WORKOS_COOKIE_PASSWORD",
+          "NEXT_PUBLIC_WORKOS_REDIRECT_URI",
+          "ACCOUNT_IDENTITY_HMAC_SECRET",
+          "CONVEX_DEPLOYMENT",
+          "NEXT_PUBLIC_CONVEX_URL",
+          "CONVEX_SERVICE_ROLE_KEY",
+          "CONVEX_USER_RESEARCH_SERVICE_KEY",
+          "OPENROUTER_API_KEY",
+          "OPENAI_API_KEY",
+          "E2B_API_KEY",
+          "E2B_TEMPLATE",
+          "NEXT_PUBLIC_BASE_URL",
+          "CENTRIFUGO_TOKEN_SECRET",
+          "CENTRIFUGO_WS_URL",
+          "AWS_S3_REGION",
+          "AWS_S3_ACCESS_KEY_ID",
+          "AWS_S3_SECRET_ACCESS_KEY",
+          "AWS_S3_BUCKET_NAME",
+          "PERPLEXITY_API_KEY",
+          "JINA_API_KEY",
+          "REDIS_URL",
+          "UPSTASH_REDIS_REST_URL",
+          "UPSTASH_REDIS_REST_TOKEN",
+        ];
+        return KEYS.filter((k) => process.env[k]).map((name) => ({
+          name,
+          value: process.env[name] as string,
+        }));
       }),
     ],
   },

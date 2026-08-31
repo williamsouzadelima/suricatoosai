@@ -1,4 +1,4 @@
-/** Current HackerAI Pro price retained by grandfathered $20/month customers. */
+/** Current Suricatoos Pro price retained by grandfathered $20/month customers. */
 export const HACKERAI_PRO_20_MONTHLY_PRICE_ID =
   "price_1S7i1qFAn4ulhcn1kyxA8jp6";
 
@@ -23,7 +23,7 @@ export function includedUsagePointsForStripePrice(
     : undefined;
 }
 
-/** Keep grandfathered PentestGPT $20 customers on the HackerAI $20 price. */
+/** Keep grandfathered PentestGPT $20 customers on the Suricatoos $20 price. */
 export function pentestgptMigrationPriceOverride(
   legacyPriceId: string | null | undefined,
 ): string | undefined {

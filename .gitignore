@@ -61,3 +61,8 @@ packages/desktop/src-tauri/target/
 
 .trigger
 /.artifacts/
+
+# temporários desta sessão (não versionar)
+*.log
+public/_hackerai_icons_backup/
+packages/desktop/src-tauri/icons/_hackerai_backup/

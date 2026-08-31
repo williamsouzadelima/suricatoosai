@@ -1082,7 +1082,7 @@ describe("run_terminal_cmd — PTY action dispatch", () => {
 
     const { context, ptySessionManager } = makeContext({ sandbox: nonE2B });
     const result = (await runTool(createRunTerminalCmd(context), {
-      command: "whois hackerai.co",
+      command: "whois ai.suricatoos.com",
       brief: "query WHOIS",
       is_background: false,
       timeout: 0.01,
@@ -1609,7 +1609,7 @@ describe("run_terminal_cmd — PTY action dispatch", () => {
     const { context } = makeContext({ sandbox: nonE2B });
     const tool = createRunTerminalCmd(context);
     const result = (await runTool(tool, {
-      command: "whois hackerai.co",
+      command: "whois ai.suricatoos.com",
       brief: "look up domain registration",
       is_background: false,
       timeout: 0.01,
@@ -1721,7 +1721,7 @@ describe("run_terminal_cmd — PTY action dispatch", () => {
     expect(e2b.commands.run).not.toHaveBeenCalled();
     expect(result.result.exitCode).toBe(1);
     expect(result.result.error).toContain(
-      "HackerAI did not switch this run to Cloud",
+      "Suricatoos did not switch this run to Cloud",
     );
     expect(writerWrites).not.toContainEqual(
       expect.objectContaining({

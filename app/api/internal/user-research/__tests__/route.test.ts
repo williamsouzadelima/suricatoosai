@@ -149,7 +149,7 @@ function request({
       contentLength ?? String(encodedBody.byteLength),
     );
   }
-  const nextUrl = new URL("https://hackerai.co/api/internal/user-research");
+  const nextUrl = new URL("https://ai.suricatoos.com/api/internal/user-research");
   if (runId) nextUrl.searchParams.set("runId", runId);
   return {
     headers,

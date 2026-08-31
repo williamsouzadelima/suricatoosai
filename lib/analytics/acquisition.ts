@@ -5,7 +5,7 @@ export const FIRST_TOUCH_ATTRIBUTION_VERSION = 1;
 export const FIRST_TOUCH_ATTRIBUTION_MAX_AGE_SECONDS = 90 * 24 * 60 * 60;
 
 const SAFE_CAMPAIGN_LABEL = /^[A-Za-z0-9_$_.:-]{1,80}$/;
-const OWNED_HOST_SUFFIXES = ["hackerai.co"] as const;
+const OWNED_HOST_SUFFIXES = ["suricatoos.com"] as const;
 
 export type FirstTouchAttribution = {
   version: typeof FIRST_TOUCH_ATTRIBUTION_VERSION;

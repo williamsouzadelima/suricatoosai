@@ -1263,7 +1263,7 @@ export const getExtraUsageBalanceForBackend = query({
 });
 
 /**
- * Minimal frontend entitlement check for HackerAI Max on paid personal plans.
+ * Minimal frontend entitlement check for Suricatoos Max on paid personal plans.
  * The selector uses this instead of subscribing to broad customization and
  * balance payloads just to answer whether Extra Usage can unlock Max.
  */

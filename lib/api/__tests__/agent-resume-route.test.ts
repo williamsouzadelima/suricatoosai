@@ -63,7 +63,7 @@ jest.mock("@/lib/api/agent-run-correlation", () => ({
 const requestFor = (chatId: string) =>
   ({
     headers: { get: () => null },
-    nextUrl: new URL(`https://hackerai.co/api/agent/resume?chatId=${chatId}`),
+    nextUrl: new URL(`https://ai.suricatoos.com/api/agent/resume?chatId=${chatId}`),
   }) as any;
 
 describe("agent resume route", () => {

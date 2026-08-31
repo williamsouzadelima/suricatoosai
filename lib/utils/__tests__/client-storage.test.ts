@@ -52,7 +52,7 @@ describe("client-storage selected model", () => {
       expect(readSelectedModel()).toBeNull();
     });
 
-    it("migrates legacy underlying-model ids to HackerAI tiers", () => {
+    it("migrates legacy underlying-model ids to Suricatoos tiers", () => {
       window.localStorage.setItem(STORAGE_KEY, "opus-4.6");
       expect(readSelectedModel()).toBe("hackerai-max");
       // The migration rewrites the unified key to the tier id.

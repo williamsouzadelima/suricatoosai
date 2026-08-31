@@ -404,7 +404,7 @@ const isApprovalInputForRequest = (
 };
 
 const APPROVAL_PROTOCOL_DENIED_REASON =
-  "This approval response is incompatible with the current Agent worker. The operation was not run. Refresh HackerAI and start a new Agent request.";
+  "This approval response is incompatible with the current Agent worker. The operation was not run. Refresh Suricatoos and start a new Agent request.";
 const APPROVAL_AUTHORIZATION_DENIED_REASON =
   "Your authorization or billing access changed while this approval was pending. The operation was not run. Start a new Agent request and try again.";
 
@@ -779,7 +779,7 @@ const buildAgentToolApprovalRequester = ({
                   verdict: "ask_user",
                   riskCategory: "unknown",
                   rationale:
-                    "HackerAI could not verify the current authorization context automatically.",
+                    "Suricatoos could not verify the current authorization context automatically.",
                   source: "failure",
                   failureClass: "provider_error",
                   rolloutPhase: autoReviewRolloutPhase,
@@ -2320,7 +2320,7 @@ export const agentLongTask = task({
     ) {
       throw new ChatSDKError(
         "bad_request:api",
-        "This Agent approval request uses an unsupported protocol version. Refresh HackerAI and start a new Agent request.",
+        "This Agent approval request uses an unsupported protocol version. Refresh Suricatoos and start a new Agent request.",
       );
     }
 

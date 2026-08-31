@@ -30,11 +30,11 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const APP_NAME = "HackerAI";
-const APP_DEFAULT_TITLE = "HackerAI - AI-Powered Penetration Testing Assistant";
-const APP_TITLE_TEMPLATE = "%s | HackerAI";
+const APP_NAME = "Suricatoos";
+const APP_DEFAULT_TITLE = "Suricatoos - AI-Powered Penetration Testing Assistant";
+const APP_TITLE_TEMPLATE = "%s | Suricatoos";
 const APP_DESCRIPTION =
-  "HackerAI is an AI pentesting assistant that helps you scan targets, exploit vulnerabilities, analyze findings, and write reports faster.";
+  "Suricatoos is an AI pentesting assistant that helps you scan targets, exploit vulnerabilities, analyze findings, and write reports faster.";
 
 export const metadata: Metadata = {
   applicationName: APP_NAME,
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
   description: APP_DESCRIPTION,
   manifest: "/manifest.json",
   keywords: [
-    "hackerai",
+    "suricatoos",
     "pentestgpt",
     "hacker ai",
     "pentest ai",
@@ -73,10 +73,10 @@ export const metadata: Metadata = {
     description: APP_DESCRIPTION,
     images: [
       {
-        url: "https://hackerai.co/icon-512x512.png",
+        url: "https://ai.suricatoos.com/icon-512x512.png",
         width: 512,
         height: 512,
-        alt: "HackerAI",
+        alt: "Suricatoos",
       },
     ],
   },
@@ -89,10 +89,10 @@ export const metadata: Metadata = {
     description: APP_DESCRIPTION,
     images: [
       {
-        url: "https://hackerai.co/icon-512x512.png",
+        url: "https://ai.suricatoos.com/icon-512x512.png",
         width: 512,
         height: 512,
-        alt: "HackerAI",
+        alt: "Suricatoos",
       },
     ],
   },

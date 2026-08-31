@@ -125,7 +125,7 @@ export function AgentPermissionSelector({
         align="start"
       >
         <div className="mb-2 text-sm text-muted-foreground">
-          How should HackerAI actions be approved?
+          How should Suricatoos actions be approved?
         </div>
         <div className="space-y-1">
           {options.map((option) => {

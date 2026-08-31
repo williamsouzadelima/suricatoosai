@@ -61,15 +61,15 @@ describe("Convex WorkOS auth configuration", () => {
   it("uses a configured custom auth domain", async () => {
     const authConfig = await loadAuthConfig({
       clientId: "client_test",
-      authDomain: "auth.hackerai.co",
+      authDomain: "auth.suricatoos.com",
     });
 
     expect(authConfig.providers).toEqual([
       {
         type: "customJwt",
-        issuer: "https://auth.hackerai.co/user_management/client_test",
+        issuer: "https://auth.suricatoos.com/user_management/client_test",
         algorithm: "RS256",
-        jwks: "https://auth.hackerai.co/sso/jwks/client_test",
+        jwks: "https://auth.suricatoos.com/sso/jwks/client_test",
       },
     ]);
   });
@@ -77,20 +77,20 @@ describe("Convex WorkOS auth configuration", () => {
   it("normalizes an HTTPS origin with trailing slashes", async () => {
     const authConfig = await loadAuthConfig({
       clientId: "client_test",
-      authDomain: " https://auth.hackerai.co/// ",
+      authDomain: " https://auth.suricatoos.com/// ",
     });
 
     expect(authConfig.providers).toEqual([
       {
         type: "customJwt",
-        issuer: "https://auth.hackerai.co/user_management/client_test",
+        issuer: "https://auth.suricatoos.com/user_management/client_test",
         algorithm: "RS256",
-        jwks: "https://auth.hackerai.co/sso/jwks/client_test",
+        jwks: "https://auth.suricatoos.com/sso/jwks/client_test",
       },
     ]);
   });
 
-  it.each([undefined, "", "http://auth.hackerai.co", "auth.hackerai.co/path"])(
+  it.each([undefined, "", "http://auth.suricatoos.com", "auth.suricatoos.com/path"])(
     "rejects a missing or invalid auth domain: %s",
     async (authDomain) => {
       await expect(

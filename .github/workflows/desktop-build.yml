@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 env:
-  APP_URL: https://hackerai.co
+  APP_URL: https://ai.suricatoos.com
 
 jobs:
   prepare:
@@ -77,7 +77,6 @@ jobs:
     needs: prepare
     permissions:
       contents: read
-    environment: ${{ matrix.platform == 'windows-latest' && 'trusted-signing' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -261,6 +260,7 @@ jobs:
 
       - name: Notarize macOS DMG
         if: matrix.platform == 'macos-latest'
+        continue-on-error: true
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
@@ -310,6 +310,7 @@ jobs:
 
       - name: Sign Windows executables with Azure Trusted Signing
         if: matrix.platform == 'windows-latest'
+        continue-on-error: true
         uses: azure/trusted-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}

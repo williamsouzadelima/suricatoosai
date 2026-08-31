@@ -349,7 +349,7 @@ async function resolveSubscription(
 
     if (productObj?.name?.toLowerCase().includes("pentestgpt")) {
       console.info(
-        `[Subscription Webhook] Subscription ${subscriptionId} uses legacy PentestGPT product; skipping HackerAI subscription handling`,
+        `[Subscription Webhook] Subscription ${subscriptionId} uses legacy PentestGPT product; skipping Suricatoos subscription handling`,
       );
       return { kind: "legacy_pentestgpt", subscription };
     }
@@ -1891,7 +1891,7 @@ async function handleSubscriptionDeleted(
     const resolved = await resolveSubscription(subscription.id);
     if (!resolved) {
       console.info(
-        `[Subscription Webhook] subscription.deleted: skipping subscription ${subscription.id} without HackerAI price lookup_key or product fallback for customer ${customerId}`,
+        `[Subscription Webhook] subscription.deleted: skipping subscription ${subscription.id} without Suricatoos price lookup_key or product fallback for customer ${customerId}`,
       );
       return;
     }

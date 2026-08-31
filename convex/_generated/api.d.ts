@@ -30,6 +30,8 @@ import type * as lib_logger from "../lib/logger.js";
 import type * as lib_retainedTail from "../lib/retainedTail.js";
 import type * as lib_sharedChatSnapshot from "../lib/sharedChatSnapshot.js";
 import type * as lib_suspensionGuards from "../lib/suspensionGuards.js";
+import type * as lib_userDeletionFence from "../lib/userDeletionFence.js";
+import type * as lib_userResearchAuth from "../lib/userResearchAuth.js";
 import type * as lib_utils from "../lib/utils.js";
 import type * as localSandbox from "../localSandbox.js";
 import type * as messages from "../messages.js";
@@ -84,6 +86,8 @@ declare const fullApi: ApiFromModules<{
   "lib/retainedTail": typeof lib_retainedTail;
   "lib/sharedChatSnapshot": typeof lib_sharedChatSnapshot;
   "lib/suspensionGuards": typeof lib_suspensionGuards;
+  "lib/userDeletionFence": typeof lib_userDeletionFence;
+  "lib/userResearchAuth": typeof lib_userResearchAuth;
   "lib/utils": typeof lib_utils;
   localSandbox: typeof localSandbox;
   messages: typeof messages;

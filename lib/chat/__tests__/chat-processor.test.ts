@@ -214,7 +214,7 @@ describe("selectModel", () => {
     ).toBe("model-deepseek-v4-pro-0813");
   });
 
-  it("routes HackerAI Pro through DeepSeek V4 Pro 0813", () => {
+  it("routes Suricatoos Pro through DeepSeek V4 Pro 0813", () => {
     expect(selectModel("agent", "pro", "hackerai-pro")).toBe(
       "model-deepseek-v4-pro-0813",
     );
@@ -365,61 +365,61 @@ describe("selectModel", () => {
 
   // Tier override — Standard is content-aware in ask mode; Max maps to Opus in both modes
   describe("tier override for ask mode (paid users)", () => {
-    it("should map HackerAI Pro to DeepSeek V4 Pro 0813 for text-only ask mode", () => {
+    it("should map Suricatoos Pro to DeepSeek V4 Pro 0813 for text-only ask mode", () => {
       expect(selectModel("ask", "ultra", "hackerai-pro")).toBe(
         "model-deepseek-v4-pro-0813",
       );
     });
 
-    it("should map HackerAI Pro to DeepSeek V4 Pro 0813 for team users", () => {
+    it("should map Suricatoos Pro to DeepSeek V4 Pro 0813 for team users", () => {
       expect(selectModel("ask", "team", "hackerai-pro")).toBe(
         "model-deepseek-v4-pro-0813",
       );
     });
 
-    it("should route HackerAI Pro vision to Grok 4.5 high", () => {
+    it("should route Suricatoos Pro vision to Grok 4.5 high", () => {
       expect(selectModel("ask", "pro", "hackerai-pro", true, false)).toBe(
         "model-grok-4.5-pro",
       );
     });
 
-    it("should keep HackerAI Pro on DeepSeek V4 Pro 0813 when a PDF is attached", () => {
+    it("should keep Suricatoos Pro on DeepSeek V4 Pro 0813 when a PDF is attached", () => {
       expect(selectModel("ask", "pro", "hackerai-pro", false, true)).toBe(
         "model-deepseek-v4-pro-0813",
       );
     });
 
-    it("should map HackerAI Standard to DeepSeek V4 Flash 0731 when no image/PDF", () => {
+    it("should map Suricatoos Standard to DeepSeek V4 Flash 0731 when no image/PDF", () => {
       expect(selectModel("ask", "pro", "hackerai-standard")).toBe(
         "model-deepseek-v4-flash-0731",
       );
     });
 
-    it("should promote HackerAI Standard vision to Grok 4.5 medium", () => {
+    it("should promote Suricatoos Standard vision to Grok 4.5 medium", () => {
       expect(selectModel("ask", "pro", "hackerai-standard", true, false)).toBe(
         "model-grok-4.5",
       );
     });
 
-    it("should keep HackerAI Standard on DeepSeek V4 Flash 0731 when a PDF is attached", () => {
+    it("should keep Suricatoos Standard on DeepSeek V4 Flash 0731 when a PDF is attached", () => {
       expect(selectModel("ask", "pro", "hackerai-standard", false, true)).toBe(
         "model-deepseek-v4-flash-0731",
       );
     });
 
-    it("should prefer Grok 4.5 medium for HackerAI Standard when image and PDF are both attached", () => {
+    it("should prefer Grok 4.5 medium for Suricatoos Standard when image and PDF are both attached", () => {
       expect(selectModel("ask", "pro", "hackerai-standard", true, true)).toBe(
         "model-grok-4.5",
       );
     });
 
-    it("should map HackerAI Max to Grok 4.6 for Ultra", () => {
+    it("should map Suricatoos Max to Grok 4.6 for Ultra", () => {
       expect(selectModel("ask", "ultra", "hackerai-max")).toBe(
         "model-grok-4.6",
       );
     });
 
-    it("should downgrade HackerAI Max to Pro outside Ultra", () => {
+    it("should downgrade Suricatoos Max to Pro outside Ultra", () => {
       expect(selectModel("ask", "pro", "hackerai-max")).toBe(
         "model-deepseek-v4-pro-0813",
       );
@@ -431,7 +431,7 @@ describe("selectModel", () => {
       );
     });
 
-    it("should map HackerAI Max to Grok 4.6 for paid users with extra usage", () => {
+    it("should map Suricatoos Max to Grok 4.6 for paid users with extra usage", () => {
       expect(
         selectModel("ask", "pro", "hackerai-max", false, false, {
           extraUsageAvailable: true,
@@ -442,49 +442,49 @@ describe("selectModel", () => {
 
   // Agent mode — Auto/Standard use DeepSeek for text/PDF and media-capable routes for images.
   describe("tier override in agent mode", () => {
-    it("should map HackerAI Standard to DeepSeek V4 Flash 0731 for text-only agent mode", () => {
+    it("should map Suricatoos Standard to DeepSeek V4 Flash 0731 for text-only agent mode", () => {
       expect(selectModel("agent", "pro", "hackerai-standard")).toBe(
         "model-deepseek-v4-flash-0731",
       );
     });
 
-    it("should route HackerAI Standard vision to Grok 4.5 medium", () => {
+    it("should route Suricatoos Standard vision to Grok 4.5 medium", () => {
       expect(
         selectModel("agent", "pro", "hackerai-standard", true, false),
       ).toBe("model-grok-4.5");
     });
 
-    it("should keep HackerAI Standard on DeepSeek V4 Flash 0731 when a PDF is attached", () => {
+    it("should keep Suricatoos Standard on DeepSeek V4 Flash 0731 when a PDF is attached", () => {
       expect(
         selectModel("agent", "pro", "hackerai-standard", false, true),
       ).toBe("model-deepseek-v4-flash-0731");
     });
 
-    it("should map HackerAI Pro to DeepSeek V4 Pro 0813 in text-only agent mode", () => {
+    it("should map Suricatoos Pro to DeepSeek V4 Pro 0813 in text-only agent mode", () => {
       expect(selectModel("agent", "pro", "hackerai-pro")).toBe(
         "model-deepseek-v4-pro-0813",
       );
     });
 
-    it("should route HackerAI Pro vision to Grok 4.5 high in agent mode", () => {
+    it("should route Suricatoos Pro vision to Grok 4.5 high in agent mode", () => {
       expect(selectModel("agent", "pro", "hackerai-pro", true, false)).toBe(
         "model-grok-4.5-pro",
       );
     });
 
-    it("should keep HackerAI Pro on DeepSeek V4 Pro 0813 when a PDF is attached", () => {
+    it("should keep Suricatoos Pro on DeepSeek V4 Pro 0813 when a PDF is attached", () => {
       expect(selectModel("agent", "pro", "hackerai-pro", false, true)).toBe(
         "model-deepseek-v4-pro-0813",
       );
     });
 
-    it("should map HackerAI Max to Grok 4.6 in agent mode for Ultra", () => {
+    it("should map Suricatoos Max to Grok 4.6 in agent mode for Ultra", () => {
       expect(selectModel("agent", "ultra", "hackerai-max")).toBe(
         "model-grok-4.6",
       );
     });
 
-    it("should downgrade HackerAI Max to Pro in agent mode outside Ultra", () => {
+    it("should downgrade Suricatoos Max to Pro in agent mode outside Ultra", () => {
       expect(selectModel("agent", "pro", "hackerai-max")).toBe(
         "model-deepseek-v4-pro-0813",
       );
@@ -496,7 +496,7 @@ describe("selectModel", () => {
       );
     });
 
-    it("should map HackerAI Max to Grok 4.6 in agent mode for paid users with extra usage", () => {
+    it("should map Suricatoos Max to Grok 4.6 in agent mode for paid users with extra usage", () => {
       expect(
         selectModel("agent", "pro-plus", "hackerai-max", false, false, {
           extraUsageAvailable: true,

@@ -146,7 +146,7 @@ const AgentApprovalSetter = () => {
     setActiveToolApprovalRequest({
       approvalId: "approval-1",
       toolCallId: "tool-1",
-      title: "Allow HackerAI to run this terminal command?",
+      title: "Allow Suricatoos to run this terminal command?",
       target: "ping -c 4 hackerone.com",
       justification: "Check whether the target host is reachable.",
       prefixRule: ["ping", "-c", "4"],
@@ -316,7 +316,7 @@ describe("ChatInput - Integration Tests", () => {
       expect(input).toHaveValue("Preserve this draft");
     });
 
-    it("keeps the draft blocked when reconnect cannot reach HackerAI", async () => {
+    it("keeps the draft blocked when reconnect cannot reach Suricatoos", async () => {
       setNavigatorOnline(false);
       mockFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
 
@@ -602,8 +602,8 @@ describe("ChatInput - Integration Tests", () => {
       const approvalRequest = {
         approvalId: "late-approval-1",
         toolCallId: "tool-1",
-        title: "Allow HackerAI to run this terminal command?",
-        target: "curl https://hackerai.co",
+        title: "Allow Suricatoos to run this terminal command?",
+        target: "curl https://ai.suricatoos.com",
         detail: "Approve to continue, or deny to stop this command.",
         kind: "terminal" as const,
         operation: "terminal_execute",
@@ -688,7 +688,7 @@ describe("ChatInput - Integration Tests", () => {
             storedApprovalRequest={{
               approvalId: "approval-1",
               toolCallId: "tool-1",
-              title: "Allow HackerAI to run this terminal command?",
+              title: "Allow Suricatoos to run this terminal command?",
               operation: "terminal_execute",
               autoReview: {
                 verdict: "ask_user",
@@ -719,7 +719,7 @@ describe("ChatInput - Integration Tests", () => {
             storedApprovalRequest={{
               approvalId: "stored-approval-1",
               toolCallId: "tool-1",
-              title: "Allow HackerAI to run this terminal command?",
+              title: "Allow Suricatoos to run this terminal command?",
               target: "ping -c 4 hackerone.com",
               detail: "Approve to continue, or deny to stop this command.",
               kind: "terminal",
@@ -752,7 +752,7 @@ describe("ChatInput - Integration Tests", () => {
       const storedApprovalRequest = {
         approvalId: "stored-approval-1",
         toolCallId: "tool-1",
-        title: "Allow HackerAI to run this terminal command?",
+        title: "Allow Suricatoos to run this terminal command?",
         target: "ping -c 4 hackerone.com",
         detail: "Approve to continue, or deny to stop this command.",
         kind: "terminal" as const,
@@ -822,7 +822,7 @@ describe("ChatInput - Integration Tests", () => {
             storedApprovalRequest={{
               approvalId: "stored-approval-1",
               toolCallId: "tool-1",
-              title: "Allow HackerAI to run this terminal command?",
+              title: "Allow Suricatoos to run this terminal command?",
               target: "ping -c 4 hackerone.com",
               detail: "Approve to continue, or deny to stop this command.",
               kind: "terminal",
@@ -855,7 +855,7 @@ describe("ChatInput - Integration Tests", () => {
             storedApprovalRequest={{
               approvalId: "stored-approval-1",
               toolCallId: "tool-1",
-              title: "Allow HackerAI to run this terminal command?",
+              title: "Allow Suricatoos to run this terminal command?",
               target: "ping -c 4 hackerone.com",
               detail: "Approve to continue, or deny to stop this command.",
               kind: "terminal",

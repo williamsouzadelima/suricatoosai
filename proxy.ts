@@ -15,6 +15,11 @@ import {
   serializeFirstTouchAttribution,
 } from "@/lib/analytics/acquisition";
 
+// Atrás do reverse proxy (Caddy) em next dev, request.url resolve p/ localhost:3000.
+// Base pública p/ redirects de auth (senão login/auth-error caem em localhost).
+const APP_BASE_URL =
+  process.env.NEXT_PUBLIC_BASE_URL ?? "https://ai.suricatoos.com";
+
 const AUTHKIT_BYPASS_PATHS = new Set([
   "/api/health/connectivity",
   "/api/health/core",
@@ -237,8 +242,8 @@ function buildEndedSessionResponse(
   }
 
   const redirectUrl = isDesktopApp(request)
-    ? new URL("/desktop-callback?error=unauthenticated", request.url)
-    : new URL("/login", request.url);
+    ? new URL("/desktop-callback?error=unauthenticated", APP_BASE_URL)
+    : new URL("/login", APP_BASE_URL);
 
   return withSessionCookieCleared(
     withAttributionCookies(request, NextResponse.redirect(redirectUrl)),
@@ -303,7 +308,7 @@ export default async function proxy(request: NextRequest) {
       return withAttributionCookies(
         request,
         NextResponse.redirect(
-          new URL("/desktop-callback?error=unauthenticated", request.url),
+          new URL("/desktop-callback?error=unauthenticated", APP_BASE_URL),
         ),
       );
     }
@@ -435,7 +440,7 @@ export default async function proxy(request: NextRequest) {
       pathname,
       hasSession: !!session.user,
     });
-    const errorUrl = new URL("/auth-error", request.url);
+    const errorUrl = new URL("/auth-error", APP_BASE_URL);
     errorUrl.searchParams.set("code", "503");
     return withAttributionCookies(
       request,

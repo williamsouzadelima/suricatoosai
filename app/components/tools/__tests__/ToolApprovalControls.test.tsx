@@ -65,7 +65,7 @@ function ApprovalStatusHarness() {
         <ToolApprovalControls
           approvalId="approval-1"
           toolCallId="tool-1"
-          title="Allow HackerAI to run this terminal command?"
+          title="Allow Suricatoos to run this terminal command?"
           target="ping -c 4 hackerone.com"
           justification="Check whether the target host is reachable."
           prefixRule={approvalPrefixRule}
@@ -149,7 +149,7 @@ describe("ToolApprovalControls", () => {
         JSON.stringify({
           approvalId: "approval-1",
           toolCallId: "tool-1",
-          title: "Allow HackerAI to run this terminal command?",
+          title: "Allow Suricatoos to run this terminal command?",
           target: "ping -c 4 hackerone.com",
           justification: "Check whether the target host is reachable.",
           prefixRule: ["ping", "-c", "4"],

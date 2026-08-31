@@ -470,7 +470,7 @@ export const hasAuthenticatedBefore = (): boolean => {
  * Migrates two flavors of legacy values when present:
  *   1. Per-mode keys from before the unified preference: `selected_model_ask`
  *      and `selected_model_agent`.
- *   2. Underlying-model ids from before the HackerAI tier rebrand
+ *   2. Underlying-model ids from before the Suricatoos tier rebrand
  *      (e.g. `"opus-4.6"` → `"hackerai-max"`) — handled by `coerceSelectedModel`.
  * Both kinds are rewritten to the unified key in their new form so the
  * migration is a one-shot.

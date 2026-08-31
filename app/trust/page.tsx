@@ -17,20 +17,20 @@ import {
 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Security & Trust | HackerAI",
+  title: "Security & Trust | Suricatoos",
   description:
-    "How HackerAI handles your data: AI providers, sandbox execution, storage, billing, account security, and subprocessors.",
+    "How Suricatoos handles your data: AI providers, sandbox execution, storage, billing, account security, and subprocessors.",
   openGraph: {
-    title: "Security & Trust | HackerAI",
+    title: "Security & Trust | Suricatoos",
     description:
-      "How HackerAI handles your data: AI providers, sandbox execution, storage, billing, account security, and subprocessors.",
+      "How Suricatoos handles your data: AI providers, sandbox execution, storage, billing, account security, and subprocessors.",
     type: "website",
   },
   twitter: {
     card: "summary",
-    title: "Security & Trust | HackerAI",
+    title: "Security & Trust | Suricatoos",
     description:
-      "How HackerAI handles your data: AI providers, sandbox execution, storage, billing, account security, and subprocessors.",
+      "How Suricatoos handles your data: AI providers, sandbox execution, storage, billing, account security, and subprocessors.",
   },
 };
 
@@ -39,9 +39,9 @@ export const dynamic = "force-static";
 const LAST_UPDATED = "August 22, 2026";
 
 const HELP_CENTER_URL =
-  process.env.NEXT_PUBLIC_HELP_CENTER_URL || "https://help.hackerai.co/en/";
+  process.env.NEXT_PUBLIC_HELP_CENTER_URL || "https://help.suricatoos.com/en/";
 
-const STATUS_PAGE_URL = "https://status.hackerai.co/";
+const STATUS_PAGE_URL = "https://status.suricatoos.com/";
 
 interface Subprocessor {
   name: string;
@@ -180,7 +180,7 @@ export default function TrustPage() {
             Security &amp; Trust
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-            HackerAI is an AI agent for penetration testing and security work.
+            Suricatoos is an AI agent for penetration testing and security work.
             This page describes the data we process, where agent code runs, and
             the services we rely on to operate.
           </p>
@@ -193,7 +193,7 @@ export default function TrustPage() {
 
         <div className="space-y-6">
           <Section icon={Database} title="Data we process">
-            <p>Depending on how you use HackerAI, the service processes:</p>
+            <p>Depending on how you use Suricatoos, the service processes:</p>
             <CheckList
               items={[
                 "Prompts and task messages you send to the agent",
@@ -327,7 +327,7 @@ export default function TrustPage() {
           <div className="grid gap-6 md:grid-cols-2">
             <Section icon={Bug} title="Responsible disclosure">
               <p>
-                Found a security vulnerability in HackerAI? Report it through
+                Found a security vulnerability in Suricatoos? Report it through
                 the <InlineLink href={HELP_CENTER_URL}>help center</InlineLink>.
                 We review all good-faith reports. We don&apos;t run a paid bug
                 bounty program at this time.
@@ -349,9 +349,9 @@ export default function TrustPage() {
           <div className="grid gap-6 md:grid-cols-2">
             <Section icon={Code} title="Source code">
               <p>
-                HackerAI is developed in the open. The full application source
+                Suricatoos is developed in the open. The full application source
                 code is public on{" "}
-                <InlineLink href="https://github.com/hackerai-tech/hackerai">
+                <InlineLink href="https://github.com/williamsouzadelima/hackerai">
                   GitHub
                 </InlineLink>
                 , including every change we ship. You can review how prompts,
@@ -362,7 +362,7 @@ export default function TrustPage() {
 
             <Section icon={BadgeCheck} title="Compliance">
               <p>
-                HackerAI doesn&apos;t currently hold SOC 2, ISO 27001, or other
+                Suricatoos doesn&apos;t currently hold SOC 2, ISO 27001, or other
                 third-party certifications. The service is offered in beta, as
                 described in our{" "}
                 <InlineLink href="/privacy-policy">Privacy Policy</InlineLink>{" "}
@@ -402,7 +402,7 @@ export default function TrustPage() {
             ))}
           </div>
           <p className="mt-8 text-center text-xs text-muted-foreground">
-            Questions about security at HackerAI? Contact us through the{" "}
+            Questions about security at Suricatoos? Contact us through the{" "}
             <InlineLink href={HELP_CENTER_URL}>help center</InlineLink>.
           </p>
         </footer>

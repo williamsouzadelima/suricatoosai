@@ -134,8 +134,8 @@ describe("terminal shell tool display helpers", () => {
       "Terminal input is too large.",
     ],
     [
-      "Sandbox is unavailable after repeated health check failures. Do NOT retry any terminal or sandbox commands. Inform the user that the sandbox could not be reached and suggest they wait a moment and try again, or delete the sandbox in Settings > Data Controls. If the issue persists, contact HackerAI support.",
-      "Sandbox is unavailable after repeated health check failures. Try again in a moment, or delete the sandbox in Settings > Data Controls. If the issue persists, contact HackerAI support.",
+      "Sandbox is unavailable after repeated health check failures. Do NOT retry any terminal or sandbox commands. Inform the user that the sandbox could not be reached and suggest they wait a moment and try again, or delete the sandbox in Settings > Data Controls. If the issue persists, contact Suricatoos support.",
+      "Sandbox is unavailable after repeated health check failures. Try again in a moment, or delete the sandbox in Settings > Data Controls. If the issue persists, contact Suricatoos support.",
     ],
     [
       "Sandbox recreation failed. The sandbox environment is not responding. Another attempt may be made but the sandbox will be marked unavailable after repeated failures.",

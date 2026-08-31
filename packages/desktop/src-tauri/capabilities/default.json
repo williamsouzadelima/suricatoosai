@@ -4,7 +4,7 @@
   "description": "Default capabilities for HackerAI Desktop",
   "windows": ["main"],
   "remote": {
-    "urls": ["http://localhost:*", "https://hackerai.co/*"]
+    "urls": ["http://localhost:*", "https://ai.suricatoos.com/*"]
   },
   "permissions": [
     "core:default",

@@ -109,7 +109,7 @@ describe("Strix subagent skills", () => {
     }
 
     const aws = renderSubagentSkillKnowledge(["cloud/aws"]);
-    expect(aws).toContain("HackerAI runtime override (takes precedence)");
+    expect(aws).toContain("Suricatoos runtime override (takes precedence)");
     expect(aws).toContain("Never pass access keys");
 
     const dependency = renderSubagentSkillKnowledge([

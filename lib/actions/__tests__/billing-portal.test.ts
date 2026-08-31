@@ -29,7 +29,7 @@ jest.mock("@/lib/posthog/server", () => ({
 describe("redirectToBillingPortal", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.NEXT_PUBLIC_BASE_URL = "https://hackerai.co";
+    process.env.NEXT_PUBLIC_BASE_URL = "https://ai.suricatoos.com";
     mockGetBillingActionContext.mockResolvedValue({
       organizationId: "org_123",
       user: { id: "user_123" },
@@ -51,7 +51,7 @@ describe("redirectToBillingPortal", () => {
 
     expect(mockCreateBillingPortalSession).toHaveBeenCalledWith({
       customer: "cus_123",
-      return_url: "https://hackerai.co",
+      return_url: "https://ai.suricatoos.com",
     });
     expect(mockPostHogError).not.toHaveBeenCalled();
   });
@@ -71,7 +71,7 @@ describe("redirectToBillingPortal", () => {
 
     expect(mockCreateBillingPortalSession).toHaveBeenCalledWith({
       customer: "cus_123",
-      return_url: "https://hackerai.co",
+      return_url: "https://ai.suricatoos.com",
       flow_data: { type: "payment_method_update" },
     });
     expect(mockPostHogEvent).toHaveBeenCalledWith(

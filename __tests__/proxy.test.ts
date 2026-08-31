@@ -679,7 +679,7 @@ describe("proxy", () => {
     expect(response).toMatchObject({ kind: "redirect" });
     expect(response.cookies.delete).toHaveBeenCalledWith("wos-session");
     expect(mockNextResponseRedirect).toHaveBeenCalledWith(
-      new URL("/login", "https://hackerai.co/dashboard"),
+      new URL("/login", "https://ai.suricatoos.com"),
     );
   });
 });

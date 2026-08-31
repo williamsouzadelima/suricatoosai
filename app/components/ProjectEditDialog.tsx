@@ -196,7 +196,7 @@ export function ProjectEditDialog({
                     ? folderPath
                       ? "New Agent tasks will start in this folder."
                       : "Without a linked folder, this remains a lightweight project."
-                    : "Open HackerAI Desktop to change or remove this folder."}
+                    : "Open Suricatoos Desktop to change or remove this folder."}
                 </p>
               </div>
             ) : null}

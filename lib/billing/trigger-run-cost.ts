@@ -21,7 +21,7 @@ const nonNegativeFinite = (value: unknown): number =>
 
 /**
  * Converts Trigger.dev's authoritative per-run usage into the dollar amounts
- * used by HackerAI billing. Trigger calculates compute cost from the machine
+ * used by Suricatoos billing. Trigger calculates compute cost from the machine
  * actually assigned to the run, so this automatically distinguishes
  * small-1x, small-2x, retries, and future machine-price changes.
  */

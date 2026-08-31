@@ -22,6 +22,9 @@ if (
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  // App roda atrás de reverse proxy (Caddy) no domínio público em modo dev;
+  // libera os assets /_next/* para o Origin do domínio (senão 403 nos chunks).
+  allowedDevOrigins: ["ai.suricatoos.com", "suricatoos.com"],
   productionBrowserSourceMaps: posthogSourceMapsEnabled,
   typescript: {
     // Pull request CI runs pnpm typecheck while the preview builds in parallel.

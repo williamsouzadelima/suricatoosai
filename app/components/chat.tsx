@@ -2312,7 +2312,7 @@ export const Chat = ({ autoResume }: { autoResume: boolean }) => {
             className="fixed inset-0 z-50 flex items-center justify-center bg-background p-4"
             role="dialog"
             aria-modal="true"
-            aria-label="HackerAI’s Computer"
+            aria-label="Suricatoos’s Computer"
             tabIndex={-1}
             data-layout="overlay"
             data-testid="computer-sidebar-container"

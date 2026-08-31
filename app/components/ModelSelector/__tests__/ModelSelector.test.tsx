@@ -86,12 +86,12 @@ describe("ModelSelector", () => {
         "Balanced quality and speed, recommended for most tasks",
       ),
     ).toBeVisible();
-    expect(screen.getByText("HackerAI Standard")).toBeVisible();
-    expect(screen.getByText("HackerAI Pro")).toBeVisible();
-    expect(screen.getByText("HackerAI Max")).toBeVisible();
+    expect(screen.getByText("Suricatoos Standard")).toBeVisible();
+    expect(screen.getByText("Suricatoos Pro")).toBeVisible();
+    expect(screen.getByText("Suricatoos Max")).toBeVisible();
 
     expect(
-      screen.getByRole("button", { name: /HackerAI Standard/i }),
+      screen.getByRole("button", { name: /Suricatoos Standard/i }),
     ).toHaveAttribute("aria-pressed", "false");
   });
 
@@ -102,16 +102,16 @@ describe("ModelSelector", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
 
     await user.hover(
-      screen.getByRole("button", { name: /HackerAI Standard/i }),
+      screen.getByRole("button", { name: /Suricatoos Standard/i }),
     );
     expect(
       await screen.findAllByText("Powered by DeepSeek V4 Flash 0731"),
     ).not.toHaveLength(0);
 
     await user.unhover(
-      screen.getByRole("button", { name: /HackerAI Standard/i }),
+      screen.getByRole("button", { name: /Suricatoos Standard/i }),
     );
-    await user.hover(screen.getByRole("button", { name: /HackerAI Pro/i }));
+    await user.hover(screen.getByRole("button", { name: /Suricatoos Pro/i }));
     expect(
       await screen.findAllByText("Powered by DeepSeek V4 Pro 0813"),
     ).not.toHaveLength(0);
@@ -123,7 +123,7 @@ describe("ModelSelector", () => {
       <ModelSelector value="hackerai-pro" onChange={onChange} mode="ask" />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /HackerAI Pro/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Pro/i }));
     fireEvent.click(
       screen.getByRole("button", {
         name: /Auto Balanced quality and speed/i,
@@ -133,12 +133,12 @@ describe("ModelSelector", () => {
     expect(onChange).toHaveBeenCalledWith("auto");
   });
 
-  it("selects HackerAI Pro in ask mode without a high-cost warning", () => {
+  it("selects Suricatoos Pro in ask mode without a high-cost warning", () => {
     const onChange = jest.fn();
     render(<ModelSelector value="auto" onChange={onChange} mode="ask" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /HackerAI Pro/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Pro/i }));
 
     expect(
       screen.queryByTestId("high-cost-model-warning"),
@@ -146,12 +146,12 @@ describe("ModelSelector", () => {
     expect(onChange).toHaveBeenCalledWith("hackerai-pro");
   });
 
-  it("selects HackerAI Pro in agent mode without a high-cost warning", () => {
+  it("selects Suricatoos Pro in agent mode without a high-cost warning", () => {
     const onChange = jest.fn();
     render(<ModelSelector value="auto" onChange={onChange} mode="agent" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /HackerAI Pro/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Pro/i }));
 
     expect(
       screen.queryByTestId("high-cost-model-warning"),
@@ -170,17 +170,17 @@ describe("ModelSelector", () => {
     render(<ModelSelector value="auto" onChange={onChange} mode="agent" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    const maxButton = screen.getByRole("button", { name: /HackerAI Max/i });
+    const maxButton = screen.getByRole("button", { name: /Suricatoos Max/i });
 
     expect(maxButton).toHaveAccessibleName(
-      "HackerAI Max. Use Extra Usage or upgrade to Ultra for Max mode.",
+      "Suricatoos Max. Use Extra Usage or upgrade to Ultra for Max mode.",
     );
 
     fireEvent.click(maxButton);
 
     expect(onChange).not.toHaveBeenCalled();
     expect(
-      screen.getByRole("dialog", { name: "Unlock HackerAI Max" }),
+      screen.getByRole("dialog", { name: "Unlock Suricatoos Max" }),
     ).toBeVisible();
     expect(
       screen.getByText(/pay for Max as you go, or upgrade to Ultra/i),
@@ -204,11 +204,11 @@ describe("ModelSelector", () => {
     render(<ModelSelector value="auto" onChange={jest.fn()} mode="agent" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    await user.hover(screen.getByRole("button", { name: /HackerAI Max/i }));
+    await user.hover(screen.getByRole("button", { name: /Suricatoos Max/i }));
 
     expect(
       screen.queryByRole("group", {
-        name: "Choose how to access HackerAI Max",
+        name: "Choose how to access Suricatoos Max",
       }),
     ).not.toBeInTheDocument();
   });
@@ -223,7 +223,7 @@ describe("ModelSelector", () => {
     render(<ModelSelector value="auto" onChange={jest.fn()} mode="agent" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /HackerAI Max/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Max/i }));
     fireEvent.click(screen.getByRole("button", { name: "Upgrade to Ultra" }));
 
     expect(mockRedirectToPricing).toHaveBeenCalledWith({
@@ -247,10 +247,10 @@ describe("ModelSelector", () => {
     render(<ModelSelector value="auto" onChange={onChange} mode="agent" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /HackerAI Max/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Max/i }));
 
     expect(
-      screen.getByRole("dialog", { name: "Unlock HackerAI Max" }),
+      screen.getByRole("dialog", { name: "Unlock Suricatoos Max" }),
     ).toBeVisible();
     expect(
       screen.getByText(/pay for Max as you go, or upgrade to Ultra/i),
@@ -276,7 +276,7 @@ describe("ModelSelector", () => {
     render(<ModelSelector value="auto" onChange={jest.fn()} mode="agent" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /HackerAI Max/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Max/i }));
     fireEvent.click(screen.getByRole("button", { name: "Upgrade to Ultra" }));
 
     expect(mockRedirectToPricing).toHaveBeenCalledWith({
@@ -294,9 +294,9 @@ describe("ModelSelector", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
 
-    const maxButton = screen.getByRole("button", { name: /HackerAI Max/i });
+    const maxButton = screen.getByRole("button", { name: /Suricatoos Max/i });
     expect(maxButton).toHaveAccessibleName(
-      "HackerAI Max. Checking Extra Usage for Max mode.",
+      "Suricatoos Max. Checking Extra Usage for Max mode.",
     );
     expect(maxButton).toBeDisabled();
 
@@ -306,7 +306,7 @@ describe("ModelSelector", () => {
     expect(mockOpenSettingsDialog).not.toHaveBeenCalled();
   });
 
-  it("selects HackerAI Max on Pro Plus when extra usage is available", () => {
+  it("selects Suricatoos Max on Pro Plus when extra usage is available", () => {
     mockMaxEntitlement = {
       extraUsageAvailable: true,
       reason: "available",
@@ -317,30 +317,30 @@ describe("ModelSelector", () => {
     render(<ModelSelector value="auto" onChange={onChange} mode="agent" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /HackerAI Max/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Max/i }));
 
     expect(onChange).toHaveBeenCalledWith("hackerai-max");
     expect(mockRedirectToPricing).not.toHaveBeenCalled();
   });
 
-  it("selects HackerAI Max for Ultra users", () => {
+  it("selects Suricatoos Max for Ultra users", () => {
     mockSubscription = "ultra";
     const onChange = jest.fn();
     render(<ModelSelector value="auto" onChange={onChange} mode="agent" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /HackerAI Max/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Max/i }));
 
     expect(onChange).toHaveBeenCalledWith("hackerai-max");
   });
 
-  it("locks HackerAI Max for team users", () => {
+  it("locks Suricatoos Max for team users", () => {
     mockSubscription = "team";
     const onChange = jest.fn();
     render(<ModelSelector value="auto" onChange={onChange} mode="agent" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /HackerAI Max/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Max/i }));
 
     expect(onChange).not.toHaveBeenCalled();
     expect(mockOpenSettingsDialog).toHaveBeenCalledWith("Extra Usage");
@@ -370,12 +370,12 @@ describe("ModelSelector", () => {
       <ModelSelector value="hackerai-max" onChange={jest.fn()} mode="agent" />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /HackerAI Pro/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Pro/i }));
 
     const proButton = screen
-      .getAllByRole("button", { name: /HackerAI Pro/i })
+      .getAllByRole("button", { name: /Suricatoos Pro/i })
       .find((button) => button.hasAttribute("aria-pressed"));
-    const maxButton = screen.getByRole("button", { name: /HackerAI Max/i });
+    const maxButton = screen.getByRole("button", { name: /Suricatoos Max/i });
 
     expect(proButton).toBeDefined();
     expect(proButton).toHaveAttribute("aria-pressed", "true");
@@ -395,10 +395,10 @@ describe("ModelSelector", () => {
       <ModelSelector value="hackerai-max" onChange={jest.fn()} mode="agent" />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /HackerAI Max/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Max/i }));
 
     const maxButton = screen
-      .getAllByRole("button", { name: /HackerAI Max/i })
+      .getAllByRole("button", { name: /Suricatoos Max/i })
       .find((button) => button.hasAttribute("aria-pressed"));
 
     expect(maxButton).toBeDefined();

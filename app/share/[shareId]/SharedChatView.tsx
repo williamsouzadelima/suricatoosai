@@ -165,11 +165,11 @@ export function SharedChatView({ shareId }: SharedChatViewProps) {
   // Update page title when chat loads
   useEffect(() => {
     if (taskTitle) {
-      document.title = `${taskTitle} | HackerAI`;
+      document.title = `${taskTitle} | Suricatoos`;
     }
 
     return () => {
-      document.title = "Shared Task | HackerAI";
+      document.title = "Shared Task | Suricatoos";
     };
   }, [taskTitle]);
 

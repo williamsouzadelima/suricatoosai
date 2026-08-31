@@ -1,5 +1,5 @@
-export const OPENROUTER_APP_REFERER = "https://hackerai.co";
-export const OPENROUTER_APP_TITLE = "HackerAI";
+export const OPENROUTER_APP_REFERER = "https://ai.suricatoos.com";
+export const OPENROUTER_APP_TITLE = "Suricatoos";
 export const OPENROUTER_APP_CATEGORIES = "cloud-agent,cli-agent";
 
 export const openrouterAttributionHeaders = {

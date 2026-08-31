@@ -4,7 +4,7 @@
 @import "@workos-inc/widgets/styles.css";
 @source "../node_modules/streamdown/dist/index.js";
 
-/* Keep WorkOS widget dialogs above HackerAI's z-50 dialog portals. */
+/* Keep WorkOS widget dialogs above Suricatoos's z-50 dialog portals. */
 .woswidgets-dialog-overlay {
   z-index: 60;
 }
@@ -66,8 +66,8 @@
   --card-foreground: #000000;
   --popover: #ffffff;
   --popover-foreground: #000000;
-  --primary: #ffffff;
-  --primary-foreground: #000000;
+  --primary: #ff7678;
+  --primary-foreground: #ffffff;
   --secondary: #181818;
   --secondary-foreground: #000000;
   --muted: #f8f8f8;
@@ -77,7 +77,7 @@
   --destructive: #dc2626;
   --border: #e5e5e5;
   --input: #e5e5e5;
-  --ring: #999999;
+  --ring: #ff7678;
   --chart-1: #ff4500;
   --chart-2: #51da4c;
   --chart-3: #0000ff;
@@ -116,7 +116,7 @@
   --card-foreground: #ffffff;
   --popover: #111111;
   --popover-foreground: #ffffff;
-  --primary: #000000;
+  --primary: #ff7678;
   --primary-foreground: #ffffff;
   --secondary: #181818;
   --secondary-foreground: #ffffff;
@@ -127,7 +127,7 @@
   --destructive: #ef4444;
   --border: #333333;
   --input: #333333;
-  --ring: #666666;
+  --ring: #ff7678;
   --chart-1: #ff4500;
   --chart-2: #51da4c;
   --chart-3: #0000ff;

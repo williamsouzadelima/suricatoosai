@@ -15,10 +15,7 @@ function AuthenticatedHeader() {
     <header className="w-full px-6 max-sm:px-4 flex-shrink-0">
       <div className="py-[10px] flex gap-10 items-center justify-between">
         <div className="flex items-center gap-2">
-          <HackerAISVG theme="dark" scale={0.15} />
-          <span className="text-foreground text-xl font-semibold max-sm:text-lg">
-            HackerAI
-          </span>
+          <HackerAISVG theme="dark" scale={0.18} />
         </div>
         <Button
           asChild
@@ -46,7 +43,7 @@ function DownloadContent() {
       <div className="container mx-auto max-w-3xl space-y-8">
         <div className="text-center">
           <h1 className="mb-4 text-4xl font-bold text-card-foreground">
-            {isMobile ? "Install HackerAI" : "Download HackerAI"}
+            {isMobile ? "Install Suricatoos" : "Download Suricatoos"}
           </h1>
           <p className="text-lg text-muted-foreground">
             {isMobile

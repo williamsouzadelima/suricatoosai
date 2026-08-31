@@ -1303,7 +1303,7 @@ describe("getMessagesByChatId", () => {
     const lastUserMessage = {
       id: "user-message-1",
       role: "user" as const,
-      parts: [{ type: "text" as const, text: "do recon on hackerai.co" }],
+      parts: [{ type: "text" as const, text: "do recon on ai.suricatoos.com" }],
     };
 
     mockQuery

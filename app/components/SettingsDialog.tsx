@@ -278,7 +278,7 @@ const SettingsDialog = ({
         onOpenChange={setShowNotesDialog}
       />
 
-      {/* Customize HackerAI Dialog */}
+      {/* Customize Suricatoos Dialog */}
       <CustomizeHackerAIDialog
         open={showCustomizeDialog}
         onOpenChange={setShowCustomizeDialog}

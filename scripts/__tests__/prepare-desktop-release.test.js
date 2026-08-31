@@ -25,42 +25,42 @@ function signatureFor(contents) {
 }
 
 function createArtifacts(root, version) {
-  writeArtifact(root, "desktop-macOS-arm64", `HackerAI_${version}_aarch64.dmg`);
+  writeArtifact(root, "desktop-macOS-arm64", `Suricatoos_${version}_aarch64.dmg`);
   writeArtifact(
     root,
     "desktop-macOS-arm64",
-    "HackerAI.app.tar.gz",
+    "Suricatoos.app.tar.gz",
     "mac-arm-updater",
   );
   writeArtifact(
     root,
     "desktop-macOS-arm64",
-    "HackerAI.app.tar.gz.sig",
+    "Suricatoos.app.tar.gz.sig",
     signatureFor("mac-arm-updater"),
   );
-  writeArtifact(root, "desktop-macOS-x64", `HackerAI_${version}_x64.dmg`);
+  writeArtifact(root, "desktop-macOS-x64", `Suricatoos_${version}_x64.dmg`);
   writeArtifact(
     root,
     "desktop-macOS-x64",
-    "HackerAI.app.tar.gz",
+    "Suricatoos.app.tar.gz",
     "mac-x64-updater",
   );
   writeArtifact(
     root,
     "desktop-macOS-x64",
-    "HackerAI.app.tar.gz.sig",
+    "Suricatoos.app.tar.gz.sig",
     signatureFor("mac-x64-updater"),
   );
-  writeArtifact(root, "desktop-macOS-universal", "HackerAI-universal.dmg");
+  writeArtifact(root, "desktop-macOS-universal", "Suricatoos-universal.dmg");
 
   for (const filename of [
-    `HackerAI_${version}_amd64.AppImage`,
-    `HackerAI_${version}_amd64.AppImage.tar.gz`,
-    `HackerAI_${version}_amd64.deb`,
+    `Suricatoos_${version}_amd64.AppImage`,
+    `Suricatoos_${version}_amd64.AppImage.tar.gz`,
+    `Suricatoos_${version}_amd64.deb`,
   ]) {
     writeArtifact(root, "desktop-Linux-x64", filename);
   }
-  const linuxX64Updater = `HackerAI_${version}_amd64.AppImage.tar.gz`;
+  const linuxX64Updater = `Suricatoos_${version}_amd64.AppImage.tar.gz`;
   writeArtifact(
     root,
     "desktop-Linux-x64",
@@ -69,13 +69,13 @@ function createArtifacts(root, version) {
   );
 
   for (const filename of [
-    `HackerAI_${version}_aarch64.AppImage`,
-    `HackerAI_${version}_aarch64.AppImage.tar.gz`,
-    `HackerAI_${version}_arm64.deb`,
+    `Suricatoos_${version}_aarch64.AppImage`,
+    `Suricatoos_${version}_aarch64.AppImage.tar.gz`,
+    `Suricatoos_${version}_arm64.deb`,
   ]) {
     writeArtifact(root, "desktop-Linux-arm64", filename);
   }
-  const linuxArmUpdater = `HackerAI_${version}_aarch64.AppImage.tar.gz`;
+  const linuxArmUpdater = `Suricatoos_${version}_aarch64.AppImage.tar.gz`;
   writeArtifact(
     root,
     "desktop-Linux-arm64",
@@ -84,12 +84,12 @@ function createArtifacts(root, version) {
   );
 
   for (const filename of [
-    `HackerAI_${version}_x64-setup.exe`,
-    `HackerAI_${version}_x64-setup.nsis.zip`,
+    `Suricatoos_${version}_x64-setup.exe`,
+    `Suricatoos_${version}_x64-setup.nsis.zip`,
   ]) {
     writeArtifact(root, "desktop-Windows-x64", filename);
   }
-  const windowsUpdater = `HackerAI_${version}_x64-setup.nsis.zip`;
+  const windowsUpdater = `Suricatoos_${version}_x64-setup.nsis.zip`;
   writeArtifact(
     root,
     "desktop-Windows-x64",
@@ -167,10 +167,10 @@ describe("prepare-desktop-release", () => {
       expect(fixture.result.status).toBe(0);
       expect(fixture.result.stderr).toBe("");
       expect(
-        existsSync(path.join(fixture.release, "HackerAI-linux-x64.AppImage")),
+        existsSync(path.join(fixture.release, "Suricatoos-linux-x64.AppImage")),
       ).toBe(true);
       expect(
-        existsSync(path.join(fixture.release, "HackerAI-windows-x64.exe")),
+        existsSync(path.join(fixture.release, "Suricatoos-windows-x64.exe")),
       ).toBe(true);
 
       const latest = JSON.parse(
@@ -179,15 +179,15 @@ describe("prepare-desktop-release", () => {
       expect(latest.version).toBe("0.0.57");
       expect(latest.pub_date).toBe("2026-07-17T00:00:00Z");
       expect(latest.platforms["darwin-aarch64"]).toEqual({
-        url: "https://github.com/hackerai-tech/hackerai/releases/download/desktop-v0.0.57/HackerAI-aarch64.app.tar.gz",
+        url: "https://github.com/hackerai-tech/hackerai/releases/download/desktop-v0.0.57/Suricatoos-aarch64.app.tar.gz",
         signature: signatureFor("mac-arm-updater"),
       });
       expect(latest.platforms["darwin-x86_64"]).toEqual({
-        url: "https://github.com/hackerai-tech/hackerai/releases/download/desktop-v0.0.57/HackerAI-x86_64.app.tar.gz",
+        url: "https://github.com/hackerai-tech/hackerai/releases/download/desktop-v0.0.57/Suricatoos-x86_64.app.tar.gz",
         signature: signatureFor("mac-x64-updater"),
       });
       expect(latest.platforms["windows-x86_64"].signature).toBe(
-        signatureFor("HackerAI_0.0.57_x64-setup.nsis.zip"),
+        signatureFor("Suricatoos_0.0.57_x64-setup.nsis.zip"),
       );
     } finally {
       rmSync(fixture.workspace, { recursive: true, force: true });
@@ -200,7 +200,7 @@ describe("prepare-desktop-release", () => {
     try {
       expect(fixture.result.status).toBe(1);
       expect(fixture.result.stderr).toContain(
-        "Expected exactly one HackerAI_0.0.57_aarch64.dmg",
+        "Expected exactly one Suricatoos_0.0.57_aarch64.dmg",
       );
     } finally {
       rmSync(fixture.workspace, { recursive: true, force: true });
@@ -213,7 +213,7 @@ describe("prepare-desktop-release", () => {
         writeArtifact(
           artifacts,
           "desktop-macOS-arm64",
-          "HackerAI.app.tar.gz",
+          "Suricatoos.app.tar.gz",
           "tampered-updater",
         );
       },

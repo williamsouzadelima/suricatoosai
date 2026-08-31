@@ -96,7 +96,7 @@ describe("useFileUpload desktop-local agent attachments", () => {
       tokens: 10,
     });
     (writeGeneratedTextAttachment as jest.Mock).mockResolvedValue({
-      path: "/Users/alice/Library/Application Support/HackerAI/generated-text-attachments/paste-1/Pasted text.txt",
+      path: "/Users/alice/Library/Application Support/Suricatoos/generated-text-attachments/paste-1/Pasted text.txt",
       name: "Pasted text.txt",
       mediaType: "text/plain",
       size: 5000,
@@ -166,7 +166,7 @@ describe("useFileUpload desktop-local agent attachments", () => {
         storage: "local-desktop",
         localAttachmentId: expect.any(String),
         localPath:
-          "/Users/alice/Library/Application Support/HackerAI/generated-text-attachments/paste-1/Pasted text.txt",
+          "/Users/alice/Library/Application Support/Suricatoos/generated-text-attachments/paste-1/Pasted text.txt",
         generatedSource: "pasted-text",
         generatedTextAttachmentId: expect.any(String),
         generatedTextAttachment: expect.objectContaining({

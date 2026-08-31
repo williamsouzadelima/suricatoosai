@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const iconsDir = join(__dirname, "../src-tauri/icons");
-const sourceSvg = join(iconsDir, "HackerAI.svg");
+const sourceSvg = join(iconsDir, "Suricatoos.svg");
 
 async function createIcon(svgBuffer, size, filename) {
   await sharp(svgBuffer)

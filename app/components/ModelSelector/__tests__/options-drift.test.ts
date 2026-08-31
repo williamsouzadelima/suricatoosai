@@ -4,7 +4,7 @@ import { myProvider, resolveTierToProviderKey } from "@/lib/ai/providers";
 import type { ChatMode } from "@/types/chat";
 
 /**
- * Drift guard: every selectable HackerAI tier must resolve to a provider key
+ * Drift guard: every selectable Suricatoos tier must resolve to a provider key
  * registered with `myProvider` in *both* modes. Without this, picking the
  * tier from the UI would crash on `myProvider.languageModel()`.
  */
@@ -31,7 +31,7 @@ describe("ModelSelector tier ↔ provider drift", () => {
     expect([...askIds].sort()).toEqual([...agentIds].sort());
   });
 
-  it("HackerAI Standard resolves to DeepSeek V4 Flash 0731 in both modes", () => {
+  it("Suricatoos Standard resolves to DeepSeek V4 Flash 0731 in both modes", () => {
     expect(resolveTierToProviderKey("hackerai-standard", "ask")).toBe(
       "model-deepseek-v4-flash-0731",
     );
@@ -40,7 +40,7 @@ describe("ModelSelector tier ↔ provider drift", () => {
     );
   });
 
-  it("HackerAI Pro resolves to DeepSeek V4 Pro 0813 in both modes", () => {
+  it("Suricatoos Pro resolves to DeepSeek V4 Pro 0813 in both modes", () => {
     expect(resolveTierToProviderKey("hackerai-pro", "ask")).toBe(
       "model-deepseek-v4-pro-0813",
     );
@@ -49,7 +49,7 @@ describe("ModelSelector tier ↔ provider drift", () => {
     );
   });
 
-  it("HackerAI Max resolves to the same provider in both modes", () => {
+  it("Suricatoos Max resolves to the same provider in both modes", () => {
     expect(resolveTierToProviderKey("hackerai-max", "ask")).toBe(
       "model-grok-4.6",
     );
@@ -63,8 +63,8 @@ describe("ModelSelector tier ↔ provider drift", () => {
     expect(resolveTierToProviderKey("auto", "agent")).toBeNull();
   });
 
-  it("hover-popup descriptions are present for every HackerAI tier", () => {
-    const tiered = allOptions.filter((o) => o.label.startsWith("HackerAI"));
+  it("hover-popup descriptions are present for every Suricatoos tier", () => {
+    const tiered = allOptions.filter((o) => o.label.startsWith("Suricatoos"));
     expect(tiered.length).toBeGreaterThan(0);
     for (const option of tiered) {
       expect(option.description).toBeTruthy();
@@ -79,7 +79,7 @@ describe("ModelSelector tier ↔ provider drift", () => {
     ).toBe("DeepSeek V4 Flash 0731");
   });
 
-  it("discloses DeepSeek V4 Pro 0813 for HackerAI Pro", () => {
+  it("discloses DeepSeek V4 Pro 0813 for Suricatoos Pro", () => {
     expect(
       ASK_MODEL_OPTIONS.find((option) => option.id === "hackerai-pro")
         ?.poweredBy,
@@ -90,7 +90,7 @@ describe("ModelSelector tier ↔ provider drift", () => {
     ).toBe("DeepSeek V4 Pro 0813");
   });
 
-  it("discloses Grok 4.6 for HackerAI Max", () => {
+  it("discloses Grok 4.6 for Suricatoos Max", () => {
     expect(
       ASK_MODEL_OPTIONS.find((option) => option.id === "hackerai-max")
         ?.poweredBy,

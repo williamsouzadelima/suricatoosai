@@ -20,7 +20,7 @@ jest.spyOn(console, "error").mockImplementation(() => {});
 
 describe("DeleteAccountDialog", () => {
   const mockUser = {
-    email: "signin.hackerai.co.harmonize442@passmail.net",
+    email: "signin.ai.suricatoos.com.harmonize442@passmail.net",
     lastSignInAt: new Date().toISOString(),
   };
   const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;

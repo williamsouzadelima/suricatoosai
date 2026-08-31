@@ -501,7 +501,7 @@ export const MessageErrorState = ({
                 size="sm"
                 onClick={() =>
                   window.open(
-                    "https://help.hackerai.co/",
+                    "https://help.suricatoos.com/",
                     "_blank",
                     "noopener,noreferrer",
                   )

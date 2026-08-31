@@ -1573,7 +1573,7 @@ fn save_update_check_timestamp(app: &tauri::AppHandle) {
 fn get_allowed_hosts() -> Vec<String> {
     match std::env::var("HACKERAI_ALLOWED_HOSTS") {
         Ok(hosts) => hosts.split(',').map(|s| s.trim().to_string()).collect(),
-        Err(_) => vec!["hackerai.co".to_string(), "localhost".to_string()],
+        Err(_) => vec!["ai.suricatoos.com".to_string(), "localhost".to_string()],
     }
 }
 
@@ -1669,7 +1669,7 @@ fn handle_auth_deep_link(app: &tauri::AppHandle, url: &url::Url) {
                         .filter(|o| validate_origin(o))
                         .unwrap_or_else(|| {
                             log::warn!("Deep link has missing or invalid origin, using production");
-                            "https://hackerai.co".to_string()
+                            "https://ai.suricatoos.com".to_string()
                         });
 
                     let encoded_token: String =
@@ -1873,13 +1873,13 @@ mod tests {
         let token = "a".repeat(64);
         let desktop_state = "b".repeat(64);
         let url = url::Url::parse(&format!(
-            "hackerai://auth?token={token}&origin=https%3A%2F%2Fhackerai.co&desktop_state={desktop_state}"
+            "suricatoos://auth?token={token}&origin=https%3A%2F%2Fai.suricatoos.com&desktop_state={desktop_state}"
         ))
         .expect("valid deep link");
 
         let label = deep_link_log_label(&url);
 
-        assert_eq!(label, "hackerai://auth");
+        assert_eq!(label, "suricatoos://auth");
         assert!(!label.contains(&token));
         assert!(!label.contains(&desktop_state));
         assert!(!label.contains("origin"));
@@ -2197,7 +2197,7 @@ pub fn run() {
                 }
             });
 
-            log::info!("HackerAI Desktop initialized");
+            log::info!("Suricatoos Desktop initialized");
             Ok(())
         })
         .build(tauri::generate_context!())
