@@ -68,6 +68,7 @@ export default defineConfig({
           "AWS_S3_ACCESS_KEY_ID",
           "AWS_S3_SECRET_ACCESS_KEY",
           "AWS_S3_BUCKET_NAME",
+          "AWS_S3_ENDPOINT",
           "PERPLEXITY_API_KEY",
           "JINA_API_KEY",
           "REDIS_URL",
