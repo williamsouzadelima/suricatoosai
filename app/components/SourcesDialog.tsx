@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 
 interface Source {
   title?: string;
@@ -19,6 +20,7 @@ export const SourcesDialog = ({
   onOpenChange,
   sources,
 }: SourcesDialogProps) => {
+  const t = useTranslations("dialogs");
   const getFaviconUrl = (domain: string) => {
     return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
   };
@@ -41,7 +43,7 @@ export const SourcesDialog = ({
         aria-describedby={undefined}
       >
         <div className="flex w-full flex-row items-center justify-between border-b px-1 pb-3">
-          <DialogTitle>Citations</DialogTitle>
+          <DialogTitle>{t("sources.title")}</DialogTitle>
         </div>
         <div className="h-[60vh] max-h-[700px] w-full overflow-y-auto">
           <div className="flex w-full flex-col mt-0">

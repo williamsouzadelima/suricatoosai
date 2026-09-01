@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { Trash2 } from "lucide-react";
 import { usePaginatedQuery, useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
@@ -21,6 +22,7 @@ interface ManageNotesDialogProps {
 
 // Content component that manages its own state - resets naturally on mount
 const ManageNotesDialogContent = () => {
+  const t = useTranslations("dialogs");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -57,10 +59,10 @@ const ManageNotesDialogContent = () => {
         error instanceof ConvexError
           ? (error.data as { message?: string })?.message ||
             error.message ||
-            "Failed to delete note"
+            t("notes.deleteNoteError")
           : error instanceof Error
             ? error.message
-            : "Failed to delete note";
+            : t("notes.deleteNoteError");
       toast.error(errorMessage);
     }
   };
@@ -74,10 +76,10 @@ const ManageNotesDialogContent = () => {
         error instanceof ConvexError
           ? (error.data as { message?: string })?.message ||
             error.message ||
-            "Failed to delete all notes"
+            t("notes.deleteAllError")
           : error instanceof Error
             ? error.message
-            : "Failed to delete all notes";
+            : t("notes.deleteAllError");
       toast.error(errorMessage);
     }
   };
@@ -89,11 +91,10 @@ const ManageNotesDialogContent = () => {
     <>
       <DialogHeader className="px-6 py-4">
         <DialogTitle className="text-lg font-normal text-left">
-          Saved notes
+          {t("notes.title")}
         </DialogTitle>
         <div className="text-xs text-muted-foreground text-left mt-1">
-          Notes are saved across all your tasks and help Suricatoos provide more
-          personalized assistance.
+          {t("notes.description")}
         </div>
       </DialogHeader>
 
@@ -106,17 +107,18 @@ const ManageNotesDialogContent = () => {
           >
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="text-muted-foreground">Loading notes...</div>
+                <div className="text-muted-foreground">
+                  {t("notes.loading")}
+                </div>
               </div>
             ) : allNotes.length === 0 ? (
               <div className="flex items-center justify-center py-8">
                 <div className="text-center">
                   <div className="mb-2 text-muted-foreground">
-                    No notes saved yet
+                    {t("notes.empty")}
                   </div>
                   <div className="text-sm text-muted-foreground/70">
-                    Suricatoos will save notes as you work to remember important
-                    information.
+                    {t("notes.emptyHint")}
                   </div>
                 </div>
               </div>
@@ -154,7 +156,7 @@ const ManageNotesDialogContent = () => {
                           <div className="text-md flex items-center justify-end gap-2">
                             <button
                               onClick={() => handleDeleteNote(note.note_id)}
-                              aria-label="Remove note"
+                              aria-label={t("notes.removeNote")}
                               className="text-muted-foreground hover:text-destructive transition-colors"
                             >
                               <Trash2 className="h-5 w-5" />
@@ -168,7 +170,7 @@ const ManageNotesDialogContent = () => {
                     <tr>
                       <td colSpan={2} className="py-4 text-center">
                         <div className="text-muted-foreground text-sm">
-                          Loading more...
+                          {t("notes.loadingMore")}
                         </div>
                       </td>
                     </tr>
@@ -186,7 +188,7 @@ const ManageNotesDialogContent = () => {
               variant="outline"
               className="border-destructive text-destructive hover:bg-destructive/10"
             >
-              Delete all
+              {t("notes.deleteAll")}
             </Button>
           </div>
         )}

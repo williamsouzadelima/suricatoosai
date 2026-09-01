@@ -1,12 +1,12 @@
-# @hackerai/local
+# @suricatoos/local
 
-HackerAI Local Sandbox Client - Execute commands on your local machine from HackerAI.
+Suricatoos Local Sandbox Client - Execute commands on your local machine from Suricatoos.
 
 ## Quick Start
 
 No installation or manual token handling is required:
 
-1. Go to [HackerAI Settings](https://hackerai.co/settings)
+1. Go to [Suricatoos Settings](https://hackerai.co/settings)
 2. Open "Remote Control"
 3. Click "Copy connect command"
 4. Paste and run the command in your terminal
@@ -17,14 +17,14 @@ included automatically.
 ## Global Installation (Optional)
 
 ```bash
-npm install -g @hackerai/local
+npm install -g @suricatoos/local
 ```
 
-After installation, copy the connect command from HackerAI Settings and replace
-`npx @hackerai/local@latest` with `hackerai-local`. Leave the generated
+After installation, copy the connect command from Suricatoos Settings and replace
+`npx @suricatoos/local@latest` with `suricatoos-local`. Leave the generated
 arguments unchanged.
 
-Commands run directly on your host OS. The client connects to HackerAI and relays commands in real-time.
+Commands run directly on your host OS. The client connects to Suricatoos and relays commands in real-time.
 
 ## Options
 

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { X } from "lucide-react";
@@ -55,6 +56,7 @@ const UpgradeConfirmationDialog: React.FC<UpgradeConfirmationDialogProps> = ({
   reason,
   limitType,
 }) => {
+  const t = useTranslations("pricing");
   const [details, setDetails] = useState<SubscriptionDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -100,7 +102,7 @@ const UpgradeConfirmationDialog: React.FC<UpgradeConfirmationDialogProps> = ({
 
         const previewData = await previewRes.json().catch(() => ({}));
         if (!previewRes.ok) {
-          setError(previewData.error || "Failed to calculate upgrade preview");
+          setError(previewData.error || t("upgradeConfirm.failedPreview"));
           return;
         }
 
@@ -122,8 +124,8 @@ const UpgradeConfirmationDialog: React.FC<UpgradeConfirmationDialogProps> = ({
         console.error("Error fetching subscription details:", error);
         // Set fallback values
         setDetails({
-          paymentMethod: "Payment method on file",
-          currentPlan: "current",
+          paymentMethod: t("upgradeConfirm.paymentMethodOnFile"),
+          currentPlan: t("upgradeConfirm.currentFallback"),
           proratedAmount: price,
           proratedCredit: 0,
           totalDue: price,
@@ -153,7 +155,7 @@ const UpgradeConfirmationDialog: React.FC<UpgradeConfirmationDialogProps> = ({
 
   const handleConfirmPayment = async () => {
     if (!checkoutAttemptId || !details) {
-      setError("Still preparing checkout details. Please wait a moment.");
+      setError(t("upgradeConfirm.stillPreparing"));
       return;
     }
 
@@ -183,7 +185,7 @@ const UpgradeConfirmationDialog: React.FC<UpgradeConfirmationDialogProps> = ({
 
       if (!response.ok) {
         // Handle error without throwing (cleaner console)
-        setError(result.error || "Failed to update subscription");
+        setError(result.error || t("upgradeConfirm.failedUpdate"));
         setConfirming(false);
         return;
       }
@@ -203,7 +205,7 @@ const UpgradeConfirmationDialog: React.FC<UpgradeConfirmationDialogProps> = ({
         // Payment failed, redirect to invoice payment page
         window.location.href = result.invoiceUrl;
       } else {
-        setError(result.message || "Failed to update subscription");
+        setError(result.message || t("upgradeConfirm.failedUpdate"));
         setConfirming(false);
       }
     } catch (error) {
@@ -211,7 +213,7 @@ const UpgradeConfirmationDialog: React.FC<UpgradeConfirmationDialogProps> = ({
       setError(
         error instanceof Error
           ? error.message
-          : "Failed to update subscription. Please try again.",
+          : t("upgradeConfirm.failedUpdateRetry"),
       );
       setConfirming(false);
     }
@@ -225,12 +227,12 @@ const UpgradeConfirmationDialog: React.FC<UpgradeConfirmationDialogProps> = ({
       >
         <div className="flex items-center justify-between mb-6">
           <DialogTitle className="text-2xl font-semibold">
-            Confirm plan changes
+            {t("upgradeConfirm.confirmPlanChanges")}
           </DialogTitle>
           <button
             onClick={onClose}
             className="text-foreground opacity-50 transition hover:opacity-75"
-            aria-label="Close dialog"
+            aria-label={t("upgradeConfirm.closeDialog")}
           >
             <X className="h-6 w-6" />
           </button>
@@ -247,24 +249,26 @@ const UpgradeConfirmationDialog: React.FC<UpgradeConfirmationDialogProps> = ({
               <div className="flex items-center justify-between pb-4 border-b">
                 <div>
                   <div className="text-lg font-medium">
-                    Suricatoos {planName} subscription
+                    {t("upgradeConfirm.subscriptionLabel", { planName })}
                     {details?.quantity && details.quantity > 1 && (
                       <span className="text-muted-foreground font-normal">
                         {" "}
-                        ({details.quantity} seats)
+                        {t("upgradeConfirm.seatsCount", {
+                          count: details.quantity,
+                        })}
                       </span>
                     )}
                   </div>
                   <div className="text-sm text-muted-foreground mt-1">
-                    Prorated charge for remaining time in your current billing
-                    cycle.
+                    {t("upgradeConfirm.proratedCharge")}
                   </div>
                   {isValidUnix(details?.currentPeriodStart) &&
                     isValidUnix(details?.currentPeriodEnd) && (
                       <div className="text-xs text-muted-foreground mt-1">
-                        Current period:{" "}
-                        {formatUnixDate(details.currentPeriodStart)} –{" "}
-                        {formatUnixDate(details.currentPeriodEnd)}
+                        {t("upgradeConfirm.currentPeriod", {
+                          start: formatUnixDate(details.currentPeriodStart),
+                          end: formatUnixDate(details.currentPeriodEnd),
+                        })}
                       </div>
                     )}
                 </div>
@@ -277,10 +281,15 @@ const UpgradeConfirmationDialog: React.FC<UpgradeConfirmationDialogProps> = ({
               {proratedCredit > 0 && (
                 <div className="flex items-start justify-between pb-4 border-b">
                   <div>
-                    <div className="text-lg font-medium">Proration credit</div>
+                    <div className="text-lg font-medium">
+                      {t("upgradeConfirm.prorationCredit")}
+                    </div>
                     <div className="text-sm text-muted-foreground mt-1">
-                      Credit for unused time on your{" "}
-                      {details?.currentPlan || "current"} plan
+                      {t("upgradeConfirm.creditUnusedTime", {
+                        plan:
+                          details?.currentPlan ||
+                          t("upgradeConfirm.currentFallback"),
+                      })}
                     </div>
                   </div>
                   <div className="text-lg font-semibold text-green-600">
@@ -293,9 +302,11 @@ const UpgradeConfirmationDialog: React.FC<UpgradeConfirmationDialogProps> = ({
               {additionalCredit > 0 && (
                 <div className="flex items-start justify-between pb-4 border-b">
                   <div>
-                    <div className="text-lg font-medium">Credit to balance</div>
+                    <div className="text-lg font-medium">
+                      {t("upgradeConfirm.creditToBalance")}
+                    </div>
                     <div className="text-sm text-muted-foreground mt-1">
-                      Excess credit will be added to your account balance
+                      {t("upgradeConfirm.excessCredit")}
                     </div>
                   </div>
                   <div className="text-lg font-semibold text-green-600">
@@ -306,7 +317,9 @@ const UpgradeConfirmationDialog: React.FC<UpgradeConfirmationDialogProps> = ({
 
               {/* Total */}
               <div className="flex items-center justify-between pb-6 border-b">
-                <div className="text-xl font-semibold">Total due today</div>
+                <div className="text-xl font-semibold">
+                  {t("upgradeConfirm.totalDueToday")}
+                </div>
                 <div className="text-xl font-semibold">
                   ${totalDue.toFixed(2)}
                 </div>
@@ -318,15 +331,15 @@ const UpgradeConfirmationDialog: React.FC<UpgradeConfirmationDialogProps> = ({
                   <div className="flex items-center justify-between pb-6 border-b">
                     <div>
                       <div className="text-base font-medium">
-                        Next invoice on{" "}
-                        {formatUnixDate(details.nextInvoiceDate)}
+                        {t("upgradeConfirm.nextInvoiceOn", {
+                          date: formatUnixDate(details.nextInvoiceDate),
+                        })}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        Estimate; subject to changes to your account balance or
-                        usage.
+                        {t("upgradeConfirm.estimateNote")}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        Full included usage renews on this billing date.
+                        {t("upgradeConfirm.fullUsageRenews")}
                       </div>
                     </div>
                     <div className="text-base font-semibold">
@@ -338,7 +351,9 @@ const UpgradeConfirmationDialog: React.FC<UpgradeConfirmationDialogProps> = ({
               {/* Payment Method */}
               {details?.paymentMethod && (
                 <div className="flex items-center justify-between pb-6 border-b">
-                  <div className="text-base font-medium">Payment Method</div>
+                  <div className="text-base font-medium">
+                    {t("upgradeConfirm.paymentMethod")}
+                  </div>
                   <div className="text-base">{details.paymentMethod}</div>
                 </div>
               )}
@@ -361,7 +376,7 @@ const UpgradeConfirmationDialog: React.FC<UpgradeConfirmationDialogProps> = ({
               disabled={confirming || loadingDetails}
               className="px-8"
             >
-              Cancel
+              {t("upgradeConfirm.cancel")}
             </Button>
             <Button
               variant="default"
@@ -373,10 +388,10 @@ const UpgradeConfirmationDialog: React.FC<UpgradeConfirmationDialogProps> = ({
               {confirming ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
+                  {t("upgradeConfirm.processing")}
                 </>
               ) : (
-                "Confirm and pay"
+                t("upgradeConfirm.confirmAndPay")
               )}
             </Button>
           </div>

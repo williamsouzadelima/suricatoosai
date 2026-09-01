@@ -282,7 +282,7 @@ const runSandboxCommand = async (
 };
 
 /**
- * E2B uses /home/user/upload; any local connection uses /tmp/hackerai-upload
+ * E2B uses /home/user/upload; any local connection uses /tmp/suricatoos-upload
  * since the host machine may not have /home/user (e.g. macOS in dangerous mode).
  */
 export const getUploadBasePath = (
@@ -290,7 +290,7 @@ export const getUploadBasePath = (
 ): string =>
   sandboxPreference === "e2b" || !sandboxPreference
     ? "/home/user/upload"
-    : "/tmp/hackerai-upload";
+    : "/tmp/suricatoos-upload";
 
 const getLastUserMessageIndex = (messages: UIMessage[]): number => {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -816,7 +816,7 @@ const shellQuote = (value: string): string =>
   `'${value.replace(/'/g, "'\\''")}'`;
 
 const UPLOAD_PATH_FALLBACK_PREFIXES = [
-  "/tmp/hackerai-upload/",
+  "/tmp/suricatoos-upload/",
   "/home/user/upload/",
 ];
 
@@ -850,7 +850,7 @@ const resolveWritableUploadFallbackPath = async (
     `filename=${shellQuote(fileName)}`,
     `for base in "\${TMPDIR:-/tmp}" /var/tmp "\${HOME:-}" "\${PWD:-.}"; do`,
     `  [ -n "$base" ] || continue`,
-    `  root="$base/hackerai-upload"`,
+    `  root="$base/suricatoos-upload"`,
     `  mkdir -p "$root" 2>/dev/null && [ -w "$root" ] || continue`,
     `  root="$(cd "$root" 2>/dev/null && pwd -P)" || continue`,
     // A reused sandbox can contain a stale root-owned file with the same

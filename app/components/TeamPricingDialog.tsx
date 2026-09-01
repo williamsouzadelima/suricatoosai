@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
   initialPlan = "monthly",
 }) => {
   const { user } = useAuth();
+  const t = useTranslations("pricing");
   const { subscription } = useGlobalState();
   const { upgradeLoading, handleUpgrade } = useUpgrade();
   const [billingPeriod, setBillingPeriod] = React.useState<
@@ -69,7 +71,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
 
   const handleContinue = async () => {
     if (!user) {
-      toast.error("Please sign in to upgrade");
+      toast.error(t("team.signInToUpgrade"));
       return;
     }
 
@@ -165,7 +167,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
           className="!max-w-none !w-screen !h-screen !max-h-none !m-0 !rounded-none !inset-0 !translate-x-0 !translate-y-0 !top-0 !left-0 overflow-y-auto"
           showCloseButton={false}
         >
-          <DialogTitle className="sr-only">Team Pricing</DialogTitle>
+          <DialogTitle className="sr-only">{t("team.dialogTitle")}</DialogTitle>
           <div className="h-full w-full overflow-y-auto">
             {/* Mobile View */}
             <div className="md:hidden relative flex min-h-[100dvh] w-full justify-center overflow-y-auto pt-4">
@@ -173,15 +175,14 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                 <div className="flex w-full flex-col gap-6 [@media(min-width:450px)]:px-4">
                   <div className="flex flex-col gap-4 text-center">
                     <div className="text-3xl font-normal">
-                      Set up your Business plan
+                      {t("team.setupBusinessPlan")}
                     </div>
                     <div className="text-muted-foreground">
-                      Minimum 2 seats. Add and reassign seats at anytime
+                      {t("team.minimumSeatsHint")}
                     </div>
                     {subscription === "pro" && (
                       <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg px-4 py-2">
-                        Your remaining Pro subscription time will be credited
-                        toward Team
+                        {t("team.proCreditNote")}
                       </div>
                     )}
                   </div>
@@ -192,7 +193,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                         htmlFor="seats"
                         className="mb-1 flex text-base font-medium"
                       >
-                        Seats
+                        {t("team.seats")}
                       </Label>
                       <div className="relative flex items-center">
                         <Input
@@ -230,7 +231,9 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <label className="font-medium">Plan Summary</label>
+                      <label className="font-medium">
+                        {t("team.planSummary")}
+                      </label>
                       <div className="flex flex-col gap-6 rounded-3xl border border-border p-5">
                         <div
                           role="group"
@@ -249,9 +252,11 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                                 }`}
                               >
                                 <div className="flex flex-wrap justify-center gap-1 text-center">
-                                  Yearly
+                                  {t("team.yearly")}
                                   <span className="text-[#10A37F]">
-                                    ({discountPercentage}% off)
+                                    {t("team.yearlyOff", {
+                                      percent: discountPercentage,
+                                    })}
                                   </span>
                                 </div>
                               </button>
@@ -269,7 +274,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                                     : "text-muted-foreground"
                                 }`}
                               >
-                                Monthly
+                                {t("team.monthly")}
                               </button>
                               {billingPeriod === "monthly" && (
                                 <div className="bg-background absolute inset-0 -z-10 box-content h-full rounded-full shadow-sm" />
@@ -280,15 +285,17 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
 
                         <div className="flex grow flex-col text-sm">
                           <div className="text-muted-foreground flex w-full justify-between text-sm">
-                            <div className="flex">Suricatoos Team</div>
+                            <div className="flex">{t("team.productName")}</div>
                             <div className="flex">
                               ${formatNumber(fullPrice)}
                             </div>
                           </div>
                           <div className="text-muted-foreground/70 flex w-full justify-between text-xs">
                             <div className="flex">
-                              {seats} users
-                              {billingPeriod === "yearly" ? " x 12 months" : ""}
+                              {t("team.usersCount", { seats })}
+                              {billingPeriod === "yearly"
+                                ? t("team.timesTwelveMonths")
+                                : ""}
                             </div>
                             <div className="flex">
                               $
@@ -297,20 +304,22 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                                   ? 40 * 12
                                   : pricePerSeat,
                               )}
-                              /seat
+                              {t("team.perSeat")}
                             </div>
                           </div>
 
                           {billingPeriod === "yearly" && discount > 0 && (
                             <>
                               <div className="text-muted-foreground flex w-full justify-between text-sm mt-3">
-                                <div className="flex">Discount</div>
+                                <div className="flex">{t("team.discount")}</div>
                                 <div className="flex font-medium text-[#10A37F]">
                                   -${formatNumber(discount)}
                                 </div>
                               </div>
                               <div className="text-muted-foreground/70 text-xs">
-                                Yearly (-{discountPercentage}%)
+                                {t("team.yearlyDiscountLabel", {
+                                  percent: discountPercentage,
+                                })}
                               </div>
                             </>
                           )}
@@ -318,7 +327,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                           <hr className="border-border my-3" />
 
                           <div className="flex w-full justify-between text-base font-medium">
-                            <div className="flex">Today&apos;s total</div>
+                            <div className="flex">{t("team.todaysTotal")}</div>
                             <div className="flex">
                               USD $
                               {formatNumber(
@@ -330,9 +339,9 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                           </div>
 
                           <div className="text-muted-foreground/70 mt-2 text-xs">
-                            Billed{" "}
-                            {billingPeriod === "monthly" ? "monthly" : "yearly"}{" "}
-                            starting today
+                            {billingPeriod === "monthly"
+                              ? t("team.billedMonthly")
+                              : t("team.billedYearly")}
                           </div>
                         </div>
                       </div>
@@ -349,10 +358,10 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                       {upgradeLoading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Processing...
+                          {t("team.processing")}
                         </>
                       ) : (
-                        "Continue to billing"
+                        t("team.continueToBilling")
                       )}
                     </Button>
                     <Button
@@ -362,7 +371,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                       className="w-full rounded-xl"
                       size="lg"
                     >
-                      Cancel
+                      {t("team.cancel")}
                     </Button>
                   </div>
                 </div>
@@ -382,13 +391,12 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                   </button>
 
                   <div className="mb-8 text-3xl font-medium md:mt-[120px]">
-                    Pick your plan
+                    {t("team.pickYourPlan")}
                   </div>
 
                   {subscription === "pro" && (
                     <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg px-4 py-2 mb-6 text-center">
-                      Your remaining Pro subscription time will be credited
-                      toward Team
+                      {t("team.proCreditNote")}
                     </div>
                   )}
 
@@ -402,7 +410,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                     {/* Yearly Plan */}
                     <div className="relative">
                       <Badge className="absolute start-3 top-0 -translate-y-1/2 px-2 py-1 text-xs font-medium rounded-xl bg-[#10A37F] text-white border-none z-10">
-                        Save {discountPercentage}%
+                        {t("team.savePercent", { percent: discountPercentage })}
                       </Badge>
                       <label
                         htmlFor="yearly"
@@ -413,7 +421,9 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                         }`}
                       >
                         <div className="flex w-full items-center justify-between">
-                          <div className="text-xl font-medium">Yearly</div>
+                          <div className="text-xl font-medium">
+                            {t("team.yearly")}
+                          </div>
                           <RadioGroupItem value="yearly" id="yearly" />
                         </div>
                         <div className="flex flex-col gap-3 text-muted-foreground text-sm mt-3">
@@ -422,17 +432,17 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                               USD $33{" "}
                               <s className="text-muted-foreground">$40</s>
                             </p>
-                            <p>per user/month</p>
+                            <p>{t("team.perUserMonth")}</p>
                           </div>
                           <ul className="ms-3 list-disc">
                             <li className="marker:text-muted-foreground mb-2">
-                              Billed yearly
+                              {t("team.billedYearlyItem")}
                             </li>
                             <li className="marker:text-muted-foreground mb-2">
-                              Minimum 2 users
+                              {t("team.minimumUsers")}
                             </li>
                             <li className="marker:text-muted-foreground mb-2">
-                              Add and reassign users as needed
+                              {t("team.addReassignUsers")}
                             </li>
                           </ul>
                         </div>
@@ -449,23 +459,25 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                       }`}
                     >
                       <div className="flex w-full items-center justify-between">
-                        <div className="text-xl font-medium">Monthly</div>
+                        <div className="text-xl font-medium">
+                          {t("team.monthly")}
+                        </div>
                         <RadioGroupItem value="monthly" id="monthly" />
                       </div>
                       <div className="flex flex-col gap-3 text-muted-foreground text-sm mt-3">
                         <div>
                           <p className="text-foreground">USD $40</p>
-                          <p>per user/month</p>
+                          <p>{t("team.perUserMonth")}</p>
                         </div>
                         <ul className="ms-3 list-disc">
                           <li className="marker:text-muted-foreground mb-2">
-                            Billed monthly
+                            {t("team.billedMonthlyItem")}
                           </li>
                           <li className="marker:text-muted-foreground mb-2">
-                            Minimum 2 users
+                            {t("team.minimumUsers")}
                           </li>
                           <li className="marker:text-muted-foreground mb-2">
-                            Add or remove users as needed
+                            {t("team.addRemoveUsers")}
                           </li>
                         </ul>
                       </div>
@@ -477,7 +489,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                       htmlFor="seats-desktop"
                       className="mb-1 flex text-base font-medium"
                     >
-                      Users
+                      {t("team.users")}
                     </Label>
                     <div className="relative flex items-center gap-3">
                       <Input
@@ -515,7 +527,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                   </div>
 
                   <div className="text-muted-foreground self-start text-xs">
-                    Add more seats at any time. Minimum of {minSeats} seats.
+                    {t("team.addSeatsHint", { min: minSeats })}
                   </div>
                 </div>
               </div>
@@ -523,34 +535,40 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
               {/* Right Column - Summary */}
               <div className="col-span-3 flex h-full flex-col items-center overflow-hidden p-6 md:col-span-1 md:shadow-lg">
                 <div className="flex w-full max-w-[400px] flex-col md:mt-[120px]">
-                  <p className="mb-8 text-xl font-medium">Summary</p>
+                  <p className="mb-8 text-xl font-medium">
+                    {t("team.summary")}
+                  </p>
 
                   <div className="flex grow flex-col text-sm">
                     <div className="text-muted-foreground flex w-full justify-between text-sm">
-                      <div className="flex">Suricatoos Team</div>
+                      <div className="flex">{t("team.productName")}</div>
                       <div className="flex">${formatNumber(fullPrice)}</div>
                     </div>
                     <div className="text-muted-foreground/70 flex w-full justify-between text-xs">
-                      <div className="flex">{seats} users</div>
+                      <div className="flex">
+                        {t("team.usersCount", { seats })}
+                      </div>
                       <div className="flex">
                         $
                         {formatNumber(
                           billingPeriod === "yearly" ? 40 * 12 : pricePerSeat,
                         )}
-                        /seat
+                        {t("team.perSeat")}
                       </div>
                     </div>
 
                     {billingPeriod === "yearly" && discount > 0 && (
                       <div className="text-muted-foreground flex w-full justify-between text-sm mt-2">
-                        <div className="flex">Discount</div>
+                        <div className="flex">{t("team.discount")}</div>
                         <div className="flex">-${formatNumber(discount)}</div>
                       </div>
                     )}
                     {billingPeriod === "yearly" && discount > 0 && (
                       <div className="text-muted-foreground/70 flex w-full justify-between text-xs">
                         <div className="flex">
-                          Yearly (-{discountPercentage}%)
+                          {t("team.yearlyDiscountLabel", {
+                            percent: discountPercentage,
+                          })}
                         </div>
                       </div>
                     )}
@@ -558,7 +576,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                     <hr className="border-border my-3" />
 
                     <div className="flex w-full justify-between text-base font-medium">
-                      <div className="flex">Today&apos;s total</div>
+                      <div className="flex">{t("team.todaysTotal")}</div>
                       <div className="flex">
                         USD $
                         {formatNumber(
@@ -570,9 +588,9 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                     </div>
 
                     <div className="text-muted-foreground/70 mt-2 text-xs">
-                      Billed{" "}
-                      {billingPeriod === "monthly" ? "monthly" : "yearly"}{" "}
-                      starting today
+                      {billingPeriod === "monthly"
+                        ? t("team.billedMonthly")
+                        : t("team.billedYearly")}
                     </div>
                   </div>
 
@@ -585,10 +603,10 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                     {upgradeLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
+                        {t("team.processing")}
                       </>
                     ) : (
-                      "Continue to billing"
+                      t("team.continueToBilling")
                     )}
                   </Button>
 
@@ -599,7 +617,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                     className="mt-4 w-full rounded-xl"
                     size="lg"
                   >
-                    Cancel
+                    {t("team.cancel")}
                   </Button>
                 </div>
               </div>

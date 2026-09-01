@@ -7,12 +7,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useTranslations } from "next-intl";
 import { useGlobalState } from "@/app/contexts/GlobalState";
 import type { QueueBehavior } from "@/types/chat";
 import { SandboxSelector } from "@/app/components/SandboxSelector";
 import { AgentPermissionSelector } from "@/app/components/AgentPermissionSelector";
 
 const AgentsTab = () => {
+  const t = useTranslations("settingsAgents");
   const {
     queueBehavior,
     setQueueBehavior,
@@ -27,11 +29,11 @@ const AgentsTab = () => {
   }> = [
     {
       value: "queue",
-      label: "Queue after current message",
+      label: t("agents.queueAfterCurrent"),
     },
     {
       value: "stop-and-send",
-      label: "Stop & send right away",
+      label: t("agents.stopAndSend"),
     },
   ];
 
@@ -41,9 +43,9 @@ const AgentsTab = () => {
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 border-b gap-3">
           <div className="flex-1">
-            <div className="font-medium">Default execution environment</div>
+            <div className="font-medium">{t("agents.defaultExecEnv")}</div>
             <div className="text-sm text-muted-foreground">
-              Choose the default sandbox environment for Agent mode
+              {t("agents.defaultExecEnvDesc")}
             </div>
           </div>
           <div className="w-full sm:w-auto">
@@ -60,9 +62,11 @@ const AgentsTab = () => {
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 border-b gap-3">
           <div className="flex-1">
-            <div className="font-medium">Default agent permissions</div>
+            <div className="font-medium">
+              {t("agents.defaultAgentPermissions")}
+            </div>
             <div className="text-sm text-muted-foreground">
-              Commands and file edits
+              {t("agents.commandsAndFileEdits")}
             </div>
           </div>
           <div className="w-full sm:w-auto">
@@ -76,10 +80,9 @@ const AgentsTab = () => {
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 border-b gap-3">
             <div className="flex-1">
-              <div className="font-medium">Queue Messages</div>
+              <div className="font-medium">{t("agents.queueMessages")}</div>
               <div className="text-sm text-muted-foreground">
-                Adjust the default behavior of sending a message while Agent is
-                streaming
+                {t("agents.queueMessagesDesc")}
               </div>
             </div>
             <Select

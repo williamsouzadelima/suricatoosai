@@ -1,6 +1,7 @@
 "use client";
 
 import { Folder, FolderMinus, LoaderCircle } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +31,7 @@ export function MoveChatToProjectDialog({
   open,
   onOpenChange,
 }: MoveChatToProjectDialogProps) {
+  const t = useTranslations("dialogs");
   const projectListData = useProjects();
   const projects = projectListData.results;
   const { movingDestination, moveToProject } = useMoveChatToProjectAction({
@@ -60,10 +62,8 @@ export function MoveChatToProjectDialog({
         showCloseButton={movingDestination === null}
       >
         <DialogHeader>
-          <DialogTitle>Move to project</DialogTitle>
-          <DialogDescription>
-            Choose the project where this task should appear.
-          </DialogDescription>
+          <DialogTitle>{t("moveChat.title")}</DialogTitle>
+          <DialogDescription>{t("moveChat.description")}</DialogDescription>
         </DialogHeader>
 
         <div className="max-h-72 space-y-1 overflow-y-auto py-2">
@@ -83,7 +83,7 @@ export function MoveChatToProjectDialog({
               ) : (
                 <FolderMinus className="size-4 shrink-0" aria-hidden="true" />
               )}
-              <span>Remove from project</span>
+              <span>{t("moveChat.removeFromProject")}</span>
             </Button>
           ) : null}
 
@@ -93,11 +93,11 @@ export function MoveChatToProjectDialog({
               role="status"
             >
               <LoaderCircle className="size-4 animate-spin" />
-              Loading projects…
+              {t("moveChat.loading")}
             </div>
           ) : projects.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              Create a project from the sidebar first.
+              {t("moveChat.empty")}
             </p>
           ) : (
             projects.map((project) => (
@@ -125,7 +125,7 @@ export function MoveChatToProjectDialog({
               role="status"
             >
               <LoaderCircle className="size-4 animate-spin" />
-              Loading more projects…
+              {t("moveChat.loadingMore")}
             </div>
           ) : null}
 
@@ -137,7 +137,7 @@ export function MoveChatToProjectDialog({
               onClick={() => projectListData.loadMore(10)}
               disabled={movingDestination !== null}
             >
-              Show more projects
+              {t("moveChat.showMore")}
             </Button>
           ) : null}
         </div>
@@ -149,7 +149,7 @@ export function MoveChatToProjectDialog({
             onClick={() => onOpenChange(false)}
             disabled={movingDestination !== null}
           >
-            Cancel
+            {t("moveChat.cancel")}
           </Button>
         </DialogFooter>
       </DialogContent>

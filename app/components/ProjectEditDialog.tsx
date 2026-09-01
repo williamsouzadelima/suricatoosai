@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { FolderOpen, X } from "lucide-react";
 import { toast } from "sonner";
 import type { Doc } from "@/convex/_generated/dataModel";
@@ -31,6 +32,7 @@ export function ProjectEditDialog({
   onOpenChange,
 }: ProjectEditDialogProps) {
   const updateProject = useUpdateProject();
+  const t = useTranslations("dialogs");
   const isMobile = useIsMobile();
   const [name, setName] = useState(project.name);
   const [folderPath, setFolderPath] = useState<string | null>(
@@ -82,13 +84,13 @@ export function ProjectEditDialog({
         name: trimmedName,
         ...(folderChanged ? { folderPath } : {}),
       });
-      toast.success("Project updated");
+      toast.success(t("projectEdit.updated"));
       onOpenChange(false);
     } catch (error) {
       console.error("Failed to update project:", error);
-      toast.error("Failed to update project", {
+      toast.error(t("projectEdit.updateError"), {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t("projectEdit.tryAgain"),
       });
     } finally {
       setIsSaving(false);
@@ -103,16 +105,16 @@ export function ProjectEditDialog({
       >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Edit project</DialogTitle>
+            <DialogTitle>{t("projectEdit.title")}</DialogTitle>
             <DialogDescription>
-              Choose a short, recognizable project name.
+              {t("projectEdit.description")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-5 py-5">
             <div className="space-y-2">
               <Label htmlFor={`project-name-${project._id}`}>
-                Project name
+                {t("projectEdit.nameLabel")}
               </Label>
               <Input
                 id={`project-name-${project._id}`}
@@ -135,7 +137,8 @@ export function ProjectEditDialog({
                   id={`project-folder-${project._id}`}
                   className="text-sm font-medium leading-none"
                 >
-                  Desktop folder{isDesktopApp ? " (optional)" : ""}
+                  {t("projectEdit.desktopFolder")}
+                  {isDesktopApp ? t("projectEdit.optionalSuffix") : ""}
                 </p>
 
                 {folderPath ? (
@@ -160,7 +163,9 @@ export function ProjectEditDialog({
                           onClick={handleChooseFolder}
                           disabled={isSaving || isPickingFolder}
                         >
-                          {isPickingFolder ? "Opening…" : "Change"}
+                          {isPickingFolder
+                            ? t("projectEdit.opening")
+                            : t("projectEdit.change")}
                         </Button>
                         <Button
                           type="button"
@@ -169,7 +174,7 @@ export function ProjectEditDialog({
                           className="size-7 shrink-0"
                           onClick={() => setFolderPath(null)}
                           disabled={isSaving || isPickingFolder}
-                          aria-label="Remove linked folder"
+                          aria-label={t("projectEdit.removeFolder")}
                         >
                           <X className="size-4" aria-hidden="true" />
                         </Button>
@@ -186,17 +191,17 @@ export function ProjectEditDialog({
                   >
                     <FolderOpen className="size-4" aria-hidden="true" />
                     {isPickingFolder
-                      ? "Opening folder picker…"
-                      : "Use existing folder"}
+                      ? t("projectEdit.openingPicker")
+                      : t("projectEdit.useFolder")}
                   </Button>
                 )}
 
                 <p className="text-xs text-muted-foreground" aria-live="polite">
                   {isDesktopApp
                     ? folderPath
-                      ? "New Agent tasks will start in this folder."
-                      : "Without a linked folder, this remains a lightweight project."
-                    : "Open Suricatoos Desktop to change or remove this folder."}
+                      ? t("projectEdit.helpLinked")
+                      : t("projectEdit.helpUnlinked")
+                    : t("projectEdit.helpWeb")}
                 </p>
               </div>
             ) : null}
@@ -209,13 +214,13 @@ export function ProjectEditDialog({
               onClick={() => setOpen(false)}
               disabled={isSaving || isPickingFolder}
             >
-              Cancel
+              {t("projectEdit.cancel")}
             </Button>
             <Button
               type="submit"
               disabled={!name.trim() || isSaving || isPickingFolder}
             >
-              {isSaving ? "Saving…" : "Save"}
+              {isSaving ? t("projectEdit.saving") : t("projectEdit.save")}
             </Button>
           </DialogFooter>
         </form>

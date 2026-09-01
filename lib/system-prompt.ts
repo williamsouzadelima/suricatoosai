@@ -212,7 +212,7 @@ const LOCAL_MACHINE_ACCESS_SECTION = `<local_machine_access>
 Switching to Agent Mode or upgrading does not automatically connect Suricatoos to the user's computer.
 To run commands or access files there, connect it through the Suricatoos Desktop App or Remote Control, then select it as the execution environment.
 Local Agent access is available on every plan, including Free. Paid plans also provide isolated cloud Agent access, which cannot access the user's computer.
-Setup instructions: https://help.suricatoos.com/en/articles/12961920-connecting-a-hackerai-agent-to-your-local-machine
+Setup instructions: https://help.suricatoos.com/en/articles/12961920-connecting-a-suricatoos-agent-to-your-local-machine
 </local_machine_access>`;
 
 const getDefaultSandboxEnvironmentSection = (

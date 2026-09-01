@@ -721,7 +721,7 @@ Commands run directly on the host OS "workstation" without Docker isolation. Be 
         sandboxContext,
       );
       const setupUrl =
-        "https://help.suricatoos.com/en/articles/12961920-connecting-a-hackerai-agent-to-your-local-machine";
+        "https://help.suricatoos.com/en/articles/12961920-connecting-a-suricatoos-agent-to-your-local-machine";
 
       expect(prompt).toContain("<local_machine_access>");
       expect(prompt).toContain(

@@ -845,7 +845,7 @@ async function runPythonScript(
   }
 
   const shell = await detectSandboxShell(sandbox);
-  const tempScriptPath = `/tmp/hackerai_script_${Date.now()}_${Math.random().toString(36).slice(2)}.py`;
+  const tempScriptPath = `/tmp/suricatoos_script_${Date.now()}_${Math.random().toString(36).slice(2)}.py`;
   await sandbox.files.write(tempScriptPath, script, {
     user: "user" as const,
   });
@@ -1108,7 +1108,7 @@ async function appendSandboxTextFile(
     return;
   }
 
-  const tempPath = `/tmp/hackerai_append_${Date.now()}_${Math.random().toString(36).slice(2)}.tmp`;
+  const tempPath = `/tmp/suricatoos_append_${Date.now()}_${Math.random().toString(36).slice(2)}.tmp`;
   await sandbox.files.write(tempPath, text, {
     user: "user" as const,
   });

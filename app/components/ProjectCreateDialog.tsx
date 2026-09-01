@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { FolderOpen, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ export function ProjectCreateDialog({
   showSuccessToast = true,
 }: ProjectCreateDialogProps) {
   const createProject = useCreateProject();
+  const t = useTranslations("dialogs");
   const isMobile = useIsMobile();
   const { desktopBridgeActive } = useGlobalState();
   const [name, setName] = useState("");
@@ -48,9 +50,9 @@ export function ProjectCreateDialog({
   const isDesktopApp = isTauriEnvironment();
   const folderHelpText = folderPath
     ? desktopBridgeActive
-      ? "New Agent tasks will start in this folder."
-      : "This folder will be ready for Agent tasks when Desktop finishes connecting."
-    : "Use an existing folder to make new Agent tasks start there, or skip this for a lightweight project.";
+      ? t("projectCreate.folderHelpConnected")
+      : t("projectCreate.folderHelpConnecting")
+    : t("projectCreate.folderHelpEmpty");
 
   useEffect(() => {
     if (!open) {
@@ -91,12 +93,12 @@ export function ProjectCreateDialog({
       });
       onCreated(projectId, trimmedName);
       onOpenChange(false);
-      if (showSuccessToast) toast.success("Project created");
+      if (showSuccessToast) toast.success(t("projectCreate.created"));
     } catch (error) {
       console.error("Failed to create project:", error);
-      toast.error("Failed to create project", {
+      toast.error(t("projectCreate.createError"), {
         description:
-          error instanceof Error ? error.message : "Please try again.",
+          error instanceof Error ? error.message : t("projectCreate.tryAgain"),
       });
     } finally {
       setIsSaving(false);
@@ -111,24 +113,26 @@ export function ProjectCreateDialog({
       >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Create project</DialogTitle>
+            <DialogTitle>{t("projectCreate.title")}</DialogTitle>
             <DialogDescription>
               {isDesktopApp
-                ? "Group related tasks and optionally link a local folder for Agent."
-                : "Group related tasks in one place."}
+                ? t("projectCreate.descDesktop")
+                : t("projectCreate.descWeb")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-5 py-5">
             <div className="space-y-2">
-              <Label htmlFor="project-name">Project name</Label>
+              <Label htmlFor="project-name">
+                {t("projectCreate.nameLabel")}
+              </Label>
               <Input
                 id="project-name"
                 name="projectName"
                 autoComplete="off"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="New project"
+                placeholder={t("projectCreate.namePlaceholder")}
                 maxLength={80}
                 autoFocus={isMobile === false}
                 disabled={isSaving}
@@ -141,7 +145,7 @@ export function ProjectCreateDialog({
                   id="project-folder-label"
                   className="text-sm font-medium leading-none"
                 >
-                  Local folder (optional)
+                  {t("projectCreate.folderLabel")}
                 </p>
                 {folderPath ? (
                   <div
@@ -162,7 +166,7 @@ export function ProjectCreateDialog({
                       className="size-7 shrink-0"
                       onClick={() => setFolderPath(null)}
                       disabled={isSaving}
-                      aria-label="Remove selected folder"
+                      aria-label={t("projectCreate.removeFolder")}
                     >
                       <X className="size-4" />
                     </Button>
@@ -178,8 +182,8 @@ export function ProjectCreateDialog({
                   >
                     <FolderOpen className="size-4" />
                     {isPickingFolder
-                      ? "Opening folder picker…"
-                      : "Use existing folder"}
+                      ? t("projectCreate.openingPicker")
+                      : t("projectCreate.useFolder")}
                   </Button>
                 )}
                 <p
@@ -200,13 +204,15 @@ export function ProjectCreateDialog({
               onClick={() => setOpen(false)}
               disabled={isSaving || isPickingFolder}
             >
-              Cancel
+              {t("projectCreate.cancel")}
             </Button>
             <Button
               type="submit"
               disabled={!name.trim() || isSaving || isPickingFolder}
             >
-              {isSaving ? "Creating…" : "Create project"}
+              {isSaving
+                ? t("projectCreate.creating")
+                : t("projectCreate.create")}
             </Button>
           </DialogFooter>
         </form>

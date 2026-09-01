@@ -1362,7 +1362,7 @@ describe("CentrifugoSandbox", () => {
       });
 
       await expect(
-        sandbox.files.write("/tmp/hackerai-transfer.ps1", "x".repeat(12_000)),
+        sandbox.files.write("/tmp/suricatoos-transfer.ps1", "x".repeat(12_000)),
       ).rejects.toThrow("relay disconnected");
 
       const firstChunk = commands.find((command) =>
@@ -1456,12 +1456,12 @@ describe("CentrifugoSandbox", () => {
 
       await sandbox.files.downloadFromUrl(
         "https://example.com/image.png?X-Amz-Algorithm=test&X-Amz-Credential=opaque&X-Amz-Signature=opaque",
-        "/tmp/hackerai-upload/image.png",
+        "/tmp/suricatoos-upload/image.png",
       );
 
       expect(runs[0]).toBe("echo $BASH_VERSION");
       expect(runs[1]).toContain(
-        'if not exist "C:\\temp\\hackerai-upload" mkdir "C:\\temp\\hackerai-upload"',
+        'if not exist "C:\\temp\\suricatoos-upload" mkdir "C:\\temp\\suricatoos-upload"',
       );
       expect(runs[1]).toContain(
         '"https://example.com/image.png?X-Amz-Algorithm=test&X-Amz-Credential=opaque&X-Amz-Signature=opaque"',
@@ -1493,11 +1493,11 @@ describe("CentrifugoSandbox", () => {
 
       await sandbox.files.downloadFromUrl(
         "https://example.com/image.png?X-Amz-Algorithm=test&X-Amz-Signature=opaque",
-        "/tmp/hackerai-upload/image.png",
+        "/tmp/suricatoos-upload/image.png",
       );
 
       expect(runs[0]).toBe("echo $BASH_VERSION");
-      expect(runs[1]).toContain("mkdir -p '/tmp/hackerai-upload'");
+      expect(runs[1]).toContain("mkdir -p '/tmp/suricatoos-upload'");
       expect(runs[1]).toContain(
         "'https://example.com/image.png?X-Amz-Algorithm=test&X-Amz-Signature=opaque'",
       );
@@ -1521,11 +1521,11 @@ describe("CentrifugoSandbox", () => {
 
       await sandbox.files.downloadFromUrl(
         "https://example.com/image.png?X-Amz-Signature=opaque",
-        "/tmp/hackerai-upload/image.png",
+        "/tmp/suricatoos-upload/image.png",
       );
 
       expect(runs[0]).toBe("echo $BASH_VERSION");
-      expect(runs[1]).toContain("mkdir -p '/tmp/hackerai-upload'");
+      expect(runs[1]).toContain("mkdir -p '/tmp/suricatoos-upload'");
       expect(runs[1]).not.toContain("if not exist");
       expect(sandbox.isWindows()).toBe(false);
     });
@@ -1535,17 +1535,17 @@ describe("CentrifugoSandbox", () => {
       // Mock validateDownloadUrl is real; use an https URL it accepts.
       await sandbox.files.downloadFromUrl(
         "https://example.com/image.png",
-        "/tmp/hackerai-upload/image.png",
+        "/tmp/suricatoos-upload/image.png",
       );
       const cmd = runs[0];
-      expect(cmd).toContain("mkdir -p '/c/temp/hackerai-upload'");
+      expect(cmd).toContain("mkdir -p '/c/temp/suricatoos-upload'");
       expect(cmd).toContain("curl -fsSL");
       expect(cmd).toContain("--ssl-no-revoke");
       expect(cmd).toContain("--retry 3");
       expect(cmd).toContain("--retry-delay 1");
       expect(cmd).toContain("--retry-all-errors");
       expect(cmd).toContain("--retry-connrefused");
-      expect(cmd).toContain("-o '/c/temp/hackerai-upload/image.png'");
+      expect(cmd).toContain("-o '/c/temp/suricatoos-upload/image.png'");
       expect(cmd).not.toContain("if not exist");
       expect(cmd).not.toContain("\\");
       expect(runOptions[0]).toMatchObject({
@@ -1578,7 +1578,7 @@ describe("CentrifugoSandbox", () => {
       const signedUrl = `https://example.com/image.png?X-Amz-Signature=${"a".repeat(6_000)}`;
       await sandbox.files.downloadFromUrl(
         signedUrl,
-        "/tmp/hackerai-upload/image.png",
+        "/tmp/suricatoos-upload/image.png",
       );
 
       expect(run).toHaveBeenNthCalledWith(1, "where curl 2>nul", {
@@ -1594,7 +1594,7 @@ describe("CentrifugoSandbox", () => {
       );
       expect(command.length).toBeLessThan(8_191);
       expect(command).not.toContain(signedUrl);
-      expect(command).not.toContain("C:\\temp\\hackerai-upload");
+      expect(command).not.toContain("C:\\temp\\suricatoos-upload");
 
       const scriptChunks = commands
         .filter((command) => command.startsWith("echo "))
@@ -1614,7 +1614,7 @@ describe("CentrifugoSandbox", () => {
         Buffer.from(signedUrl, "utf8").toString("base64"),
       );
       expect(script).toContain(
-        Buffer.from("C:\\temp\\hackerai-upload\\image.png", "utf8").toString(
+        Buffer.from("C:\\temp\\suricatoos-upload\\image.png", "utf8").toString(
           "base64",
         ),
       );
@@ -1642,7 +1642,7 @@ describe("CentrifugoSandbox", () => {
         if (command.startsWith("powershell ")) {
           return {
             stdout: "",
-            stderr: `Upload failed for ${uploadUrl} from C:\\temp\\hackerai-upload\\report.txt`,
+            stderr: `Upload failed for ${uploadUrl} from C:\\temp\\suricatoos-upload\\report.txt`,
             exitCode: 1,
           };
         }
@@ -1652,7 +1652,7 @@ describe("CentrifugoSandbox", () => {
 
       const uploadUrl = `https://example.com/upload?X-Amz-Signature=${"b".repeat(6_000)}`;
       const upload = sandbox.files.uploadToUrl(
-        "/tmp/hackerai-upload/report.txt",
+        "/tmp/suricatoos-upload/report.txt",
         uploadUrl,
         "text/plain",
       );
@@ -1661,7 +1661,7 @@ describe("CentrifugoSandbox", () => {
       );
       await expect(upload).rejects.not.toThrow(uploadUrl);
       await expect(upload).rejects.not.toThrow(
-        "C:\\temp\\hackerai-upload\\report.txt",
+        "C:\\temp\\suricatoos-upload\\report.txt",
       );
 
       const commands = run.mock.calls.map(([command]) => command as string);
@@ -1720,7 +1720,7 @@ describe("CentrifugoSandbox", () => {
       const remove = jest.fn(async () => undefined);
       sandbox.files.write = write;
       sandbox.files.remove = remove;
-      const nativeSource = "C:\\temp\\hackerai-upload\\report.txt";
+      const nativeSource = "C:\\temp\\suricatoos-upload\\report.txt";
       (sandbox as any).commands.run = jest.fn(async (command: string) =>
         command.startsWith("powershell.exe ")
           ? {
@@ -1733,7 +1733,7 @@ describe("CentrifugoSandbox", () => {
 
       await expect(
         sandbox.files.uploadToUrl(
-          "/tmp/hackerai-upload/report.txt",
+          "/tmp/suricatoos-upload/report.txt",
           "https://example.com/upload?X-Amz-Signature=opaque",
           "text/plain",
         ),
@@ -1743,7 +1743,7 @@ describe("CentrifugoSandbox", () => {
 
       const nativeScriptPath = write.mock.calls[0][0] as string;
       expect(nativeScriptPath).toMatch(
-        /^C:\\temp\\hackerai-transfer-[\w-]+\.ps1$/,
+        /^C:\\temp\\suricatoos-transfer-[\w-]+\.ps1$/,
       );
       const powerShellCommand = (sandbox as any).commands.run.mock.calls.find(
         ([command]: [string]) => command.startsWith("powershell.exe "),
@@ -1775,7 +1775,7 @@ describe("CentrifugoSandbox", () => {
       (sandbox as any).httpClient = "powershell";
       sandbox.files.write = jest.fn(async () => undefined);
       sandbox.files.remove = jest.fn(async () => undefined);
-      const nativeDestination = "C:\\temp\\hackerai-upload\\report.txt";
+      const nativeDestination = "C:\\temp\\suricatoos-upload\\report.txt";
       (sandbox as any).commands.run = jest.fn(async (command: string) =>
         command.startsWith("powershell.exe ")
           ? {
@@ -1793,7 +1793,7 @@ describe("CentrifugoSandbox", () => {
       await expect(
         sandbox.files.downloadFromUrl(
           "https://example.com/report.txt?X-Amz-Signature=opaque",
-          "/tmp/hackerai-upload/report.txt",
+          "/tmp/suricatoos-upload/report.txt",
         ),
       ).rejects.toThrow(
         "Failed to download file: Download failed at [redacted-destination-path]",
@@ -1810,7 +1810,7 @@ describe("CentrifugoSandbox", () => {
 
       await sandbox.files.downloadFromUrl(
         "https://example.com/image.png",
-        "/tmp/hackerai-upload/image.png",
+        "/tmp/suricatoos-upload/image.png",
       );
 
       expect(runs[0]).toContain("curl -fsSL");
@@ -1847,7 +1847,7 @@ describe("CentrifugoSandbox", () => {
       try {
         await sandbox.files.downloadFromUrl(
           "https://example.com/image.png",
-          "/tmp/hackerai-upload/image.png",
+          "/tmp/suricatoos-upload/image.png",
         );
 
         expect(run).toHaveBeenNthCalledWith(1, "command -v curl || true", {
@@ -1925,7 +1925,7 @@ describe("CentrifugoSandbox", () => {
 
       try {
         await sandbox.files.uploadToUrl(
-          "/tmp/hackerai-upload/report.txt",
+          "/tmp/suricatoos-upload/report.txt",
           "https://example.com/upload",
           "text/plain",
         );
@@ -1977,7 +1977,7 @@ describe("CentrifugoSandbox", () => {
       try {
         await expect(
           sandbox.files.uploadToUrl(
-            "/tmp/hackerai-upload/report.txt",
+            "/tmp/suricatoos-upload/report.txt",
             "https://example.com/upload",
             "text/plain",
           ),
@@ -2017,7 +2017,7 @@ describe("CentrifugoSandbox", () => {
       try {
         const promise = sandbox.files.downloadFromUrl(
           "https://example.com/image.png",
-          "/tmp/hackerai-upload/image.png",
+          "/tmp/suricatoos-upload/image.png",
         );
         await jest.advanceTimersByTimeAsync(500);
         await promise;
@@ -2060,7 +2060,7 @@ describe("CentrifugoSandbox", () => {
       await expect(
         sandbox.files.downloadFromUrl(
           "https://example.com/image.png",
-          "/tmp/hackerai-upload/image.png",
+          "/tmp/suricatoos-upload/image.png",
         ),
       ).rejects.toThrow("Failed to download file");
 
@@ -2098,7 +2098,7 @@ describe("CentrifugoSandbox", () => {
 
       await sandbox.files.downloadFromUrl(
         "https://example.com/image.png",
-        "/tmp/hackerai-upload/image.png",
+        "/tmp/suricatoos-upload/image.png",
       );
 
       expect(run).toHaveBeenNthCalledWith(
@@ -2117,7 +2117,7 @@ describe("CentrifugoSandbox", () => {
         "https://storage.example.com/opaque-object/private-image.png?X-Amz-Credential=" +
         "a".repeat(160) +
         "&X-Amz-Signature=secret";
-      const localPath = "/tmp/hackerai-upload/private-image.png";
+      const localPath = "/tmp/suricatoos-upload/private-image.png";
       (sandbox as any).commands.run = jest.fn(async (cmd: string) => {
         if (cmd.includes("target_dir_exists")) {
           return {
@@ -2156,7 +2156,7 @@ describe("CentrifugoSandbox", () => {
       const { sandbox, runs, runOptions } = createWindowsBashSandbox();
 
       await sandbox.files.uploadToUrl(
-        "/tmp/hackerai-upload/report.txt",
+        "/tmp/suricatoos-upload/report.txt",
         "https://example.com/upload",
         "text/plain",
       );
@@ -2164,7 +2164,7 @@ describe("CentrifugoSandbox", () => {
       expect(runs[0]).toContain("curl -fsSL --ssl-no-revoke -X PUT");
       expect(runs[0]).toContain("-H 'Content-Type: text/plain'");
       expect(runs[0]).toContain(
-        "--data-binary @'/c/temp/hackerai-upload/report.txt'",
+        "--data-binary @'/c/temp/suricatoos-upload/report.txt'",
       );
       expect(runOptions[0]).toMatchObject({
         displayName: "Uploading: report.txt",
@@ -2202,7 +2202,7 @@ describe("CentrifugoSandbox", () => {
 
       try {
         const promise = sandbox.files.uploadToUrl(
-          "/tmp/hackerai-upload/report.txt",
+          "/tmp/suricatoos-upload/report.txt",
           "https://example.com/upload",
           "text/plain",
         );
@@ -2258,7 +2258,7 @@ describe("CentrifugoSandbox", () => {
         const assertion = expect(
           sandbox.files.downloadFromUrl(
             "https://example.com/image.png",
-            "/tmp/hackerai-upload/image.png",
+            "/tmp/suricatoos-upload/image.png",
           ),
         ).rejects.toThrow("Failed to download file");
         await jest.advanceTimersByTimeAsync(5_000);
@@ -2299,7 +2299,7 @@ describe("CentrifugoSandbox", () => {
         const assertion = expect(
           sandbox.files.downloadFromUrl(
             "https://example.com/image.png",
-            "/tmp/hackerai-upload/image.png",
+            "/tmp/suricatoos-upload/image.png",
           ),
         ).rejects.toThrow("Failed to download file");
         await jest.advanceTimersByTimeAsync(5_000);
@@ -2328,7 +2328,7 @@ describe("CentrifugoSandbox", () => {
 
       const promise = sandbox.files.downloadFromUrl(
         "https://example.com/large.har",
-        "/tmp/hackerai-upload/large.har",
+        "/tmp/suricatoos-upload/large.har",
       );
 
       await jest.advanceTimersByTimeAsync(500);
@@ -2366,7 +2366,7 @@ describe("CentrifugoSandbox", () => {
       try {
         const promise = sandbox.files.downloadFromUrl(
           "https://example.com/large.har",
-          "/tmp/hackerai-upload/large.har",
+          "/tmp/suricatoos-upload/large.har",
         );
 
         await jest.advanceTimersByTimeAsync(500);
@@ -2421,7 +2421,7 @@ describe("CentrifugoSandbox", () => {
       try {
         const promise = sandbox.files.downloadFromUrl(
           "https://example.com/image.png",
-          "/tmp/hackerai-upload/image.png",
+          "/tmp/suricatoos-upload/image.png",
         );
 
         await jest.advanceTimersByTimeAsync(500);
@@ -2451,8 +2451,8 @@ describe("CentrifugoSandbox", () => {
 
     it("ensureDirectory emits mkdir -p with MSYS path", async () => {
       const { sandbox, runs } = createWindowsBashSandbox();
-      await (sandbox as any).ensureDirectory("C:\\temp\\hackerai-upload");
-      expect(runs[0]).toBe("mkdir -p '/c/temp/hackerai-upload'");
+      await (sandbox as any).ensureDirectory("C:\\temp\\suricatoos-upload");
+      expect(runs[0]).toBe("mkdir -p '/c/temp/suricatoos-upload'");
     });
 
     it("files.read uses cat with MSYS path", async () => {

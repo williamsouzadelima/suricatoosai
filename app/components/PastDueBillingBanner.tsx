@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { AlertTriangle, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ export function PastDueBillingBanner({
   isOpening,
   onUpdatePayment,
 }: PastDueBillingBannerProps) {
+  const t = useTranslations("pricing");
   useEffect(() => {
     captureAuthenticatedEvent(
       PAID_FUNNEL_EVENTS.recoveryPromptImpressed,
@@ -63,10 +65,7 @@ export function PastDueBillingBanner({
           aria-hidden="true"
           className="mt-0.5 h-4 w-4 shrink-0 text-amber-500"
         />
-        <p className="text-foreground">
-          Your renewal payment failed—update your payment method to keep your
-          plan.
-        </p>
+        <p className="text-foreground">{t("pastDue.renewalFailed")}</p>
       </div>
       <Button
         type="button"
@@ -79,10 +78,10 @@ export function PastDueBillingBanner({
         {isOpening ? (
           <>
             <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
-            Opening...
+            {t("pastDue.opening")}
           </>
         ) : (
-          "Update payment"
+          t("pastDue.updatePayment")
         )}
       </Button>
     </div>

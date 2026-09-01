@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -64,6 +65,7 @@ type PricingIntentCopy = {
 export function getPricingIntentCopy(
   context: PricingDialogContext | undefined,
   subscription: string,
+  t?: (key: string) => string,
 ): PricingIntentCopy | null {
   if (subscription !== "free") return null;
 
@@ -73,15 +75,28 @@ export function getPricingIntentCopy(
 
   if (source === "agent_mode_gate") {
     return {
-      title: "Unlock cloud Agent mode",
-      description:
-        "Use Agent without connecting a local sandbox, with higher limits, file uploads, and stronger models included.",
-      proDescription: "Cloud agents and higher limits",
-      proPlusDescription: "More usage for repeated Agent runs",
-      ultraDescription: "Maximum room for serious workloads",
-      proButtonText: "Use cloud Agent",
-      proPlusButtonText: "Get more Agent usage",
-      ultraButtonText: "Get Ultra",
+      title: t ? t("dialog.intent.agentMode.title") : "Unlock cloud Agent mode",
+      description: t
+        ? t("dialog.intent.agentMode.description")
+        : "Use Agent without connecting a local sandbox, with higher limits, file uploads, and stronger models included.",
+      proDescription: t
+        ? t("dialog.intent.agentMode.proDescription")
+        : "Cloud agents and higher limits",
+      proPlusDescription: t
+        ? t("dialog.intent.agentMode.proPlusDescription")
+        : "More usage for repeated Agent runs",
+      ultraDescription: t
+        ? t("dialog.intent.agentMode.ultraDescription")
+        : "Maximum room for serious workloads",
+      proButtonText: t
+        ? t("dialog.intent.agentMode.proButtonText")
+        : "Use cloud Agent",
+      proPlusButtonText: t
+        ? t("dialog.intent.agentMode.proPlusButtonText")
+        : "Get more Agent usage",
+      ultraButtonText: t
+        ? t("dialog.intent.agentMode.ultraButtonText")
+        : "Get Ultra",
     };
   }
 
@@ -94,15 +109,28 @@ export function getPricingIntentCopy(
     reason === "daily_requests_exhausted"
   ) {
     return {
-      title: "Keep working",
-      description:
-        "Upgrade to continue today with higher usage limits, file uploads, and stronger models for heavier security work.",
-      proDescription: "Continue with higher limits",
-      proPlusDescription: "More room for heavier work",
-      ultraDescription: "Maximum usage for intensive testing",
-      proButtonText: "Continue with Pro",
-      proPlusButtonText: "Keep going with Pro+",
-      ultraButtonText: "Scale up with Ultra",
+      title: t ? t("dialog.intent.limit.title") : "Keep working",
+      description: t
+        ? t("dialog.intent.limit.description")
+        : "Upgrade to continue today with higher usage limits, file uploads, and stronger models for heavier security work.",
+      proDescription: t
+        ? t("dialog.intent.limit.proDescription")
+        : "Continue with higher limits",
+      proPlusDescription: t
+        ? t("dialog.intent.limit.proPlusDescription")
+        : "More room for heavier work",
+      ultraDescription: t
+        ? t("dialog.intent.limit.ultraDescription")
+        : "Maximum usage for intensive testing",
+      proButtonText: t
+        ? t("dialog.intent.limit.proButtonText")
+        : "Continue with Pro",
+      proPlusButtonText: t
+        ? t("dialog.intent.limit.proPlusButtonText")
+        : "Keep going with Pro+",
+      ultraButtonText: t
+        ? t("dialog.intent.limit.ultraButtonText")
+        : "Scale up with Ultra",
     };
   }
 
@@ -126,6 +154,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
   footerNote,
   featureHeader,
 }) => {
+  const t = useTranslations("pricing");
   return (
     <div
       className={`border border-border md:min-h-[30rem] md:rounded-2xl relative flex w-full min-w-0 flex-col justify-center gap-4 rounded-xl px-6 py-6 text-sm bg-background ${customClassName}`}
@@ -175,7 +204,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
           {isButtonLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Upgrading...
+              {t("dialog.upgrading")}
             </>
           ) : (
             buttonText
@@ -213,6 +242,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
   context,
 }) => {
   const { user } = useAuth();
+  const t = useTranslations("pricing");
   const { subscription, isCheckingProPlan, setTeamPricingDialogOpen } =
     useGlobalState();
   const { upgradeLoading, handleUpgrade } = useUpgrade();
@@ -224,7 +254,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
     planName: string;
     price: number;
   } | null>(null);
-  const pricingIntentCopy = getPricingIntentCopy(context, subscription);
+  const pricingIntentCopy = getPricingIntentCopy(context, subscription, t);
 
   // Auto-close pricing dialog for ultra/team users (pro-plus can still upgrade to ultra)
   React.useEffect(() => {
@@ -319,14 +349,14 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
   const getFreeButtonConfig = () => {
     if (user && !isCheckingProPlan && subscription === "free") {
       return {
-        text: "Your current plan",
+        text: t("dialog.yourCurrentPlan"),
         disabled: true,
         className: "opacity-50 cursor-not-allowed",
         variant: "secondary" as const,
       };
     } else if (!user) {
       return {
-        text: "Get Started",
+        text: t("dialog.getStarted"),
         disabled: false,
         className: "",
         variant: "secondary" as const,
@@ -337,7 +367,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
       };
     } else {
       return {
-        text: "Current Plan",
+        text: t("dialog.currentPlan"),
         disabled: true,
         className: "opacity-50 cursor-not-allowed",
         variant: "secondary" as const,
@@ -349,7 +379,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
   const getProButtonConfig = () => {
     if (user && !isCheckingProPlan && subscription === "pro") {
       return {
-        text: "Current Plan",
+        text: t("dialog.currentPlan"),
         disabled: true,
         className: "opacity-50 cursor-not-allowed",
         variant: "secondary" as const,
@@ -357,14 +387,14 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
     } else if (user && subscription === "pro-plus") {
       // Pro+ users can't downgrade to Pro
       return {
-        text: "Pro",
+        text: t("dialog.pro"),
         disabled: true,
         className: "opacity-50 cursor-not-allowed",
         variant: "secondary" as const,
       };
     } else if (user) {
       return {
-        text: pricingIntentCopy?.proButtonText ?? "Get Pro",
+        text: pricingIntentCopy?.proButtonText ?? t("dialog.getPro"),
         disabled: upgradeLoading,
         className: "",
         variant: "default" as const,
@@ -378,7 +408,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
       };
     } else {
       return {
-        text: "Get Pro",
+        text: t("dialog.getPro"),
         disabled: false,
         className: "",
         variant: "default" as const,
@@ -394,7 +424,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
   const getProPlusButtonConfig = () => {
     if (user && !isCheckingProPlan && subscription === "pro-plus") {
       return {
-        text: "Current Plan",
+        text: t("dialog.currentPlan"),
         disabled: true,
         className: "opacity-50 cursor-not-allowed",
         variant: "secondary" as const,
@@ -402,8 +432,8 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
     } else if (user) {
       const buttonText =
         subscription === "pro"
-          ? "Upgrade to Pro+"
-          : (pricingIntentCopy?.proPlusButtonText ?? "Get Pro+");
+          ? t("dialog.upgradeToProPlus")
+          : (pricingIntentCopy?.proPlusButtonText ?? t("dialog.getProPlus"));
       return {
         text: buttonText,
         disabled: upgradeLoading,
@@ -419,7 +449,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
       };
     } else {
       return {
-        text: "Get Pro+",
+        text: t("dialog.getProPlus"),
         disabled: false,
         className: "font-semibold bg-[#615eeb] hover:bg-[#504bb8] text-white",
         variant: "default" as const,
@@ -435,7 +465,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
   const getUltraButtonConfig = () => {
     if (user && !isCheckingProPlan && subscription === "ultra") {
       return {
-        text: "Current Plan",
+        text: t("dialog.currentPlan"),
         disabled: true,
         className: "opacity-50 cursor-not-allowed",
         variant: "secondary" as const,
@@ -444,8 +474,8 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
       return {
         text:
           subscription === "pro" || subscription === "pro-plus"
-            ? "Upgrade to Ultra"
-            : (pricingIntentCopy?.ultraButtonText ?? "Get Ultra"),
+            ? t("dialog.upgradeToUltra")
+            : (pricingIntentCopy?.ultraButtonText ?? t("dialog.getUltra")),
         disabled: upgradeLoading,
         className: "font-semibold bg-[#615eeb] hover:bg-[#504bb8] text-white",
         variant: "default" as const,
@@ -459,7 +489,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
       };
     } else {
       return {
-        text: "Get Ultra",
+        text: t("dialog.getUltra"),
         disabled: false,
         className: "font-semibold bg-[#615eeb] hover:bg-[#504bb8] text-white",
         variant: "default" as const,
@@ -502,7 +532,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
             <div></div>
             <div className="my-1 flex flex-col items-center justify-center md:mt-0 md:mb-0">
               <DialogTitle className="text-3xl font-semibold">
-                {pricingIntentCopy?.title ?? "Upgrade your plan"}
+                {pricingIntentCopy?.title ?? t("dialog.title")}
               </DialogTitle>
               {pricingIntentCopy && (
                 <p className="text-muted-foreground mt-2 max-w-2xl text-center text-sm">
@@ -535,9 +565,9 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
             >
               {!hasSubscription && (
                 <PlanCard
-                  planName="Free"
+                  planName={t("dialog.plans.free")}
                   price={0}
-                  description="Try Suricatoos"
+                  description={t("dialog.freeDescription")}
                   features={freeFeatures}
                   buttonText={freeButtonConfig.text}
                   buttonVariant={freeButtonConfig.variant}
@@ -550,11 +580,11 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
               )}
 
               <PlanCard
-                planName="Pro"
+                planName={t("dialog.plans.pro")}
                 price={isYearly ? PRICING.pro.yearly : PRICING.pro.monthly}
                 description={
                   pricingIntentCopy?.proDescription ??
-                  "For everyday productivity"
+                  t("dialog.proDescription")
                 }
                 features={proFeatures}
                 buttonText={proButtonConfig.text}
@@ -570,7 +600,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
               />
 
               <PlanCard
-                planName="Pro+"
+                planName={t("dialog.plans.proPlus")}
                 price={
                   isYearly
                     ? PRICING["pro-plus"].yearly
@@ -578,7 +608,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
                 }
                 description={
                   pricingIntentCopy?.proPlusDescription ??
-                  "For power users who need more"
+                  t("dialog.proPlusDescription")
                 }
                 features={proPlusFeatures}
                 buttonText={proPlusButtonConfig.text}
@@ -588,16 +618,16 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
                 isButtonDisabled={proPlusButtonConfig.disabled}
                 isButtonLoading={proPlusButtonConfig.loading}
                 customClassName="order-3 border-[#CFCEFC] bg-[#F5F5FF] dark:bg-[#282841] dark:border-[#484777] md:order-none"
-                badgeText="RECOMMENDED"
+                badgeText={t("dialog.recommended")}
                 featureHeader={PLAN_HEADERS["pro-plus"]}
               />
 
               <PlanCard
-                planName="Ultra"
+                planName={t("dialog.plans.ultra")}
                 price={isYearly ? PRICING.ultra.yearly : PRICING.ultra.monthly}
                 description={
                   pricingIntentCopy?.ultraDescription ??
-                  "Get the most out of Suricatoos"
+                  t("dialog.ultraDescription")
                 }
                 features={ultraFeatures}
                 buttonText={ultraButtonConfig.text}
@@ -617,21 +647,21 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
                 className="rounded-full border border-border bg-background text-foreground hover:bg-muted/60"
                 onClick={handleTeamClick}
               >
-                View Team Plans
+                {t("dialog.viewTeamPlans")}
               </Button>
             </div>
 
             <p className="text-muted-foreground mx-auto mt-8 max-w-[88rem] text-center text-xs">
-              Learn how we handle your data on our{" "}
+              {t("dialog.dataHandlingPrefix")}
               <a
                 href="/trust"
                 target="_blank"
                 rel="noreferrer"
                 className="text-foreground underline underline-offset-2"
               >
-                Security &amp; Trust
-              </a>{" "}
-              page.
+                {t("dialog.securityTrustLink")}
+              </a>
+              {t("dialog.dataHandlingSuffix")}
             </p>
           </div>
         </DialogContent>

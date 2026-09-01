@@ -1,3 +1,4 @@
+import createNextIntlPlugin from "next-intl/plugin";
 import type { NextConfig } from "next";
 
 const postHogSourceMapApiKey = process.env.POSTHOG_CLI_API_KEY?.trim();
@@ -19,6 +20,8 @@ if (
     "[PostHog] Source maps are disabled. Set both POSTHOG_CLI_API_KEY and POSTHOG_CLI_PROJECT_ID to enable upload.",
   );
 }
+
+const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
 const nextConfig: NextConfig = {
   devIndicators: false,
@@ -92,4 +95,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

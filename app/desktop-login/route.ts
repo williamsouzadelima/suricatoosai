@@ -3,11 +3,14 @@ import { createOAuthState } from "@/lib/desktop-auth";
 import { workos } from "@/app/api/workos";
 import { getAuthRedirectPath } from "@/lib/auth/auth-redirect-intents";
 
+const APP_BASE_URL =
+  process.env.NEXT_PUBLIC_BASE_URL ?? "https://ai.suricatoos.com";
+
 const DESKTOP_AUTH_STATE_REGEX = /^[a-f0-9]{64}$/;
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const desktopCallbackUrl = `${url.origin}/api/auth/desktop-callback`;
+  const desktopCallbackUrl = `${APP_BASE_URL}/api/auth/desktop-callback`;
 
   try {
     if (!process.env.WORKOS_CLIENT_ID) {
@@ -15,7 +18,7 @@ export async function GET(request: Request) {
         "[Desktop Login] Missing WORKOS_CLIENT_ID environment variable",
       );
       return NextResponse.redirect(
-        new URL("/login?error=config_error", url.origin),
+        new URL("/login?error=config_error", APP_BASE_URL),
       );
     }
 
@@ -33,7 +36,7 @@ export async function GET(request: Request) {
     ) {
       console.warn("[Desktop Login] Missing or invalid desktop auth state");
       return NextResponse.redirect(
-        new URL("/login?error=state_error", url.origin),
+        new URL("/login?error=state_error", APP_BASE_URL),
       );
     }
 
@@ -51,7 +54,7 @@ export async function GET(request: Request) {
     if (!state) {
       console.error("[Desktop Login] Failed to create OAuth state");
       return NextResponse.redirect(
-        new URL("/login?error=state_error", url.origin),
+        new URL("/login?error=state_error", APP_BASE_URL),
       );
     }
 
@@ -67,7 +70,7 @@ export async function GET(request: Request) {
   } catch (err) {
     console.error("[Desktop Login] Failed to generate authorization URL:", err);
     return NextResponse.redirect(
-      new URL("/login?error=auth_init_failed", url.origin),
+      new URL("/login?error=auth_init_failed", APP_BASE_URL),
     );
   }
 }

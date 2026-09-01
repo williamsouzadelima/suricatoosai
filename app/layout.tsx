@@ -14,6 +14,8 @@ import { AgentApprovalProvider } from "./contexts/AgentApprovalContext";
 import { PostHogProvider } from "./providers";
 import { DataStreamProvider } from "./components/DataStreamProvider";
 import { ChunkLoadRecovery } from "./components/ChunkLoadRecovery";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages } from "next-intl/server";
 import { resolveClientInitialAuth } from "@/lib/auth/initial-auth";
 import {
   FIRST_TOUCH_ATTRIBUTION_COOKIE_NAME,
@@ -31,7 +33,8 @@ const geistMono = Geist_Mono({
 });
 
 const APP_NAME = "Suricatoos";
-const APP_DEFAULT_TITLE = "Suricatoos - AI-Powered Penetration Testing Assistant";
+const APP_DEFAULT_TITLE =
+  "Suricatoos - AI-Powered Penetration Testing Assistant";
 const APP_TITLE_TEMPLATE = "%s | Suricatoos";
 const APP_DESCRIPTION =
   "Suricatoos is an AI pentesting assistant that helps you scan targets, exploit vulnerabilities, analyze findings, and write reports faster.";
@@ -126,6 +129,8 @@ export default async function RootLayout({
   const firstTouchAttribution = parseFirstTouchAttribution(
     cookieStore.get(FIRST_TOUCH_ATTRIBUTION_COOKIE_NAME)?.value,
   );
+  const locale = await getLocale();
+  const messages = await getMessages();
 
   const content = (
     <GlobalStateProvider>
@@ -149,7 +154,7 @@ export default async function RootLayout({
 
   return (
     <html
-      lang="en"
+      lang={locale}
       className={`${geistSans.variable} ${geistMono.variable} dark h-full`}
       suppressHydrationWarning
     >
@@ -161,9 +166,11 @@ export default async function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className="antialiased h-full">
-        <ConvexClientProvider initialAuth={initialAuth}>
-          {content}
-        </ConvexClientProvider>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <ConvexClientProvider initialAuth={initialAuth}>
+            {content}
+          </ConvexClientProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

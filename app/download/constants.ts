@@ -1,5 +1,5 @@
 const GITHUB_RELEASE_BASE =
-  "https://github.com/williamsouzadelima/hackerai/releases/latest/download";
+  "https://github.com/williamsouzadelima/suricatoosai/releases/latest/download";
 
 export const downloadLinks = {
   macos: `${GITHUB_RELEASE_BASE}/Suricatoos-universal.dmg`,

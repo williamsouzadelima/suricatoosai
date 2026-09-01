@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { HackerAISVG } from "@/components/icons/hackerai-svg";
+import { useTranslations } from "next-intl";
 import { useGlobalState } from "../contexts/GlobalState";
 import { useChats } from "../hooks/useChats";
 import { useStartNewChat } from "../hooks/useStartNewChat";
@@ -78,6 +79,7 @@ const SidebarHeaderContentImpl: FC<SidebarHeaderContentImplProps> = ({
   isMobileOverlay,
   toggleSidebar,
 }) => {
+  const t = useTranslations("sidebar");
   const startNewChat = useStartNewChat();
   const { subscription, isCheckingProPlan } = useGlobalState();
 
@@ -145,7 +147,7 @@ const SidebarHeaderContentImpl: FC<SidebarHeaderContentImplProps> = ({
                 <SidebarIcon className="size-[18px]" />
               </Button>
             </TooltipTrigger>
-            <SidebarActionTooltip label="Toggle sidebar" side="right" />
+            <SidebarActionTooltip label={t("toggleSidebar")} side="right" />
           </Tooltip>
 
           {/* Sidebar Actions - Collapsed */}
@@ -164,7 +166,7 @@ const SidebarHeaderContentImpl: FC<SidebarHeaderContentImplProps> = ({
                     <SquarePen className="size-[18px]" />
                   </Button>
                 </TooltipTrigger>
-                <SidebarActionTooltip label="New task" side="right" />
+                <SidebarActionTooltip label={t("newTask")} side="right" />
               </Tooltip>
             </div>
 
@@ -177,13 +179,13 @@ const SidebarHeaderContentImpl: FC<SidebarHeaderContentImplProps> = ({
                     size="sm"
                     className="size-9 p-0 hover:bg-sidebar-accent/50"
                     onClick={handleSearchOpen}
-                    aria-label="Search"
+                    aria-label={t("search")}
                   >
                     <Search className="size-[18px]" />
                   </Button>
                 </TooltipTrigger>
                 <SidebarActionTooltip
-                  label="Search"
+                  label={t("search")}
                   shortcut={searchShortcutLabel}
                   side="right"
                 />
@@ -240,13 +242,13 @@ const SidebarHeaderContentImpl: FC<SidebarHeaderContentImplProps> = ({
                 size="icon-sm"
                 className="size-9 text-sidebar-foreground/65 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
                 onClick={handleSearchOpen}
-                aria-label="Search"
+                aria-label={t("search")}
               >
                 <Search className="size-[18px]" />
               </Button>
             </TooltipTrigger>
             <SidebarActionTooltip
-              label="Search"
+              label={t("search")}
               shortcut={searchShortcutLabel}
             />
           </Tooltip>
@@ -264,7 +266,7 @@ const SidebarHeaderContentImpl: FC<SidebarHeaderContentImplProps> = ({
                 <PanelLeft className="size-[18px]" />
               </Button>
             </TooltipTrigger>
-            <SidebarActionTooltip label="Toggle sidebar" />
+            <SidebarActionTooltip label={t("toggleSidebar")} />
           </Tooltip>
         </div>
       </div>
@@ -281,7 +283,7 @@ const SidebarHeaderContentImpl: FC<SidebarHeaderContentImplProps> = ({
           >
             <SquarePen className="size-4" />
             <div className="mr-2 flex-1 overflow-hidden text-clip whitespace-nowrap text-sm font-medium text-left">
-              New task
+              {t("newTask")}
             </div>
           </Button>
         </div>

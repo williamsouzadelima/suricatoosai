@@ -1,7 +1,15 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useTransition } from "react";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
+import { useLocale, useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
+import {
+  locales,
+  localeMeta,
+  setLocaleCookie,
+  type Locale,
+} from "@/i18n/config";
 import { useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
@@ -20,6 +28,7 @@ import {
   Gift,
   ShieldCheck,
   Zap,
+  Languages,
 } from "lucide-react";
 import Link from "next/link";
 import { useGlobalState } from "@/app/contexts/GlobalState";
@@ -138,6 +147,15 @@ const UpgradeBanner = ({ isCollapsed }: { isCollapsed: boolean }) => {
 const SidebarUserNav = ({ isCollapsed = false }: { isCollapsed?: boolean }) => {
   const { user } = useAuth();
   const { subscription } = useGlobalState();
+  const activeLocale = useLocale() as Locale;
+  const tLang = useTranslations("language");
+  const langRouter = useRouter();
+  const [, startLocaleTransition] = useTransition();
+  const changeLocale = (next: Locale) => {
+    if (next === activeLocale) return;
+    setLocaleCookie(next);
+    startLocaleTransition(() => langRouter.refresh());
+  };
   const [rateLimitsExpanded, setRateLimitsExpanded] = useState(false);
   const [referralDialogOpen, setReferralDialogOpen] = useState(false);
   const [tokenUsage, setTokenUsage] = useState<{
@@ -247,7 +265,7 @@ const SidebarUserNav = ({ isCollapsed = false }: { isCollapsed?: boolean }) => {
 
   const handleGitHub = () => {
     const newWindow = window.open(
-      "https://github.com/williamsouzadelima/hackerai",
+      "https://github.com/williamsouzadelima/suricatoosai",
       "_blank",
       "noopener,noreferrer",
     );
@@ -535,6 +553,43 @@ const SidebarUserNav = ({ isCollapsed = false }: { isCollapsed?: boolean }) => {
           )}
 
           <DropdownMenuSeparator />
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <DropdownMenuItem className="gap-4 cursor-pointer py-1.5">
+                <Languages className="h-4 w-4 text-foreground" />
+                <span>{tLang("label")}</span>
+                <span className="ml-auto flex items-center gap-1.5 text-muted-foreground">
+                  <span className="text-base leading-none">
+                    {(localeMeta[activeLocale] ?? localeMeta.en).flag}
+                  </span>
+                  <ChevronRight className="h-4 w-4" />
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              side={isMobile ? "top" : "right"}
+              align={isMobile ? "center" : "start"}
+              sideOffset={isMobile ? 8 : 4}
+              className="rounded-2xl"
+            >
+              {locales.map((l) => {
+                const meta = localeMeta[l];
+                return (
+                  <DropdownMenuItem
+                    key={l}
+                    onClick={() => changeLocale(l)}
+                    className={`py-1.5 ${l === activeLocale ? "font-semibold" : ""}`}
+                  >
+                    <span className="mr-2 text-base leading-none">
+                      {meta.flag}
+                    </span>
+                    <span>{meta.label}</span>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

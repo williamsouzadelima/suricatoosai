@@ -13,11 +13,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { useGlobalState } from "@/app/contexts/GlobalState";
 import { ManageSharedChatsDialog } from "./ManageSharedChatsDialog";
 import { formatTaskUiCopy } from "@/app/utils/task-ui-copy";
 
 const DataControlsTab = () => {
+  const t = useTranslations("settings");
   const { subscription } = useGlobalState();
   const [showDeleteChats, setShowDeleteChats] = useState(false);
   const [isDeletingChats, setIsDeletingChats] = useState(false);
@@ -35,7 +37,7 @@ const DataControlsTab = () => {
 
       if (!response.ok) {
         const errorMessage = await response.text();
-        throw new Error(errorMessage || "Failed to delete all tasks");
+        throw new Error(errorMessage || t("dataControls.failedDeleteTasks"));
       }
 
       setShowDeleteChats(false);
@@ -43,7 +45,9 @@ const DataControlsTab = () => {
     } catch (error) {
       console.error("Failed to delete all chats:", error);
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to delete all tasks";
+        error instanceof Error
+          ? error.message
+          : t("dataControls.failedDeleteTasks");
       toast.error(formatTaskUiCopy(errorMessage));
       setShowDeleteChats(false);
     } finally {
@@ -61,13 +65,13 @@ const DataControlsTab = () => {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Failed to delete sandbox");
+        throw new Error(data.error || t("dataControls.failedDeleteSandbox"));
       }
 
-      toast.success("Terminal sandbox deleted");
+      toast.success(t("dataControls.sandboxDeleted"));
     } catch (error) {
       console.error("Failed to delete sandbox:", error);
-      toast.error("Failed to delete terminal sandbox");
+      toast.error(t("dataControls.failedDeleteTerminalSandbox"));
     } finally {
       setShowDeleteSandboxes(false);
       setIsDeletingSandboxes(false);
@@ -80,18 +84,20 @@ const DataControlsTab = () => {
       <div>
         <div className="flex items-center justify-between py-3">
           <div>
-            <div className="font-medium">Shared tasks</div>
+            <div className="font-medium">
+              {t("dataControls.sharedTasksTitle")}
+            </div>
             <div className="text-sm text-muted-foreground mt-1">
-              Manage your publicly shared conversations
+              {t("dataControls.sharedTasksDescription")}
             </div>
           </div>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowManageSharedChats(true)}
-            aria-label="Manage shared tasks"
+            aria-label={t("dataControls.manageSharedTasksAria")}
           >
-            Manage
+            {t("dataControls.manage")}
           </Button>
         </div>
       </div>
@@ -103,15 +109,17 @@ const DataControlsTab = () => {
       <div>
         <div className="flex items-center justify-between py-3">
           <div>
-            <div className="font-medium">Delete all tasks</div>
+            <div className="font-medium">
+              {t("dataControls.deleteAllTasksTitle")}
+            </div>
           </div>
           <Button
             variant="destructive"
             size="sm"
             onClick={() => setShowDeleteChats(true)}
-            aria-label="Delete all tasks"
+            aria-label={t("dataControls.deleteAllTasksAria")}
           >
-            Delete all
+            {t("dataControls.deleteAll")}
           </Button>
         </div>
       </div>
@@ -121,18 +129,20 @@ const DataControlsTab = () => {
         <div>
           <div className="flex items-center justify-between py-3">
             <div>
-              <div className="font-medium">Delete terminal sandbox</div>
+              <div className="font-medium">
+                {t("dataControls.deleteSandboxTitle")}
+              </div>
               <div className="text-sm text-muted-foreground mt-1">
-                Remove all files and data from terminal
+                {t("dataControls.deleteSandboxDescription")}
               </div>
             </div>
             <Button
               variant="destructive"
               size="sm"
               onClick={() => setShowDeleteSandboxes(true)}
-              aria-label="Delete terminal sandbox"
+              aria-label={t("dataControls.deleteSandboxAria")}
             >
-              Delete
+              {t("dataControls.delete")}
             </Button>
           </div>
         </div>
@@ -144,16 +154,18 @@ const DataControlsTab = () => {
       {/* Security & Trust Section */}
       <div className="py-3">
         <div className="text-sm text-muted-foreground">
-          Learn how Suricatoos handles your data on our{" "}
-          <a
-            href="/trust"
-            target="_blank"
-            rel="noreferrer"
-            className="text-foreground underline underline-offset-2"
-          >
-            Security &amp; Trust
-          </a>{" "}
-          page.
+          {t.rich("dataControls.securityTrustNotice", {
+            link: (chunks) => (
+              <a
+                href="/trust"
+                target="_blank"
+                rel="noreferrer"
+                className="text-foreground underline underline-offset-2"
+              >
+                {chunks}
+              </a>
+            ),
+          })}
         </div>
       </div>
 
@@ -162,23 +174,24 @@ const DataControlsTab = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Clear your task history - are you sure?
+              {t("dataControls.clearHistoryTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete all
-              your tasks and remove all associated data from our servers.
+              {t("dataControls.clearHistoryDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeletingChats}>
-              Cancel
+              {t("dataControls.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteAllChats}
               disabled={isDeletingChats}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isDeletingChats ? "Deleting..." : "Confirm deletion"}
+              {isDeletingChats
+                ? t("dataControls.deleting")
+                : t("dataControls.confirmDeletion")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -192,24 +205,24 @@ const DataControlsTab = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Delete terminal sandbox - are you sure?
+              {t("dataControls.deleteSandboxConfirmTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently remove all
-              files and data from your terminal sandbox. Any running processes
-              and active Agent or validation runs will be stopped.
+              {t("dataControls.deleteSandboxConfirmDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeletingSandboxes}>
-              Cancel
+              {t("dataControls.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteSandboxes}
               disabled={isDeletingSandboxes}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isDeletingSandboxes ? "Deleting..." : "Delete"}
+              {isDeletingSandboxes
+                ? t("dataControls.deleting")
+                : t("dataControls.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

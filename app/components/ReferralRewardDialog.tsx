@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import {
   ArrowLeft,
   Check,
@@ -47,6 +48,7 @@ export function ReferralRewardDialog({
   open,
   onOpenChange,
 }: ReferralRewardDialogProps) {
+  const t = useTranslations("dialogs");
   const [program, setProgram] = React.useState<ReferralProgram | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -68,7 +70,7 @@ export function ReferralRewardDialog({
       .then(async (response) => {
         const body = await response.json().catch(() => ({}));
         if (!response.ok) {
-          throw new Error(body.error || "Unable to load referral link");
+          throw new Error(body.error || t("referral.loadLinkError"));
         }
         return body as ReferralProgram;
       })
@@ -84,9 +86,7 @@ export function ReferralRewardDialog({
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(
-          err instanceof Error ? err.message : "Unable to load referral",
-        );
+        setError(err instanceof Error ? err.message : t("referral.loadError"));
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
@@ -103,29 +103,29 @@ export function ReferralRewardDialog({
     try {
       await navigator.clipboard.writeText(program.referralUrl);
       setCopied(true);
-      toast.success("Referral link copied");
+      toast.success(t("referral.linkCopied"));
       captureAuthenticatedEvent("referral_link_copied", {
         referral_code: program.code,
         referrer_subscription_tier: program.referrerSubscriptionTier,
       });
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      toast.error("Unable to copy referral link");
+      toast.error(t("referral.copyError"));
     }
   };
 
   const referrerReward = program?.referrerRewardDollars ?? 0;
-  const referrerRewardTitle = `Earn $${referrerReward} in extra usage credits`;
-  const referrerRewardCopy = (
-    <>
-      You get <b>${referrerReward} in extra usage credits</b> when they upgrade
-    </>
-  );
+  const referrerRewardTitle = t("referral.rewardTitle", {
+    amount: referrerReward,
+  });
+  const referrerRewardCopy = t.rich("referral.rewardCopy", {
+    amount: referrerReward,
+    b: (chunks) => <b>{chunks}</b>,
+  });
   const referredSignupBonusUnits = program?.referredSignupBonusUnits ?? 0;
-  const referredSignupBonusCopy =
-    referredSignupBonusUnits > 0
-      ? `${referredSignupBonusUnits} extra free request${referredSignupBonusUnits === 1 ? "" : "s"}`
-      : "extra free requests";
+  const referredSignupBonusCopy = t("referral.signupBonus", {
+    count: referredSignupBonusUnits,
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -141,14 +141,13 @@ export function ReferralRewardDialog({
                 onClick={() => setView("main")}
               >
                 <ArrowLeft className="size-4" />
-                Back
+                {t("referral.back")}
               </Button>
               <DialogTitle className="text-lg leading-none font-medium">
-                General referral guidelines
+                {t("referral.guidelinesTitle")}
               </DialogTitle>
               <DialogDescription className="sr-only">
-                How the Suricatoos referral program works and what activity is
-                eligible for rewards.
+                {t("referral.guidelinesSrDescription")}
               </DialogDescription>
             </DialogHeader>
 
@@ -156,69 +155,58 @@ export function ReferralRewardDialog({
               <ul className="flex list-disc flex-col gap-2 px-5">
                 <li>
                   <span className="text-muted-foreground text-sm">
-                    Referral links are available to paid Suricatoos customers and
-                    apply to new users who sign up through your link only.
+                    {t("referral.guideline1")}
                   </span>
                 </li>
                 <li>
                   <span className="text-muted-foreground text-sm">
-                    Rewards are earned once your invitee creates a new account
-                    and subscribes to any paid Suricatoos plan. No credit is
-                    granted for inactive or incomplete referrals.
+                    {t("referral.guideline2")}
                   </span>
                 </li>
                 <li>
                   <span className="text-muted-foreground text-sm">
-                    We may review referral activity and account quality to
-                    prevent abuse, spam, disposable accounts, or other
-                    low-quality participation.
+                    {t("referral.guideline3")}
                   </span>
                 </li>
                 <li>
                   <span className="text-muted-foreground text-sm">
-                    Each new user can generate only one (1) reward. No stacking
-                    or loophole hunting.
+                    {t("referral.guideline4")}
                   </span>
                 </li>
                 <li>
                   <span className="text-muted-foreground text-sm">
-                    Deleting and recreating an account does not reset usage
-                    limits or referral eligibility.
+                    {t("referral.guideline5")}
                   </span>
                 </li>
                 <li>
                   <span className="text-muted-foreground text-sm">
-                    Please avoid spamming or misusing your referral link to earn
-                    credits without bringing legitimate users to the platform.
-                    Our systems actively monitor referral engagement and flag
-                    unusual activity.
+                    {t("referral.guideline6")}
                   </span>
                 </li>
                 <li>
                   <span className="text-muted-foreground text-sm">
-                    If we detect suspicious or non-compliant activity, we
-                    reserve the right to withhold rewards or deactivate your
-                    referral link.
+                    {t("referral.guideline7")}
                   </span>
                 </li>
                 <li>
                   <span className="text-muted-foreground text-sm">
-                    We may update, pause, or discontinue this program at any
-                    time as we continue to experiment and improve.
+                    {t("referral.guideline8")}
                   </span>
                 </li>
               </ul>
               <p className="text-muted-foreground mt-4 px-5 text-sm">
-                For complete terms of service and referral rules, see{" "}
-                <a
-                  href="/terms-of-service"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-foreground hover:text-foreground/80 underline"
-                >
-                  Suricatoos Terms
-                </a>
-                .
+                {t.rich("referral.termsText", {
+                  link: (chunks) => (
+                    <a
+                      href="/terms-of-service"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-foreground hover:text-foreground/80 underline"
+                    >
+                      {chunks}
+                    </a>
+                  ),
+                })}
               </p>
             </div>
           </>
@@ -232,7 +220,7 @@ export function ReferralRewardDialog({
                 {referrerRewardTitle}
               </DialogTitle>
               <DialogDescription className="text-muted-foreground max-w-xs text-sm">
-                Invite friends. When they upgrade, you both win.
+                {t("referral.inviteTagline")}
               </DialogDescription>
             </DialogHeader>
 
@@ -240,7 +228,7 @@ export function ReferralRewardDialog({
               <>
                 <div className="md:py-2">
                   <div className="text-muted-foreground mb-3 text-base font-normal">
-                    How it works:
+                    {t("referral.howItWorks")}
                   </div>
                   <ul className="flex flex-col gap-4" aria-hidden="true">
                     {[0, 1, 2].map((i) => (
@@ -270,7 +258,7 @@ export function ReferralRewardDialog({
                   <Skeleton className="h-5 w-40" />
                 </div>
                 <span className="sr-only" role="status">
-                  Loading your referral link…
+                  {t("referral.loadingLink")}
                 </span>
               </>
             ) : error ? (
@@ -281,7 +269,7 @@ export function ReferralRewardDialog({
               <>
                 <div className="md:py-2">
                   <div className="text-muted-foreground mb-3 text-base font-normal">
-                    How it works:
+                    {t("referral.howItWorks")}
                   </div>
                   <ul className="flex flex-col gap-4">
                     <li className="flex items-center gap-3">
@@ -289,7 +277,7 @@ export function ReferralRewardDialog({
                         <Zap className="size-5" />
                       </span>
                       <span className="text-foreground text-base font-normal">
-                        Share your invite link
+                        {t("referral.stepShare")}
                       </span>
                     </li>
                     <li className="flex items-center gap-3">
@@ -297,7 +285,10 @@ export function ReferralRewardDialog({
                         <UserPlus className="size-5" />
                       </span>
                       <span className="text-foreground text-base font-normal">
-                        They sign up and get <b>{referredSignupBonusCopy}</b>
+                        {t.rich("referral.stepSignup", {
+                          bonus: referredSignupBonusCopy,
+                          b: (chunks) => <b>{chunks}</b>,
+                        })}
                       </span>
                     </li>
                     <li className="flex items-center gap-3">
@@ -317,18 +308,18 @@ export function ReferralRewardDialog({
                       <b className="tabular-nums">
                         {program.stats.attributedSignups}
                       </b>{" "}
-                      signed up,{" "}
+                      {t("referral.signedUp")}{" "}
                       <b className="tabular-nums">
                         {program.stats.paidConversions}
                       </b>{" "}
-                      converted
+                      {t("referral.converted")}
                       {program.stats.awardedDollars > 0 ? (
                         <>
                           ,{" "}
                           <b className="tabular-nums">
                             ${program.stats.awardedDollars}
                           </b>{" "}
-                          earned
+                          {t("referral.earned")}
                         </>
                       ) : null}
                     </span>
@@ -345,7 +336,7 @@ export function ReferralRewardDialog({
                           marginSize={0}
                           className="size-full"
                           role="img"
-                          aria-label="Referral invite QR code"
+                          aria-label={t("referral.qrLabel")}
                         />
                       </div>
                     ) : null}
@@ -355,11 +346,11 @@ export function ReferralRewardDialog({
                         <LinkIcon className="text-muted-foreground mr-2 size-4 shrink-0" />
                         <span
                           className="text-foreground min-w-0 flex-1 truncate text-sm"
-                          aria-label="Referral link"
+                          aria-label={t("referral.linkLabel")}
                         >
                           {program.active
                             ? program.referralUrl
-                            : "Link inactive"}
+                            : t("referral.linkInactive")}
                         </span>
                       </div>
                       <Button
@@ -367,17 +358,17 @@ export function ReferralRewardDialog({
                         onClick={copyLink}
                         disabled={!program.active}
                         className="h-10 w-full rounded-[10px]"
-                        aria-label="Copy referral link"
+                        aria-label={t("referral.copyLinkAria")}
                       >
                         {copied ? (
                           <>
                             <Check className="size-5" />
-                            Copied
+                            {t("referral.copied")}
                           </>
                         ) : (
                           <>
                             <Copy className="size-5" />
-                            Copy link
+                            {t("referral.copyLink")}
                           </>
                         )}
                       </Button>
@@ -393,7 +384,7 @@ export function ReferralRewardDialog({
                     className="text-foreground"
                     onClick={() => setView("guidelines")}
                   >
-                    View Terms and Conditions
+                    {t("referral.viewTerms")}
                   </Button>
                 </div>
               </>

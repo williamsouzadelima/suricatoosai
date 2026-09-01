@@ -1051,7 +1051,7 @@ Browser automation is host-dependent on this connection. Chromium and agent-brow
   }
 
   /**
-   * Convert Unix-style paths (e.g. /tmp/hackerai-upload/file.png) to
+   * Convert Unix-style paths (e.g. /tmp/suricatoos-upload/file.png) to
    * Windows-native paths when running on a Windows sandbox.
    * Paths are generated before the sandbox platform is known, so they
    * always arrive in Unix form and need translating here.
@@ -1322,7 +1322,7 @@ Browser automation is host-dependent on this connection. Chromium and agent-brow
   private async preparePowerShellCommand(
     script: string,
   ): Promise<{ command: string; cleanup: () => Promise<void> }> {
-    const scriptPath = `/tmp/hackerai-transfer-${crypto.randomUUID()}.ps1`;
+    const scriptPath = `/tmp/suricatoos-transfer-${crypto.randomUUID()}.ps1`;
     const nativeScriptPath = this.toNativePath(
       this.resolveWorkingPath(scriptPath),
     );
@@ -1881,7 +1881,7 @@ Browser automation is host-dependent on this connection. Chromium and agent-brow
           const diagDir = escapedDir || (useBash ? "/" : '"."');
           const diagCmd = useBash
             ? `test -d ${diagDir} && echo target_dir_exists=true || echo target_dir_exists=false; test -w ${diagDir} && echo target_dir_writable=true || echo target_dir_writable=false; df -h /tmp 2>&1 | sed -n '1,2p'`
-            : `if exist ${diagDir} (echo target_dir_exists=true) else (echo target_dir_exists=false) & (pushd ${diagDir} >nul 2>nul && (copy /Y NUL .hackerai_write_probe.tmp >nul 2>nul && del /q .hackerai_write_probe.tmp >nul 2>nul && echo target_dir_writable=true || echo target_dir_writable=false) & popd >nul 2>nul) || echo target_dir_writable=false`;
+            : `if exist ${diagDir} (echo target_dir_exists=true) else (echo target_dir_exists=false) & (pushd ${diagDir} >nul 2>nul && (copy /Y NUL .suricatoos_write_probe.tmp >nul 2>nul && del /q .suricatoos_write_probe.tmp >nul 2>nul && echo target_dir_writable=true || echo target_dir_writable=false) & popd >nul 2>nul) || echo target_dir_writable=false`;
           const diag = await this.commands.run(diagCmd, { displayName: "" });
           const safeStderr = redactTransferDetails(result.stderr, url, [
             rawPath,

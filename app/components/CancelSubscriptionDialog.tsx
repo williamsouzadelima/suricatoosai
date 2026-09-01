@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import {
   Dialog,
   DialogContent,
@@ -108,6 +109,7 @@ export const CancelSubscriptionDialog = ({
   onCancellationCompleted,
 }: CancelSubscriptionDialogProps) => {
   const { subscription } = useGlobalState();
+  const t = useTranslations("pricing");
   const [isProcessing, setIsProcessing] = useState(false);
   const [reasonCategory, setReasonCategory] = useState<
     CancellationReasonCategory | ""
@@ -231,19 +233,17 @@ export const CancelSubscriptionDialog = ({
       });
       toast.success(
         result.alreadyScheduled
-          ? "Subscription already scheduled to cancel"
+          ? t("cancel.toastAlreadyScheduled")
           : result.cancelAtPeriodEnd
-            ? "Subscription scheduled to cancel"
-            : "Subscription canceled. Payment retries stopped.",
+            ? t("cancel.toastScheduled")
+            : t("cancel.toastCanceled"),
       );
     } catch (error) {
       if (!openRef.current || requestIdRef.current !== requestId) {
         return;
       }
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to cancel subscription",
+        error instanceof Error ? error.message : t("cancel.toastFailed"),
       );
     } finally {
       if (openRef.current && requestIdRef.current === requestId) {
@@ -335,13 +335,13 @@ export const CancelSubscriptionDialog = ({
       : Heart;
   const stepLabel = cancellationResult
     ? canceledImmediately
-      ? "Subscription canceled"
-      : "Cancellation scheduled"
+      ? t("cancel.stepCanceled")
+      : t("cancel.stepScheduled")
     : isConfirmStep
-      ? "Final confirmation"
+      ? t("cancel.stepFinalConfirmation")
       : isDetailsStep
-        ? "Your feedback"
-        : "Main reason";
+        ? t("cancel.stepYourFeedback")
+        : t("cancel.stepMainReason");
   const selectedReasonLabel = CANCELLATION_REASON_OPTIONS.find(
     (option) => option.value === reasonCategory,
   )?.label;
@@ -371,7 +371,7 @@ export const CancelSubscriptionDialog = ({
           </div>
           <button
             type="button"
-            aria-label="Close"
+            aria-label={t("cancel.closeAria")}
             onClick={() => handleOpenChange(false)}
             disabled={isProcessing}
             className="flex size-8 shrink-0 items-center justify-center rounded-md bg-premium-bg text-premium-text transition-colors hover:bg-premium-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
@@ -386,15 +386,20 @@ export const CancelSubscriptionDialog = ({
               <DialogHeader className="gap-3 text-left sm:text-left">
                 <DialogTitle className="text-3xl leading-tight font-semibold sm:text-4xl">
                   {canceledImmediately
-                    ? "Subscription canceled"
-                    : "Cancellation scheduled"}
+                    ? t("cancel.stepCanceled")
+                    : t("cancel.stepScheduled")}
                 </DialogTitle>
                 <DialogDescription className="text-base leading-7">
                   {canceledImmediately
-                    ? `Your ${planName} subscription is canceled. We won't retry the failed renewal payment.`
+                    ? t("cancel.resultCanceledDesc", { plan: planName })
                     : periodEndDate
-                      ? `You'll keep your ${planName} plan until ${periodEndDate}.`
-                      : `You'll keep your ${planName} plan until the end of your current billing period.`}
+                      ? t("cancel.resultKeepUntilDate", {
+                          plan: planName,
+                          date: periodEndDate,
+                        })
+                      : t("cancel.resultKeepUntilPeriodEnd", {
+                          plan: planName,
+                        })}
                 </DialogDescription>
               </DialogHeader>
             </div>
@@ -403,7 +408,7 @@ export const CancelSubscriptionDialog = ({
                 className="h-11 w-full sm:w-44"
                 onClick={() => handleOpenChange(false)}
               >
-                Done
+                {t("cancel.done")}
               </Button>
             </DialogFooter>
           </>
@@ -412,10 +417,10 @@ export const CancelSubscriptionDialog = ({
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-7 sm:px-8">
               <DialogHeader className="gap-4 text-left sm:text-left">
                 <DialogTitle className="text-3xl leading-tight font-semibold sm:text-4xl">
-                  Are you sure you want to cancel?
+                  {t("cancel.confirmTitle")}
                 </DialogTitle>
                 <DialogDescription className="text-base leading-7">
-                  {`You'll keep your ${planName} plan through any period you've already paid for. If a renewal payment is overdue, cancellation takes effect immediately and stops further retries.`}
+                  {t("cancel.confirmDesc", { plan: planName })}
                 </DialogDescription>
               </DialogHeader>
 
@@ -432,12 +437,14 @@ export const CancelSubscriptionDialog = ({
 
               <div className="mt-5 rounded-md border border-border bg-background/60 p-3 text-sm text-muted-foreground">
                 <p>
-                  <span className="font-medium text-foreground">Reason:</span>{" "}
+                  <span className="font-medium text-foreground">
+                    {t("cancel.reasonLabel")}
+                  </span>{" "}
                   {selectedReasonLabel}
                 </p>
                 <p className="mt-1">
                   <span className="font-medium text-foreground">
-                    What happened:
+                    {t("cancel.whatHappenedLabel")}
                   </span>{" "}
                   {selectedReasonSubcategoryLabel}
                 </p>
@@ -454,7 +461,7 @@ export const CancelSubscriptionDialog = ({
                 {isProcessing ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
-                  "Confirm & Cancel"
+                  t("cancel.confirmCancelButton")
                 )}
               </Button>
               <Button
@@ -463,7 +470,7 @@ export const CancelSubscriptionDialog = ({
                 disabled={isProcessing}
                 className="h-11 w-full sm:w-36"
               >
-                Back
+                {t("cancel.back")}
               </Button>
             </div>
           </>
@@ -472,16 +479,16 @@ export const CancelSubscriptionDialog = ({
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-7 sm:px-8">
               <DialogHeader className="gap-3 text-left sm:text-left">
                 <DialogTitle className="text-3xl leading-tight font-semibold sm:text-4xl">
-                  Tell us what happened
+                  {t("cancel.detailsTitle")}
                 </DialogTitle>
                 <DialogDescription className="text-base leading-7">
-                  A little more detail helps us focus on the right improvement.
+                  {t("cancel.detailsDesc")}
                 </DialogDescription>
               </DialogHeader>
 
               <div className="mt-6 rounded-md border border-border bg-muted/40 p-3 text-sm">
                 <span className="font-medium text-foreground">
-                  Main reason:
+                  {t("cancel.mainReasonLabel")}
                 </span>{" "}
                 <span className="text-muted-foreground">
                   {selectedReasonLabel}
@@ -490,7 +497,7 @@ export const CancelSubscriptionDialog = ({
 
               <div className="mt-6 space-y-2">
                 <Label id="cancellation-reason-subcategory-label">
-                  What best describes what happened?
+                  {t("cancel.describeWhatHappened")}
                 </Label>
                 <div
                   className="space-y-2"
@@ -535,14 +542,14 @@ export const CancelSubscriptionDialog = ({
                 </div>
                 {subcategoryMissing ? (
                   <p className="text-xs text-destructive">
-                    Please select what best describes the issue.
+                    {t("cancel.subcategoryMissing")}
                   </p>
                 ) : null}
               </div>
 
               <div className="mt-6 space-y-2">
                 <Label htmlFor="cancellation-reason-details">
-                  Tell us a little more
+                  {t("cancel.tellUsMore")}
                 </Label>
                 <Textarea
                   id="cancellation-reason-details"
@@ -554,12 +561,12 @@ export const CancelSubscriptionDialog = ({
                   maxLength={2000}
                   disabled={isProcessing}
                   aria-invalid={detailsMissing}
-                  placeholder="A short note is required before continuing."
+                  placeholder={t("cancel.detailsPlaceholder")}
                   className="min-h-28 resize-none bg-muted/30"
                 />
                 {detailsMissing ? (
                   <p className="text-xs text-destructive">
-                    Please write a cancellation reason.
+                    {t("cancel.detailsMissing")}
                   </p>
                 ) : null}
               </div>
@@ -574,7 +581,7 @@ export const CancelSubscriptionDialog = ({
                   !hasRequiredDetails && "opacity-60",
                 )}
               >
-                Next
+                {t("cancel.next")}
               </Button>
               <Button
                 variant="outline"
@@ -582,7 +589,7 @@ export const CancelSubscriptionDialog = ({
                 disabled={isProcessing}
                 className="h-11 w-full sm:w-36"
               >
-                Back
+                {t("cancel.back")}
               </Button>
             </div>
           </>
@@ -591,17 +598,17 @@ export const CancelSubscriptionDialog = ({
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-7 sm:px-8">
               <DialogHeader className="gap-3 text-left sm:text-left">
                 <DialogTitle className="text-3xl leading-tight font-semibold sm:text-4xl">
-                  Before you go...
+                  {t("cancel.beforeYouGo")}
                 </DialogTitle>
                 <DialogDescription className="text-base leading-7">
-                  Could you share why you&apos;re leaving so we can improve?
+                  {t("cancel.shareWhyLeaving")}
                 </DialogDescription>
               </DialogHeader>
 
               <div
                 className="mt-7 space-y-2"
                 role="radiogroup"
-                aria-label="Main cancellation reason"
+                aria-label={t("cancel.mainReasonAria")}
                 aria-invalid={categoryMissing}
               >
                 {visibleCancellationReasonOptions.map((option, index) => {
@@ -639,7 +646,7 @@ export const CancelSubscriptionDialog = ({
               </div>
               {categoryMissing ? (
                 <p className="mt-2 text-xs text-destructive">
-                  Please select a main reason.
+                  {t("cancel.categoryMissing")}
                 </p>
               ) : null}
             </div>
@@ -653,7 +660,7 @@ export const CancelSubscriptionDialog = ({
                   !hasRequiredReason && "opacity-60",
                 )}
               >
-                Next
+                {t("cancel.next")}
               </Button>
               <Button
                 variant="outline"
@@ -661,7 +668,7 @@ export const CancelSubscriptionDialog = ({
                 disabled={isProcessing}
                 className="h-11 w-full sm:w-36"
               >
-                Back
+                {t("cancel.back")}
               </Button>
             </div>
           </>

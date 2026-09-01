@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { X, Download, Circle, CircleCheck, File } from "lucide-react";
 import {
   Dialog,
@@ -49,7 +50,9 @@ const FileItem = ({
   onToggle,
   fileUrl,
 }: FileItemProps) => {
-  const fileName = file.part.name || file.part.filename || "Unknown file";
+  const t = useTranslations("dialogs");
+  const fileName =
+    file.part.name || file.part.filename || t("allFiles.unknownFile");
 
   const handleDownload = async () => {
     if (!fileUrl) return;
@@ -67,17 +70,17 @@ const FileItem = ({
       URL.revokeObjectURL(blobUrl);
 
       if (isTauriEnvironment()) {
-        toast.success(`Downloaded ${fileName}`, {
-          description: "Saved to Downloads folder",
+        toast.success(t("allFiles.downloaded", { fileName }), {
+          description: t("allFiles.savedToDownloads"),
           action: {
-            label: "Show in folder",
+            label: t("allFiles.showInFolder"),
             onClick: () => openDownloadsFolder(),
           },
         });
       }
     } catch (error) {
       console.error("Error downloading file:", error);
-      toast.error("Failed to download file");
+      toast.error(t("allFiles.downloadError"));
     }
   };
 
@@ -98,7 +101,9 @@ const FileItem = ({
           size="icon"
           className="h-5 w-5 p-0 hover:opacity-85"
           type="button"
-          aria-label={`${isSelected ? "Deselect" : "Select"} file`}
+          aria-label={
+            isSelected ? t("allFiles.deselectFile") : t("allFiles.selectFile")
+          }
         >
           {isSelected ? (
             <CircleCheck className="w-5 h-5" />
@@ -134,7 +139,7 @@ const FileItem = ({
           size="icon"
           className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
           type="button"
-          aria-label="Download file"
+          aria-label={t("allFiles.downloadFile")}
         >
           <Download className="w-4 h-4 text-muted-foreground" />
         </Button>
@@ -149,6 +154,7 @@ const AllFilesDialog = ({
   files,
   chatTitle,
 }: AllFilesDialogProps) => {
+  const t = useTranslations("dialogs");
   const getFileUrlsBatchAction = useAction(
     api.s3Actions.getFileUrlsBatchAction,
   );
@@ -381,21 +387,27 @@ const AllFilesDialog = ({
       URL.revokeObjectURL(blobUrl);
 
       if (isTauriEnvironment()) {
-        toast.success(`Downloaded ${filesToDownload.length} files`, {
-          description: `Saved as ${fileName}.zip to Downloads folder`,
-          action: {
-            label: "Show in folder",
-            onClick: () => openDownloadsFolder(),
+        toast.success(
+          t("allFiles.downloadedCount", { count: filesToDownload.length }),
+          {
+            description: t("allFiles.savedAsZip", { fileName }),
+            action: {
+              label: t("allFiles.showInFolder"),
+              onClick: () => openDownloadsFolder(),
+            },
           },
-        });
+        );
       } else {
         toast.success(
-          `Downloaded ${filesToDownload.length} files as ${fileName}.zip`,
+          t("allFiles.downloadedCountZip", {
+            count: filesToDownload.length,
+            fileName,
+          }),
         );
       }
     } catch (error) {
       console.error("Error creating ZIP file:", error);
-      toast.error("Failed to create ZIP file");
+      toast.error(t("allFiles.zipError"));
     }
 
     // Exit selection mode after download
@@ -409,9 +421,9 @@ const AllFilesDialog = ({
         style={{ width: "600px" }}
         showCloseButton={false}
       >
-        <DialogTitle className="sr-only">All files in this task</DialogTitle>
+        <DialogTitle className="sr-only">{t("allFiles.title")}</DialogTitle>
         <DialogDescription className="sr-only">
-          Download files attached to this task.
+          {t("allFiles.srDescription")}
         </DialogDescription>
         {selectionMode ? (
           <header className="flex items-center justify-between pt-6 pr-6 pl-6 pb-2.5">
@@ -426,7 +438,7 @@ const AllFilesDialog = ({
               ) : (
                 <Circle className="w-5 h-5 text-muted-foreground" />
               )}
-              Select all
+              {t("allFiles.selectAll")}
             </Button>
             <Button
               onClick={handleCancelSelection}
@@ -434,13 +446,13 @@ const AllFilesDialog = ({
               className="text-muted-foreground hover:opacity-85 text-sm h-auto p-0"
               type="button"
             >
-              Cancel
+              {t("allFiles.cancel")}
             </Button>
           </header>
         ) : (
           <header className="flex items-center pt-6 pr-6 pl-6 pb-2.5">
             <h1 className="flex-1 text-foreground text-lg font-semibold">
-              All files in this task
+              {t("allFiles.title")}
             </h1>
             <div className="flex items-center gap-2">
               <Button
@@ -448,7 +460,7 @@ const AllFilesDialog = ({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
-                aria-label="Download files"
+                aria-label={t("allFiles.downloadFiles")}
                 type="button"
               >
                 <Download className="size-5 text-muted-foreground" />
@@ -458,7 +470,7 @@ const AllFilesDialog = ({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
-                aria-label="Close dialog"
+                aria-label={t("allFiles.closeDialog")}
                 type="button"
               >
                 <X className="size-5 text-muted-foreground" />
@@ -471,11 +483,11 @@ const AllFilesDialog = ({
           <div className="flex flex-col gap-0">
             {files.length === 0 ? (
               <div className="text-center text-muted-foreground py-8">
-                No files
+                {t("allFiles.noFiles")}
               </div>
             ) : isLoadingUrls ? (
               <div className="text-center text-muted-foreground py-8">
-                Loading files...
+                {t("allFiles.loadingFiles")}
               </div>
             ) : (
               files.map((file, index) => {
@@ -509,7 +521,7 @@ const AllFilesDialog = ({
             >
               <Download className="w-[18px] h-[18px] text-muted-foreground" />
               <span className="text-sm text-muted-foreground">
-                Batch download ({selectedFiles.size})
+                {t("allFiles.batchDownload", { count: selectedFiles.size })}
               </span>
             </Button>
           </footer>

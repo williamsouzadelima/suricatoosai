@@ -20,20 +20,12 @@ import { useTypingAnimation } from "../hooks/useTypingAnimation";
 import { upsertDraft } from "@/lib/utils/client-storage";
 import Loading from "@/components/ui/loading";
 import { useHasAuthenticatedBefore } from "../hooks/useHasAuthenticatedBefore";
-
-const LOGIN_TYPING_PREFIX = "Ask Suricatoos to ";
-const LOGIN_TYPING_TAILS = [
-  "find vulnerabilities in...",
-  "audit the security of...",
-  "test the defenses of...",
-  "review the code of...",
-  "write a pentest report for...",
-  "hunt for bugs in...",
-];
+import { useTranslations } from "next-intl";
 
 // Simple unauthenticated content that redirects to signup on message send
 const UnauthenticatedContent = () => {
   const input = useComposerInput();
+  const t = useTranslations("landing");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,10 +36,10 @@ const UnauthenticatedContent = () => {
   };
 
   const animatedTail = useTypingAnimation({
-    phrases: LOGIN_TYPING_TAILS,
+    phrases: t.raw("tails") as string[],
     enabled: true,
   });
-  const animatedPlaceholder = `${LOGIN_TYPING_PREFIX}${animatedTail}`;
+  const animatedPlaceholder = `${t("typingPrefix")}${animatedTail}`;
 
   const handleStop = () => {
     // No-op for unauthenticated users
@@ -81,10 +73,10 @@ const UnauthenticatedContent = () => {
           {/* Title */}
           <div className="mb-4 flex flex-col items-center px-4 text-center md:mb-6">
             <h1 className="text-4xl font-bold text-foreground mb-2 md:text-5xl">
-              What will you hack today?
+              {t("title")}
             </h1>
             <p className="text-muted-foreground text-lg leading-tight md:text-xl">
-              Find and fix vulnerabilities by working with AI.
+              {t("subtitle")}
             </p>
           </div>
 

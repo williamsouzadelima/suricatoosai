@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useGlobalState } from "@/app/contexts/GlobalState";
 import { redirectToPricing } from "@/app/hooks/usePricingDialog";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +57,7 @@ function formatCancellationDate(currentPeriodEnd?: number) {
 }
 
 const AccountTab = () => {
+  const t = useTranslations("settings");
   const { subscription, setMigrateFromPentestgptDialogOpen } = useGlobalState();
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -147,7 +149,7 @@ const AccountTab = () => {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Failed to open billing portal",
+          : t("account.toastBillingPortalError"),
       );
       setIsOpeningBillingPortal(false);
     }
@@ -184,10 +186,12 @@ const AccountTab = () => {
         cancelAtPeriodEnd: result.cancelAtPeriodEnd,
         currentPeriodEnd: result.currentPeriodEnd,
       });
-      toast.success("Cancellation removed. Your plan will renew as usual.");
+      toast.success(t("account.toastCancellationRemoved"));
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to keep plan active",
+        error instanceof Error
+          ? error.message
+          : t("account.toastKeepPlanError"),
       );
     } finally {
       setIsKeepingPlan(false);
@@ -206,14 +210,14 @@ const AccountTab = () => {
           <div>
             <div className="font-medium">
               {subscription === "ultra"
-                ? "Suricatoos Ultra"
+                ? t("account.planUltra")
                 : subscription === "team"
-                  ? "Suricatoos Team"
+                  ? t("account.planTeam")
                   : subscription === "pro-plus"
-                    ? "Suricatoos Pro+"
+                    ? t("account.planProPlus")
                     : subscription === "pro"
-                      ? "Suricatoos Pro"
-                      : "Get Suricatoos Pro"}
+                      ? t("account.planPro")
+                      : t("account.planGetPro")}
             </div>
           </div>
           {subscription !== "free" ? (
@@ -229,11 +233,11 @@ const AccountTab = () => {
                     {isKeepingPlan ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Keeping...</span>
+                        <span>{t("account.keeping")}</span>
                       </>
                     ) : (
                       <>
-                        <span>Manage</span>
+                        <span>{t("account.manage")}</span>
                         <ChevronDown className="h-4 w-4" />
                       </>
                     )}
@@ -253,7 +257,7 @@ const AccountTab = () => {
                         }
                       >
                         <Sparkle className="h-4 w-4" />
-                        <span>Upgrade plan</span>
+                        <span>{t("account.upgradePlan")}</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                     </>
@@ -262,7 +266,7 @@ const AccountTab = () => {
                     <>
                       <DropdownMenuItem disabled>
                         <CalendarClock className="h-4 w-4" />
-                        <span>Cancellation scheduled</span>
+                        <span>{t("account.cancellationScheduledMenu")}</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
@@ -274,18 +278,18 @@ const AccountTab = () => {
                         ) : (
                           <Undo2 className="h-4 w-4" />
                         )}
-                        <span>Keep plan</span>
+                        <span>{t("account.keepPlan")}</span>
                       </DropdownMenuItem>
                     </>
                   ) : noActiveSubscription ? (
                     <DropdownMenuItem disabled>
                       <CalendarClock className="h-4 w-4" />
-                      <span>No active subscription</span>
+                      <span>{t("account.noActiveSubscription")}</span>
                     </DropdownMenuItem>
                   ) : isCheckingCancellationStatus ? (
                     <DropdownMenuItem disabled>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Checking subscription</span>
+                      <span>{t("account.checkingSubscription")}</span>
                     </DropdownMenuItem>
                   ) : (
                     <DropdownMenuItem
@@ -293,7 +297,7 @@ const AccountTab = () => {
                       onClick={handleCancelSubscription}
                     >
                       <X className="h-4 w-4" />
-                      <span>Cancel subscription</span>
+                      <span>{t("account.cancelSubscription")}</span>
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
@@ -313,7 +317,7 @@ const AccountTab = () => {
                 })
               }
             >
-              Upgrade
+              {t("account.upgrade")}
             </Button>
           )}
         </div>
@@ -321,11 +325,11 @@ const AccountTab = () => {
         {cancellationScheduled && (
           <div className="mt-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
             <span className="font-medium text-foreground">
-              Cancellation scheduled.
+              {t("account.cancellationScheduledLabel")}
             </span>{" "}
             {cancellationEndDate
-              ? `Your plan stays active until ${cancellationEndDate}.`
-              : "Your plan stays active until the end of the current billing period."}
+              ? t("account.planActiveUntil", { date: cancellationEndDate })
+              : t("account.planActiveUntilPeriodEnd")}
           </div>
         )}
 
@@ -347,14 +351,14 @@ const AccountTab = () => {
         <div className="mt-2 rounded-lg bg-transparent px-0">
           <span className="text-sm font-semibold inline-block pb-4">
             {subscription === "ultra"
-              ? "Thanks for subscribing to Ultra! Your plan includes everything in Pro, plus:"
+              ? t("account.thanksUltra")
               : subscription === "team"
-                ? "Thanks for subscribing to Team! Your plan includes:"
+                ? t("account.thanksTeam")
                 : subscription === "pro-plus"
-                  ? "Thanks for subscribing to Pro+! Your plan includes everything in Pro, plus:"
+                  ? t("account.thanksProPlus")
                   : subscription === "pro"
-                    ? "Thanks for subscribing to Pro! Your plan includes:"
-                    : "Get everything in Free, and more."}
+                    ? t("account.thanksPro")
+                    : t("account.getEverythingFree")}
           </span>
           <ul className="mb-2 flex flex-col gap-5">
             {(subscription === "ultra"
@@ -376,9 +380,9 @@ const AccountTab = () => {
         <div className="border-b pb-6">
           <div className="flex items-center justify-between py-3">
             <div>
-              <div className="font-medium">Migrate from PentestGPT</div>
+              <div className="font-medium">{t("account.migrateTitle")}</div>
               <div className="text-sm text-muted-foreground mt-1">
-                Transfer your active PentestGPT subscription
+                {t("account.migrateDescription")}
               </div>
             </div>
             <Button
@@ -388,7 +392,7 @@ const AccountTab = () => {
               onClick={handleOpenMigrateConfirm}
               disabled={isMigrating}
             >
-              {isMigrating ? "Migrating..." : "Migrate"}
+              {isMigrating ? t("account.migrating") : t("account.migrate")}
             </Button>
           </div>
         </div>
@@ -399,7 +403,7 @@ const AccountTab = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between py-3">
               <div>
-                <div className="font-medium">Payment</div>
+                <div className="font-medium">{t("account.payment")}</div>
               </div>
               <Button
                 type="button"
@@ -414,7 +418,9 @@ const AccountTab = () => {
                   )
                 }
               >
-                {pastDueStatus ? "Update payment" : "Manage"}
+                {pastDueStatus
+                  ? t("account.updatePayment")
+                  : t("account.manage")}
               </Button>
             </div>
           </div>
@@ -425,7 +431,7 @@ const AccountTab = () => {
       <div>
         <div className="flex items-center justify-between py-3">
           <div>
-            <div className="font-medium">Delete account</div>
+            <div className="font-medium">{t("account.deleteAccountTitle")}</div>
           </div>
           <Button
             type="button"
@@ -433,9 +439,9 @@ const AccountTab = () => {
             variant="destructive"
             size="sm"
             onClick={() => setShowDeleteAccount(true)}
-            aria-label="Delete account"
+            aria-label={t("account.deleteAccountAria")}
           >
-            Delete
+            {t("account.delete")}
           </Button>
         </div>
       </div>

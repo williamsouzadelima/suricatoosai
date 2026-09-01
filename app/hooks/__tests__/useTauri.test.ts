@@ -2,11 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
-import {
-  DESKTOP_UPDATE_URL,
-  navigateToAuth,
-  pickLocalFolder,
-} from "../useTauri";
+import { navigateToAuth, pickLocalFolder } from "../useTauri";
 
 jest.mock("@tauri-apps/api/core", () => ({
   invoke: jest.fn(),
@@ -54,39 +50,22 @@ describe("navigateToAuth", () => {
     });
   });
 
-  it("opens desktop login with a desktop auth state when supported", async () => {
-    const desktopAuthState = "a".repeat(64);
-    mockInvoke.mockImplementation(async (command: string) => {
-      if (command === "prepare_desktop_auth_state") {
-        return desktopAuthState;
-      }
-      if (command === "get_dev_auth_port") {
-        return 0;
-      }
-      throw new Error(`Unexpected command: ${command}`);
-    });
-
+  it("uses in-webview auth without native desktop bridges (signup)", async () => {
     await navigateToAuth("/signup?returnTo=%2Fsettings");
 
-    expect(mockOpenUrl).toHaveBeenCalledWith(
-      `http://localhost/desktop-login?returnTo=%2Fsettings&desktop_state=${desktopAuthState}&screen_hint=sign-up`,
-    );
+    // Desktop app é webview do web app: navega in-webview (window.location),
+    // sem browser externo, deep-link ou prompt de update.
+    expect(mockOpenUrl).not.toHaveBeenCalled();
+    expect(mockInvoke).not.toHaveBeenCalled();
     expect(mockToastError).not.toHaveBeenCalled();
   });
 
-  it("opens the latest desktop release when the secure auth bridge is missing", async () => {
-    mockInvoke.mockRejectedValue(new Error("unknown command"));
-
+  it("uses in-webview auth without native desktop bridges (login)", async () => {
     await navigateToAuth("/login");
 
-    expect(mockToastError).toHaveBeenCalledWith(
-      "Update Suricatoos Desktop to sign in",
-      expect.objectContaining({
-        description: expect.stringContaining("secure sign-in bridge"),
-      }),
-    );
-    expect(mockOpenUrl).toHaveBeenCalledTimes(1);
-    expect(mockOpenUrl).toHaveBeenCalledWith(DESKTOP_UPDATE_URL);
+    expect(mockOpenUrl).not.toHaveBeenCalled();
+    expect(mockInvoke).not.toHaveBeenCalled();
+    expect(mockToastError).not.toHaveBeenCalled();
   });
 });
 

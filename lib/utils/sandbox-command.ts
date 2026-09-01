@@ -1,5 +1,5 @@
-// Production Convex URL (must match @hackerai/local@latest package)
-const PRODUCTION_CONVEX_URL = "https://convex.haiusercontent.com";
+// Production Convex URL (must match @suricatoos/local@latest package)
+const PRODUCTION_CONVEX_URL = "https://dutiful-sheep-343.convex.cloud";
 
 // Add --convex-url flag if running against non-production backend
 export const convexUrlFlag =
@@ -12,4 +12,4 @@ export const convexUrlFlag =
 export const runCommand =
   process.env.NODE_ENV === "development"
     ? "node packages/local/dist/index.js"
-    : "npx @hackerai/local@latest";
+    : "npx @suricatoos/local@latest";

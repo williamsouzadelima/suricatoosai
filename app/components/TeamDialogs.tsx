@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Loader2, Plus, Minus } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface TeamMember {
   id: string;
@@ -80,6 +81,7 @@ export const TeamDialogs = ({
   leaving,
   handleLeaveTeam,
 }: TeamDialogsProps) => {
+  const t = useTranslations("dialogs");
   return (
     <>
       {/* Invite Member Dialog */}
@@ -94,23 +96,19 @@ export const TeamDialogs = ({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Invite team member</DialogTitle>
-            <DialogDescription>
-              Send an invitation to join your team. If they already have an
-              account, they&apos;ll need to log out and log back in after
-              accepting the invite to access the team subscription.
-            </DialogDescription>
+            <DialogTitle>{t("team.inviteTitle")}</DialogTitle>
+            <DialogDescription>{t("team.inviteDescription")}</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleInvite}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium">
-                  Email address
+                  {t("team.emailLabel")}
                 </label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="colleague@company.com"
+                  placeholder={t("team.emailPlaceholder")}
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   disabled={inviting}
@@ -127,16 +125,16 @@ export const TeamDialogs = ({
                 }}
                 disabled={inviting}
               >
-                Cancel
+                {t("team.cancel")}
               </Button>
               <Button type="submit" disabled={inviting}>
                 {inviting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Sending...
+                    {t("team.sending")}
                   </>
                 ) : (
-                  "Send invitation"
+                  t("team.sendInvite")
                 )}
               </Button>
             </DialogFooter>
@@ -151,13 +149,14 @@ export const TeamDialogs = ({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remove team member</DialogTitle>
+            <DialogTitle>{t("team.removeTitle")}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to remove{" "}
-              <span className="font-medium text-foreground">
-                {memberToRemove?.email}
-              </span>{" "}
-              from your team? This action cannot be undone.
+              {t.rich("team.removeDescription", {
+                email: memberToRemove?.email ?? "",
+                b: (chunks) => (
+                  <span className="font-medium text-foreground">{chunks}</span>
+                ),
+              })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -166,7 +165,7 @@ export const TeamDialogs = ({
               onClick={() => setMemberToRemove(null)}
               disabled={removing === memberToRemove?.id}
             >
-              Cancel
+              {t("team.cancel")}
             </Button>
             <Button
               variant="destructive"
@@ -176,10 +175,10 @@ export const TeamDialogs = ({
               {removing === memberToRemove?.id ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Removing...
+                  {t("team.removing")}
                 </>
               ) : (
-                "Remove member"
+                t("team.removeButton")
               )}
             </Button>
           </DialogFooter>
@@ -193,14 +192,14 @@ export const TeamDialogs = ({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Revoke invitation</DialogTitle>
+            <DialogTitle>{t("team.revokeTitle")}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to revoke the invitation for{" "}
-              <span className="font-medium text-foreground">
-                {inviteToRevoke?.email}
-              </span>
-              ? They will no longer be able to join your team using this
-              invitation.
+              {t.rich("team.revokeDescription", {
+                email: inviteToRevoke?.email ?? "",
+                b: (chunks) => (
+                  <span className="font-medium text-foreground">{chunks}</span>
+                ),
+              })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -209,7 +208,7 @@ export const TeamDialogs = ({
               onClick={() => setInviteToRevoke(null)}
               disabled={revokingInvite === inviteToRevoke?.id}
             >
-              Cancel
+              {t("team.cancel")}
             </Button>
             <Button
               variant="destructive"
@@ -219,10 +218,10 @@ export const TeamDialogs = ({
               {revokingInvite === inviteToRevoke?.id ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Revoking...
+                  {t("team.revoking")}
                 </>
               ) : (
-                "Revoke invitation"
+                t("team.revokeButton")
               )}
             </Button>
           </DialogFooter>
@@ -238,12 +237,8 @@ export const TeamDialogs = ({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Leave team</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to leave this team? You will lose access to
-              all team plan features and will need to be re-invited to join
-              again.
-            </DialogDescription>
+            <DialogTitle>{t("team.leaveTitle")}</DialogTitle>
+            <DialogDescription>{t("team.leaveDescription")}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button
@@ -251,7 +246,7 @@ export const TeamDialogs = ({
               onClick={() => setShowLeaveDialog(false)}
               disabled={leaving}
             >
-              Cancel
+              {t("team.cancel")}
             </Button>
             <Button
               variant="destructive"
@@ -261,10 +256,10 @@ export const TeamDialogs = ({
               {leaving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Leaving...
+                  {t("team.leaving")}
                 </>
               ) : (
-                "Leave team"
+                t("team.leaveButton")
               )}
             </Button>
           </DialogFooter>
@@ -281,18 +276,16 @@ export const TeamWelcomeDialog = ({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) => {
+  const t = useTranslations("dialogs");
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Welcome to Team Plan! 🎉</DialogTitle>
-          <DialogDescription>
-            Thanks for subscribing to the Team plan! You can now add members to
-            your team through Settings → Team tab.
-          </DialogDescription>
+          <DialogTitle>{t("team.welcomeTitle")}</DialogTitle>
+          <DialogDescription>{t("team.welcomeDescription")}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button onClick={() => onOpenChange(false)}>Got it</Button>
+          <Button onClick={() => onOpenChange(false)}>{t("team.gotIt")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -334,6 +327,7 @@ export const ManageSeatsDialog = ({
   totalUsedSeats: number;
   onSuccess: () => void;
 }) => {
+  const t = useTranslations("dialogs");
   const [targetSeats, setTargetSeats] = useState(currentSeats);
   const [preview, setPreview] = useState<SeatPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -425,12 +419,18 @@ export const ManageSeatsDialog = ({
 
   const getButtonText = () => {
     if (confirming) return null;
-    if (!preview || seatsDelta === 0) return "Select seat count";
+    if (!preview || seatsDelta === 0) return t("team.selectSeatCount");
 
     if (isIncrease) {
-      return `Add ${seatsDelta} seat${seatsDelta > 1 ? "s" : ""} for $${preview.totalDue.toFixed(2)}`;
+      return t("team.addSeats", {
+        count: seatsDelta,
+        amount: preview.totalDue.toFixed(2),
+      });
     } else {
-      return `Remove ${Math.abs(seatsDelta)} seat${Math.abs(seatsDelta) > 1 ? "s" : ""} (+$${preview.proratedCredit.toFixed(2)} credit)`;
+      return t("team.removeSeats", {
+        count: Math.abs(seatsDelta),
+        amount: preview.proratedCredit.toFixed(2),
+      });
     }
   };
 
@@ -438,17 +438,16 @@ export const ManageSeatsDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Manage seats</DialogTitle>
-          <DialogDescription>
-            Adjust the number of seats for your team. Adding seats charges a
-            prorated amount; removing seats applies a credit to your account.
-          </DialogDescription>
+          <DialogTitle>{t("team.manageTitle")}</DialogTitle>
+          <DialogDescription>{t("team.manageDescription")}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
           {/* Seat Selector */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Number of seats</label>
+            <label className="text-sm font-medium">
+              {t("team.numberOfSeats")}
+            </label>
             <div className="flex items-center gap-3">
               <Button
                 type="button"
@@ -486,14 +485,17 @@ export const ManageSeatsDialog = ({
               </Button>
               <span className="text-sm text-muted-foreground">
                 {seatsDelta === 0
-                  ? `${currentSeats} seats (no change)`
+                  ? t("team.seatsNoChange", { count: currentSeats })
                   : isIncrease
-                    ? `(+${seatsDelta} new)`
-                    : `(${seatsDelta} fewer)`}
+                    ? t("team.seatsNew", { count: seatsDelta })
+                    : t("team.seatsFewer", { count: seatsDelta })}
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Currently using {totalUsedSeats} of {currentSeats} seats
+              {t("team.currentlyUsing", {
+                used: totalUsedSeats,
+                total: currentSeats,
+              })}
             </p>
           </div>
 
@@ -506,7 +508,9 @@ export const ManageSeatsDialog = ({
             <div className="space-y-4 rounded-lg border p-4">
               <div className="flex justify-between text-sm">
                 <span>
-                  {isIncrease ? "Additional seats" : "Seats to remove"}
+                  {isIncrease
+                    ? t("team.additionalSeats")
+                    : t("team.seatsToRemove")}
                 </span>
                 <span className="font-medium">
                   {isIncrease ? `+${seatsDelta}` : seatsDelta}
@@ -514,9 +518,13 @@ export const ManageSeatsDialog = ({
               </div>
               <div className="flex justify-between text-sm">
                 <span>
-                  {isIncrease ? "Prorated charge" : "Prorated credit"}
+                  {isIncrease
+                    ? t("team.proratedCharge")
+                    : t("team.proratedCredit")}
                   <span className="text-muted-foreground ml-1">
-                    (~${preview.proratedPerSeat.toFixed(2)}/seat)
+                    {t("team.perSeat", {
+                      amount: preview.proratedPerSeat.toFixed(2),
+                    })}
                   </span>
                 </span>
                 <span
@@ -529,7 +537,9 @@ export const ManageSeatsDialog = ({
               </div>
               <div className="border-t pt-3 flex justify-between">
                 <span className="font-medium">
-                  {isIncrease ? "Total due today" : "Credit to account"}
+                  {isIncrease
+                    ? t("team.totalDueToday")
+                    : t("team.creditToAccount")}
                 </span>
                 <span
                   className={`font-semibold text-lg ${isDecrease ? "text-green-600" : ""}`}
@@ -541,13 +551,13 @@ export const ManageSeatsDialog = ({
               </div>
               {preview.paymentMethod && isIncrease && (
                 <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Payment method</span>
+                  <span>{t("team.paymentMethod")}</span>
                   <span>{preview.paymentMethod}</span>
                 </div>
               )}
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>
-                  Next invoice
+                  {t("team.nextInvoice")}
                   {formatUnixDate(preview.currentPeriodEnd) &&
                     ` (${formatUnixDate(preview.currentPeriodEnd)})`}
                 </span>
@@ -571,7 +581,7 @@ export const ManageSeatsDialog = ({
             onClick={() => onOpenChange(false)}
             disabled={confirming}
           >
-            Cancel
+            {t("team.cancel")}
           </Button>
           <Button
             onClick={handleConfirm}
@@ -582,7 +592,7 @@ export const ManageSeatsDialog = ({
             {confirming ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Processing...
+                {t("team.processing")}
               </>
             ) : (
               getButtonText()

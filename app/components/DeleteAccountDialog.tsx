@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
 import {
   Dialog,
@@ -61,6 +62,7 @@ export const DeleteAccountDialog = ({
   onOpenChange,
 }: DeleteAccountDialogProps) => {
   const { user } = useAuth();
+  const t = useTranslations("dialogs");
   const [isDeleting, setIsDeleting] = useState(false);
   const [emailInput, setEmailInput] = useState("");
   const [confirmInput, setConfirmInput] = useState("");
@@ -125,9 +127,7 @@ export const DeleteAccountDialog = ({
       window.location.replace("/");
     } catch (error) {
       console.error("Failed to delete user data:", error);
-      toast.error(
-        "Failed to delete account. Please try again or contact support.",
-      );
+      toast.error(t("deleteAccount.deleteError"));
       setIsDeleting(false);
     }
   };
@@ -139,22 +139,18 @@ export const DeleteAccountDialog = ({
         className="sm:max-w-md max-h-[90vh] overflow-y-auto"
       >
         <DialogHeader>
-          <DialogTitle>Delete account - are you sure?</DialogTitle>
+          <DialogTitle>{t("deleteAccount.title")}</DialogTitle>
         </DialogHeader>
         <DialogDescription
           data-testid="delete-account-description"
           className="pt-2 text-sm text-foreground"
         >
-          Deleting your account will remove all your data, including tasks,
-          settings, and personal information. Deleting and recreating an account
-          does not reset usage limits or referral eligibility. This action
-          cannot be undone.
+          {t("deleteAccount.description")}
         </DialogDescription>
 
         {!hasRecentLogin && (
           <p className="text-xs pt-4 text-muted-foreground">
-            You may only delete your account if you have logged in within the
-            last 10 minutes. Please log in again, then return here to continue.
+            {t("deleteAccount.recentLoginWarning")}
           </p>
         )}
 
@@ -162,14 +158,14 @@ export const DeleteAccountDialog = ({
           <div className="pt-4 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="delete-email">
-                Please type your account email.
+                {t("deleteAccount.emailLabel")}
               </Label>
               <Input
                 data-testid="email-confirmation"
                 id="delete-email"
                 type="email"
                 inputMode="email"
-                aria-label="Account email"
+                aria-label={t("deleteAccount.emailAria")}
                 placeholder={expectedEmail || "name@example.com"}
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
@@ -179,12 +175,12 @@ export const DeleteAccountDialog = ({
 
             <div className="space-y-2">
               <Label htmlFor="delete-confirm">
-                To proceed, type &quot;DELETE&quot; in the input field below.
+                {t("deleteAccount.confirmLabel")}
               </Label>
               <Input
                 data-testid="delete-phrase-input"
                 id="delete-confirm"
-                aria-label="Type DELETE to confirm"
+                aria-label={t("deleteAccount.confirmAria")}
                 placeholder="DELETE"
                 value={confirmInput}
                 onChange={(e) => setConfirmInput(e.target.value)}
@@ -205,7 +201,7 @@ export const DeleteAccountDialog = ({
               onClick={handleRefreshLogin}
               className="w-full"
             >
-              Refresh login
+              {t("deleteAccount.refreshLogin")}
             </Button>
           ) : (
             <Button
@@ -223,7 +219,9 @@ export const DeleteAccountDialog = ({
               ) : (
                 <Lock aria-hidden="true" className="size-4" />
               )}
-              {isDeleting ? "Deleting..." : "Permanently delete my account"}
+              {isDeleting
+                ? t("deleteAccount.deleting")
+                : t("deleteAccount.deleteButton")}
             </Button>
           )}
         </DialogFooter>

@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
 import { navigateToAuth } from "@/app/hooks/useTauri";
 import { Download } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 interface HeaderProps {
   chatTitle?: string;
@@ -15,6 +17,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ chatTitle, hideDownload = false }) => {
   const { user, loading } = useAuth();
+  const t = useTranslations("header");
 
   return (
     <header className="w-full px-6 max-sm:px-4 flex-shrink-0">
@@ -34,6 +37,7 @@ const Header: React.FC<HeaderProps> = ({ chatTitle, hideDownload = false }) => {
           {!chatTitle && <div className="flex gap-[40px]"></div>}
           {!loading && !user && (
             <div className="flex gap-2 items-center">
+              <LanguageSwitcher />
               {!hideDownload && (
                 <Button
                   asChild
@@ -43,7 +47,7 @@ const Header: React.FC<HeaderProps> = ({ chatTitle, hideDownload = false }) => {
                 >
                   <Link href="/download">
                     <Download className="h-4 w-4 mr-1.5" />
-                    Download
+                    {t("download")}
                   </Link>
                 </Button>
               )}
@@ -54,7 +58,7 @@ const Header: React.FC<HeaderProps> = ({ chatTitle, hideDownload = false }) => {
                 size="default"
                 className="min-w-[74px] rounded-[10px]"
               >
-                Sign in
+                {t("signIn")}
               </Button>
               <Button
                 data-testid="sign-up-button"
@@ -67,7 +71,7 @@ const Header: React.FC<HeaderProps> = ({ chatTitle, hideDownload = false }) => {
                 size="default"
                 className="min-w-16 rounded-[10px]"
               >
-                Get started
+                {t("getStarted")}
               </Button>
             </div>
           )}
@@ -88,7 +92,7 @@ const Header: React.FC<HeaderProps> = ({ chatTitle, hideDownload = false }) => {
               size="sm"
               className="rounded-[10px]"
             >
-              Sign in
+              {t("signIn")}
             </Button>
             <Button
               data-testid="sign-up-button-mobile"
@@ -101,7 +105,7 @@ const Header: React.FC<HeaderProps> = ({ chatTitle, hideDownload = false }) => {
               size="sm"
               className="rounded-[10px]"
             >
-              Get started
+              {t("getStarted")}
             </Button>
           </div>
         )}

@@ -27,6 +27,7 @@ import { UsageTab } from "@/app/components/UsageTab";
 import { ExtraUsageSection } from "@/app/components/ExtraUsageSection";
 import { TeamExtraUsageSection } from "@/app/components/TeamExtraUsageSection";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTranslations } from "next-intl";
 import { useGlobalState } from "@/app/contexts/GlobalState";
 
 interface SettingsDialogProps {
@@ -46,6 +47,7 @@ const SettingsDialog = ({
   const [showNotesDialog, setShowNotesDialog] = useState(false);
   const isMobile = useIsMobile();
   const { subscription } = useGlobalState();
+  const t = useTranslations("settings");
   const [isTeamAdmin, setIsTeamAdmin] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -71,27 +73,35 @@ const SettingsDialog = ({
 
   // Base tabs visible to all users
   const baseTabs = [
-    { id: "Personalization", label: "Personalization", icon: Settings },
-    { id: "Security", label: "Security", icon: Shield },
-    { id: "Data controls", label: "Data controls", icon: Database },
+    { id: "Personalization", label: t("tabs.personalization"), icon: Settings },
+    { id: "Security", label: t("tabs.security"), icon: Shield },
+    { id: "Data controls", label: t("tabs.dataControls"), icon: Database },
   ];
 
   // Shared tabs for all users with agent mode access
-  const agentsTab = { id: "Agents", label: "Agents", icon: Infinity };
+  const agentsTab = { id: "Agents", label: t("tabs.agents"), icon: Infinity };
   const localSandboxTab = {
     id: "Remote Control",
-    label: "Remote Control",
+    label: t("tabs.remoteControl"),
     icon: Server,
   };
   // Tabs only for paid users
-  const usageTab = { id: "Usage", label: "Usage", icon: ChartNoAxesCombined };
+  const usageTab = {
+    id: "Usage",
+    label: t("tabs.usage"),
+    icon: ChartNoAxesCombined,
+  };
   const extraUsageTab = {
     id: "Extra Usage",
-    label: "Extra Usage",
+    label: t("tabs.extraUsage"),
     icon: Gauge,
   };
-  const membersTab = { id: "Members", label: "Members", icon: Users };
-  const accountTab = { id: "Account", label: "Account", icon: CircleUserRound };
+  const membersTab = { id: "Members", label: t("tabs.members"), icon: Users };
+  const accountTab = {
+    id: "Account",
+    label: t("tabs.account"),
+    icon: CircleUserRound,
+  };
 
   const tabs =
     subscription === "team"
@@ -116,7 +126,7 @@ const SettingsDialog = ({
         : [...baseTabs, agentsTab, localSandboxTab, accountTab];
 
   const canShowInitialTab = initialTab
-    ? tabs.some((t) => t.id === initialTab)
+    ? tabs.some((tab) => tab.id === initialTab)
     : false;
   const [prevInitialTab, setPrevInitialTab] = useState<string | null>(null);
   const [prevCanShowInitialTab, setPrevCanShowInitialTab] = useState(false);
@@ -161,12 +171,12 @@ const SettingsDialog = ({
           showCloseButton={!isMobile}
         >
           {/* Accessibility: Always include DialogTitle */}
-          <DialogTitle className="sr-only">Settings</DialogTitle>
+          <DialogTitle className="sr-only">{t("dialog.title")}</DialogTitle>
 
           {isMobile && (
             <div className="relative z-10 p-0">
               <div className="flex items-center justify-between px-4 py-3 border-b">
-                <h3 className="text-lg font-semibold">Settings</h3>
+                <h3 className="text-lg font-semibold">{t("dialog.title")}</h3>
                 <div
                   className="flex h-7 w-7 items-center justify-center cursor-pointer rounded-md hover:bg-muted"
                   onClick={() => onOpenChange(false)}
@@ -231,7 +241,10 @@ const SettingsDialog = ({
             <div className="flex flex-col items-start self-stretch flex-1 overflow-hidden min-h-0">
               {!isMobile && (
                 <div className="gap-1 items-center px-6 py-5 hidden md:flex self-stretch border-b">
-                  <h3 className="text-lg font-medium">{activeTab}</h3>
+                  <h3 className="text-lg font-medium">
+                    {tabs.find((tab) => tab.id === activeTab)?.label ??
+                      activeTab}
+                  </h3>
                 </div>
               )}
               <div className="flex-1 self-stretch items-start overflow-y-auto px-4 pt-4 pb-4 md:px-6 md:pt-4 min-h-0">

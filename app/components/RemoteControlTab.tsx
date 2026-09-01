@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation } from "convex/react";
+import { useTranslations } from "next-intl";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,6 +62,7 @@ function useAutoSelectNewRemoteConnection({
   setSelectedModel,
   onNewConnection,
 }: UseAutoSelectNewRemoteConnectionArgs) {
+  const t = useTranslations("settingsAgents");
   const previousRemoteConnectionIdsRef = useRef<Set<string> | null>(null);
 
   useEffect(() => {
@@ -94,9 +96,9 @@ function useAutoSelectNewRemoteConnection({
 
     if (chatMode !== "agent") {
       setChatMode("agent");
-      toast.success("Local sandbox connected. Switched to Agent mode.");
+      toast.success(t("remoteControl.connectedSwitchedAgent"));
     } else {
-      toast.success("Local sandbox connected.");
+      toast.success(t("remoteControl.connected"));
     }
   }, [
     chatMode,
@@ -108,10 +110,12 @@ function useAutoSelectNewRemoteConnection({
     setSandboxPreference,
     setSelectedModel,
     subscription,
+    t,
   ]);
 }
 
 const RemoteControlTab = () => {
+  const t = useTranslations("settingsAgents");
   const [token, setToken] = useState<string | null>(null);
   const [isPreparingCommand, setIsPreparingCommand] = useState(false);
   const [isResettingToken, setIsResettingToken] = useState(false);
@@ -200,10 +204,10 @@ const RemoteControlTab = () => {
         setIsCommandCopied(false);
         copiedResetTimeoutRef.current = null;
       }, 2_000);
-      toast.success("Connect command copied. Paste it into your terminal.");
+      toast.success(t("remoteControl.commandCopied"));
     } catch (error) {
       console.error("Failed to prepare connect command:", error);
-      toast.error("Failed to copy connect command");
+      toast.error(t("remoteControl.failedCopyCommand"));
     } finally {
       setIsPreparingCommand(false);
     }
@@ -220,10 +224,10 @@ const RemoteControlTab = () => {
         copiedResetTimeoutRef.current = null;
       }
       setIsCommandCopied(false);
-      toast.success("Access token reset. Existing connections were stopped.");
+      toast.success(t("remoteControl.tokenReset"));
     } catch (error) {
       console.error("Failed to regenerate token:", error);
-      toast.error("Failed to reset access token");
+      toast.error(t("remoteControl.failedResetToken"));
     } finally {
       setIsResettingToken(false);
     }
@@ -235,7 +239,7 @@ const RemoteControlTab = () => {
       <div className="flex items-center justify-between border-b pb-3">
         <div className="flex items-center gap-2">
           <Server className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-semibold">Remote Control</h3>
+          <h3 className="text-sm font-semibold">{t("remoteControl.title")}</h3>
         </div>
         <a
           href="https://help.suricatoos.com/en/articles/12961920-connecting-a-hackerai-agent-to-your-local-machine"
@@ -243,7 +247,7 @@ const RemoteControlTab = () => {
           rel="noopener noreferrer"
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
-          <span>Learn more</span>
+          <span>{t("remoteControl.learnMore")}</span>
           <ExternalLink className="h-3 w-3" />
         </a>
       </div>
@@ -251,7 +255,7 @@ const RemoteControlTab = () => {
       {/* Active Connections */}
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Connections
+          {t("remoteControl.connections")}
         </h4>
         {activeConnections.length > 0 ? (
           <div className="space-y-2">
@@ -271,8 +275,8 @@ const RemoteControlTab = () => {
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {conn.isDesktop
-                      ? "Desktop app connected"
-                      : "Remote Control connected"}
+                      ? t("remoteControl.desktopAppConnected")
+                      : t("remoteControl.remoteControlConnected")}
                   </div>
                 </div>
               </div>
@@ -285,7 +289,7 @@ const RemoteControlTab = () => {
                 onClick={() => setShowConnectSetup(true)}
               >
                 <Terminal className="mr-2 h-3.5 w-3.5" />
-                Connect another machine
+                {t("remoteControl.connectAnotherMachine")}
               </Button>
             ) : null}
           </div>
@@ -294,9 +298,11 @@ const RemoteControlTab = () => {
             <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center mb-2">
               <Server className="h-4 w-4 text-muted-foreground" />
             </div>
-            <p className="text-sm font-medium">No active connections</p>
+            <p className="text-sm font-medium">
+              {t("remoteControl.noActiveConnections")}
+            </p>
             <p className="text-xs text-muted-foreground">
-              Connect using the commands below
+              {t("remoteControl.connectUsingCommands")}
             </p>
           </div>
         )}
@@ -307,8 +313,8 @@ const RemoteControlTab = () => {
         <div className="space-y-3">
           <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             {activeConnections.length > 0
-              ? "Connect Another Machine"
-              : "Quick Start"}
+              ? t("remoteControl.connectAnotherMachineHeading")
+              : t("remoteControl.quickStart")}
           </h4>
           <div className="overflow-hidden rounded-lg border bg-muted/30">
             <div className="flex items-center gap-2 p-2">
@@ -323,10 +329,10 @@ const RemoteControlTab = () => {
                 disabled={isPreparingCommand || isResettingToken}
                 aria-label={
                   isPreparingCommand
-                    ? "Preparing connect command"
+                    ? t("remoteControl.ariaPreparing")
                     : isCommandCopied
-                      ? "Connect command copied"
-                      : "Copy connect command"
+                      ? t("remoteControl.ariaCopied")
+                      : t("remoteControl.ariaCopy")
                 }
               >
                 {isPreparingCommand ? (
@@ -338,22 +344,22 @@ const RemoteControlTab = () => {
                 )}
                 <span aria-live="polite">
                   {isPreparingCommand
-                    ? "Preparing..."
+                    ? t("remoteControl.preparing")
                     : isCommandCopied
-                      ? "Copied"
-                      : "Copy command"}
+                      ? t("remoteControl.copied")
+                      : t("remoteControl.copyCommand")}
                 </span>
               </Button>
             </div>
             <p className="border-t px-3 py-2 text-xs text-muted-foreground">
               {isPreparingCommand
-                ? "Preparing connect command..."
-                : "Secure token included automatically when copied."}
+                ? t("remoteControl.preparingCommand")
+                : t("remoteControl.secureTokenIncluded")}
             </p>
           </div>
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">
-              Paste and run it in your terminal to connect this machine.
+              {t("remoteControl.pasteAndRun")}
             </p>
             {token ? (
               <Button
@@ -366,7 +372,9 @@ const RemoteControlTab = () => {
                 <RefreshCw
                   className={`mr-1 h-3 w-3 ${isResettingToken ? "animate-spin" : ""}`}
                 />
-                {isResettingToken ? "Resetting..." : "Reset token"}
+                {isResettingToken
+                  ? t("remoteControl.resetting")
+                  : t("remoteControl.resetToken")}
               </Button>
             ) : null}
           </div>
@@ -377,9 +385,11 @@ const RemoteControlTab = () => {
       <div className="flex items-start gap-2 p-3 bg-yellow-500/10 rounded-lg text-xs">
         <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
         <div className="text-yellow-800 dark:text-yellow-200 space-y-1">
-          <span className="font-medium">Security:</span>{" "}
+          <span className="font-medium">
+            {t("remoteControl.securityLabel")}
+          </span>{" "}
           <span className="text-yellow-700 dark:text-yellow-300">
-            Commands run directly on your OS. Stop anytime with Ctrl+C.
+            {t("remoteControl.securityNotice")}
           </span>
         </div>
       </div>

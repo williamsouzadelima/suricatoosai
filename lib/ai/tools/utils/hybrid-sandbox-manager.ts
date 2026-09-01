@@ -907,8 +907,8 @@ export class HybridSandboxManager implements SandboxManager {
 
       const uploadPath =
         platform === "win32"
-          ? "C:\\temp\\hackerai-upload"
-          : "/tmp/hackerai-upload";
+          ? "C:\\temp\\suricatoos-upload"
+          : "/tmp/suricatoos-upload";
       const agentBrowserProbe =
         platform === "win32"
           ? "where agent-browser && agent-browser --version"

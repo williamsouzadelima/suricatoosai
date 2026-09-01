@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
+import { useTranslations } from "next-intl";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
 import {
@@ -30,30 +31,42 @@ interface CustomizeHackerAIDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const predefinedTraits = [
-  "Methodical",
-  "Detail-oriented",
-  "Thorough",
-  "Risk-aware",
-  "Tool-savvy",
-];
-
-const personalityOptions = [
-  { value: "default", label: "Default", description: "" },
-  { value: "cynic", label: "Cynic", description: "Critical and sarcastic" },
-  { value: "robot", label: "Robot", description: "Efficient and blunt" },
-  {
-    value: "listener",
-    label: "Listener",
-    description: "Thoughtful and supportive",
-  },
-  { value: "nerd", label: "Nerd", description: "Exploratory and enthusiastic" },
-];
-
 export const CustomizeHackerAIDialog = ({
   open,
   onOpenChange,
 }: CustomizeHackerAIDialogProps) => {
+  const t = useTranslations("settingsAgents");
+
+  const predefinedTraits = t.raw("customize.predefinedTraits") as string[];
+
+  const personalityOptions = [
+    {
+      value: "default",
+      label: t("customize.personalityDefault"),
+      description: "",
+    },
+    {
+      value: "cynic",
+      label: t("customize.personalityCynic"),
+      description: t("customize.personalityCynicDesc"),
+    },
+    {
+      value: "robot",
+      label: t("customize.personalityRobot"),
+      description: t("customize.personalityRobotDesc"),
+    },
+    {
+      value: "listener",
+      label: t("customize.personalityListener"),
+      description: t("customize.personalityListenerDesc"),
+    },
+    {
+      value: "nerd",
+      label: t("customize.personalityNerd"),
+      description: t("customize.personalityNerdDesc"),
+    },
+  ];
+
   const [nickname, setNickname] = useState("");
   const [occupation, setOccupation] = useState("");
   const [personality, setPersonality] = useState("default");
@@ -123,10 +136,10 @@ export const CustomizeHackerAIDialog = ({
         error instanceof ConvexError
           ? (error.data as { message?: string })?.message ||
             error.message ||
-            "Failed to save customization"
+            t("customize.failedSaveCustomization")
           : error instanceof Error
             ? error.message
-            : "Failed to save customization";
+            : t("customize.failedSaveCustomization");
       toast.error(errorMessage);
     } finally {
       setIsSaving(false);
@@ -156,20 +169,18 @@ export const CustomizeHackerAIDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange} modal={true}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Personalization</DialogTitle>
-          <DialogDescription>
-            Introduce yourself to get better, more personalized responses
-          </DialogDescription>
+          <DialogTitle>{t("customize.title")}</DialogTitle>
+          <DialogDescription>{t("customize.description")}</DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto pb-3">
           <div className="space-y-5 pb-3">
             {/* Nickname */}
             <div className="flex flex-col gap-2 px-1">
-              <Label htmlFor="nickname">What should Suricatoos call you?</Label>
+              <Label htmlFor="nickname">{t("customize.nicknameLabel")}</Label>
               <TextareaAutosize
                 id="nickname"
-                placeholder="Nickname"
+                placeholder={t("customize.nicknamePlaceholder")}
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
                 className={`flex w-full rounded-md border ${isNicknameOverLimit ? "border-red-500" : "border-input"} bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none`}
@@ -177,17 +188,22 @@ export const CustomizeHackerAIDialog = ({
               />
               {isNicknameOverLimit && (
                 <div className="text-xs text-red-500 mt-1">
-                  {nickname.length}/{MAX_CHAR_LIMIT} characters
+                  {t("customize.charCount", {
+                    count: String(nickname.length),
+                    limit: String(MAX_CHAR_LIMIT),
+                  })}
                 </div>
               )}
             </div>
 
             {/* Occupation */}
             <div className="flex flex-col gap-2 px-1">
-              <Label htmlFor="occupation">What do you do?</Label>
+              <Label htmlFor="occupation">
+                {t("customize.occupationLabel")}
+              </Label>
               <TextareaAutosize
                 id="occupation"
-                placeholder="Pentester, bug bounty hunter, etc."
+                placeholder={t("customize.occupationPlaceholder")}
                 value={occupation}
                 onChange={(e) => setOccupation(e.target.value)}
                 className={`flex w-full rounded-md border ${isOccupationOverLimit ? "border-red-500" : "border-input"} bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none`}
@@ -195,7 +211,10 @@ export const CustomizeHackerAIDialog = ({
               />
               {isOccupationOverLimit && (
                 <div className="text-xs text-red-500 mt-1">
-                  {occupation.length}/{MAX_CHAR_LIMIT} characters
+                  {t("customize.charCount", {
+                    count: String(occupation.length),
+                    limit: String(MAX_CHAR_LIMIT),
+                  })}
                 </div>
               )}
             </div>
@@ -204,11 +223,11 @@ export const CustomizeHackerAIDialog = ({
             <div className="flex flex-col gap-2 px-1">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <Label className="sm:flex-shrink-0">
-                  What personality should Suricatoos have?
+                  {t("customize.personalityLabel")}
                 </Label>
                 <Select value={personality} onValueChange={setPersonality}>
                   <SelectTrigger className="w-full sm:w-auto">
-                    <SelectValue placeholder="Select personality">
+                    <SelectValue placeholder={t("customize.selectPersonality")}>
                       {
                         personalityOptions.find(
                           (opt) => opt.value === personality,
@@ -240,10 +259,10 @@ export const CustomizeHackerAIDialog = ({
 
             {/* Traits */}
             <div className="flex flex-col gap-2 px-1">
-              <Label>What traits should Suricatoos have?</Label>
+              <Label>{t("customize.traitsLabel")}</Label>
 
               <TextareaAutosize
-                placeholder="Describe or select traits"
+                placeholder={t("customize.traitsPlaceholder")}
                 value={traitsText}
                 onChange={(e) => setTraitsText(e.target.value)}
                 className={`flex w-full rounded-md border ${isTraitsOverLimit ? "border-red-500" : "border-input"} bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none`}
@@ -252,7 +271,10 @@ export const CustomizeHackerAIDialog = ({
               />
               {isTraitsOverLimit && (
                 <div className="text-xs text-red-500 mt-1">
-                  {traitsText.length}/{MAX_CHAR_LIMIT} characters
+                  {t("customize.charCount", {
+                    count: String(traitsText.length),
+                    limit: String(MAX_CHAR_LIMIT),
+                  })}
                 </div>
               )}
 
@@ -275,11 +297,11 @@ export const CustomizeHackerAIDialog = ({
             {/* Additional Info */}
             <div className="flex flex-col gap-3 px-1">
               <Label htmlFor="additional-info">
-                Anything else Suricatoos should know about you?
+                {t("customize.additionalInfoLabel")}
               </Label>
               <TextareaAutosize
                 id="additional-info"
-                placeholder="Security interests, preferred methodologies, compliance requirements"
+                placeholder={t("customize.additionalInfoPlaceholder")}
                 value={additionalInfo}
                 onChange={(e) => setAdditionalInfo(e.target.value)}
                 className={`flex w-full rounded-md border ${isAdditionalInfoOverLimit ? "border-red-500" : "border-input"} bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none`}
@@ -288,7 +310,10 @@ export const CustomizeHackerAIDialog = ({
               />
               {isAdditionalInfoOverLimit && (
                 <div className="text-xs text-red-500 mt-1">
-                  {additionalInfo.length}/{MAX_CHAR_LIMIT} characters
+                  {t("customize.charCount", {
+                    count: String(additionalInfo.length),
+                    limit: String(MAX_CHAR_LIMIT),
+                  })}
                 </div>
               )}
             </div>
@@ -297,7 +322,7 @@ export const CustomizeHackerAIDialog = ({
 
         <DialogFooter className="flex-row justify-end gap-2 border-t pt-4">
           <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
-            Cancel
+            {t("customize.cancel")}
           </Button>
           <Button
             onClick={handleSave}
@@ -309,7 +334,7 @@ export const CustomizeHackerAIDialog = ({
               isAdditionalInfoOverLimit
             }
           >
-            {isSaving ? "Saving..." : "Save"}
+            {isSaving ? t("customize.saving") : t("customize.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

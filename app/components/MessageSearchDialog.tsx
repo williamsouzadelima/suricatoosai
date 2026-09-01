@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import React, { useCallback, useState, useEffect, useRef } from "react";
 import { useConvex } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -64,6 +66,7 @@ export const MessageSearchDialog: React.FC<MessageSearchDialogProps> = ({
   const convex = useConvex();
   const { setChatSidebarOpen, closeSidebar } = useGlobalStateActions();
   const isMobile = useIsMobile();
+  const t = useTranslations("search");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   // Only fetch chats when dialog is open and there's no search query
@@ -378,12 +381,12 @@ export const MessageSearchDialog: React.FC<MessageSearchDialogProps> = ({
         showCloseButton={false}
       >
         <DialogHeader className="border-b flex-shrink-0 p-0">
-          <DialogTitle className="sr-only">Search Messages</DialogTitle>
+          <DialogTitle className="sr-only">{t("title")}</DialogTitle>
           <div className="ms-6 me-4 flex h-16 items-center justify-between">
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <Search size={20} className="text-muted-foreground shrink-0" />
               <Input
-                placeholder="Search messages..."
+                placeholder={t("placeholder")}
                 value={searchQuery}
                 maxLength={MAX_MESSAGE_SEARCH_QUERY_LENGTH}
                 onChange={(e) =>
@@ -416,7 +419,7 @@ export const MessageSearchDialog: React.FC<MessageSearchDialogProps> = ({
                       size={48}
                       className="mx-auto mb-4 opacity-50"
                     />
-                    <p className="text-sm">No tasks yet</p>
+                    <p className="text-sm">{t("noTasks")}</p>
                     <p className="text-xs mt-2">
                       Start a task to see your tasks here
                     </p>
@@ -472,7 +475,7 @@ export const MessageSearchDialog: React.FC<MessageSearchDialogProps> = ({
                         ref={chatsLoaderRef}
                         className="flex justify-center py-4 text-muted-foreground"
                       >
-                        <div className="text-sm">Scroll for more tasks...</div>
+                        <div className="text-sm">{t("scrollMoreTasks")}</div>
                       </div>
                     )}
 
@@ -480,7 +483,7 @@ export const MessageSearchDialog: React.FC<MessageSearchDialogProps> = ({
                   {chatsQuery.isLoading && chats.length > 0 && (
                     <div className="flex justify-center py-4">
                       <Loader2 className="animate-spin mr-2" size={16} />
-                      <span className="text-sm">Loading more tasks...</span>
+                      <span className="text-sm">{t("loadingMoreTasks")}</span>
                     </div>
                   )}
                 </div>
@@ -489,7 +492,7 @@ export const MessageSearchDialog: React.FC<MessageSearchDialogProps> = ({
               <div className="flex items-center justify-center py-12 text-muted-foreground">
                 <div className="text-center">
                   <Search size={48} className="mx-auto mb-4 opacity-50" />
-                  <p className="text-sm">Keep typing</p>
+                  <p className="text-sm">{t("keepTyping")}</p>
                   <p className="text-xs mt-2">
                     Search starts at {MIN_MESSAGE_SEARCH_QUERY_LENGTH}{" "}
                     characters
@@ -499,13 +502,13 @@ export const MessageSearchDialog: React.FC<MessageSearchDialogProps> = ({
             ) : isSearching ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="animate-spin mr-2" size={20} />
-                <span className="text-sm">Searching...</span>
+                <span className="text-sm">{t("searching")}</span>
               </div>
             ) : searchError === "initial" ? (
               <div className="flex items-center justify-center py-12 text-muted-foreground">
                 <div className="text-center">
                   <Search size={48} className="mx-auto mb-4 opacity-50" />
-                  <p className="text-sm">Search failed</p>
+                  <p className="text-sm">{t("searchFailed")}</p>
                   <p className="text-xs mt-2">
                     Try again or use different keywords
                   </p>
@@ -515,7 +518,7 @@ export const MessageSearchDialog: React.FC<MessageSearchDialogProps> = ({
               <div className="flex items-center justify-center py-12 text-muted-foreground">
                 <div className="text-center">
                   <Search size={48} className="mx-auto mb-4 opacity-50" />
-                  <p className="text-sm">No messages found</p>
+                  <p className="text-sm">{t("noMessages")}</p>
                   <p className="text-xs mt-2">
                     Try different keywords or phrases
                   </p>
@@ -574,7 +577,7 @@ export const MessageSearchDialog: React.FC<MessageSearchDialogProps> = ({
                       ref={loaderRef}
                       className="flex justify-center py-4 text-muted-foreground"
                     >
-                      <div className="text-sm">Scroll for more results...</div>
+                      <div className="text-sm">{t("scrollMoreResults")}</div>
                     </div>
                   )}
 
@@ -582,7 +585,7 @@ export const MessageSearchDialog: React.FC<MessageSearchDialogProps> = ({
                 {isLoadingMore && allResults.length > 0 && (
                   <div className="flex justify-center py-4">
                     <Loader2 className="animate-spin mr-2" size={16} />
-                    <span className="text-sm">Loading more...</span>
+                    <span className="text-sm">{t("loadingMore")}</span>
                   </div>
                 )}
 

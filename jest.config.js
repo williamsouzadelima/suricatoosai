@@ -32,9 +32,12 @@ const customJestConfig = {
     "^@upstash/redis$": "<rootDir>/__mocks__/@upstash/redis.ts",
     "^@upstash/ratelimit$": "<rootDir>/__mocks__/@upstash/ratelimit.ts",
     "^convex/browser$": "<rootDir>/__mocks__/convex/browser.ts",
+    "^next-intl/server$": "<rootDir>/__mocks__/next-intl-server.tsx",
+    "^next-intl$": "<rootDir>/__mocks__/next-intl.tsx",
+    "^next-intl/plugin$": "<rootDir>/__mocks__/next-intl-plugin.ts",
   },
   transformIgnorePatterns: [
-    "node_modules/(?!(uuid|@ai-sdk|ai|convex|react-hotkeys-hook|react-markdown|streamdown|remark-.*|unified|bail|is-plain-obj|trough|vfile|unist-.*|mdast-.*|micromark.*|decode-named-character-reference|character-entities|escape-string-regexp|markdown-table|property-information|hast-.*|space-separated-tokens|comma-separated-tokens|zwitch|html-void-elements|ccount|devlop|superjson)/)",
+    "node_modules/(?!(next-intl|use-intl|uuid|@ai-sdk|ai|convex|react-hotkeys-hook|react-markdown|streamdown|remark-.*|unified|bail|is-plain-obj|trough|vfile|unist-.*|mdast-.*|micromark.*|decode-named-character-reference|character-entities|escape-string-regexp|markdown-table|property-information|hast-.*|space-separated-tokens|comma-separated-tokens|zwitch|html-void-elements|ccount|devlop|superjson)/)",
   ],
   testMatch: ["**/__tests__/**/*.[jt]s?(x)", "**/?(*.)+(spec|test).[jt]s?(x)"],
   testPathIgnorePatterns: ["/node_modules/", "/.next/", "/e2e/", "/dist/"],

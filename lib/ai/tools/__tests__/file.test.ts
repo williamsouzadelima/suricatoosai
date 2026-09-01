@@ -271,7 +271,9 @@ describe("file tool large text safety", () => {
       brief: "Read file",
     })) as { error: string };
 
-    expect(result.error).toContain("Suricatoos did not switch this run to Cloud");
+    expect(result.error).toContain(
+      "Suricatoos did not switch this run to Cloud",
+    );
     expect(sandbox.files.read).not.toHaveBeenCalled();
     expect(commandRun).not.toHaveBeenCalled();
     expect(writerWrites).not.toContainEqual(
@@ -389,7 +391,7 @@ describe("file tool large text safety", () => {
 
     expect(result.content).toContain("full diff preview was skipped");
     expect(sandbox.files.write).toHaveBeenCalledWith(
-      expect.stringContaining("/tmp/hackerai_append_"),
+      expect.stringContaining("/tmp/suricatoos_append_"),
       "\nnew line\n",
       { user: "user" },
     );
@@ -431,7 +433,7 @@ describe("file tool large text safety", () => {
         exitCode: 0,
       })
       .mockImplementationOnce(async (command, opts) => {
-        expect(command).toMatch(/^python "C:\\temp\\hackerai_script_/);
+        expect(command).toMatch(/^python "C:\\temp\\suricatoos_script_/);
         expect(command).not.toContain("<<'PY'");
         expect(opts.envVars.HACKERAI_FILE_READ_PATH).toBe(
           "C:\\temp\\download.php",
@@ -548,14 +550,14 @@ describe("file tool large text safety", () => {
         exitCode: 0,
       })
       .mockImplementationOnce(async (command, opts) => {
-        expect(command).toMatch(/^python "C:\\temp\\hackerai_script_/);
+        expect(command).toMatch(/^python "C:\\temp\\suricatoos_script_/);
         expect(command).not.toContain("cat ");
         expect(command).not.toContain("rm -f");
         expect(opts.envVars.HACKERAI_FILE_APPEND_TARGET_PATH).toBe(
           "C:\\temp\\download.php",
         );
         expect(opts.envVars.HACKERAI_FILE_APPEND_SOURCE_PATH).toMatch(
-          /^C:\\temp\\hackerai_append_/,
+          /^C:\\temp\\suricatoos_append_/,
         );
         return {
           stdout: "",

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useGlobalState } from "@/app/contexts/GlobalState";
@@ -52,6 +53,7 @@ interface TeamInfo {
 }
 
 const TeamTab = () => {
+  const t = useTranslations("settingsAgents");
   const { subscription } = useGlobalState();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
@@ -79,7 +81,7 @@ const TeamTab = () => {
       const response = await fetch("/api/team/members");
 
       if (!response.ok) {
-        throw new Error("Failed to fetch team data");
+        throw new Error(t("team.failedFetchData"));
       }
 
       const data = await response.json();
@@ -88,7 +90,9 @@ const TeamTab = () => {
       setTeamInfo(data.teamInfo || null);
       setIsAdmin(data.isAdmin || false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load data");
+      toast.error(
+        err instanceof Error ? err.message : t("team.failedLoadData"),
+      );
     } finally {
       setLoading(false);
     }
@@ -105,14 +109,14 @@ const TeamTab = () => {
     e.preventDefault();
 
     if (!inviteEmail) {
-      toast.error("Please enter an email address");
+      toast.error(t("team.enterEmail"));
       return;
     }
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(inviteEmail)) {
-      toast.error("Please enter a valid email address");
+      toast.error(t("team.enterValidEmail"));
       return;
     }
 
@@ -129,17 +133,15 @@ const TeamTab = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to invite member");
+        throw new Error(data.error || t("team.failedInvite"));
       }
 
-      toast.success("Member invited successfully!");
+      toast.success(t("team.memberInvited"));
       setInviteEmail("");
       setShowInviteDialog(false);
       fetchMembers();
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to invite member",
-      );
+      toast.error(err instanceof Error ? err.message : t("team.failedInvite"));
     } finally {
       setInviting(false);
     }
@@ -182,16 +184,14 @@ const TeamTab = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to remove member");
+        throw new Error(data.error || t("team.failedRemove"));
       }
 
-      toast.success("Member removed successfully!");
+      toast.success(t("team.memberRemoved"));
       setMemberToRemove(null);
       fetchMembers();
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to remove member",
-      );
+      toast.error(err instanceof Error ? err.message : t("team.failedRemove"));
     } finally {
       setRemoving(null);
     }
@@ -209,16 +209,14 @@ const TeamTab = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to revoke invitation");
+        throw new Error(data.error || t("team.failedRevoke"));
       }
 
-      toast.success("Invitation revoked successfully!");
+      toast.success(t("team.invitationRevoked"));
       setInviteToRevoke(null);
       fetchMembers();
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to revoke invitation",
-      );
+      toast.error(err instanceof Error ? err.message : t("team.failedRevoke"));
     } finally {
       setRevokingInvite(null);
     }
@@ -231,7 +229,7 @@ const TeamTab = () => {
       // Find current user's membership ID
       const currentUserMembership = members.find((m) => m.isCurrentUser);
       if (!currentUserMembership) {
-        throw new Error("Could not find your membership");
+        throw new Error(t("team.membershipNotFound"));
       }
 
       const response = await fetch(
@@ -244,16 +242,16 @@ const TeamTab = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to leave team");
+        throw new Error(data.error || t("team.failedLeave"));
       }
 
-      toast.success("You have left the team. Logging out...");
+      toast.success(t("team.leftTeam"));
       setShowLeaveDialog(false);
 
       // Log out the user to refresh their session
       clientLogout();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to leave team");
+      toast.error(err instanceof Error ? err.message : t("team.failedLeave"));
       setLeaving(false);
     }
   };
@@ -263,9 +261,7 @@ const TeamTab = () => {
       <div className="space-y-6">
         <div className="text-center py-8">
           <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">
-            Team management is only available for Team plan subscribers.
-          </p>
+          <p className="text-muted-foreground">{t("team.teamPlanOnly")}</p>
         </div>
       </div>
     );
@@ -282,17 +278,17 @@ const TeamTab = () => {
           {/* Header */}
           <div className="flex items-start justify-between">
             <div className="space-y-1">
-              <h2 className="text-2xl font-semibold">Members</h2>
+              <h2 className="text-2xl font-semibold">{t("team.members")}</h2>
               <p className="text-sm text-muted-foreground">
                 {teamInfo ? (
                   <>
-                    Team · {members.length}{" "}
-                    {members.length === 1 ? "member" : "members"}
+                    {t("team.teamLabel")} ·{" "}
+                    {t("team.membersCount", { count: members.length })}
                     {invitations.length > 0 &&
-                      ` · ${invitations.length} pending`}
+                      ` · ${t("team.pendingCount", { count: invitations.length })}`}
                   </>
                 ) : (
-                  "Team"
+                  t("team.teamLabel")
                 )}
               </p>
             </div>
@@ -302,7 +298,7 @@ const TeamTab = () => {
                 onClick={() => setShowLeaveDialog(true)}
                 className="text-destructive hover:text-destructive"
               >
-                Leave team
+                {t("team.leaveTeam")}
               </Button>
             )}
           </div>
@@ -316,7 +312,7 @@ const TeamTab = () => {
                 onClick={() => setActiveTab("all")}
                 className="rounded-md"
               >
-                All members
+                {t("team.allMembers")}
               </Button>
               {isAdmin && (
                 <Button
@@ -325,7 +321,7 @@ const TeamTab = () => {
                   onClick={() => setActiveTab("pending")}
                   className="rounded-md"
                 >
-                  Pending invites
+                  {t("team.pendingInvitesTab")}
                 </Button>
               )}
             </div>
@@ -335,7 +331,7 @@ const TeamTab = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Search"
+                  placeholder={t("team.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -349,7 +345,7 @@ const TeamTab = () => {
                     className="gap-2"
                   >
                     <UserPlus className="h-4 w-4" />
-                    Invite member
+                    {t("team.inviteMember")}
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -362,7 +358,7 @@ const TeamTab = () => {
                         onClick={() => setShowManageSeatsDialog(true)}
                       >
                         <Settings className="h-4 w-4 mr-2" />
-                        Manage seats
+                        {t("team.manageSeats")}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -391,15 +387,19 @@ const TeamTab = () => {
             <div className="text-sm text-muted-foreground">
               {actualAvailableSeats > 0 ? (
                 <span>
-                  {actualAvailableSeats} seat
-                  {actualAvailableSeats !== 1 ? "s" : ""} available of{" "}
-                  {teamInfo.totalSeats}
+                  {t("team.seatsAvailable", {
+                    count: actualAvailableSeats,
+                    total: teamInfo.totalSeats,
+                  })}
                   {invitations.length > 0 &&
-                    ` (${invitations.length} pending invite${invitations.length !== 1 ? "s" : ""})`}
+                    ` ${t("team.pendingInvites", { count: invitations.length })}`}
                 </span>
               ) : (
                 <span>
-                  {totalUsedSeats} of {teamInfo.totalSeats} seats in use.
+                  {t("team.seatsInUse", {
+                    used: totalUsedSeats,
+                    total: teamInfo.totalSeats,
+                  })}
                 </span>
               )}
             </div>
@@ -434,7 +434,7 @@ const TeamTab = () => {
         currentSeats={teamInfo?.totalSeats || 0}
         totalUsedSeats={totalUsedSeats}
         onSuccess={() => {
-          toast.success("Seats updated successfully!");
+          toast.success(t("team.seatsUpdated"));
           fetchMembers();
         }}
       />

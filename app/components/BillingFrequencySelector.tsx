@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 
 type BillingFrequency = "monthly" | "yearly";
 
@@ -17,6 +18,7 @@ const BillingFrequencySelector: React.FC<BillingFrequencySelectorProps> = ({
   isOpen,
   className = "",
 }) => {
+  const t = useTranslations("pricing");
   const segmentedRef = React.useRef<HTMLDivElement | null>(null);
   const monthlyRef = React.useRef<HTMLLabelElement | null>(null);
   const yearlyRef = React.useRef<HTMLLabelElement | null>(null);
@@ -64,12 +66,12 @@ const BillingFrequencySelector: React.FC<BillingFrequencySelectorProps> = ({
   }, [value]);
 
   return (
-    <fieldset aria-label="Payment frequency">
+    <fieldset aria-label={t("frequency.paymentFrequency")}>
       <div
         ref={segmentedRef}
         className={`relative inline-flex items-center rounded-full border border-border bg-background p-1 ${className}`}
         tabIndex={0}
-        aria-label="Billing frequency selector"
+        aria-label={t("frequency.selectorLabel")}
         role="radiogroup"
         onKeyDown={handleKeyDown}
       >
@@ -88,7 +90,7 @@ const BillingFrequencySelector: React.FC<BillingFrequencySelectorProps> = ({
             value="monthly"
             checked={value === "monthly"}
             onChange={() => handleBillingChange("monthly")}
-            aria-label="Monthly billing"
+            aria-label={t("frequency.monthlyBilling")}
           />
           <span
             className={
@@ -97,7 +99,7 @@ const BillingFrequencySelector: React.FC<BillingFrequencySelectorProps> = ({
                 : "flex items-center justify-center px-4 py-1.5 text-sm text-muted-foreground"
             }
           >
-            Monthly
+            {t("frequency.monthly")}
           </span>
         </label>
         <label
@@ -111,7 +113,7 @@ const BillingFrequencySelector: React.FC<BillingFrequencySelectorProps> = ({
             value="yearly"
             checked={value === "yearly"}
             onChange={() => handleBillingChange("yearly")}
-            aria-label="Yearly billing"
+            aria-label={t("frequency.yearlyBilling")}
           />
           <span
             className={
@@ -120,9 +122,9 @@ const BillingFrequencySelector: React.FC<BillingFrequencySelectorProps> = ({
                 : "flex items-center justify-center gap-2 px-4 py-1.5 text-sm text-muted-foreground"
             }
           >
-            Yearly
+            {t("frequency.yearly")}
             <span className="text-[#615EEB] dark:text-[#B9B7FF] text-xs font-medium">
-              Save 17%
+              {t("frequency.save17")}
             </span>
           </span>
         </label>

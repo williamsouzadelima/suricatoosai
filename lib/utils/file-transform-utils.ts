@@ -955,7 +955,7 @@ const applyModeSpecificTransforms = async (
  * @param messages - Messages to process
  * @param mode - Chat mode ("ask" or "agent")
  * @param userId - Authenticated requester used to authorize stored file IDs
- * @param uploadBasePath - Override for agent mode (/home/user/upload or /tmp/hackerai-upload for local dangerous)
+ * @param uploadBasePath - Override for agent mode (/home/user/upload or /tmp/suricatoos-upload for local dangerous)
  * @returns Processed messages with file metadata and sandbox files for upload
  */
 export const processMessageFiles = async (

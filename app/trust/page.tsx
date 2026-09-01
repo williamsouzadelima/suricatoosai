@@ -351,7 +351,7 @@ export default function TrustPage() {
               <p>
                 Suricatoos is developed in the open. The full application source
                 code is public on{" "}
-                <InlineLink href="https://github.com/williamsouzadelima/hackerai">
+                <InlineLink href="https://github.com/williamsouzadelima/suricatoosai">
                   GitHub
                 </InlineLink>
                 , including every change we ship. You can review how prompts,
@@ -362,9 +362,9 @@ export default function TrustPage() {
 
             <Section icon={BadgeCheck} title="Compliance">
               <p>
-                Suricatoos doesn&apos;t currently hold SOC 2, ISO 27001, or other
-                third-party certifications. The service is offered in beta, as
-                described in our{" "}
+                Suricatoos doesn&apos;t currently hold SOC 2, ISO 27001, or
+                other third-party certifications. The service is offered in
+                beta, as described in our{" "}
                 <InlineLink href="/privacy-policy">Privacy Policy</InlineLink>{" "}
                 and{" "}
                 <InlineLink href="/terms-of-service">

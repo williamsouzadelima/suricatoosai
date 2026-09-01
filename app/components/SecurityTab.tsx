@@ -7,13 +7,15 @@ import { WorkOsWidgets } from "@workos-inc/widgets/workos-widgets";
 import { LogOut, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 const SecurityTab = () => {
+  const t = useTranslations("settings");
   const { getAccessToken } = useAccessToken();
   const getWidgetAccessToken = useCallback(async () => {
     const token = await getAccessToken();
     if (!token) {
-      throw new Error("Unable to load security settings");
+      throw new Error(t("security.unableToLoad"));
     }
     return token;
   }, [getAccessToken]);
@@ -23,7 +25,7 @@ const SecurityTab = () => {
       const { clientLogout } = await import("@/lib/utils/logout");
       clientLogout();
     } catch {
-      toast.error("Failed to log out");
+      toast.error(t("security.failedLogout"));
     }
   };
 
@@ -37,16 +39,16 @@ const SecurityTab = () => {
       if (response.ok) {
         const data = await response.json();
         toast.success(
-          `Logged out of ${data.revokedSessions} devices successfully`,
+          t("security.loggedOutDevices", { count: data.revokedSessions }),
         );
         const { clientLogout } = await import("@/lib/utils/logout");
         clientLogout();
       } else {
         const error = await response.json();
-        toast.error(error.error || "Failed to log out of all devices");
+        toast.error(error.error || t("security.failedLogoutAll"));
       }
     } catch {
-      toast.error("Failed to log out of all devices");
+      toast.error(t("security.failedLogoutAll"));
     }
   };
 
@@ -79,7 +81,7 @@ const SecurityTab = () => {
             <Monitor className="size-4" />
           </div>
           <div className="min-w-0 text-sm font-semibold">
-            Log out of this device
+            {t("security.logoutDevice")}
           </div>
           <Button
             data-testid="logout-button-device"
@@ -87,7 +89,7 @@ const SecurityTab = () => {
             size="sm"
             onClick={handleLogout}
           >
-            Log out
+            {t("security.logout")}
           </Button>
         </div>
 
@@ -99,11 +101,11 @@ const SecurityTab = () => {
             <LogOut className="size-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-semibold">Log out of all devices</div>
+            <div className="text-sm font-semibold">
+              {t("security.logoutAllDevices")}
+            </div>
             <div className="mt-1 text-sm text-muted-foreground">
-              Log out of all active sessions across all devices, including your
-              current session. It may take up to 10 minutes for other devices to
-              be logged out.
+              {t("security.logoutAllDescription")}
             </div>
           </div>
           <Button
@@ -113,7 +115,7 @@ const SecurityTab = () => {
             onClick={handleLogoutAll}
             className="shrink-0 bg-red-600 text-white hover:bg-red-700"
           >
-            Log out all
+            {t("security.logoutAll")}
           </Button>
         </div>
       </div>

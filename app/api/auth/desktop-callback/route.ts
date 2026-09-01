@@ -6,6 +6,9 @@ import {
 } from "@/lib/desktop-auth";
 import { workos } from "@/app/api/workos";
 
+const APP_BASE_URL =
+  process.env.NEXT_PUBLIC_BASE_URL ?? "https://ai.suricatoos.com";
+
 const DESKTOP_AUTH_STATE_REGEX = /^[a-f0-9]{64}$/;
 
 type DesktopAuthSession = {
@@ -171,7 +174,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const origin = url.origin;
+    const origin = APP_BASE_URL;
 
     // In dev mode, redirect to local HTTP server instead of deep link
     if (stateMetadata?.devCallbackPort) {

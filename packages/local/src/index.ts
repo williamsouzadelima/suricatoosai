@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
 /**
- * HackerAI Local Sandbox Client
+ * Suricatoos Local Sandbox Client
  *
- * Connects to HackerAI backend via Convex for connection lifecycle
+ * Connects to Suricatoos backend via Convex for connection lifecycle
  * and uses Centrifugo for real-time command relay and streaming output.
  *
  * Runs commands directly on the host OS (no Docker isolation).
  *
  * Usage:
- *   npx @hackerai/local --token TOKEN
+ *   npx @suricatoos/local --token TOKEN
  */
 
 import { ConvexHttpClient } from "convex/browser";
@@ -45,7 +45,7 @@ const IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
 const IDLE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 // Production Convex URL - hardcoded for the published package
-const PRODUCTION_CONVEX_URL = "https://convex.haiusercontent.com";
+const PRODUCTION_CONVEX_URL = "https://dutiful-sheep-343.convex.cloud";
 
 // Convex function references (string paths work at runtime)
 const api = {
@@ -383,7 +383,7 @@ export class LocalSandboxClient {
   }
 
   async start(): Promise<void> {
-    console.log(chalk.blue("🚀 Starting HackerAI local sandbox..."));
+    console.log(chalk.blue("🚀 Starting Suricatoos local sandbox..."));
     console.log(
       chalk.yellow(
         "⚠️  Commands run directly on your OS without any isolation.",
@@ -409,7 +409,7 @@ export class LocalSandboxClient {
   }
 
   private async connect(): Promise<void> {
-    console.log(chalk.blue("Connecting to HackerAI..."));
+    console.log(chalk.blue("Connecting to Suricatoos..."));
 
     try {
       const result = (await this.convexHttp.mutation(
@@ -522,7 +522,7 @@ export class LocalSandboxClient {
             : result.disconnectReason === "presence_sweep"
               ? "Server presence sweep marked this connection stale."
               : result.disconnectReason === "command_unresponsive"
-                ? "Server stopped this connection after repeated commands received no response. Restart HackerAI Local and try again."
+                ? "Server stopped this connection after repeated commands received no response. Restart Suricatoos Local and try again."
                 : result.disconnectReason === "desktop_kicked_by_new_session"
                   ? "A new desktop session took over."
                   : result.disconnectReason === "client_disconnect" ||
@@ -1200,10 +1200,10 @@ export function main(): void {
   // Show help
   if (hasFlag("--help") || hasFlag("-h")) {
     console.log(`
-${chalk.bold("HackerAI Local Sandbox Client")}
+${chalk.bold("Suricatoos Local Sandbox Client")}
 
 ${chalk.yellow("Usage:")}
-  npx @hackerai/local --token TOKEN [options]
+  npx @suricatoos/local --token TOKEN [options]
 
 ${chalk.yellow("Options:")}
   --token TOKEN       Authentication token from Settings (required)
@@ -1212,8 +1212,8 @@ ${chalk.yellow("Options:")}
   --help, -h          Show this help message
 
 ${chalk.yellow("Examples:")}
-  npx @hackerai/local --token hsb_abc123
-  npx @hackerai/local --token hsb_abc123 --name "Work PC"
+  npx @suricatoos/local --token hsb_abc123
+  npx @suricatoos/local --token hsb_abc123 --name "Work PC"
 
 ${chalk.red("⚠️  Security Warning:")}
   Commands run directly on your OS without any isolation.
@@ -1235,10 +1235,10 @@ ${chalk.cyan("Auto-termination:")}
   if (!config.token) {
     console.error(chalk.red("❌ No authentication token provided"));
     console.error(
-      chalk.yellow("Usage: npx @hackerai/local --token YOUR_TOKEN"),
+      chalk.yellow("Usage: npx @suricatoos/local --token YOUR_TOKEN"),
     );
     console.error(
-      chalk.yellow("Get your token from HackerAI Settings > Agents"),
+      chalk.yellow("Get your token from Suricatoos Settings > Agents"),
     );
     process.exit(1);
   }

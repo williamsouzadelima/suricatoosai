@@ -3,6 +3,7 @@
 import { ChevronRight } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
+import { useTranslations } from "next-intl";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -20,6 +21,7 @@ const PersonalizationTab = ({
   onManageNotes,
   subscription,
 }: PersonalizationTabProps) => {
+  const t = useTranslations("settingsAgents");
   const userCustomization = useQuery(
     api.userCustomization.getUserCustomization,
     {},
@@ -38,10 +40,12 @@ const PersonalizationTab = ({
             onClick={onCustomInstructions}
           >
             <div>
-              <div className="font-medium">Custom instructions</div>
+              <div className="font-medium">
+                {t("personalization.customInstructions")}
+              </div>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              Configure
+              {t("personalization.configure")}
               <ChevronRight className="h-4 w-4" />
             </div>
           </div>
@@ -51,13 +55,17 @@ const PersonalizationTab = ({
       {/* Notes Section */}
       {subscription && (
         <div>
-          <h3 className="text-lg font-medium mb-4 pb-2 border-b">Notes</h3>
+          <h3 className="text-lg font-medium mb-4 pb-2 border-b">
+            {t("personalization.notes")}
+          </h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between py-3 border-b">
               <div>
-                <div className="font-medium">Enable notes</div>
+                <div className="font-medium">
+                  {t("personalization.enableNotes")}
+                </div>
                 <div className="text-sm text-muted-foreground">
-                  Let Suricatoos save and use notes when responding.
+                  {t("personalization.enableNotesDesc")}
                 </div>
               </div>
               <Switch
@@ -73,23 +81,25 @@ const PersonalizationTab = ({
                       error instanceof ConvexError
                         ? (error.data as { message?: string })?.message ||
                           error.message ||
-                          "Failed to save customization"
+                          t("personalization.failedSaveCustomization")
                         : error instanceof Error
                           ? error.message
-                          : "Failed to save customization";
+                          : t("personalization.failedSaveCustomization");
                     toast.error(errorMessage);
                   }
                 }}
-                aria-label="Toggle notes"
+                aria-label={t("personalization.toggleNotes")}
               />
             </div>
 
             <div className="flex items-center justify-between py-3">
               <div>
-                <div className="font-medium">Manage notes</div>
+                <div className="font-medium">
+                  {t("personalization.manageNotes")}
+                </div>
               </div>
               <Button variant="outline" size="sm" onClick={onManageNotes}>
-                Manage
+                {t("personalization.manage")}
               </Button>
             </div>
           </div>

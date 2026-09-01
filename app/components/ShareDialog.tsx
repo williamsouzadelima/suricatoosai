@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { PreviewMessage } from "@/types";
@@ -32,6 +33,7 @@ export const ShareDialog = ({
   chatTitle,
   existingShareId,
 }: ShareDialogProps) => {
+  const t = useTranslations("dialogs");
   const [shareUrl, setShareUrl] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string>("");
@@ -69,7 +71,7 @@ export const ShareDialog = ({
             setShareUrl(url);
           }
         } catch (err) {
-          setError("Failed to generate share link. Please try again.");
+          setError(t("share.generateError"));
           console.error("Share error:", err);
         } finally {
           setIsGenerating(false);
@@ -84,10 +86,10 @@ export const ShareDialog = ({
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
-      toast.success("Link copied to clipboard");
+      toast.success(t("share.linkCopied"));
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      toast.error("Failed to copy link");
+      toast.error(t("share.copyError"));
       console.error("Copy error:", err);
     }
   };
@@ -129,14 +131,14 @@ export const ShareDialog = ({
             size="icon"
             className="h-9 w-9 rounded-lg"
             onClick={handleClose}
-            aria-label="Close"
+            aria-label={t("share.close")}
           >
             <XIcon className="h-5 w-5" />
           </Button>
         </div>
 
         <DialogDescription className="sr-only">
-          Share this conversation via a public link
+          {t("share.srDescription")}
         </DialogDescription>
 
         {/* Loading State */}
@@ -145,7 +147,7 @@ export const ShareDialog = ({
             <div className="flex flex-col items-center gap-4">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                Generating share link...
+                {t("share.generating")}
               </p>
             </div>
           </div>
@@ -173,9 +175,7 @@ export const ShareDialog = ({
                       );
                     }
                   } catch (err) {
-                    setError(
-                      "Failed to generate share link. Please try again.",
-                    );
+                    setError(t("share.generateError"));
                   } finally {
                     setIsGenerating(false);
                   }
@@ -184,7 +184,7 @@ export const ShareDialog = ({
                 size="sm"
                 className="w-full"
               >
-                Try again
+                {t("share.tryAgain")}
               </Button>
             </div>
           </div>
@@ -352,7 +352,7 @@ export const ShareDialog = ({
                     </div>
                   </div>
                   <span className="text-xs text-center max-w-16">
-                    {copied ? "Copied!" : "Copy link"}
+                    {copied ? t("share.copied") : t("share.copyLink")}
                   </span>
                 </button>
 

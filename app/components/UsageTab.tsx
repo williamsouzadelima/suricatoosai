@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useGlobalState } from "@/app/contexts/GlobalState";
 import { IncludedUsageCard } from "@/app/components/usage/IncludedUsageCard";
 import { OnDemandUsageCard } from "@/app/components/usage/OnDemandUsageCard";
@@ -7,14 +8,14 @@ import { UsageLogsTable } from "@/app/components/usage/UsageLogsTable";
 
 const UsageTab = () => {
   const { subscription } = useGlobalState();
+  const t = useTranslations("settings");
 
   if (subscription === "free") {
     return (
       <div className="space-y-6">
         <div className="py-4">
           <p className="text-sm text-muted-foreground">
-            Upgrade to Pro, Ultra, or Team to access detailed usage tracking and
-            limits.
+            {t("usage.upgradeMessage")}
           </p>
         </div>
       </div>
