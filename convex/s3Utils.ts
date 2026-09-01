@@ -30,6 +30,10 @@ export function getS3Client(): S3Client {
   const accessKeyId = getRequiredEnvVar("AWS_S3_ACCESS_KEY_ID");
   const secretAccessKey = getRequiredEnvVar("AWS_S3_SECRET_ACCESS_KEY");
   const region = getRequiredEnvVar("AWS_S3_REGION");
+  // Optional custom endpoint for S3-compatible backends (self-hosted MinIO,
+  // Cloudflare R2, etc.). When set, path-style addressing is required so the
+  // object lives at `${endpoint}/${bucket}/${key}` behind our reverse proxy.
+  const endpoint = process.env.AWS_S3_ENDPOINT?.trim();
 
   return new S3Client({
     region,
@@ -37,6 +41,7 @@ export function getS3Client(): S3Client {
     // SDK's default WHEN_SUPPORTED behavior otherwise signs the CRC32 of an
     // empty body, which S3 rejects when the browser PUTs the real file.
     requestChecksumCalculation: "WHEN_REQUIRED",
+    ...(endpoint ? { endpoint, forcePathStyle: true } : {}),
     credentials: {
       accessKeyId,
       secretAccessKey,
