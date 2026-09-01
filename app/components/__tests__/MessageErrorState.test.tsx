@@ -191,6 +191,12 @@ describe("MessageErrorState", () => {
   });
 
   it("opens Checkout directly and marks the stopped task for resume", async () => {
+    // O valor recomendado depende do dia do mês
+    // (getApproximateWeeklyExtraUsageSpend usa Date.now()); fixa o relógio para
+    // um instante em que monthlySpent=66 => ~$24/semana => preset $30.
+    const dateNowSpy = jest
+      .spyOn(Date, "now")
+      .mockReturnValue(Date.UTC(2026, 0, 20));
     const user = userEvent.setup();
     const error = new ChatSDKError(
       "rate_limit:chat",
@@ -209,7 +215,14 @@ describe("MessageErrorState", () => {
     );
     expect(screen.getByRole("dialog")).toBeVisible();
     expect(
-      screen.getByText("$30 should cover approximately your next week."),
+      // Texto quebrado em múltiplos nós por causa da interpolação
+      // `${recommendedAmountDollars}`; casa pelo textContent do <p>.
+      screen.getByText(
+        (_content, element) =>
+          element?.tagName === "P" &&
+          element.textContent ===
+            "$30 should cover approximately your next week.",
+      ),
     ).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Purchase" }));
@@ -225,6 +238,7 @@ describe("MessageErrorState", () => {
       ),
     );
     expect(openSettingsDialog).not.toHaveBeenCalled();
+    dateNowSpy.mockRestore();
   });
 
   it("opens payment-method recovery directly for auto-reload failures", async () => {
