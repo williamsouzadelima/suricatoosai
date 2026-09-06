@@ -753,6 +753,23 @@ export default defineSchema({
     .index("by_user_and_source", ["user_id", "source_id"])
     .index("by_customer_and_status", ["stripe_customer_id", "status"]),
 
+  // Invite-only access allowlist (Phase 1). See convex/accessAllowlist.ts.
+  access_allowlist: defineTable({
+    email: v.string(),
+    status: v.union(
+      v.literal("invited"),
+      v.literal("active"),
+      v.literal("revoked"),
+    ),
+    invited_by: v.optional(v.string()),
+    invited_at: v.number(),
+    activated_at: v.optional(v.number()),
+    revoked_at: v.optional(v.number()),
+    note: v.optional(v.string()),
+  })
+    .index("by_email", ["email"])
+    .index("by_status", ["status"]),
+
   notes: defineTable({
     user_id: v.string(),
     note_id: v.string(),

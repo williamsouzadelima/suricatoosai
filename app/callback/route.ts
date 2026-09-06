@@ -6,6 +6,11 @@ import {
 } from "@/lib/auth/authkit-callback-logging";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  isInviteOnlyEnabled,
+  isAccessAllowed,
+  markAccessActive,
+} from "@/lib/auth/invite-access";
 
 // Atrás do reverse proxy (Caddy) em next dev, request.url resolve p/ localhost:3000.
 // Usamos a base pública p/ todos os redirects de auth (senão o login cai em localhost).
@@ -102,12 +107,20 @@ const buildRecoveryResponse = async (
   return loginResponse;
 };
 
-const authHandler = handleAuth({
-  baseURL: APP_BASE_URL,
-  onError: async ({ error, request }) => {
-    return buildRecoveryResponse(request as NextRequest, error);
-  },
-});
+// Created per-request (not module scope) so the captured email in onSuccess is
+// never shared across concurrent callbacks.
+const createAuthHandler = (
+  onAuthSuccess: (email: string | undefined) => void,
+) =>
+  handleAuth({
+    baseURL: APP_BASE_URL,
+    onError: async ({ error, request }) => {
+      return buildRecoveryResponse(request as NextRequest, error);
+    },
+    onSuccess: async ({ user }) => {
+      onAuthSuccess(user?.email ?? undefined);
+    },
+  });
 
 export async function GET(request: NextRequest) {
   // Short-circuit the single most common recoverable case — no PKCE cookie
@@ -126,6 +139,11 @@ export async function GET(request: NextRequest) {
   const cookieStore = await cookies();
   const redirectPath = cookieStore.get("post_login_redirect")?.value;
 
+  let authedEmail: string | undefined;
+  const authHandler = createAuthHandler((email) => {
+    authedEmail = email;
+  });
+
   let response: NextResponse;
   try {
     // AuthKit logs known recoverable callback failures at error level before
@@ -137,6 +155,31 @@ export async function GET(request: NextRequest) {
     // Defensive: handleAuth shouldn't throw when onError is provided, but if
     // it ever does, fall back to the same recovery pipeline.
     return buildRecoveryResponse(request, error);
+  }
+
+  // Invite-only gate (Phase 1): block non-invited accounts at login. Inert
+  // unless INVITE_ONLY_ENABLED === "true". Runs once per login. Fail-open:
+  // isAccessAllowed returns true on backend errors so a blip never locks out,
+  // and superadmins are always allowed.
+  if (isInviteOnlyEnabled() && authedEmail !== undefined) {
+    const allowed = await isAccessAllowed(authedEmail);
+    if (!allowed) {
+      console.warn(
+        JSON.stringify({
+          event: "auth.invite_gate_blocked",
+          service: "hackerai-web",
+          emailDomain: authedEmail.split("@")[1] ?? null,
+        }),
+      );
+      const blocked = NextResponse.redirect(
+        new URL("/access/not-invited", APP_BASE_URL),
+      );
+      // Clear the session authkit just established so the account has no access.
+      blocked.cookies.delete("wos-session");
+      return blocked;
+    }
+    // Allowed: promote an "invited" entry to "active" (best-effort).
+    await markAccessActive(authedEmail);
   }
 
   // On a successful redirect response, always clear post_login_redirect so a
