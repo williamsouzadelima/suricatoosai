@@ -50,6 +50,7 @@ export function AdminPanel({
   const [note, setNote] = useState("");
   const [inviting, setInviting] = useState(false);
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
+  const [backfilling, setBackfilling] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -130,6 +131,34 @@ export function AdminPanel({
     [load],
   );
 
+  const backfill = useCallback(async () => {
+    if (
+      !window.confirm(
+        "Marcar TODOS os usuários atuais do WorkOS como 'active' na lista? " +
+          "Faça isto uma vez, antes de ligar o acesso por convite.",
+      )
+    ) {
+      return;
+    }
+    setBackfilling(true);
+    try {
+      const res = await fetch("/api/admin/backfill", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      toast.success(
+        `Grandfather: ${data.inserted} adicionados, ${data.skipped} já existiam ` +
+          `(${data.totalWorkosUsers} usuários no WorkOS).`,
+      );
+      await load();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Falha no backfill.",
+      );
+    } finally {
+      setBackfilling(false);
+    }
+  }, [load]);
+
   const counts = entries.reduce(
     (acc, e) => {
       acc[e.status] = (acc[e.status] ?? 0) + 1;
@@ -146,6 +175,16 @@ export function AdminPanel({
           <p className="text-sm text-muted-foreground">
             Superadmin: {adminEmail}
           </p>
+          <div className="pt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void backfill()}
+              disabled={backfilling}
+            >
+              {backfilling ? "Processando…" : "Grandfather usuários atuais"}
+            </Button>
+          </div>
           {!inviteOnlyEnabled && (
             <p className="text-sm text-amber-600 dark:text-amber-500">
               Acesso por convite está <strong>desligado</strong>
