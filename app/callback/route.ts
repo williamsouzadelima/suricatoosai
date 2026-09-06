@@ -161,24 +161,28 @@ export async function GET(request: NextRequest) {
   // unless INVITE_ONLY_ENABLED === "true". Runs once per login. Fail-open:
   // isAccessAllowed returns true on backend errors so a blip never locks out,
   // and superadmins are always allowed.
-  if (isInviteOnlyEnabled() && authedEmail !== undefined) {
-    const allowed = await isAccessAllowed(authedEmail);
-    if (!allowed) {
-      console.warn(
-        JSON.stringify({
-          event: "auth.invite_gate_blocked",
-          service: "hackerai-web",
-          emailDomain: authedEmail.split("@")[1] ?? null,
-        }),
-      );
-      const blocked = NextResponse.redirect(
-        new URL("/access/not-invited", APP_BASE_URL),
-      );
-      // Clear the session authkit just established so the account has no access.
-      blocked.cookies.delete("wos-session");
-      return blocked;
+  if (authedEmail !== undefined) {
+    if (isInviteOnlyEnabled()) {
+      const allowed = await isAccessAllowed(authedEmail);
+      if (!allowed) {
+        console.warn(
+          JSON.stringify({
+            event: "auth.invite_gate_blocked",
+            service: "hackerai-web",
+            emailDomain: authedEmail.split("@")[1] ?? null,
+          }),
+        );
+        const blocked = NextResponse.redirect(
+          new URL("/access/not-invited", APP_BASE_URL),
+        );
+        // Clear the session authkit just established so the account has no access.
+        blocked.cookies.delete("wos-session");
+        return blocked;
+      }
     }
-    // Allowed: promote an "invited" entry to "active" (best-effort).
+    // Always promote an "invited" entry to "active" so the panel reflects who
+    // has logged in — even while the flag is off (and so activated_at is right
+    // when the flag is later enabled). No-op if the email isn't on the list.
     await markAccessActive(authedEmail);
   }
 
