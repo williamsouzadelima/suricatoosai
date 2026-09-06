@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { HackerAISVG } from "@/components/icons/hackerai-svg";
 
 type Status = "invited" | "active" | "revoked";
 
@@ -225,6 +226,11 @@ export function AdminPanel({
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
+        {/* Brand */}
+        <div className="mb-6">
+          <HackerAISVG theme="dark" scale={0.16} />
+        </div>
+
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-3">
