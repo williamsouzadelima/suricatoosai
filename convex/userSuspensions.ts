@@ -8,7 +8,12 @@ const suspensionCategoryValidator = v.union(
   v.literal("dispute_fraudulent"),
   v.literal("dispute_billing_hold"),
   v.literal("support_confirmed_fraud"),
+  v.literal("admin_manual"),
 );
+
+// Stable source_id for manual superadmin suspensions, so reactivate can find
+// and resolve the exact row created by suspend.
+const ADMIN_MANUAL_SOURCE_ID = "admin-manual";
 
 const suspensionSourceValidator = v.union(
   v.literal("stripe"),
@@ -145,5 +150,108 @@ export const resolveBySource = mutation({
     });
 
     return { resolved: true };
+  },
+});
+
+// --- Manual superadmin suspend / reactivate (admin panel) ---
+
+export const adminSuspend = mutation({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    reason: v.optional(v.string()),
+    adminEmail: v.optional(v.string()),
+  },
+  returns: v.object({ suspended: v.boolean() }),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    if (!args.userId) return { suspended: false };
+
+    const now = Date.now();
+    const existing = await ctx.db
+      .query("user_suspensions")
+      .withIndex("by_user_and_source", (q) =>
+        q.eq("user_id", args.userId).eq("source_id", ADMIN_MANUAL_SOURCE_ID),
+      )
+      .first();
+
+    const fields = {
+      status: "active" as const,
+      category: "admin_manual" as const,
+      source: "support" as const,
+      source_id: ADMIN_MANUAL_SOURCE_ID,
+      source_reason: args.reason ?? args.adminEmail,
+      stripe_customer_id: "",
+      updated_at: now,
+      source_created_at: now,
+      resolved_at: undefined,
+      resolved_reason: undefined,
+    };
+
+    if (existing) {
+      await ctx.db.patch(existing._id, fields);
+    } else {
+      await ctx.db.insert("user_suspensions", {
+        ...fields,
+        user_id: args.userId,
+        created_at: now,
+      });
+    }
+    return { suspended: true };
+  },
+});
+
+export const adminUnsuspend = mutation({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    reason: v.optional(v.string()),
+  },
+  returns: v.object({ resolved: v.boolean() }),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+
+    const suspension = await ctx.db
+      .query("user_suspensions")
+      .withIndex("by_user_and_source", (q) =>
+        q.eq("user_id", args.userId).eq("source_id", ADMIN_MANUAL_SOURCE_ID),
+      )
+      .first();
+
+    if (!suspension || suspension.status !== "active") {
+      return { resolved: false };
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(suspension._id, {
+      status: "resolved",
+      resolved_at: now,
+      resolved_reason: args.reason,
+      updated_at: now,
+    });
+    return { resolved: true };
+  },
+});
+
+/** Batch: which of the given users currently have an active manual suspension. */
+export const getAdminSuspendedStatus = query({
+  args: {
+    serviceKey: v.string(),
+    userIds: v.array(v.string()),
+  },
+  returns: v.array(v.string()),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const suspended: string[] = [];
+    for (const userId of args.userIds.slice(0, 500)) {
+      const row = await ctx.db
+        .query("user_suspensions")
+        .withIndex("by_user_and_source", (q) =>
+          q.eq("user_id", userId).eq("source_id", ADMIN_MANUAL_SOURCE_ID),
+        )
+        .first();
+      if (row && row.status === "active") suspended.push(userId);
+    }
+    return suspended;
   },
 });
