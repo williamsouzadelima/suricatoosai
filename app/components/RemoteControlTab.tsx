@@ -114,6 +114,43 @@ function useAutoSelectNewRemoteConnection({
   ]);
 }
 
+const copyTextWithExecCommand = (text: string): boolean => {
+  if (typeof document === "undefined") return false;
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.top = "-9999px";
+  textarea.style.left = "-9999px";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+
+  const selection = document.getSelection();
+  const previousRange =
+    selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+
+  textarea.focus();
+  textarea.select();
+  textarea.setSelectionRange(0, text.length);
+
+  let succeeded = false;
+  try {
+    succeeded = document.execCommand("copy");
+  } catch {
+    succeeded = false;
+  }
+
+  document.body.removeChild(textarea);
+
+  if (selection && previousRange) {
+    selection.removeAllRanges();
+    selection.addRange(previousRange);
+  }
+
+  return succeeded;
+};
+
 const RemoteControlTab = () => {
   const t = useTranslations("settingsAgents");
   const [token, setToken] = useState<string | null>(null);
@@ -179,21 +216,64 @@ const RemoteControlTab = () => {
         return `${runCommand} --token ${commandToken}${convexUrlFlag}`;
       })();
 
-      // Start the clipboard write during the click gesture. Safari can expire
-      // clipboard permission while waiting for the token request to finish.
+      let copied = false;
+
+      // Path A: async ClipboardItem. Handing the promise to ClipboardItem keeps
+      // the user gesture alive on Safari/WebKit while the token request is in
+      // flight.
       if (
         typeof ClipboardItem !== "undefined" &&
+        navigator.clipboard &&
         typeof navigator.clipboard.write === "function"
       ) {
-        await navigator.clipboard.write([
-          new ClipboardItem({
-            "text/plain": commandPromise.then(
-              (command) => new Blob([command], { type: "text/plain" }),
-            ),
-          }),
-        ]);
-      } else {
-        await navigator.clipboard.writeText(await commandPromise);
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              "text/plain": commandPromise.then(
+                (command) => new Blob([command], { type: "text/plain" }),
+              ),
+            }),
+          ]);
+          copied = true;
+        } catch (writeError) {
+          // Some embedded webviews (e.g. the desktop app's WKWebView) expose
+          // clipboard.write but reject it at runtime. Fall through to the
+          // simpler strategies below instead of failing the copy.
+          console.warn(
+            "clipboard.write failed, falling back to writeText:",
+            writeError,
+          );
+        }
+      }
+
+      const command = await commandPromise;
+
+      // Path B: writeText is more broadly supported than write() across
+      // browsers and embedded webviews.
+      if (
+        !copied &&
+        navigator.clipboard &&
+        typeof navigator.clipboard.writeText === "function"
+      ) {
+        try {
+          await navigator.clipboard.writeText(command);
+          copied = true;
+        } catch (writeTextError) {
+          console.warn(
+            "clipboard.writeText failed, falling back to execCommand:",
+            writeTextError,
+          );
+        }
+      }
+
+      // Path C: legacy execCommand for contexts where the async Clipboard API
+      // is unavailable or blocked (older/embedded webviews, non-secure origins).
+      if (!copied) {
+        copied = copyTextWithExecCommand(command);
+      }
+
+      if (!copied) {
+        throw new Error("Clipboard copy failed in all strategies");
       }
 
       if (copiedResetTimeoutRef.current) {
