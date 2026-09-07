@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Bell,
   Megaphone,
+  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ import { HackerAISVG } from "@/components/icons/hackerai-svg";
 import { UsersTable } from "./UsersTable";
 import { AlertsTab } from "./AlertsTab";
 import { AnnouncementsTab } from "./AnnouncementsTab";
+import { MarketingTab } from "./MarketingTab";
 
 type Status = "invited" | "active" | "revoked";
 
@@ -105,7 +107,7 @@ export function AdminPanel({
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState(false);
   const [tab, setTab] = useState<
-    "acesso" | "usuarios" | "alertas" | "avisos"
+    "acesso" | "usuarios" | "alertas" | "avisos" | "marketing"
   >("acesso");
 
   const load = useCallback(async () => {
@@ -335,6 +337,18 @@ export function AdminPanel({
             <Megaphone className="h-3.5 w-3.5" />
             Avisos
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("marketing")}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              tab === "marketing"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Send className="h-3.5 w-3.5" />
+            Marketing
+          </button>
         </div>
 
         {tab === "usuarios" ? (
@@ -345,6 +359,8 @@ export function AdminPanel({
           <AlertsTab adminEmail={adminEmail} />
         ) : tab === "avisos" ? (
           <AnnouncementsTab />
+        ) : tab === "marketing" ? (
+          <MarketingTab />
         ) : (
           <>
         {/* Stats */}

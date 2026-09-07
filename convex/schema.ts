@@ -803,6 +803,24 @@ export default defineSchema({
     updated_at: v.number(),
   }).index("by_active", ["active"]),
 
+  // Descadastro de e-mail marketing (suppression list).
+  email_optouts: defineTable({
+    email: v.string(),
+    opted_out_at: v.number(),
+    source: v.optional(v.string()),
+  }).index("by_email", ["email"]),
+
+  // Log de campanhas de e-mail marketing.
+  email_campaigns: defineTable({
+    subject: v.string(),
+    segment: v.string(),
+    total: v.number(),
+    sent: v.number(),
+    failed: v.number(),
+    created_by: v.optional(v.string()),
+    created_at: v.number(),
+  }).index("by_created_at", ["created_at"]),
+
   notes: defineTable({
     user_id: v.string(),
     note_id: v.string(),

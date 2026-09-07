@@ -18,6 +18,7 @@ import type * as chatStreams from "../chatStreams.js";
 import type * as chats from "../chats.js";
 import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
+import type * as emailMarketing from "../emailMarketing.js";
 import type * as extraUsage from "../extraUsage.js";
 import type * as extraUsageActions from "../extraUsageActions.js";
 import type * as feedback from "../feedback.js";
@@ -78,6 +79,7 @@ declare const fullApi: ApiFromModules<{
   chats: typeof chats;
   constants: typeof constants;
   crons: typeof crons;
+  emailMarketing: typeof emailMarketing;
   extraUsage: typeof extraUsage;
   extraUsageActions: typeof extraUsageActions;
   feedback: typeof feedback;
