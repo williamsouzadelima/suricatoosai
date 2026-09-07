@@ -5,6 +5,7 @@ import { ChatLayout } from "@/app/components/ChatLayout";
 import Loading from "@/components/ui/loading";
 import { useHasAuthenticatedBefore } from "@/app/hooks/useHasAuthenticatedBefore";
 import { ChatRoutePresentationProvider } from "@/app/contexts/ChatRoutePresentationContext";
+import { AnnouncementBanner } from "@/app/components/AnnouncementBanner";
 
 const fullWidthShell = (
   <div className="h-dvh min-h-0 flex flex-col bg-background overflow-hidden">
@@ -31,6 +32,7 @@ export default function ChatRouteLayout({
   if (isAuthenticated || (isLoading && hasAuthHint)) {
     return (
       <div className="h-dvh min-h-0 flex flex-col bg-background overflow-hidden">
+        <AnnouncementBanner />
         <ChatRoutePresentationProvider>
           <ChatLayout>{children}</ChatLayout>
         </ChatRoutePresentationProvider>
@@ -44,6 +46,7 @@ export default function ChatRouteLayout({
 
   return (
     <div className="h-dvh min-h-0 flex flex-col bg-background overflow-hidden">
+      <AnnouncementBanner />
       {children}
     </div>
   );

@@ -12,6 +12,7 @@ import type * as accessAllowlist from "../accessAllowlist.js";
 import type * as accountIdentities from "../accountIdentities.js";
 import type * as adminUsers from "../adminUsers.js";
 import type * as agentAutoReviewActions from "../agentAutoReviewActions.js";
+import type * as announcements from "../announcements.js";
 import type * as cancellationReasons from "../cancellationReasons.js";
 import type * as chatStreams from "../chatStreams.js";
 import type * as chats from "../chats.js";
@@ -71,6 +72,7 @@ declare const fullApi: ApiFromModules<{
   accountIdentities: typeof accountIdentities;
   adminUsers: typeof adminUsers;
   agentAutoReviewActions: typeof agentAutoReviewActions;
+  announcements: typeof announcements;
   cancellationReasons: typeof cancellationReasons;
   chatStreams: typeof chatStreams;
   chats: typeof chats;

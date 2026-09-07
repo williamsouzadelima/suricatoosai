@@ -783,6 +783,26 @@ export default defineSchema({
     updated_at: v.number(),
   }).index("by_key", ["key"]),
 
+  // Avisos in-app (banner), publicados pelo /admin.
+  announcements: defineTable({
+    title: v.string(),
+    body: v.string(),
+    level: v.union(
+      v.literal("info"),
+      v.literal("warning"),
+      v.literal("success"),
+    ),
+    active: v.boolean(),
+    dismissible: v.boolean(),
+    starts_at: v.optional(v.number()),
+    ends_at: v.optional(v.number()),
+    cta_label: v.optional(v.string()),
+    cta_url: v.optional(v.string()),
+    created_by: v.optional(v.string()),
+    created_at: v.number(),
+    updated_at: v.number(),
+  }).index("by_active", ["active"]),
+
   notes: defineTable({
     user_id: v.string(),
     note_id: v.string(),

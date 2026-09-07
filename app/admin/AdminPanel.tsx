@@ -11,12 +11,14 @@ import {
   ShieldCheck,
   RefreshCw,
   Bell,
+  Megaphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { HackerAISVG } from "@/components/icons/hackerai-svg";
 import { UsersTable } from "./UsersTable";
 import { AlertsTab } from "./AlertsTab";
+import { AnnouncementsTab } from "./AnnouncementsTab";
 
 type Status = "invited" | "active" | "revoked";
 
@@ -102,7 +104,9 @@ export function AdminPanel({
   const [inviting, setInviting] = useState(false);
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState(false);
-  const [tab, setTab] = useState<"acesso" | "usuarios" | "alertas">("acesso");
+  const [tab, setTab] = useState<
+    "acesso" | "usuarios" | "alertas" | "avisos"
+  >("acesso");
 
   const load = useCallback(async () => {
     try {
@@ -319,6 +323,18 @@ export function AdminPanel({
             <Bell className="h-3.5 w-3.5" />
             Alertas
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("avisos")}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              tab === "avisos"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Megaphone className="h-3.5 w-3.5" />
+            Avisos
+          </button>
         </div>
 
         {tab === "usuarios" ? (
@@ -327,6 +343,8 @@ export function AdminPanel({
           </div>
         ) : tab === "alertas" ? (
           <AlertsTab adminEmail={adminEmail} />
+        ) : tab === "avisos" ? (
+          <AnnouncementsTab />
         ) : (
           <>
         {/* Stats */}
