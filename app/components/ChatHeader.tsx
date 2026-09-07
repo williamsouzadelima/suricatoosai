@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ShareDialog } from "./ShareDialog";
 import { navigateToAuth } from "@/app/hooks/useTauri";
+import { isInviteOnlyClient } from "@/lib/auth/invite-only-client";
 import { captureUpgradeCtaImpression } from "@/lib/analytics/client";
 import { formatTaskTitle } from "@/app/utils/task-ui-copy";
 
@@ -50,6 +51,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   branchedFromChatTitle,
 }) => {
   const { user, loading } = useAuth();
+  const inviteOnly = isInviteOnlyClient();
   const {
     toggleChatSidebar,
     subscription,
@@ -147,14 +149,16 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                     >
                       Sign in
                     </Button>
-                    <Button
-                      onClick={() => navigateToAuth("/signup")}
-                      variant="outline"
-                      size="default"
-                      className="min-w-16 rounded-[10px]"
-                    >
-                      Sign up
-                    </Button>
+                    {!inviteOnly && (
+                      <Button
+                        onClick={() => navigateToAuth("/signup")}
+                        variant="outline"
+                        size="default"
+                        className="min-w-16 rounded-[10px]"
+                      >
+                        Sign up
+                      </Button>
+                    )}
                   </>
                 )}
               </div>
@@ -199,14 +203,16 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                   >
                     Sign in
                   </Button>
-                  <Button
-                    onClick={() => navigateToAuth("/signup")}
-                    variant="outline"
-                    size="sm"
-                    className="rounded-[10px]"
-                  >
-                    Sign up
-                  </Button>
+                  {!inviteOnly && (
+                    <Button
+                      onClick={() => navigateToAuth("/signup")}
+                      variant="outline"
+                      size="sm"
+                      className="rounded-[10px]"
+                    >
+                      Sign up
+                    </Button>
+                  )}
                 </>
               )}
             </div>
