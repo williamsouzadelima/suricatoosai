@@ -98,7 +98,13 @@ fn find_git_bash() -> Option<String> {
         }
     }
 
-    if let Ok(out) = StdCommand::new("where").arg("git").output() {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    if let Ok(out) = StdCommand::new("where")
+        .creation_flags(CREATE_NO_WINDOW)
+        .arg("git")
+        .output()
+    {
         if out.status.success() {
             let stdout = String::from_utf8_lossy(&out.stdout);
             for line in stdout.lines() {
@@ -132,6 +138,15 @@ pub fn build_command(
 
     #[cfg(windows)]
     {
+        // Suppress the console window Windows allocates for a console child
+        // (bash.exe / cmd.exe). Without CREATE_NO_WINDOW that console is handed
+        // to the default terminal app (Windows Terminal on Win11), which flashes
+        // a black window for the child's brief lifetime — visible to the user on
+        // every command, e.g. the periodic `uname -srm && hostname` probe.
+        // tokio's Command exposes creation_flags natively on Windows, same as
+        // raw_arg — no CommandExt import needed.
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
         if config.is_cmd {
             // cmd.exe does not understand MSVCRT-style `\"` escaping that
             // Rust's std `Command::arg` applies on Windows. Use `raw_arg`
@@ -248,7 +263,9 @@ pub async fn cancel_process_tree(pid: u32) -> bool {
 
     #[cfg(windows)]
     {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         return tokio::process::Command::new("taskkill")
+            .creation_flags(CREATE_NO_WINDOW)
             .args(["/PID", &pid.to_string(), "/T", "/F"])
             .output()
             .await
