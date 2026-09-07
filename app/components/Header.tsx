@@ -9,6 +9,7 @@ import { navigateToAuth } from "@/app/hooks/useTauri";
 import { Download } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import { isInviteOnlyClient } from "@/lib/auth/invite-only-client";
 
 interface HeaderProps {
   chatTitle?: string;
@@ -18,6 +19,7 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ chatTitle, hideDownload = false }) => {
   const { user, loading } = useAuth();
   const t = useTranslations("header");
+  const inviteOnly = isInviteOnlyClient();
 
   return (
     <header className="w-full px-6 max-sm:px-4 flex-shrink-0">
@@ -60,19 +62,21 @@ const Header: React.FC<HeaderProps> = ({ chatTitle, hideDownload = false }) => {
               >
                 {t("signIn")}
               </Button>
-              <Button
-                data-testid="sign-up-button"
-                onClick={() =>
-                  navigateToAuth("/signup", {
-                    preferSignInForReturningUser: true,
-                  })
-                }
-                variant="outline"
-                size="default"
-                className="min-w-16 rounded-[10px]"
-              >
-                {t("getStarted")}
-              </Button>
+              {!inviteOnly && (
+                <Button
+                  data-testid="sign-up-button"
+                  onClick={() =>
+                    navigateToAuth("/signup", {
+                      preferSignInForReturningUser: true,
+                    })
+                  }
+                  variant="outline"
+                  size="default"
+                  className="min-w-16 rounded-[10px]"
+                >
+                  {t("getStarted")}
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -94,19 +98,21 @@ const Header: React.FC<HeaderProps> = ({ chatTitle, hideDownload = false }) => {
             >
               {t("signIn")}
             </Button>
-            <Button
-              data-testid="sign-up-button-mobile"
-              onClick={() =>
-                navigateToAuth("/signup", {
-                  preferSignInForReturningUser: true,
-                })
-              }
-              variant="outline"
-              size="sm"
-              className="rounded-[10px]"
-            >
-              {t("getStarted")}
-            </Button>
+            {!inviteOnly && (
+              <Button
+                data-testid="sign-up-button-mobile"
+                onClick={() =>
+                  navigateToAuth("/signup", {
+                    preferSignInForReturningUser: true,
+                  })
+                }
+                variant="outline"
+                size="sm"
+                className="rounded-[10px]"
+              >
+                {t("getStarted")}
+              </Button>
+            )}
           </div>
         )}
       </div>

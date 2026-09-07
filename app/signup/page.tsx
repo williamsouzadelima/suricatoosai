@@ -10,6 +10,7 @@ import {
   isValidReferralCode,
 } from "@/lib/referrals/config";
 import { workos } from "@/app/api/workos";
+import { isInviteOnlyEnabled } from "@/lib/auth/invite-access";
 
 export const runtime = "nodejs";
 
@@ -89,6 +90,12 @@ const getReferralInviteContext = async (
 };
 
 export default async function SignupPage({ searchParams }: SignupPageProps) {
+  // Invite-only: no public self-registration (referral signup included).
+  // Only login is offered; invited users join via the WorkOS invitation link.
+  if (isInviteOnlyEnabled()) {
+    redirect("/login");
+  }
+
   const params = await searchParams;
   const referralCode =
     firstValue(params.referral_code) ?? firstValue(params.ref);

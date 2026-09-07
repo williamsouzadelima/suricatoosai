@@ -48,6 +48,7 @@ const UNAUTHENTICATED_PATHS = new Set([
   "/desktop-login",
   "/desktop-callback",
   "/auth-error",
+  "/access/not-invited",
   "/privacy-policy",
   "/terms-of-service",
   "/trust",
