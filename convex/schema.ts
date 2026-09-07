@@ -724,6 +724,7 @@ export default defineSchema({
       v.literal("dispute_fraudulent"),
       v.literal("dispute_billing_hold"),
       v.literal("support_confirmed_fraud"),
+      v.literal("admin_manual"),
     ),
     source: v.union(v.literal("stripe"), v.literal("support")),
     source_id: v.string(),

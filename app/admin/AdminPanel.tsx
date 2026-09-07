@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { HackerAISVG } from "@/components/icons/hackerai-svg";
+import { UsersTable } from "./UsersTable";
 
 type Status = "invited" | "active" | "revoked";
 
@@ -99,6 +100,7 @@ export function AdminPanel({
   const [inviting, setInviting] = useState(false);
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState(false);
+  const [tab, setTab] = useState<"acesso" | "usuarios">("acesso");
 
   const load = useCallback(async () => {
     try {
@@ -279,6 +281,38 @@ export function AdminPanel({
           </div>
         )}
 
+        {/* Tabs */}
+        <div className="mt-6 inline-flex gap-1 rounded-lg border bg-card p-1">
+          <button
+            type="button"
+            onClick={() => setTab("acesso")}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              tab === "acesso"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Convites &amp; acesso
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("usuarios")}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              tab === "usuarios"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Usuários
+          </button>
+        </div>
+
+        {tab === "usuarios" ? (
+          <div className="mt-6">
+            <UsersTable />
+          </div>
+        ) : (
+          <>
         {/* Stats */}
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard
@@ -442,6 +476,8 @@ export function AdminPanel({
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
     </div>
   );
