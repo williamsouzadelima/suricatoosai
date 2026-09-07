@@ -9,6 +9,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { GlobalStateProvider } from "./contexts/GlobalState";
 import { AgentAutoReviewAvailabilityProvider } from "./contexts/AgentAutoReviewAvailabilityContext";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
+import { ConvexErrorBoundary } from "./components/ConvexErrorBoundary";
 import { TodoBlockProvider } from "./contexts/TodoBlockContext";
 import { AgentApprovalProvider } from "./contexts/AgentApprovalContext";
 import { PostHogProvider } from "./providers";
@@ -168,7 +169,7 @@ export default async function RootLayout({
       <body className="antialiased h-full">
         <NextIntlClientProvider locale={locale} messages={messages}>
           <ConvexClientProvider initialAuth={initialAuth}>
-            {content}
+            <ConvexErrorBoundary>{content}</ConvexErrorBoundary>
           </ConvexClientProvider>
         </NextIntlClientProvider>
       </body>
