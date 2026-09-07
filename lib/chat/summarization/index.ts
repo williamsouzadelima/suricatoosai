@@ -721,7 +721,7 @@ const saveTranscriptToSandbox = async (
 
       // Save as structured JSON — model messages (mid-stream, with separate
       // tool-call/tool-result parts) when available, otherwise UI messages
-      const content = JSON.stringify(modelMessages ?? messages, null, 2);
+      const content = JSON.stringify(modelMessages ?? messages);
       if (isE2BSandbox(sandbox)) {
         // E2B uploads via HTTP — no shell argument limits, string is fine
         await sandbox.files.write(path, content);
@@ -738,8 +738,6 @@ const saveTranscriptToSandbox = async (
       const errorMsg = error instanceof Error ? error.message : String(error);
       const isPublishError = errorMsg.includes("Failed to publish");
       const isUnrecoverable =
-        errorMsg.includes("connection closed") ||
-        errorMsg.includes("connection lost") ||
         errorMsg.includes("program not found");
       if (isPublishError && !isUnrecoverable && attempt < maxRetries) {
         console.warn(

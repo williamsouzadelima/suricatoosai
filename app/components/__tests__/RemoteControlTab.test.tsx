@@ -352,4 +352,41 @@ describe("RemoteControlTab", () => {
     expect(mockWriteText).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
   });
+
+  it("falls back to writeText when clipboard.write is unavailable at runtime", async () => {
+    const mockWrite = jest.fn<(items: unknown[]) => Promise<void>>();
+    mockWrite.mockRejectedValue(new DOMException("Not allowed"));
+    // Simulate the desktop app's WKWebView: the async ClipboardItem API is
+    // present but write() rejects at runtime.
+    (globalThis as unknown as { ClipboardItem: unknown }).ClipboardItem =
+      class {
+        constructor(_items: Record<string, unknown>) {}
+      };
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { write: mockWrite, writeText: mockWriteText },
+    });
+
+    try {
+      render(<RemoteControlTab />);
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Copy connect command" }),
+      );
+
+      await waitFor(() => {
+        expect(mockWriteText).toHaveBeenCalledWith(
+          expect.stringContaining("--token test-token"),
+        );
+      });
+      expect(mockWrite).toHaveBeenCalledTimes(1);
+      expect(toast.success).toHaveBeenCalledWith(
+        "Connect command copied. Paste it into your terminal.",
+      );
+      expect(toast.error).not.toHaveBeenCalled();
+    } finally {
+      delete (globalThis as unknown as { ClipboardItem?: unknown })
+        .ClipboardItem;
+    }
+  });
 });
