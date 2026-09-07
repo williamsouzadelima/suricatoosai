@@ -1,0 +1,3 @@
+ops/monitoring/*.sh text eol=lf
+ops/monitoring/*.service text eol=lf
+ops/monitoring/*.timer text eol=lf
