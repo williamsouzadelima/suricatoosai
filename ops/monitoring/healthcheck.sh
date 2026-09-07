@@ -25,7 +25,9 @@ CONVEX_QUERY_PATH="${CONVEX_QUERY_PATH:-referrals:getUnreadRewardNotifications}"
 CONVEX_SERVICE_KEY="${CONVEX_SERVICE_KEY:-}"
 RESEND_API_KEY="${RESEND_API_KEY:-}"
 ALERT_EMAIL_FROM="${ALERT_EMAIL_FROM:-Suricatoos Alertas <alertas@suricatoos.com>}"
-SERVICES="${SERVICES:-suricatoos-next suricatoos-trigger suricatoos-connector caddy centrifugo}"
+# O suricatoos-connector fica FORA por padrão: ele cicla sozinho (idle 1h ->
+# reinicia), o que geraria falsos alertas. Adicione-o via SERVICES se quiser.
+SERVICES="${SERVICES:-suricatoos-next suricatoos-trigger caddy centrifugo}"
 MIN_AVAIL_MB="${MIN_AVAIL_MB:-150}"
 MAX_DISK_PCT="${MAX_DISK_PCT:-90}"
 CURL_TIMEOUT="${CURL_TIMEOUT:-10}"
@@ -33,6 +35,11 @@ STATE_DIR="${STATE_DIR:-/var/lib/suricatoos-monitor}"
 LOG_FILE="${LOG_FILE:-/var/log/suricatoos-monitor.log}"
 HEARTBEAT_HOUR="${HEARTBEAT_HOUR:-9}"   # hora local p/ heartbeat diário "tudo ok" (vazio = desliga)
 HOSTLABEL="${HOSTLABEL:-$(hostname)}"
+
+# Alguns .env guardam os valores entre aspas; o dotenv do Next as remove, mas a
+# extração crua no env do monitor não — então limpamos aspas/espaços aqui.
+CONVEX_SERVICE_KEY=$(printf '%s' "$CONVEX_SERVICE_KEY" | tr -d "\"' \t\r\n")
+RESEND_API_KEY=$(printf '%s' "$RESEND_API_KEY" | tr -d "\"' \t\r\n")
 
 STATE_FILE="$STATE_DIR/failing"
 HEARTBEAT_STAMP="$STATE_DIR/last_heartbeat_day"
