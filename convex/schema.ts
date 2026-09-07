@@ -771,6 +771,18 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_status", ["status"]),
 
+  // Configuração dos canais de alerta do monitor de saúde (doc único, key="global").
+  // Gerenciada pelo /admin; lida pelo monitor no Kali via service key (+ cache local).
+  monitor_settings: defineTable({
+    key: v.string(),
+    teams_enabled: v.boolean(),
+    teams_webhook_url: v.optional(v.string()),
+    email_enabled: v.boolean(),
+    email_to: v.optional(v.string()),
+    updated_by: v.optional(v.string()),
+    updated_at: v.number(),
+  }).index("by_key", ["key"]),
+
   notes: defineTable({
     user_id: v.string(),
     note_id: v.string(),

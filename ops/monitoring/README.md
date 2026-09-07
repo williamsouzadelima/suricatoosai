@@ -21,6 +21,21 @@ estourou e desabilitou o deployment → app fora do ar sem ninguém saber).
   ela parar de chegar, o próprio monitor pode ter caído.
 - **Log:** `/var/log/suricatoos-monitor.log`.
 
+## Canais de alerta (Teams + e-mail) — gerenciados pelo /admin
+
+Ligar/desligar Teams e e-mail e definir webhook/destinatário é feito na **aba
+"Alertas" do painel `/admin`** (superadmin). Essa config vive no Convex
+(`monitor_settings`) e o monitor a **cacheia** em `/var/lib/suricatoos-monitor/channels`
+a cada rodada — então, se o Convex cair (o cenário monitorado!), o monitor ainda
+usa o último canal conhecido para avisar.
+
+Os únicos segredos no `/etc/suricatoos-monitor.env` são:
+- `CONVEX_SERVICE_KEY` — para ler a config no Convex (= `CONVEX_SERVICE_ROLE_KEY`).
+- `RESEND_API_KEY` — para enviar e-mail (domínio `suricatoos.com` já verificado).
+
+A URL do webhook do Teams e o e-mail de destino ficam no painel, não no env.
+Botão **"Enviar teste"** no /admin dispara um alerta na hora pelos canais ligados.
+
 ## Ponto cego (assumido)
 
 Roda NO Kali → **não** detecta o host totalmente fora do ar (rede/energia/kernel).
@@ -31,10 +46,10 @@ pé) este monitor cobre.
 ## Instalação no Kali
 
 ```bash
-# 1) segredo do canal de alerta (NÃO vai pro git)
+# 1) segredos de servidor (NÃO vão pro git): CONVEX_SERVICE_KEY + RESEND_API_KEY
 cp /root/suricatoos/ops/monitoring/suricatoos-monitor.env.example /etc/suricatoos-monitor.env
 chmod 600 /etc/suricatoos-monitor.env
-$EDITOR /etc/suricatoos-monitor.env     # preencher Telegram OU Resend
+$EDITOR /etc/suricatoos-monitor.env     # (Teams/e-mail on/off e destinos são no /admin)
 
 # 2) systemd
 chmod +x /root/suricatoos/ops/monitoring/healthcheck.sh

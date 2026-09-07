@@ -10,11 +10,13 @@ import {
   Search,
   ShieldCheck,
   RefreshCw,
+  Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { HackerAISVG } from "@/components/icons/hackerai-svg";
 import { UsersTable } from "./UsersTable";
+import { AlertsTab } from "./AlertsTab";
 
 type Status = "invited" | "active" | "revoked";
 
@@ -100,7 +102,7 @@ export function AdminPanel({
   const [inviting, setInviting] = useState(false);
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState(false);
-  const [tab, setTab] = useState<"acesso" | "usuarios">("acesso");
+  const [tab, setTab] = useState<"acesso" | "usuarios" | "alertas">("acesso");
 
   const load = useCallback(async () => {
     try {
@@ -305,12 +307,26 @@ export function AdminPanel({
           >
             Usuários
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("alertas")}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              tab === "alertas"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Bell className="h-3.5 w-3.5" />
+            Alertas
+          </button>
         </div>
 
         {tab === "usuarios" ? (
           <div className="mt-6">
             <UsersTable />
           </div>
+        ) : tab === "alertas" ? (
+          <AlertsTab adminEmail={adminEmail} />
         ) : (
           <>
         {/* Stats */}
