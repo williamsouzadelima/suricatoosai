@@ -1,0 +1,9 @@
+[Unit]
+Description=Suricatoos health monitor (one-shot check)
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/suricatoos-monitor.env
+ExecStart=/root/suricatoos/ops/monitoring/healthcheck.sh
+# Sem Restart: é one-shot disparado pelo .timer
