@@ -13,6 +13,7 @@ import {
   Bell,
   Megaphone,
   Send,
+  LayoutDashboard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ import { UsersTable } from "./UsersTable";
 import { AlertsTab } from "./AlertsTab";
 import { AnnouncementsTab } from "./AnnouncementsTab";
 import { MarketingTab } from "./MarketingTab";
+import { OverviewTab } from "./OverviewTab";
 
 type Status = "invited" | "active" | "revoked";
 
@@ -107,8 +109,8 @@ export function AdminPanel({
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState(false);
   const [tab, setTab] = useState<
-    "acesso" | "usuarios" | "alertas" | "avisos" | "marketing"
-  >("acesso");
+    "overview" | "acesso" | "usuarios" | "alertas" | "avisos" | "marketing"
+  >("overview");
 
   const load = useCallback(async () => {
     try {
@@ -290,7 +292,19 @@ export function AdminPanel({
         )}
 
         {/* Tabs */}
-        <div className="mt-6 inline-flex gap-1 rounded-lg border bg-card p-1">
+        <div className="mt-6 flex flex-wrap gap-1 rounded-lg border bg-card p-1">
+          <button
+            type="button"
+            onClick={() => setTab("overview")}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              tab === "overview"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <LayoutDashboard className="h-3.5 w-3.5" />
+            Visão geral
+          </button>
           <button
             type="button"
             onClick={() => setTab("acesso")}
@@ -351,7 +365,9 @@ export function AdminPanel({
           </button>
         </div>
 
-        {tab === "usuarios" ? (
+        {tab === "overview" ? (
+          <OverviewTab onNavigate={setTab} />
+        ) : tab === "usuarios" ? (
           <div className="mt-6">
             <UsersTable />
           </div>
