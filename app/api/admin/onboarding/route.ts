@@ -3,6 +3,7 @@ import { getSuperadminUser } from "@/lib/auth/require-superadmin";
 import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
 import { sendWelcomeTo } from "@/lib/onboarding/welcome";
+import { recordAudit } from "@/lib/admin/audit";
 
 export const runtime = "nodejs";
 
@@ -70,6 +71,12 @@ export async function POST(req: NextRequest) {
       body: text,
       updatedBy: admin.email ?? admin.id,
     });
+    await recordAudit(
+      admin.email ?? admin.id,
+      "boas-vindas.salvar",
+      undefined,
+      body.enabled ? "ligado" : "desligado",
+    );
     return NextResponse.json({ success: true });
   }
 

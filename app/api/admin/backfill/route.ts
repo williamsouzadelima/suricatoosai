@@ -3,6 +3,7 @@ import { getSuperadminUser } from "@/lib/auth/require-superadmin";
 import { workos } from "@/app/api/workos";
 import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
+import { recordAudit } from "@/lib/admin/audit";
 
 export const runtime = "nodejs";
 
@@ -46,6 +47,13 @@ export async function POST() {
   const result = await getConvexClient().mutation(
     api.accessAllowlist.backfillActive,
     { serviceKey, emails, invitedBy: "backfill" },
+  );
+
+  await recordAudit(
+    admin.email ?? admin.id,
+    "grandfather",
+    undefined,
+    `${result.inserted} adicionados, ${result.skipped} já existiam (${emails.length} no WorkOS)`,
   );
 
   return NextResponse.json({

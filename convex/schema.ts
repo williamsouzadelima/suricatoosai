@@ -842,6 +842,15 @@ export default defineSchema({
     failed: v.optional(v.number()),
   }).index("by_status_and_time", ["status", "scheduled_at"]),
 
+  // Log de auditoria de ações do /admin (quem fez o quê).
+  audit_log: defineTable({
+    actor: v.string(),
+    action: v.string(),
+    target: v.optional(v.string()),
+    detail: v.optional(v.string()),
+    created_at: v.number(),
+  }).index("by_created_at", ["created_at"]),
+
   // E-mail de boas-vindas automático (doc único, key="global").
   welcome_settings: defineTable({
     key: v.string(),

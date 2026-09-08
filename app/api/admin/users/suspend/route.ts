@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSuperadminUser } from "@/lib/auth/require-superadmin";
 import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
+import { recordAudit } from "@/lib/admin/audit";
 
 export const runtime = "nodejs";
 
@@ -39,6 +40,12 @@ export async function POST(req: NextRequest) {
       reason: body.reason?.trim() || undefined,
       adminEmail: admin.email ?? admin.id,
     });
+    await recordAudit(
+      admin.email ?? admin.id,
+      "usuario.suspender",
+      userId,
+      body.reason?.trim() || undefined,
+    );
     return NextResponse.json({ success: true, suspended: res.suspended });
   }
 
@@ -48,6 +55,7 @@ export async function POST(req: NextRequest) {
       userId,
       reason: body.reason?.trim() || undefined,
     });
+    await recordAudit(admin.email ?? admin.id, "usuario.reativar", userId);
     return NextResponse.json({ success: true, resolved: res.resolved });
   }
 

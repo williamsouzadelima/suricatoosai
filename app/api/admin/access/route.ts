@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSuperadminUser } from "@/lib/auth/require-superadmin";
 import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
+import { recordAudit } from "@/lib/admin/audit";
 
 export const runtime = "nodejs";
 
@@ -72,6 +73,7 @@ export async function POST(req: NextRequest) {
       serviceKey,
       email,
     });
+    await recordAudit(admin.email ?? admin.id, "acesso.revogar", email);
     return NextResponse.json({ success: true, email, status: "revoked" });
   }
 
@@ -80,6 +82,7 @@ export async function POST(req: NextRequest) {
       api.accessAllowlist.addInvite,
       { serviceKey, email, invitedBy: admin.email ?? admin.id },
     );
+    await recordAudit(admin.email ?? admin.id, "acesso.reconvidar", email);
     return NextResponse.json({ success: true, email, status: result.status });
   }
 

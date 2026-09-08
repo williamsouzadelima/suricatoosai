@@ -15,6 +15,7 @@ import {
   Send,
   LayoutDashboard,
   Download,
+  ScrollText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ import { AlertsTab } from "./AlertsTab";
 import { AnnouncementsTab } from "./AnnouncementsTab";
 import { MarketingTab } from "./MarketingTab";
 import { OverviewTab } from "./OverviewTab";
+import { AuditTab } from "./AuditTab";
 
 type Status = "invited" | "active" | "revoked";
 
@@ -111,7 +113,13 @@ export function AdminPanel({
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState(false);
   const [tab, setTab] = useState<
-    "overview" | "acesso" | "usuarios" | "alertas" | "avisos" | "marketing"
+    | "overview"
+    | "acesso"
+    | "usuarios"
+    | "alertas"
+    | "avisos"
+    | "marketing"
+    | "auditoria"
   >("overview");
 
   const load = useCallback(async () => {
@@ -389,6 +397,18 @@ export function AdminPanel({
             <Send className="h-3.5 w-3.5" />
             Marketing
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("auditoria")}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              tab === "auditoria"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ScrollText className="h-3.5 w-3.5" />
+            Auditoria
+          </button>
         </div>
 
         {tab === "overview" ? (
@@ -403,6 +423,8 @@ export function AdminPanel({
           <AnnouncementsTab />
         ) : tab === "marketing" ? (
           <MarketingTab />
+        ) : tab === "auditoria" ? (
+          <AuditTab />
         ) : (
           <>
         {/* Stats */}

@@ -3,6 +3,7 @@ import { getSuperadminUser } from "@/lib/auth/require-superadmin";
 import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { recordAudit } from "@/lib/admin/audit";
 
 export const runtime = "nodejs";
 
@@ -70,6 +71,7 @@ export async function POST(req: NextRequest) {
       serviceKey,
       id: body.id as Id<"announcements">,
     });
+    await recordAudit(admin.email ?? admin.id, "aviso.excluir", body.id);
     return NextResponse.json({ success: true });
   }
 
@@ -81,6 +83,11 @@ export async function POST(req: NextRequest) {
       id: body.id as Id<"announcements">,
       active: Boolean(body.active),
     });
+    await recordAudit(
+      admin.email ?? admin.id,
+      body.active ? "aviso.publicar" : "aviso.despublicar",
+      body.id,
+    );
     return NextResponse.json({ success: true });
   }
 
@@ -131,6 +138,7 @@ export async function POST(req: NextRequest) {
       ...common,
       id: body.id as Id<"announcements">,
     });
+    await recordAudit(admin.email ?? admin.id, "aviso.editar", title);
     return NextResponse.json({ success: true });
   }
 
@@ -139,6 +147,7 @@ export async function POST(req: NextRequest) {
       ...common,
       createdBy: admin.email ?? admin.id,
     });
+    await recordAudit(admin.email ?? admin.id, "aviso.criar", title);
     return NextResponse.json({ success: true, id });
   }
 

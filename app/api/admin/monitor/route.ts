@@ -3,6 +3,7 @@ import { getSuperadminUser } from "@/lib/auth/require-superadmin";
 import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
 import { sendTeamsAlert, sendEmailAlert } from "@/lib/monitoring/notify";
+import { recordAudit } from "@/lib/admin/audit";
 
 export const runtime = "nodejs";
 
@@ -96,6 +97,14 @@ export async function POST(req: NextRequest) {
       email_to: parsed.email_to,
       updatedBy: admin.email ?? admin.id,
     });
+    await recordAudit(
+      admin.email ?? admin.id,
+      "alertas.salvar",
+      undefined,
+      [parsed.teams_enabled ? "teams" : "", parsed.email_enabled ? "email" : ""]
+        .filter(Boolean)
+        .join("+") || "nenhum canal",
+    );
     return NextResponse.json({ success: true });
   }
 

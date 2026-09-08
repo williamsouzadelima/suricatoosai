@@ -3,6 +3,7 @@ import { getSuperadminUser } from "@/lib/auth/require-superadmin";
 import { workos } from "@/app/api/workos";
 import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
+import { recordAudit } from "@/lib/admin/audit";
 
 export const runtime = "nodejs";
 
@@ -58,6 +59,13 @@ export async function POST(req: NextRequest) {
       error instanceof Error ? error.message : String(error),
     );
   }
+
+  await recordAudit(
+    admin.email ?? admin.id,
+    "convite.enviar",
+    email,
+    result.created ? "novo" : "reenvio",
+  );
 
   return NextResponse.json({
     success: true,

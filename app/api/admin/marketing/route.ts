@@ -9,6 +9,7 @@ import {
   sendCampaign,
   normSegment,
 } from "@/lib/marketing/dispatch";
+import { recordAudit } from "@/lib/admin/audit";
 
 export const runtime = "nodejs";
 
@@ -95,6 +96,7 @@ export async function POST(req: NextRequest) {
       serviceKey,
       id: body.id as Id<"scheduled_campaigns">,
     });
+    await recordAudit(admin.email ?? admin.id, "campanha.cancelar", body.id);
     return NextResponse.json({ success: true });
   }
 
@@ -156,6 +158,12 @@ export async function POST(req: NextRequest) {
       scheduledAt: when,
       createdBy: admin.email ?? admin.id,
     });
+    await recordAudit(
+      admin.email ?? admin.id,
+      "campanha.agendar",
+      normSegment(body.segment),
+      `${subject} @ ${new Date(when).toISOString()}`,
+    );
     return NextResponse.json({ success: true });
   }
 
@@ -172,6 +180,12 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
+    await recordAudit(
+      admin.email ?? admin.id,
+      "campanha.enviar",
+      normSegment(body.segment),
+      `${subject} → ${r.sent}/${r.total}`,
+    );
     return NextResponse.json({
       success: r.failed === 0,
       total: r.total,
