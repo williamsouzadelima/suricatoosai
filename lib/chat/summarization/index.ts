@@ -719,6 +719,24 @@ const saveTranscriptToSandbox = async (
         await sandbox.commands.run(`mkdir -p ${dir}`, { timeoutMs: 5000 });
       }
 
+      // [connclose-diag] Timestamp the write start so it can be correlated with
+      // connclose_diag_sandbox_close_called / *_use_centrifugo_connection by
+      // connection_id — proves whether a close lands inside the write window.
+      console.warn(
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          level: "warn",
+          event: "connclose_diag_transcript_write_start",
+          service: "web",
+          attempt,
+          connection_id:
+            typeof (sandbox as { getConnectionId?: () => string })
+              .getConnectionId === "function"
+              ? (sandbox as { getConnectionId: () => string }).getConnectionId()
+              : null,
+        }),
+      );
+
       // Save as structured JSON — model messages (mid-stream, with separate
       // tool-call/tool-result parts) when available, otherwise UI messages
       const content = JSON.stringify(modelMessages ?? messages);
