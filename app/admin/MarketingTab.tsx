@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Mail, Send, TestTube2, Users } from "lucide-react";
+import { Mail, Send, TestTube2, Users, CalendarClock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WelcomeCard } from "./WelcomeCard";
@@ -18,6 +18,47 @@ interface Campaign {
   created_by?: string;
   created_at: number;
 }
+
+interface Scheduled {
+  id: string;
+  subject: string;
+  segment: string;
+  scheduled_at: number;
+  status: string;
+  total?: number;
+  sent?: number;
+  failed?: number;
+}
+
+const toMs = (s: string): number | undefined => {
+  if (!s) return undefined;
+  const t = new Date(s).getTime();
+  return Number.isFinite(t) ? t : undefined;
+};
+
+const SCHED_STATUS: Record<string, { label: string; badge: string }> = {
+  pending: {
+    label: "agendada",
+    badge: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  },
+  sending: {
+    label: "enviando",
+    badge: "border-primary/30 bg-primary/10 text-primary",
+  },
+  sent: {
+    label: "enviada",
+    badge:
+      "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  },
+  failed: {
+    label: "falhou",
+    badge: "border-destructive/30 bg-destructive/10 text-destructive",
+  },
+  canceled: {
+    label: "cancelada",
+    badge: "border-border bg-muted text-muted-foreground",
+  },
+};
 
 const SEGMENTS: { value: Segment; label: string }[] = [
   { value: "active", label: "Ativos" },
@@ -48,6 +89,10 @@ export function MarketingTab() {
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [sending, setSending] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState("");
+  const [scheduled, setScheduled] = useState<Scheduled[]>([]);
+  const [scheduling, setScheduling] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,6 +102,7 @@ export function MarketingTab() {
       const data = await res.json();
       setCounts(data.counts ?? { active: 0, invited: 0, all: 0 });
       setCampaigns(data.campaigns ?? []);
+      setScheduled(data.scheduled ?? []);
       setEmailConfigured(Boolean(data.emailConfigured));
       setAdminEmail(data.adminEmail ?? null);
     } catch (error) {
@@ -142,6 +188,64 @@ export function MarketingTab() {
     }
   }, [valid, subject, body, segment, recipientCount, load]);
 
+  const schedule = useCallback(async () => {
+    if (!valid) {
+      toast.error("Preencha assunto e mensagem.");
+      return;
+    }
+    const when = toMs(scheduleAt);
+    if (!when || when < Date.now()) {
+      toast.error("Escolha uma data/hora futura.");
+      return;
+    }
+    setScheduling(true);
+    try {
+      const res = await fetch("/api/admin/marketing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "schedule",
+          segment,
+          subject,
+          body,
+          scheduledAt: when,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      toast.success(`Campanha agendada para ${new Date(when).toLocaleString("pt-BR")}.`);
+      setSubject("");
+      setBody("");
+      setScheduleAt("");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao agendar.");
+    } finally {
+      setScheduling(false);
+    }
+  }, [valid, scheduleAt, segment, subject, body, load]);
+
+  const cancelScheduled = useCallback(
+    async (id: string) => {
+      setBusyId(id);
+      try {
+        const res = await fetch("/api/admin/marketing", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "cancel", id }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+        await load();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Falha ao cancelar.");
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [load],
+  );
+
   return (
     <div className="mt-6 space-y-4">
       <WelcomeCard />
@@ -225,8 +329,82 @@ export function MarketingTab() {
                 : `Teste${adminEmail ? ` (p/ ${adminEmail})` : ""}`}
             </Button>
           </div>
+
+          <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+            <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <CalendarClock className="h-4 w-4" />
+              Agendar p/ depois:
+            </span>
+            <Input
+              type="datetime-local"
+              value={scheduleAt}
+              onChange={(e) => setScheduleAt(e.target.value)}
+              className="sm:w-56"
+            />
+            <Button
+              variant="outline"
+              onClick={() => void schedule()}
+              disabled={scheduling || !valid || !scheduleAt}
+            >
+              <CalendarClock className="h-4 w-4" />
+              {scheduling ? "Agendando…" : "Agendar"}
+            </Button>
+          </div>
         </div>
       </div>
+
+      {/* Agendadas */}
+      {scheduled.length > 0 && (
+        <div className="rounded-xl border bg-card">
+          <div className="border-b p-5">
+            <h2 className="text-base font-semibold">Agendadas</h2>
+          </div>
+          <ul className="divide-y">
+            {scheduled.map((s) => {
+              const st = SCHED_STATUS[s.status] ?? SCHED_STATUS.pending;
+              return (
+                <li
+                  key={s.id}
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm"
+                >
+                  <span
+                    className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${st.badge}`}
+                  >
+                    {st.label}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-medium">
+                    {s.subject}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {new Date(s.scheduled_at).toLocaleString("pt-BR", {
+                      day: "2-digit",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  {s.status === "sent" && (
+                    <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
+                      {s.sent}/{s.total}
+                    </span>
+                  )}
+                  {s.status === "pending" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="shrink-0 text-destructive hover:text-destructive"
+                      disabled={busyId === s.id}
+                      onClick={() => void cancelScheduled(s.id)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
       {/* History */}
       <div className="rounded-xl border bg-card">

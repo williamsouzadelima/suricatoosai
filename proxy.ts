@@ -50,6 +50,7 @@ const UNAUTHENTICATED_PATHS = new Set([
   "/auth-error",
   "/access/not-invited",
   "/unsubscribe",
+  "/api/cron/dispatch-campaigns",
   "/privacy-policy",
   "/terms-of-service",
   "/trust",

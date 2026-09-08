@@ -49,6 +49,7 @@ import type * as referrals from "../referrals.js";
 import type * as s3Actions from "../s3Actions.js";
 import type * as s3Cleanup from "../s3Cleanup.js";
 import type * as s3Utils from "../s3Utils.js";
+import type * as scheduledCampaigns from "../scheduledCampaigns.js";
 import type * as sharedChats from "../sharedChats.js";
 import type * as subagents from "../subagents.js";
 import type * as supportFraudActions from "../supportFraudActions.js";
@@ -111,6 +112,7 @@ declare const fullApi: ApiFromModules<{
   s3Actions: typeof s3Actions;
   s3Cleanup: typeof s3Cleanup;
   s3Utils: typeof s3Utils;
+  scheduledCampaigns: typeof scheduledCampaigns;
   sharedChats: typeof sharedChats;
   subagents: typeof subagents;
   supportFraudActions: typeof supportFraudActions;

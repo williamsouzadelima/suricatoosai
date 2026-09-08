@@ -821,6 +821,27 @@ export default defineSchema({
     created_at: v.number(),
   }).index("by_created_at", ["created_at"]),
 
+  // Campanhas de e-mail agendadas (dispatcher processa as "pending" vencidas).
+  scheduled_campaigns: defineTable({
+    subject: v.string(),
+    body: v.string(),
+    segment: v.string(),
+    scheduled_at: v.number(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("sending"),
+      v.literal("sent"),
+      v.literal("failed"),
+      v.literal("canceled"),
+    ),
+    created_by: v.optional(v.string()),
+    created_at: v.number(),
+    sent_at: v.optional(v.number()),
+    total: v.optional(v.number()),
+    sent: v.optional(v.number()),
+    failed: v.optional(v.number()),
+  }).index("by_status_and_time", ["status", "scheduled_at"]),
+
   // E-mail de boas-vindas automático (doc único, key="global").
   welcome_settings: defineTable({
     key: v.string(),

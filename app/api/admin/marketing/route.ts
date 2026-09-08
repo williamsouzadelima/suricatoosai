@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSuperadminUser } from "@/lib/auth/require-superadmin";
 import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import { sendBatch, unsubUrl, renderMarketingHtml } from "@/lib/marketing/send";
 import {
-  sendBatch,
-  unsubUrl,
-  renderMarketingHtml,
-  type BatchMessage,
-} from "@/lib/marketing/send";
+  recipientsFor,
+  sendCampaign,
+  normSegment,
+} from "@/lib/marketing/dispatch";
 
 export const runtime = "nodejs";
 
@@ -18,60 +19,6 @@ const FROM =
 
 function getServiceKey(): string | null {
   return process.env.CONVEX_SERVICE_ROLE_KEY ?? null;
-}
-const norm = (e: string) => e.trim().toLowerCase();
-
-type Segment = "active" | "invited" | "all";
-function normSegment(v: unknown): Segment {
-  return v === "invited" || v === "all" ? v : "active";
-}
-
-async function recipientsFor(
-  serviceKey: string,
-  segment: Segment,
-): Promise<string[]> {
-  const convex = getConvexClient();
-  const optOuts = new Set(
-    (
-      await convex.query(api.emailMarketing.getOptOutEmails, { serviceKey })
-    ).map(norm),
-  );
-  const emails: string[] = [];
-  if (segment === "active" || segment === "all") {
-    const rows = await convex.query(api.accessAllowlist.list, {
-      serviceKey,
-      status: "active",
-      limit: 2000,
-    });
-    emails.push(...rows.map((r) => r.email));
-  }
-  if (segment === "invited" || segment === "all") {
-    const rows = await convex.query(api.accessAllowlist.list, {
-      serviceKey,
-      status: "invited",
-      limit: 2000,
-    });
-    emails.push(...rows.map((r) => r.email));
-  }
-  return Array.from(new Set(emails.map(norm))).filter(
-    (e) => e && e.includes("@") && !optOuts.has(e),
-  );
-}
-
-function buildMessage(
-  email: string,
-  subject: string,
-  body: string,
-  secret: string,
-): BatchMessage {
-  const u = unsubUrl(APP_BASE_URL, email, secret);
-  return {
-    to: email,
-    subject,
-    html: renderMarketingHtml(body, u),
-    text: `${body}\n\n---\nPara não receber mais estes e-mails: ${u}`,
-    unsubscribeUrl: u,
-  };
 }
 
 export async function GET() {
@@ -85,13 +32,17 @@ export async function GET() {
     );
   }
 
-  const [active, invited, all, campaigns] = await Promise.all([
+  const [active, invited, all, campaigns, scheduled] = await Promise.all([
     recipientsFor(serviceKey, "active"),
     recipientsFor(serviceKey, "invited"),
     recipientsFor(serviceKey, "all"),
     getConvexClient().query(api.emailMarketing.listCampaigns, {
       serviceKey,
       limit: 20,
+    }),
+    getConvexClient().query(api.scheduledCampaigns.listAll, {
+      serviceKey,
+      limit: 50,
     }),
   ]);
 
@@ -100,6 +51,7 @@ export async function GET() {
     emailConfigured: Boolean(process.env.RESEND_API_KEY),
     adminEmail: admin.email ?? null,
     campaigns,
+    scheduled,
   });
 }
 
@@ -126,11 +78,24 @@ export async function POST(req: NextRequest) {
     segment?: string;
     subject?: string;
     body?: string;
+    scheduledAt?: number;
+    id?: string;
   };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  // Cancelar um agendamento não exige assunto/corpo.
+  if (body.action === "cancel") {
+    if (!body.id)
+      return NextResponse.json({ error: "id required" }, { status: 400 });
+    await getConvexClient().mutation(api.scheduledCampaigns.cancel, {
+      serviceKey,
+      id: body.id as Id<"scheduled_campaigns">,
+    });
+    return NextResponse.json({ success: true });
   }
 
   const subject = (body.subject ?? "").trim();
@@ -150,8 +115,16 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    const msg = buildMessage(to, `[teste] ${subject}`, text, serviceKey);
-    const r = await sendBatch(apiKey, FROM, [msg]);
+    const u = unsubUrl(APP_BASE_URL, to, serviceKey);
+    const r = await sendBatch(apiKey, FROM, [
+      {
+        to,
+        subject: `[teste] ${subject}`,
+        html: renderMarketingHtml(text, u),
+        text: `${text}\n\n---\nDescadastrar: ${u}`,
+        unsubscribeUrl: u,
+      },
+    ]);
     if (r.failed > 0) {
       return NextResponse.json(
         { error: r.error ?? "Falha ao enviar teste." },
@@ -161,31 +134,47 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, to });
   }
 
+  if (body.action === "schedule") {
+    const when = body.scheduledAt;
+    if (typeof when !== "number" || !Number.isFinite(when)) {
+      return NextResponse.json(
+        { error: "Data/hora inválida." },
+        { status: 400 },
+      );
+    }
+    if (when < Date.now() - 60_000) {
+      return NextResponse.json(
+        { error: "A data/hora precisa estar no futuro." },
+        { status: 400 },
+      );
+    }
+    await getConvexClient().mutation(api.scheduledCampaigns.schedule, {
+      serviceKey,
+      subject,
+      body: text,
+      segment: normSegment(body.segment),
+      scheduledAt: when,
+      createdBy: admin.email ?? admin.id,
+    });
+    return NextResponse.json({ success: true });
+  }
+
   if (body.action === "send") {
-    const segment = normSegment(body.segment);
-    const recipients = await recipientsFor(serviceKey, segment);
-    if (recipients.length === 0) {
+    const r = await sendCampaign(serviceKey, apiKey, {
+      segment: normSegment(body.segment),
+      subject,
+      body: text,
+      createdBy: admin.email ?? admin.id,
+    });
+    if (r.total === 0) {
       return NextResponse.json(
         { error: "Nenhum destinatário no segmento (após descadastros)." },
         { status: 400 },
       );
     }
-    const messages = recipients.map((e) =>
-      buildMessage(e, subject, text, serviceKey),
-    );
-    const r = await sendBatch(apiKey, FROM, messages);
-    await getConvexClient().mutation(api.emailMarketing.logCampaign, {
-      serviceKey,
-      subject,
-      segment,
-      total: recipients.length,
-      sent: r.sent,
-      failed: r.failed,
-      createdBy: admin.email ?? admin.id,
-    });
     return NextResponse.json({
       success: r.failed === 0,
-      total: recipients.length,
+      total: r.total,
       sent: r.sent,
       failed: r.failed,
       error: r.error,
@@ -193,7 +182,7 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json(
-    { error: "Unknown action (test|send)" },
+    { error: "Unknown action (test|send|schedule|cancel)" },
     { status: 400 },
   );
 }

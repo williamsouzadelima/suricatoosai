@@ -1,0 +1,7 @@
+[Unit]
+Description=Suricatoos — dispatcher de campanhas de e-mail agendadas
+After=network-online.target suricatoos-next.service
+
+[Service]
+Type=oneshot
+ExecStart=/root/suricatoos/ops/cron/dispatch.sh
