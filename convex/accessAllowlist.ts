@@ -57,12 +57,14 @@ export const markActive = mutation({
     email: v.string(),
     nowMs: v.optional(v.number()),
   },
-  returns: v.null(),
+  // `promoted` is true only on the login that flips invited -> active (once),
+  // so callers can fire a one-time welcome email.
+  returns: v.object({ promoted: v.boolean() }),
   handler: async (ctx, args) => {
     validateServiceKey(args.serviceKey);
 
     const email = normalizeEmail(args.email);
-    if (!email) return null;
+    if (!email) return { promoted: false };
     const now = args.nowMs ?? Date.now();
 
     const entry = await ctx.db
@@ -74,8 +76,9 @@ export const markActive = mutation({
     // or missing entry — that is the gate's job, not this bookkeeping call.
     if (entry && entry.status === "invited") {
       await ctx.db.patch(entry._id, { status: "active", activated_at: now });
+      return { promoted: true };
     }
-    return null;
+    return { promoted: false };
   },
 });
 

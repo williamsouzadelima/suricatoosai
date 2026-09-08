@@ -1,6 +1,7 @@
 import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
 import { isSuperadmin } from "@/lib/auth/superadmin";
+import { sendWelcomeEmail } from "@/lib/onboarding/welcome";
 
 /**
  * Invite-only access gate (Phase 1).
@@ -54,10 +55,14 @@ export async function markAccessActive(
   const serviceKey = process.env.CONVEX_SERVICE_ROLE_KEY;
   if (!serviceKey) return;
   try {
-    await getConvexClient().mutation(api.accessAllowlist.markActive, {
-      serviceKey,
-      email,
-    });
+    const result = await getConvexClient().mutation(
+      api.accessAllowlist.markActive,
+      { serviceKey, email },
+    );
+    // Primeira ativação (invited -> active): dispara o boas-vindas uma vez.
+    if (result.promoted) {
+      await sendWelcomeEmail(email);
+    }
   } catch (error) {
     console.warn(
       "[invite-access] markActive failed (non-fatal)",

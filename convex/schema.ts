@@ -821,6 +821,16 @@ export default defineSchema({
     created_at: v.number(),
   }).index("by_created_at", ["created_at"]),
 
+  // E-mail de boas-vindas automático (doc único, key="global").
+  welcome_settings: defineTable({
+    key: v.string(),
+    enabled: v.boolean(),
+    subject: v.string(),
+    body: v.string(),
+    updated_by: v.optional(v.string()),
+    updated_at: v.number(),
+  }).index("by_key", ["key"]),
+
   notes: defineTable({
     user_id: v.string(),
     note_id: v.string(),

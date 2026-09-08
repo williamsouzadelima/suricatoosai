@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Mail, Send, TestTube2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { WelcomeCard } from "./WelcomeCard";
 
 type Segment = "active" | "invited" | "all";
 
@@ -143,6 +144,8 @@ export function MarketingTab() {
 
   return (
     <div className="mt-6 space-y-4">
+      <WelcomeCard />
+
       {!emailConfigured && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-600 dark:text-amber-400">
           RESEND_API_KEY não está configurada no servidor — envios ficam
