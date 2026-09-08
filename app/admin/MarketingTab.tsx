@@ -2,10 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Mail, Send, TestTube2, Users, CalendarClock, X } from "lucide-react";
+import {
+  Mail,
+  Send,
+  TestTube2,
+  Users,
+  CalendarClock,
+  X,
+  Download,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WelcomeCard } from "./WelcomeCard";
+import { toCsv, downloadCsv, csvName } from "@/lib/utils/csv";
 
 type Segment = "active" | "invited" | "all";
 
@@ -408,8 +417,42 @@ export function MarketingTab() {
 
       {/* History */}
       <div className="rounded-xl border bg-card">
-        <div className="border-b p-5">
+        <div className="flex items-center justify-between border-b p-5">
           <h2 className="text-base font-semibold">Histórico</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={campaigns.length === 0}
+            title="Exportar CSV"
+            onClick={() =>
+              downloadCsv(
+                csvName("campanhas"),
+                toCsv(
+                  campaigns.map((c) => ({
+                    assunto: c.subject,
+                    segmento: c.segment,
+                    total: c.total,
+                    enviados: c.sent,
+                    falhas: c.failed,
+                    por: c.created_by ?? "",
+                    quando: new Date(c.created_at).toISOString(),
+                  })),
+                  [
+                    { key: "assunto", label: "Assunto" },
+                    { key: "segmento", label: "Segmento" },
+                    { key: "total", label: "Total" },
+                    { key: "enviados", label: "Enviados" },
+                    { key: "falhas", label: "Falhas" },
+                    { key: "por", label: "Por" },
+                    { key: "quando", label: "Quando" },
+                  ],
+                ),
+              )
+            }
+          >
+            <Download className="h-4 w-4" />
+            CSV
+          </Button>
         </div>
         {loading ? (
           <div className="p-8 text-center text-sm text-muted-foreground">

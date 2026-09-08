@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Search, Ban, RotateCcw } from "lucide-react";
+import { Search, Ban, RotateCcw, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toCsv, downloadCsv, csvName } from "@/lib/utils/csv";
 
 interface UserRow {
   id: string;
@@ -111,6 +112,38 @@ export function UsersTable() {
     );
   }, [users, query]);
 
+  const exportCsv = useCallback(() => {
+    const rows = filtered.map((u) => ({
+      email: u.email,
+      nome: u.name ?? "",
+      status: u.allowlistStatus ?? "",
+      suspenso: u.suspended ? "sim" : "nao",
+      requests: u.requests,
+      tokens_entrada: u.inputTokens,
+      tokens_saida: u.outputTokens,
+      custo_usd: u.costDollars.toFixed(2),
+      ultima_atividade: u.lastActivityAt
+        ? new Date(u.lastActivityAt).toISOString()
+        : "",
+      entrou: u.lastSignInAt ?? "",
+    }));
+    downloadCsv(
+      csvName("usuarios"),
+      toCsv(rows, [
+        { key: "email", label: "E-mail" },
+        { key: "nome", label: "Nome" },
+        { key: "status", label: "Status" },
+        { key: "suspenso", label: "Suspenso" },
+        { key: "requests", label: "Requests" },
+        { key: "tokens_entrada", label: "Tokens entrada" },
+        { key: "tokens_saida", label: "Tokens saida" },
+        { key: "custo_usd", label: "Custo USD" },
+        { key: "ultima_atividade", label: "Ultima atividade" },
+        { key: "entrou", label: "Entrou" },
+      ]),
+    );
+  }, [filtered]);
+
   return (
     <div className="rounded-xl border bg-card">
       <div className="flex flex-col gap-3 border-b p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -120,14 +153,26 @@ export function UsersTable() {
             {users.length}
           </span>
         </h2>
-        <div className="relative sm:w-72">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar e-mail ou nome…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="pl-8"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative sm:w-72">
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar e-mail ou nome…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportCsv}
+            disabled={filtered.length === 0}
+            title="Exportar CSV"
+          >
+            <Download className="h-4 w-4" />
+            CSV
+          </Button>
         </div>
       </div>
 

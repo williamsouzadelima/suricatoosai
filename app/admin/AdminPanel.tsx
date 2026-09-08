@@ -14,9 +14,11 @@ import {
   Megaphone,
   Send,
   LayoutDashboard,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toCsv, downloadCsv, csvName } from "@/lib/utils/csv";
 import { HackerAISVG } from "@/components/icons/hackerai-svg";
 import { UsersTable } from "./UsersTable";
 import { AlertsTab } from "./AlertsTab";
@@ -235,6 +237,30 @@ export function AdminPanel({
     );
   }, [entries, query]);
 
+  const exportCsv = useCallback(() => {
+    const rows = filtered.map((e) => ({
+      email: e.email,
+      status: e.status,
+      convidado_por: e.invited_by ?? "",
+      convidado_em: e.invited_at ? new Date(e.invited_at).toISOString() : "",
+      ativo_desde: e.activated_at ? new Date(e.activated_at).toISOString() : "",
+      revogado_em: e.revoked_at ? new Date(e.revoked_at).toISOString() : "",
+      nota: e.note ?? "",
+    }));
+    downloadCsv(
+      csvName("acesso"),
+      toCsv(rows, [
+        { key: "email", label: "E-mail" },
+        { key: "status", label: "Status" },
+        { key: "convidado_por", label: "Convidado por" },
+        { key: "convidado_em", label: "Convidado em" },
+        { key: "ativo_desde", label: "Ativo desde" },
+        { key: "revogado_em", label: "Revogado em" },
+        { key: "nota", label: "Nota" },
+      ]),
+    );
+  }, [filtered]);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
@@ -442,14 +468,26 @@ export function AdminPanel({
         <div className="mt-6 rounded-xl border bg-card">
           <div className="flex flex-col gap-3 border-b p-5 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-base font-semibold">Lista de acesso</h2>
-            <div className="relative sm:w-72">
-              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Buscar e-mail ou nota…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="pl-8"
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative sm:w-72">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar e-mail ou nota…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportCsv}
+                disabled={filtered.length === 0}
+                title="Exportar CSV"
+              >
+                <Download className="h-4 w-4" />
+                CSV
+              </Button>
             </div>
           </div>
 
