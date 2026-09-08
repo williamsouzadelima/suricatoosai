@@ -6,8 +6,9 @@ import { Search, Ban, RotateCcw, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toCsv, downloadCsv, csvName } from "@/lib/utils/csv";
+import { UserDetailModal } from "./UserDetailModal";
 
-interface UserRow {
+export interface UserRow {
   id: string;
   email: string;
   name: string | null;
@@ -45,6 +46,7 @@ export function UsersTable() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<UserRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -201,7 +203,8 @@ export function UsersTable() {
               {filtered.map((u) => (
                 <tr
                   key={u.id}
-                  className="border-b transition-colors last:border-0 hover:bg-muted/40"
+                  onClick={() => setSelected(u)}
+                  className="cursor-pointer border-b transition-colors last:border-0 hover:bg-muted/40"
                 >
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2 font-medium">
@@ -231,7 +234,10 @@ export function UsersTable() {
                   <td className="px-5 py-3 text-right tabular-nums">
                     ${u.costDollars.toFixed(2)}
                   </td>
-                  <td className="px-5 py-3 text-right">
+                  <td
+                    className="px-5 py-3 text-right"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     {u.suspended ? (
                       <Button
                         size="sm"
@@ -260,6 +266,14 @@ export function UsersTable() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {selected && (
+        <UserDetailModal
+          user={selected}
+          onClose={() => setSelected(null)}
+          onChanged={load}
+        />
       )}
     </div>
   );
