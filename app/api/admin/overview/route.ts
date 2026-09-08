@@ -53,6 +53,21 @@ export async function GET() {
   let sent30d = 0;
   for (const c of campaigns) if (c.created_at >= d30) sent30d += c.sent;
 
+  // Novos usuários por semana (janelas de 7 dias terminando agora), 10 semanas.
+  const WEEK = 7 * DAY;
+  const WEEKS = 10;
+  const signupsByWeek: { start: number; count: number }[] = [];
+  for (let i = WEEKS - 1; i >= 0; i--) {
+    const end = now - i * WEEK;
+    const start = end - WEEK;
+    let count = 0;
+    for (const e of entries) {
+      const joined = e.activated_at ?? e.invited_at;
+      if (joined >= start && joined < end) count++;
+    }
+    signupsByWeek.push({ start, count });
+  }
+
   return NextResponse.json({
     users,
     announcementsActive: activeAnnouncements.length,
@@ -61,6 +76,7 @@ export async function GET() {
       sent30d,
       recent: campaigns.slice(0, 5),
     },
+    signupsByWeek,
     // Chegar aqui já implica Convex respondendo e site servindo.
     health: { convex: true, site: true },
   });

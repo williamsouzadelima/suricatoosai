@@ -37,6 +37,7 @@ interface Overview {
       created_at: number;
     }[];
   };
+  signupsByWeek: { start: number; count: number }[];
 }
 
 const fmtNum = (n: number) =>
@@ -53,6 +54,9 @@ const fmtDate = (ms: number) =>
     hour: "2-digit",
     minute: "2-digit",
   });
+
+const fmtWeek = (ms: number) =>
+  new Date(ms).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 
 function Stat({
   icon,
@@ -174,6 +178,46 @@ export function OverviewTab({
           />
         </div>
       </div>
+
+      {/* Crescimento */}
+      {!loading && data && data.signupsByWeek.length > 0 && (
+        <div className="rounded-xl border bg-card p-5">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Novos usuários por semana
+          </h3>
+          {(() => {
+            const weeks = data.signupsByWeek;
+            const max = Math.max(1, ...weeks.map((w) => w.count));
+            return (
+              <>
+                <div className="flex h-28 items-end gap-1.5">
+                  {weeks.map((w, i) => (
+                    <div
+                      key={i}
+                      className="group flex flex-1 flex-col items-center justify-end gap-1"
+                      title={`${w.count} em ${fmtWeek(w.start)}`}
+                    >
+                      <span className="text-[10px] tabular-nums text-muted-foreground">
+                        {w.count > 0 ? w.count : ""}
+                      </span>
+                      <div
+                        className="w-full rounded-t bg-primary/70 transition-colors group-hover:bg-primary"
+                        style={{
+                          height: `${Math.max(3, (w.count / max) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-1.5 flex justify-between text-[10px] text-muted-foreground">
+                  <span>{fmtWeek(weeks[0].start)}</span>
+                  <span>agora</span>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Uso */}
       <div>
