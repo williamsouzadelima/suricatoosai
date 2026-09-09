@@ -33,7 +33,7 @@ const cost = (o: Partial<{ taskReal: number; userReal: number; taskCapped: boole
   ...o,
 });
 
-describe("enforceBudget (Fase 4b — gate)", () => {
+describe("enforceBudget (Fase 4b — gate + plano Camada B)", () => {
   const OLD = process.env.CONVEX_SERVICE_ROLE_KEY;
   beforeEach(() => {
     jest.clearAllMocks();
@@ -45,55 +45,62 @@ describe("enforceBudget (Fase 4b — gate)", () => {
     else process.env.CONVEX_SERVICE_ROLE_KEY = OLD;
   });
 
-  it("no-op quando o controle está desligado (não lê custo)", async () => {
+  it("no-op (NO_PLAN) quando o controle está desligado (não lê custo)", async () => {
     mockQuery.mockResolvedValueOnce({ ...CFG, enabled: false });
-    await expect(enforceBudget({ userId: "u1", chatId: "c1" })).resolves.toBeUndefined();
+    const plan = await enforceBudget({ userId: "u1", chatId: "c1" });
+    expect(plan.taskCapRemainingDollars).toBeNull();
     expect(mockQuery).toHaveBeenCalledTimes(1);
   });
 
-  it("BLOQUEIA quando block por-task ligado e custo real >= teto", async () => {
+  it("BLOQUEIA (throw) quando block por-task ligado e custo real >= teto", async () => {
     mockQuery.mockResolvedValueOnce(CFG).mockResolvedValueOnce(cost({ taskReal: 6 }));
     await expect(enforceBudget({ userId: "u1", chatId: "c1" })).rejects.toBeInstanceOf(ChatSDKError);
   });
 
-  it("NÃO bloqueia abaixo do teto", async () => {
+  it("NÃO bloqueia abaixo do teto e devolve o teto restante da task (Camada B)", async () => {
     mockQuery.mockResolvedValueOnce(CFG).mockResolvedValueOnce(cost({ taskReal: 2 }));
-    await expect(enforceBudget({ userId: "u1", chatId: "c1" })).resolves.toBeUndefined();
+    const plan = await enforceBudget({ userId: "u1", chatId: "c1" });
+    expect(plan.taskCapRemainingDollars).toBe(3); // 5 - 2
   });
 
-  it("NÃO bloqueia em modo alerta-only (block flag off) mesmo acima do teto", async () => {
+  it("alerta-only (block off): não bloqueia e SEM plano de corte mid-run", async () => {
     mockQuery
       .mockResolvedValueOnce({ ...CFG, perTaskBlock: false })
       .mockResolvedValueOnce(cost({ taskReal: 99 }));
-    await expect(enforceBudget({ userId: "u1", chatId: "c1" })).resolves.toBeUndefined();
+    const plan = await enforceBudget({ userId: "u1", chatId: "c1" });
+    expect(plan.taskCapRemainingDollars).toBeNull();
   });
 
-  it("NÃO bloqueia sobre soma capada abaixo do teto (anti-subcontagem)", async () => {
+  it("NÃO bloqueia sobre soma capada abaixo do teto (anti-subcontagem); plano usa o parcial", async () => {
     mockQuery
       .mockResolvedValueOnce(CFG)
       .mockResolvedValueOnce(cost({ taskReal: 3, taskCapped: true }));
-    await expect(enforceBudget({ userId: "u1", chatId: "c1" })).resolves.toBeUndefined();
+    const plan = await enforceBudget({ userId: "u1", chatId: "c1" });
+    expect(plan.taskCapRemainingDollars).toBe(2); // 5 - 3
   });
 
   it("NÃO bloqueia com cap negativo/inválido (guarda contra wrong-block)", async () => {
     mockQuery
       .mockResolvedValueOnce({ ...CFG, perTaskCapDollars: -1 })
       .mockResolvedValueOnce(cost({ taskReal: 0 }));
-    await expect(enforceBudget({ userId: "u1", chatId: "c1" })).resolves.toBeUndefined();
+    const plan = await enforceBudget({ userId: "u1", chatId: "c1" });
+    expect(plan.taskCapRemainingDollars).toBeNull();
   });
 
-  it("FAIL-OPEN: erro de infra na leitura não bloqueia", async () => {
+  it("FAIL-OPEN: erro de infra na leitura → NO_PLAN, não bloqueia", async () => {
     mockQuery.mockRejectedValueOnce(new Error("convex down"));
-    await expect(enforceBudget({ userId: "u1", chatId: "c1" })).resolves.toBeUndefined();
+    const plan = await enforceBudget({ userId: "u1", chatId: "c1" });
+    expect(plan.taskCapRemainingDollars).toBeNull();
   });
 
   it("kill switch BUDGET_ENFORCEMENT_DISABLED desliga tudo (nem lê)", async () => {
     process.env.BUDGET_ENFORCEMENT_DISABLED = "true";
-    await expect(enforceBudget({ userId: "u1", chatId: "c1" })).resolves.toBeUndefined();
+    const plan = await enforceBudget({ userId: "u1", chatId: "c1" });
+    expect(plan.taskCapRemainingDollars).toBeNull();
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  it("BLOQUEIA por teto de usuário quando acima", async () => {
+  it("BLOQUEIA por teto de usuário quando acima (usuário nunca gera plano mid-run)", async () => {
     mockQuery
       .mockResolvedValueOnce({
         ...CFG,

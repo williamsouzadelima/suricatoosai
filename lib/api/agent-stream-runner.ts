@@ -670,6 +670,15 @@ export type AgentStreamContext = {
   getSandboxCostDollars?: () => number;
   /** Current cumulative Trigger.dev run cost, including compute and invocation. */
   getTriggerRunCostDollars?: () => number;
+  /**
+   * [budget 4b Camada B] Orçamento REAL restante da task para ESTE run
+   * (perTaskCap − custo real já liquidado). Quando o custo real deste run cruza
+   * esse valor, o run é abortado mid-stream (só quando o bloqueio por task está
+   * ligado). null/undefined = sem corte por task.
+   */
+  taskBudgetCapRemainingDollars?: number | null;
+  /** [budget 4b] Dispara o alerta ao cortar o run pelo teto da task mid-run. */
+  onTaskBudgetCapHit?: (realCostDollars: number) => void;
   settleUsageAfterStep?: (args: {
     currentCostDollars: number;
     sandboxCostDollars: number;
@@ -1749,18 +1758,41 @@ export async function createAgentStream(
         ctx.usageTracker.computeCostDollars(modelName) +
         sandboxCostDollars +
         triggerRunCostDollars;
-      const budgetDecision =
-        ctx.budgetMonitor?.checkAfterStep(currentCostDollars);
+      // [budget 4b Camada B] Custo REAL deste run (créditos deduzidos) vs teto
+      // restante da task. Independente do BudgetMonitor (que pode ser null no
+      // tier ultra) e sem tocar checkAfterStep (que serve outros caps).
+      const currentRealCostDollars =
+        ctx.usageTracker.providerBilledModelCost +
+        sandboxCostDollars +
+        triggerRunCostDollars;
+      const taskBudgetCapHit =
+        ctx.taskBudgetCapRemainingDollars != null &&
+        !state.stoppedDueToAgentRunSpendCap &&
+        currentRealCostDollars >= ctx.taskBudgetCapRemainingDollars;
+      // Quando o corte por task vence, não roda checkAfterStep — evita emitir o
+      // aviso de "continuar com premium" do cap legado num stop que já é da task.
+      const budgetDecision = taskBudgetCapHit
+        ? undefined
+        : ctx.budgetMonitor?.checkAfterStep(currentCostDollars);
       await ctx.settleUsageAfterStep?.({
         currentCostDollars,
         sandboxCostDollars,
         triggerRunCostDollars,
         force:
+          taskBudgetCapHit ||
           budgetDecision?.type === "abort" ||
           budgetDecision?.type === "abort-agent-run-spend-cap",
         model: response?.modelId ?? modelName,
       });
-      if (budgetDecision?.type === "abort-agent-run-spend-cap") {
+      if (taskBudgetCapHit) {
+        state.stoppedDueToAgentRunSpendCap = true;
+        try {
+          ctx.onTaskBudgetCapHit?.(currentRealCostDollars);
+        } catch (error) {
+          console.warn("[agent-stream] onTaskBudgetCapHit failed:", error);
+        }
+        ctx.abortController.abort();
+      } else if (budgetDecision?.type === "abort-agent-run-spend-cap") {
         state.stoppedDueToAgentRunSpendCap = true;
         ctx.abortController.abort();
       } else if (budgetDecision?.type === "abort") {

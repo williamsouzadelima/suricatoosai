@@ -86,6 +86,7 @@ import {
   UsageRefundTracker,
 } from "@/lib/rate-limit";
 import { assertUserCanMakeCostIncurringRequest } from "@/lib/suspensions";
+import { enforceBudget } from "@/lib/budget-guard";
 import {
   saveMessage,
   updateChat,
@@ -4012,6 +4013,16 @@ export const agentLongTask = task({
                   }
                 : null;
 
+            // [budget 4b Camada B] Plano de corte por task para os runs longos.
+            // blockOnExceed:false → o bloqueio de run-start já ocorreu no enqueue
+            // (agent-trigger-route); aqui só pegamos o teto real restante da task
+            // para cortar mid-run (remaining=0 se já acima). Fail-open/no-op por padrão.
+            const budgetPlan = await enforceBudget({
+              userId,
+              chatId,
+              blockOnExceed: false,
+            });
+
             // Shared runner context — immutable deps + platform hook.
             const streamCtx: AgentStreamContext = {
               trackedProvider,
@@ -4043,6 +4054,9 @@ export const agentLongTask = task({
               summarizationTracker,
               usageTracker,
               budgetMonitor,
+              taskBudgetCapRemainingDollars: budgetPlan.taskCapRemainingDollars,
+              onTaskBudgetCapHit: (realCostDollars: number) =>
+                budgetPlan.fireTaskCapHitAlert(realCostDollars),
               sandboxManager,
               getTodoManager,
               ensureSandbox,

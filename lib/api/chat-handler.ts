@@ -310,7 +310,8 @@ export const createChatHandler = () => {
       // [budget 4b] Gate de orçamento: alerta sempre; BLOQUEIA (throw) só quando o
       // escopo tem block ligado e o custo real cruzou o teto. Fail-open + default
       // off + kill switch. Mesmo ponto que o gate de suspensão (antes da dedução).
-      await enforceBudget({ userId, chatId });
+      // Devolve o plano p/ a Camada B (corte mid-run por task).
+      const budgetPlan = await enforceBudget({ userId, chatId });
       usageRefundTracker.setUser(userId, subscription, organizationId);
       assertChatModeAccess({ mode, subscription });
       if (subscription === "free") {
@@ -1405,6 +1406,9 @@ export const createChatHandler = () => {
               summarizationTracker,
               usageTracker,
               budgetMonitor,
+              taskBudgetCapRemainingDollars: budgetPlan.taskCapRemainingDollars,
+              onTaskBudgetCapHit: (realCostDollars: number) =>
+                budgetPlan.fireTaskCapHitAlert(realCostDollars),
               sandboxManager,
               getTodoManager,
               ensureSandbox,
