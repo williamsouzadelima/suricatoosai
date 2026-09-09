@@ -1341,6 +1341,58 @@ describe("CentrifugoSandbox", () => {
       }
     }, 15000);
 
+    it("streams a large binary write as relay-sized base64 chunks", async () => {
+      const sandbox = createSandbox({
+        osInfo: {
+          platform: "linux",
+          arch: "x86_64",
+          release: "6.1",
+          hostname: "linux-dev",
+        },
+      });
+      (sandbox as any).shellKind = "bash";
+      const commands: string[] = [];
+      (sandbox as any).commands.run = jest.fn(async (command: string) => {
+        commands.push(command);
+        return { stdout: "", stderr: "", exitCode: 0 };
+      });
+
+      // ~130KB of binary -> ~173KB base64, which must not ride in a single
+      // relay publish (the 64KB message limit). Distinct byte pattern so the
+      // reconstruction assertion is meaningful.
+      const bytes = new Uint8Array(130 * 1024);
+      for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 7) % 256;
+      await sandbox.files.write(
+        "/tmp/agent-transcripts/t.json",
+        bytes.buffer as ArrayBuffer,
+      );
+
+      const writeCmds = commands.filter((c) => c.includes("| base64 -d"));
+      // Multiple chunks, first truncates then the rest append in order.
+      expect(writeCmds.length).toBeGreaterThan(1);
+      expect(writeCmds[0]).toContain("| base64 -d > ");
+      for (const c of writeCmds.slice(1)) {
+        expect(c).toContain("| base64 -d >> ");
+      }
+
+      // Every published base64 chunk must fit under the relay budget and be
+      // divisible by 4 so each slice decodes independently.
+      const RELAY_MAX = 46 * 1024;
+      const chunks = writeCmds.map((c) => {
+        const m = c.match(/printf '%s' "([^"]*)"/);
+        return m ? m[1] : "";
+      });
+      for (const chunk of chunks) {
+        expect(chunk.length).toBeGreaterThan(0);
+        expect(chunk.length).toBeLessThanOrEqual(RELAY_MAX);
+        expect(chunk.length % 4).toBe(0);
+      }
+
+      // The concatenated chunks decode back to the exact original bytes.
+      const reconstructed = Buffer.from(chunks.join(""), "base64");
+      expect(reconstructed.equals(Buffer.from(bytes))).toBe(true);
+    });
+
     it("cleans the cmd Base64 temporary file when a chunk command rejects", async () => {
       const sandbox = createSandbox({
         osInfo: {

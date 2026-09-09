@@ -1071,8 +1071,14 @@ Browser automation is host-dependent on this connection. Chromium and agent-brow
     return `${base}${separator}${relative}`;
   }
 
-  // Max chunk size ~500KB base64 to stay under size limits (bash path)
-  private static readonly MAX_CHUNK_SIZE = 500 * 1024;
+  // Command-path (bash) writes carry their payload inline in a single relay
+  // publish, so each command must stay under the Centrifugo message limit
+  // (default ~64KB) — otherwise the server closes the client with "message size
+  // limit exceeded" before the publish lands. Keep each base64 write chunk well
+  // below that after the `printf … | base64 -d` wrapper + CommandMessage
+  // envelope. Must be divisible by 4 so each base64 slice decodes independently
+  // and the appended pieces concatenate cleanly.
+  private static readonly MAX_RELAY_WRITE_CHUNK_CHARS = 46 * 1024;
 
   // Keep native file relay messages comfortably below common WebSocket frame
   // limits after JSON overhead. Base64 chunks must stay divisible by 4.
@@ -1650,23 +1656,45 @@ Browser automation is host-dependent on this connection. Chromium and agent-brow
             .catch(() => undefined);
           throw error;
         }
-      } else if (
-        isBinary &&
-        contentStr.length > CentrifugoSandbox.MAX_CHUNK_SIZE
-      ) {
-        // POSIX: Chunk large binary files to stay under size limits
-        const chunks: string[] = [];
-        for (
-          let i = 0;
-          i < contentStr.length;
-          i += CentrifugoSandbox.MAX_CHUNK_SIZE
+      } else {
+        const escapedPath = escapePath(path);
+
+        // Small text content: a single `cat` heredoc is cheapest (no ~33% base64
+        // inflation). Anything larger must be streamed, because each command we
+        // publish carries its payload inline and the Centrifugo relay rejects a
+        // publish over its message limit (default ~64KB), closing the client with
+        // "message size limit exceeded" before the publish lands.
+        if (
+          !isBinary &&
+          contentStr.length <= CentrifugoSandbox.MAX_RELAY_WRITE_CHUNK_CHARS
         ) {
-          chunks.push(
-            contentStr.slice(i, i + CentrifugoSandbox.MAX_CHUNK_SIZE),
+          const delimiter = `HACKERAI_EOF_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+          const result = await this.commands.run(
+            `cat > ${escapedPath} <<'${delimiter}'\n${contentStr}\n${delimiter}`,
+            { displayName: `Writing: ${fileName}` },
           );
+          if (result.exitCode !== 0) {
+            throw new Error(`Failed to write file: ${result.stderr}`);
+          }
+          return;
         }
 
-        const escapedPath = escapePath(path);
+        // Stream the payload as relay-sized base64 chunks appended in order.
+        // Binary content is already base64; text is base64-encoded here so the
+        // same decode-append path applies without heredoc escaping. Chunk size
+        // is divisible by 4, so each slice decodes independently.
+        const b64 = isBinary
+          ? contentStr
+          : Buffer.from(contentStr, "utf8").toString("base64");
+        const chunkSize = CentrifugoSandbox.MAX_RELAY_WRITE_CHUNK_CHARS;
+        const chunks: string[] = [];
+        for (let i = 0; i < b64.length; i += chunkSize) {
+          chunks.push(b64.slice(i, i + chunkSize));
+        }
+        // Ensure at least one write so empty content still creates the file.
+        if (chunks.length === 0) {
+          chunks.push("");
+        }
         for (let i = 0; i < chunks.length; i++) {
           const operator = i === 0 ? ">" : ">>";
           const result = await this.commands.run(
@@ -1676,24 +1704,6 @@ Browser automation is host-dependent on this connection. Chromium and agent-brow
           if (result.exitCode !== 0) {
             throw new Error(`Failed to write file: ${result.stderr}`);
           }
-        }
-      } else {
-        const escapedPath = escapePath(path);
-        // Docker containers and Unix dangerous-mode hosts use cat heredoc
-        // (more efficient — no ~33% base64 inflation or arg length limits).
-        let command: string;
-        if (isBinary) {
-          command = `printf '%s' "${contentStr}" | base64 -d > ${escapedPath}`;
-        } else {
-          const delimiter = `HACKERAI_EOF_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-          command = `cat > ${escapedPath} <<'${delimiter}'\n${contentStr}\n${delimiter}`;
-        }
-
-        const result = await this.commands.run(command, {
-          displayName: `Writing: ${fileName}`,
-        });
-        if (result.exitCode !== 0) {
-          throw new Error(`Failed to write file: ${result.stderr}`);
         }
       }
     },
