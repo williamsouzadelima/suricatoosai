@@ -14,7 +14,7 @@ import { createTools } from "@/lib/ai/tools";
 import { ptySessionManager } from "@/lib/ai/tools/utils/pty-session-manager";
 import { generateTitleFromUserMessageWithWriter } from "@/lib/actions";
 import { getUserIDAndPro } from "@/lib/auth/get-user-id";
-import { checkBudgetAndAlert } from "@/lib/budget-guard";
+import { enforceBudget } from "@/lib/budget-guard";
 import { assertUserCanMakeCostIncurringRequest } from "@/lib/suspensions";
 import type {
   LimitRescueRequest,
@@ -307,9 +307,10 @@ export const createChatHandler = () => {
           subscription,
         );
       await assertUserCanMakeCostIncurringRequest(userId);
-      // [budget 4a] Alerta-only, fire-and-forget: nunca bloqueia nem adiciona
-      // latência ao run. O bloqueio (throw + estorno) é a Fase 4b.
-      void checkBudgetAndAlert({ userId, chatId });
+      // [budget 4b] Gate de orçamento: alerta sempre; BLOQUEIA (throw) só quando o
+      // escopo tem block ligado e o custo real cruzou o teto. Fail-open + default
+      // off + kill switch. Mesmo ponto que o gate de suspensão (antes da dedução).
+      await enforceBudget({ userId, chatId });
       usageRefundTracker.setUser(userId, subscription, organizationId);
       assertChatModeAccess({ mode, subscription });
       if (subscription === "free") {

@@ -205,9 +205,11 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
 
         <div className="space-y-5 p-5">
           <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
-            Threshold sobre o <strong>custo real</strong> (OpenRouter). Nesta versão o
-            controle é <strong>alerta-only</strong>: os tetos disparam alerta, mas o
-            <strong> bloqueio</strong> do run ainda não está ativo (Fase 4b). Padrão de fábrica: desligado.
+            Threshold sobre o <strong>custo real</strong> (OpenRouter). Padrão de fábrica:
+            desligado. Com <strong>bloqueio</strong> ligado, um novo run é{" "}
+            <strong>recusado</strong> quando o custo real já acumulado (da task ou do usuário
+            no período) passou do teto — <strong>não corta</strong> um run em andamento (corte
+            mid-run por task é refinamento futuro). Alertas disparam a partir do % de aviso.
           </p>
 
           {/* POR TASK */}
@@ -223,9 +225,9 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
                 placeholder="ex.: 5.00" value={taskCap}
                 onChange={(e) => setTaskCap(e.target.value)}
               />
-              <label className="ml-4 flex items-center gap-2 text-sm text-muted-foreground opacity-60">
-                <Switch checked={taskBlock} onCheckedChange={setTaskBlock} disabled />
-                Bloquear ao estourar <span className="text-xs">(Fase 4b)</span>
+              <label className="ml-4 flex items-center gap-2 text-sm text-muted-foreground">
+                <Switch checked={taskBlock} onCheckedChange={setTaskBlock} />
+                Recusar novo run se a task passou do teto
               </label>
             </div>
           </fieldset>
@@ -252,9 +254,9 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
                 <option value="month">mês</option>
                 <option value="day">dia</option>
               </select>
-              <label className="ml-4 flex items-center gap-2 text-sm text-muted-foreground opacity-60">
-                <Switch checked={userBlock} onCheckedChange={setUserBlock} disabled />
-                Recusar iniciar novo run <span className="text-xs">(Fase 4b)</span>
+              <label className="ml-4 flex items-center gap-2 text-sm text-muted-foreground">
+                <Switch checked={userBlock} onCheckedChange={setUserBlock} />
+                Recusar iniciar novo run
               </label>
             </div>
           </fieldset>
