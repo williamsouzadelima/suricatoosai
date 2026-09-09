@@ -14,6 +14,7 @@ import { createTools } from "@/lib/ai/tools";
 import { ptySessionManager } from "@/lib/ai/tools/utils/pty-session-manager";
 import { generateTitleFromUserMessageWithWriter } from "@/lib/actions";
 import { getUserIDAndPro } from "@/lib/auth/get-user-id";
+import { checkBudgetAndAlert } from "@/lib/budget-guard";
 import { assertUserCanMakeCostIncurringRequest } from "@/lib/suspensions";
 import type {
   LimitRescueRequest,
@@ -306,6 +307,9 @@ export const createChatHandler = () => {
           subscription,
         );
       await assertUserCanMakeCostIncurringRequest(userId);
+      // [budget 4a] Alerta-only, fire-and-forget: nunca bloqueia nem adiciona
+      // latência ao run. O bloqueio (throw + estorno) é a Fase 4b.
+      void checkBudgetAndAlert({ userId, chatId });
       usageRefundTracker.setUser(userId, subscription, organizationId);
       assertChatModeAccess({ mode, subscription });
       if (subscription === "free") {

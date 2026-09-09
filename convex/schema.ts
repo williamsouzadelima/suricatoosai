@@ -861,6 +861,49 @@ export default defineSchema({
     updated_at: v.number(),
   }).index("by_key", ["key"]),
 
+  // Fase 4: orçamento de gasto por task (chat) e por usuário, sobre o custo
+  // REAL (provider_billed_cost_dollars). Doc único key="global". Alerta-only por
+  // padrão; bloqueio exige opt-in explícito por escopo (per_task_block/per_user_block).
+  budget_settings: defineTable({
+    key: v.string(),
+    enabled: v.boolean(),
+    per_task_enabled: v.boolean(),
+    per_task_cap_dollars: v.optional(v.number()),
+    per_task_block: v.boolean(),
+    per_user_enabled: v.boolean(),
+    per_user_cap_dollars: v.optional(v.number()),
+    per_user_period: v.union(v.literal("day"), v.literal("month")),
+    per_user_block: v.boolean(),
+    warn_threshold_pct: v.optional(v.number()),
+    alert_teams: v.boolean(),
+    alert_email: v.boolean(),
+    updated_by: v.optional(v.string()),
+    updated_at: v.number(),
+  }).index("by_key", ["key"]),
+
+  // Override de teto por usuário (lookup O(1) no run-start); disabled isenta o usuário.
+  budget_user_overrides: defineTable({
+    user_id: v.string(),
+    email: v.optional(v.string()),
+    per_task_cap_dollars: v.optional(v.number()),
+    per_user_cap_dollars: v.optional(v.number()),
+    disabled: v.optional(v.boolean()),
+    note: v.optional(v.string()),
+    updated_by: v.optional(v.string()),
+    updated_at: v.number(),
+  }).index("by_user_id", ["user_id"]),
+
+  // Dedup durável de alertas de orçamento (sobrevive a retries do Trigger e a
+  // cruzamentos multi-run do teto por usuário). 1 alerta por scope+período+threshold.
+  budget_alerts: defineTable({
+    scope: v.union(v.literal("task"), v.literal("user")),
+    scope_id: v.string(),
+    period_key: v.string(),
+    threshold: v.string(),
+    notified_at: v.number(),
+    cost_at_alert: v.optional(v.number()),
+  }).index("by_scope_key", ["scope", "scope_id", "period_key", "threshold"]),
+
   notes: defineTable({
     user_id: v.string(),
     note_id: v.string(),

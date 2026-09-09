@@ -17,6 +17,7 @@ import {
   Download,
   ScrollText,
   DollarSign,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,7 @@ import { MarketingTab } from "./MarketingTab";
 import { OverviewTab } from "./OverviewTab";
 import { AuditTab } from "./AuditTab";
 import { TaskCostsTab } from "./TaskCostsTab";
+import { BudgetTab } from "./BudgetTab";
 
 type Status = "invited" | "active" | "revoked";
 
@@ -123,6 +125,7 @@ export function AdminPanel({
     | "marketing"
     | "auditoria"
     | "custos"
+    | "orcamentos"
   >("overview");
 
   const load = useCallback(async () => {
@@ -424,6 +427,18 @@ export function AdminPanel({
             <DollarSign className="h-3.5 w-3.5" />
             Custos
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("orcamentos")}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              tab === "orcamentos"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Wallet className="h-3.5 w-3.5" />
+            Orçamentos
+          </button>
         </div>
 
         {tab === "overview" ? (
@@ -442,6 +457,8 @@ export function AdminPanel({
           <AuditTab />
         ) : tab === "custos" ? (
           <TaskCostsTab />
+        ) : tab === "orcamentos" ? (
+          <BudgetTab adminEmail={adminEmail} />
         ) : (
           <>
         {/* Stats */}

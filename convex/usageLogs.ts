@@ -317,3 +317,67 @@ export const getUserUsageLogs = query({
     };
   },
 });
+
+/**
+ * Fase 4: soma o custo REAL (provider_billed_cost_dollars) da task (by_chat) e do
+ * usuário no período (by_user range). É a ÚNICA fonte para decisão de orçamento —
+ * nunca usa cost_dollars (que subconta). capped=true quando a soma bateu o teto de
+ * leitura (limite inferior); o chamador NÃO deve bloquear sobre dado incompleto.
+ */
+export const getRealCostForBudgetCheck = query({
+  args: {
+    serviceKey: v.string(),
+    chatId: v.optional(v.string()),
+    userId: v.string(),
+    periodStartMs: v.number(),
+    periodEndMs: v.number(),
+    rowCap: v.optional(v.number()),
+  },
+  returns: v.object({
+    taskReal: v.number(),
+    userReal: v.number(),
+    taskCapped: v.boolean(),
+    userCapped: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const cap = args.rowCap ?? 5000;
+
+    let taskReal = 0;
+    let taskCapped = false;
+    const chatId = args.chatId;
+    if (chatId) {
+      const taskRows = await ctx.db
+        .query("usage_logs")
+        .withIndex("by_chat", (q) => q.eq("chat_id", chatId))
+        .order("desc")
+        .take(cap);
+      taskCapped = taskRows.length === cap;
+      for (const r of taskRows) {
+        if (typeof r.provider_billed_cost_dollars === "number") {
+          taskReal += r.provider_billed_cost_dollars;
+        }
+      }
+    }
+
+    const userRows = await ctx.db
+      .query("usage_logs")
+      .withIndex("by_user", (q) =>
+        q
+          .eq("user_id", args.userId)
+          .gte("_creationTime", args.periodStartMs)
+          .lte("_creationTime", args.periodEndMs),
+      )
+      .order("desc")
+      .take(cap);
+    const userCapped = userRows.length === cap;
+    let userReal = 0;
+    for (const r of userRows) {
+      if (typeof r.provider_billed_cost_dollars === "number") {
+        userReal += r.provider_billed_cost_dollars;
+      }
+    }
+
+    return { taskReal, userReal, taskCapped, userCapped };
+  },
+});

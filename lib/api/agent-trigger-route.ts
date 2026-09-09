@@ -7,6 +7,7 @@ import type { UIMessage } from "ai";
 
 import { getUserIDAndPro } from "@/lib/auth/get-user-id";
 import { assertUserCanMakeCostIncurringRequest } from "@/lib/suspensions";
+import { checkBudgetAndAlert } from "@/lib/budget-guard";
 import {
   getChatById,
   getUserCustomization,
@@ -458,6 +459,8 @@ export const createAgentTriggerPost =
           subscription,
         );
       await assertUserCanMakeCostIncurringRequest(userId);
+      // [budget 4a] Alerta-only, fire-and-forget (nunca bloqueia; 4b adiciona o gate).
+      void checkBudgetAndAlert({ userId, chatId: parsedBody.body.chatId });
       const userLocation = geolocation(req);
       const triggerRegion =
         getTriggerRegionForVercelRequest(req, userLocation) ?? "us-east-1";

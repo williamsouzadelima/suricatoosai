@@ -74,6 +74,9 @@ export default defineConfig({
           "REDIS_URL",
           "UPSTASH_REDIS_REST_URL",
           "UPSTASH_REDIS_REST_TOKEN",
+          "RESEND_API_KEY",
+          "ALERT_EMAIL_FROM",
+          "BUDGET_ENFORCEMENT_DISABLED",
         ];
         return KEYS.filter((k) => process.env[k]).map((name) => ({
           name,
