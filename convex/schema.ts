@@ -1000,11 +1000,17 @@ export default defineSchema({
     ),
     max_mode: v.optional(v.boolean()),
     byok: v.optional(v.boolean()),
+    // Real credits deducted by OpenRouter for the model steps (sum of
+    // usage.raw.cost), as opposed to cost_dollars which prefers
+    // upstream_inference_cost and can undercount the actual charge. Present only
+    // on rows written after this field was added; historical rows leave it undefined.
+    provider_billed_cost_dollars: v.optional(v.number()),
   })
     .index("by_usage_settlement_id", ["usage_settlement_id"])
     .index("by_user", ["user_id"])
     .index("by_user_and_model", ["user_id", "model"])
-    .index("by_org", ["organization_id"]),
+    .index("by_org", ["organization_id"])
+    .index("by_chat", ["chat_id"]),
 
   // Durable revenue ledger for unit economics reporting. Revenue is stored as
   // gross/net dollars because usage costs are sub-cent dollar values already.

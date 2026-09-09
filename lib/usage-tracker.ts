@@ -79,6 +79,8 @@ export interface UsageCostRecord {
   costDollars: number;
   modelCostDollars: number;
   nonModelCostDollars: number;
+  /** Real credits deducted by OpenRouter (usage.raw.cost sum); undercounts avoided. */
+  providerBilledCostDollars: number;
   costSource: UsageCostSource;
 }
 
@@ -100,6 +102,15 @@ export class UsageTracker {
    * separately because it survives resetModelLeg() during a fallback retry.
    */
   modelProviderCost = 0;
+  /**
+   * Real credits deducted by OpenRouter (sum of usage.raw.cost), never
+   * overridden by upstream_inference_cost. providerCost/cost_dollars prefer the
+   * upstream figure and can undercount the actual charge, so the true billed
+   * model cost is tracked independently here. modelLegBilledCost mirrors
+   * modelProviderCost so a fallback retry discards the abandoned leg's billed cost.
+   */
+  providerBilledModelCost = 0;
+  private modelLegBilledCost = 0;
   private modelStepCosts: ModelStepCost[] = [];
   private summarizationStepCosts: ModelStepCost[] = [];
   /** Costs from sandbox sessions and tool usage (always accurate, even on non-clean streams) */
@@ -122,6 +133,8 @@ export class UsageTracker {
   resetModelLeg() {
     this.providerCost -= this.modelProviderCost;
     this.modelProviderCost = 0;
+    this.providerBilledModelCost -= this.modelLegBilledCost;
+    this.modelLegBilledCost = 0;
     this.inputTokens = this.summarizationInputTokens;
     this.outputTokens = this.summarizationOutputTokens;
     this.totalTokens = this.inputTokens + this.outputTokens;
@@ -152,6 +165,15 @@ export class UsageTracker {
     if (isPositiveFiniteNumber(stepCost)) {
       this.providerCost += stepCost;
       this.modelProviderCost += stepCost;
+    }
+    // Track the real credits OpenRouter deducted for this step (usage.raw.cost),
+    // independent of the upstream-preferring stepCost above.
+    const stepBilledCost = isPositiveFiniteNumber(usage.raw?.cost)
+      ? (usage.raw!.cost as number)
+      : 0;
+    if (stepBilledCost > 0) {
+      this.providerBilledModelCost += stepBilledCost;
+      this.modelLegBilledCost += stepBilledCost;
     }
     return stepCostIndex;
   }
@@ -191,6 +213,8 @@ export class UsageTracker {
       // Summarization survives resetModelLeg(), so do not include it in
       // modelProviderCost (the amount removed for a streamed-model retry).
       this.providerCost += rawCost;
+      // Summarization usage.cost is already the real deducted amount.
+      this.providerBilledModelCost += rawCost;
     }
   }
 
@@ -458,6 +482,7 @@ export class UsageTracker {
       costDollars,
       modelCostDollars,
       nonModelCostDollars: this.nonModelCost,
+      providerBilledCostDollars: this.providerBilledModelCost,
       costSource: this.hasAuthoritativeModelCost
         ? "provider"
         : this.hasAnyAuthoritativeModelCost
@@ -508,6 +533,7 @@ export class UsageTracker {
       costDollars: usage.costDollars,
       modelCostDollars: usage.modelCostDollars,
       nonModelCostDollars: usage.nonModelCostDollars,
+      providerBilledCostDollars: usage.providerBilledCostDollars,
       costSource: usage.costSource,
     });
   }

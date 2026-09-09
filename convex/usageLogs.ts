@@ -70,6 +70,7 @@ export const logUsage = mutation({
     ),
     model_cost_dollars: v.optional(v.number()),
     non_model_cost_dollars: v.optional(v.number()),
+    provider_billed_cost_dollars: v.optional(v.number()),
     cost_source: v.optional(
       v.union(
         v.literal("provider"),
@@ -165,6 +166,7 @@ export const logUsage = mutation({
       usage_deduction_failure_reason: args.usage_deduction_failure_reason,
       model_cost_dollars: modelCostDollars,
       non_model_cost_dollars: nonModelCostDollars,
+      provider_billed_cost_dollars: args.provider_billed_cost_dollars,
       cost_source: costSource,
     });
 

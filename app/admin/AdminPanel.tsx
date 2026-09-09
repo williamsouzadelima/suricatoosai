@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   Download,
   ScrollText,
+  DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ import { AnnouncementsTab } from "./AnnouncementsTab";
 import { MarketingTab } from "./MarketingTab";
 import { OverviewTab } from "./OverviewTab";
 import { AuditTab } from "./AuditTab";
+import { TaskCostsTab } from "./TaskCostsTab";
 
 type Status = "invited" | "active" | "revoked";
 
@@ -120,6 +122,7 @@ export function AdminPanel({
     | "avisos"
     | "marketing"
     | "auditoria"
+    | "custos"
   >("overview");
 
   const load = useCallback(async () => {
@@ -409,6 +412,18 @@ export function AdminPanel({
             <ScrollText className="h-3.5 w-3.5" />
             Auditoria
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("custos")}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              tab === "custos"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <DollarSign className="h-3.5 w-3.5" />
+            Custos
+          </button>
         </div>
 
         {tab === "overview" ? (
@@ -425,6 +440,8 @@ export function AdminPanel({
           <MarketingTab />
         ) : tab === "auditoria" ? (
           <AuditTab />
+        ) : tab === "custos" ? (
+          <TaskCostsTab />
         ) : (
           <>
         {/* Stats */}

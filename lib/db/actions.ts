@@ -2124,6 +2124,7 @@ export async function logUsageRecord({
   costDollars,
   modelCostDollars,
   nonModelCostDollars,
+  providerBilledCostDollars,
   costSource,
 }: {
   usageSettlementId?: string;
@@ -2150,6 +2151,7 @@ export async function logUsageRecord({
   costDollars: number;
   modelCostDollars?: number;
   nonModelCostDollars?: number;
+  providerBilledCostDollars?: number;
   costSource?: "provider" | "hybrid" | "token_estimate" | "raw_token_estimate";
 }) {
   try {
@@ -2179,6 +2181,7 @@ export async function logUsageRecord({
       cost_dollars: costDollars,
       model_cost_dollars: modelCostDollars,
       non_model_cost_dollars: nonModelCostDollars,
+      provider_billed_cost_dollars: providerBilledCostDollars,
       cost_source: costSource,
     });
   } catch (error) {

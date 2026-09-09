@@ -680,8 +680,23 @@ describe("UsageTracker", () => {
         costDollars: 0.01,
         modelCostDollars: 0.01,
         nonModelCostDollars: 0,
+        providerBilledCostDollars: 0.01,
         costSource: "provider",
       });
+    });
+
+    it("tracks the real deducted cost separately from the upstream-preferred cost", () => {
+      const t = new UsageTracker();
+      // OpenRouter reports a small upstream_inference_cost but deducts the real
+      // usage.raw.cost — cost_dollars prefers the former (undercount), while
+      // providerBilledModelCost must capture the true charge.
+      t.accumulateStep({
+        inputTokens: 1000,
+        outputTokens: 500,
+        raw: { cost: 0.2457, cost_details: { upstream_inference_cost: 0.0036 } },
+      });
+      expect(t.computeCostDollars("model-default")).toBeCloseTo(0.0036, 4);
+      expect(t.providerBilledModelCost).toBeCloseTo(0.2457, 4);
     });
 
     it("labels token-estimated cost as a raw estimate", () => {
