@@ -465,12 +465,6 @@ export class HybridSandboxManager implements SandboxManager {
    */
   private async closeCurrentSandbox(): Promise<void> {
     if (this.sandbox instanceof CentrifugoSandbox) {
-      // [connclose-diag] Which churn closes the shared sandbox (and its stack).
-      logStructured("warn", "connclose_diag_close_current_sandbox", {
-        user_id: this.userID,
-        connection_id: this.currentConnectionId,
-        stack: new Error().stack,
-      });
       await this.sandbox.close().catch((err) => {
         if (isExpectedAlreadyGoneCleanupError(err)) {
           console.debug(`[${this.userID}] Sandbox was already closed:`, err);
@@ -762,15 +756,6 @@ export class HybridSandboxManager implements SandboxManager {
   private async useCentrifugoConnection(
     connection: ConnectionInfo,
   ): Promise<void> {
-    // [connclose-diag] Reveals connectionId churn (from != to) that forces a
-    // closeCurrentSandbox during a run — the leading trigger candidate.
-    logStructured("warn", "connclose_diag_use_centrifugo_connection", {
-      user_id: this.userID,
-      from_connection_id: this.currentConnectionId,
-      to_connection_id: connection.connectionId,
-      has_sandbox: this.sandbox != null,
-      stack: new Error().stack,
-    });
     await this.closeCurrentSandbox();
     const centrifugoWsUrl = process.env.CENTRIFUGO_WS_URL;
     const centrifugoTokenSecret = process.env.CENTRIFUGO_TOKEN_SECRET;
@@ -840,13 +825,6 @@ export class HybridSandboxManager implements SandboxManager {
   }
 
   async resetSandbox(reason?: string): Promise<void> {
-    // [connclose-diag] Other path that closes the shared sandbox (recovery/reset).
-    logStructured("warn", "connclose_diag_reset_sandbox", {
-      user_id: this.userID,
-      reason: reason ?? null,
-      connection_id: this.currentConnectionId,
-      stack: new Error().stack,
-    });
     const sandbox = this.sandbox;
     this.sandbox = null;
     this.isLocal = false;

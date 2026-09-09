@@ -273,11 +273,6 @@ export interface CentrifugoConfig {
 export class CentrifugoSandbox extends EventEmitter {
   readonly sandboxKind = "centrifugo" as const;
   private activeClients: Centrifuge[] = [];
-  // [connclose-diag] Stamped at the start of close() so each client's
-  // "disconnected" handler can positively attribute its own close to close()
-  // (vs. a transport/server-side drop). Temporary diagnostic — remove with the
-  // connclose_diag_* logs once the summarization transcript-save trigger is known.
-  private closeDiag: { at: number; stack?: string } | null = null;
 
   constructor(
     private userId: string,
@@ -610,9 +605,6 @@ Browser automation is host-dependent on this connection. Chromium and agent-brow
         let tSubscribed = 0;
         let tPublished = 0;
         let tFirstMessage = 0;
-        // [connclose-diag] Reason from this client's "disconnected" event,
-        // surfaced into the publish-failure reject so the cause is self-evident.
-        let lastDisconnectInfo: string | undefined;
 
         const cleanup = () => {
           if (timeoutId) {
@@ -967,10 +959,6 @@ Browser automation is host-dependent on this connection. Chromium and agent-brow
                                 return String(err);
                               }
                             })()
-                      }${
-                        lastDisconnectInfo
-                          ? ` [client disconnected: ${lastDisconnectInfo}]`
-                          : ""
                       }`,
                     ),
                   );
@@ -991,43 +979,6 @@ Browser automation is host-dependent on this connection. Chromium and agent-brow
 
         client.on("connected", () => {
           tConnected = Date.now();
-        });
-
-        // [connclose-diag] Positively classify why this command's client closed.
-        // code=0/"disconnect called" => explicit client.disconnect() by the app
-        // (cleanup() of a settled run, or close() disconnecting all activeClients);
-        // other codes => transport/server drop. closed_by_sandbox_close ties the
-        // close to a recent close() call and surfaces the caller's stack.
-        client.on("disconnected", (ctx) => {
-          const now = Date.now();
-          const closedBySandboxClose =
-            this.closeDiag != null && now - this.closeDiag.at < 2000;
-          lastDisconnectInfo = `code=${ctx?.code} reason=${JSON.stringify(
-            ctx?.reason,
-          )}`;
-          console.warn(
-            JSON.stringify({
-              timestamp: new Date().toISOString(),
-              level: "warn",
-              event: "connclose_diag_client_disconnected",
-              service: "web",
-              connection_id: this.connectionInfo.connectionId,
-              command_id: commandId,
-              display_name: opts?.displayName,
-              code: ctx?.code,
-              reason: ctx?.reason,
-              ms_since_start: now - t0,
-              connected_ms: tConnected ? tConnected - t0 : null,
-              subscribed_ms: tSubscribed ? tSubscribed - t0 : null,
-              published: publishedCommand,
-              publish_in_flight: commandPublishInFlight,
-              settled,
-              closed_by_sandbox_close: closedBySandboxClose,
-              close_caller_stack: closedBySandboxClose
-                ? this.closeDiag?.stack
-                : undefined,
-            }),
-          );
         });
 
         client.on("error", (ctx) => {
@@ -2047,24 +1998,6 @@ Browser automation is host-dependent on this connection. Chromium and agent-brow
   }
 
   async close(): Promise<void> {
-    // [connclose-diag] Stamp + log so a client's "disconnected" handler can
-    // attribute its close here, and the stack reveals the caller (resetSandbox /
-    // closeCurrentSandbox / useCentrifugoConnection). Only noisy when there are
-    // live clients (i.e., a close racing an in-flight command/transcript-write).
-    this.closeDiag = { at: Date.now(), stack: new Error().stack };
-    if (this.activeClients.length > 0) {
-      console.warn(
-        JSON.stringify({
-          timestamp: new Date().toISOString(),
-          level: "warn",
-          event: "connclose_diag_sandbox_close_called",
-          service: "web",
-          connection_id: this.connectionInfo.connectionId,
-          active_clients: this.activeClients.length,
-          stack: this.closeDiag.stack,
-        }),
-      );
-    }
     for (const client of this.activeClients) {
       try {
         client.disconnect();
