@@ -1,6 +1,7 @@
 import { AlertCircle, RefreshCw, Home } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { HackerAISVG } from "@/components/icons/hackerai-svg";
 import {
   Card,
   CardContent,
@@ -71,7 +72,8 @@ export default async function AuthErrorPage({
   const errorInfo = ERROR_MESSAGES[code as ErrorCode] ?? DEFAULT_ERROR;
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6 p-4">
+      <HackerAISVG scale={0.16} />
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">

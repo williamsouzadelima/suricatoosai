@@ -18,6 +18,7 @@
     "unlockFeatures": "Unlock more features"
   },
   "landing": {
+    "eyebrow": "Offensive security, on watch",
     "title": "What will you hack today?",
     "subtitle": "Find and fix vulnerabilities by working with AI.",
     "typingPrefix": "Ask Suricatoos to ",
