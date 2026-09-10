@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Archivo } from "next/font/google";
 import { cookies, headers } from "next/headers";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import "./globals.css";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/theme-provider";
 import { GlobalStateProvider } from "./contexts/GlobalState";
 import { AgentAutoReviewAvailabilityProvider } from "./contexts/AgentAutoReviewAvailabilityContext";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
@@ -33,6 +34,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Archivo carrega a personalidade "display" (títulos/marketing) sem trocar o
+// corpo em Geist. Referenciada por --font-archivo em app/globals.css.
+const archivo = Archivo({
+  variable: "--font-archivo",
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+});
+
 const APP_NAME = "Suricatoos";
 const APP_DEFAULT_TITLE =
   "Suricatoos - AI-Powered Penetration Testing Assistant";
@@ -44,7 +53,7 @@ export const metadata: Metadata = {
   applicationName: APP_NAME,
   title: {
     default: APP_DEFAULT_TITLE,
-    template: "%s",
+    template: APP_TITLE_TEMPLATE,
   },
   description: APP_DESCRIPTION,
   manifest: "/manifest.json",
@@ -156,7 +165,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={`${geistSans.variable} ${geistMono.variable} dark h-full`}
+      className={`${geistSans.variable} ${geistMono.variable} ${archivo.variable} dark h-full`}
       suppressHydrationWarning
     >
       <head>
@@ -167,11 +176,18 @@ export default async function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className="antialiased h-full">
-        <NextIntlClientProvider locale={locale} messages={messages}>
-          <ConvexClientProvider initialAuth={initialAuth}>
-            <ConvexErrorBoundary>{content}</ConvexErrorBoundary>
-          </ConvexClientProvider>
-        </NextIntlClientProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          <NextIntlClientProvider locale={locale} messages={messages}>
+            <ConvexClientProvider initialAuth={initialAuth}>
+              <ConvexErrorBoundary>{content}</ConvexErrorBoundary>
+            </ConvexClientProvider>
+          </NextIntlClientProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -123,7 +123,7 @@ const BillingFrequencySelector: React.FC<BillingFrequencySelectorProps> = ({
             }
           >
             {t("frequency.yearly")}
-            <span className="text-[#615EEB] dark:text-[#B9B7FF] text-xs font-medium">
+            <span className="text-link text-xs font-medium">
               {t("frequency.save17")}
             </span>
           </span>

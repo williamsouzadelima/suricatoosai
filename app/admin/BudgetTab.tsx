@@ -204,7 +204,7 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
         </div>
 
         <div className="space-y-5 p-5">
-          <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+          <p className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
             Threshold sobre o <strong>custo real</strong> (OpenRouter). Padrão de fábrica:
             desligado. Com <strong>bloqueio</strong> ligado, um novo run é{" "}
             <strong>recusado</strong> quando o custo real já acumulado (da task ou do usuário
@@ -279,7 +279,7 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
             </label>
           </div>
           {(alertTeams && !teamsConfigured) || (alertEmail && !emailConfigured) ? (
-            <p className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+            <p className="flex items-center gap-1 text-xs text-warning">
               <AlertTriangle className="h-3.5 w-3.5" />
               Configure os destinos (webhook Teams / e-mail) na aba <strong>Alertas</strong> — os
               alertas de orçamento reusam esses canais.

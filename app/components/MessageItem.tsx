@@ -443,7 +443,7 @@ export const MessageItem = memo(function MessageItem({
                 data-testid="message-content"
                 className={`${
                   isUser
-                    ? "max-w-[80%] bg-secondary rounded-[18px] px-4 py-1.5 data-[multiline]:py-3 rounded-se-lg text-primary-foreground border border-border"
+                    ? "max-w-[80%] bg-primary rounded-[18px] px-4 py-1.5 data-[multiline]:py-3 rounded-se-lg text-primary-foreground"
                     : "w-full prose space-y-3 max-w-none dark:prose-invert min-w-0"
                 } overflow-hidden`}
               >

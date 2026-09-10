@@ -177,7 +177,7 @@ export function AlertsTab({ adminEmail }: { adminEmail: string }) {
             className="mt-1"
           />
           {!emailConfigured && (
-            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+            <p className="mt-2 text-xs text-warning">
               ⚠️ RESEND_API_KEY não está configurada no servidor — o e-mail não
               será enviado até ela existir.
             </p>

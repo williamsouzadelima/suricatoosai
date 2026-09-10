@@ -113,7 +113,7 @@ const FileItem = ({
         </Button>
       )}
 
-      <div className="relative flex items-center justify-center w-10 h-10 rounded-lg bg-[#FF5588]">
+      <div className="relative flex items-center justify-center w-10 h-10 rounded-lg bg-primary">
         <File className="w-6 h-6 text-white" />
       </div>
 

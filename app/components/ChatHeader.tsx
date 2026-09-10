@@ -280,7 +280,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                 aria-label="Share"
                 data-testid="share-chat-button"
                 onClick={() => setShowShareDialog(true)}
-                className={`relative flex-shrink-0 rounded-full h-[34px] px-3 py-0 text-sm font-medium transition-colors hover:bg-[#ffffff1a] max-md:hidden ${
+                className={`relative flex-shrink-0 rounded-full h-[34px] px-3 py-0 text-sm font-medium transition-colors hover:bg-accent max-md:hidden ${
                   isExistingChat && id && taskTitle
                     ? ""
                     : "invisible pointer-events-none"

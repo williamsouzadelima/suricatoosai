@@ -253,7 +253,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                               >
                                 <div className="flex flex-wrap justify-center gap-1 text-center">
                                   {t("team.yearly")}
-                                  <span className="text-[#10A37F]">
+                                  <span className="text-primary">
                                     {t("team.yearlyOff", {
                                       percent: discountPercentage,
                                     })}
@@ -290,7 +290,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                               ${formatNumber(fullPrice)}
                             </div>
                           </div>
-                          <div className="text-muted-foreground/70 flex w-full justify-between text-xs">
+                          <div className="text-muted-foreground flex w-full justify-between text-xs">
                             <div className="flex">
                               {t("team.usersCount", { seats })}
                               {billingPeriod === "yearly"
@@ -312,11 +312,11 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                             <>
                               <div className="text-muted-foreground flex w-full justify-between text-sm mt-3">
                                 <div className="flex">{t("team.discount")}</div>
-                                <div className="flex font-medium text-[#10A37F]">
+                                <div className="flex font-medium text-primary">
                                   -${formatNumber(discount)}
                                 </div>
                               </div>
-                              <div className="text-muted-foreground/70 text-xs">
+                              <div className="text-muted-foreground text-xs">
                                 {t("team.yearlyDiscountLabel", {
                                   percent: discountPercentage,
                                 })}
@@ -338,7 +338,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                             </div>
                           </div>
 
-                          <div className="text-muted-foreground/70 mt-2 text-xs">
+                          <div className="text-muted-foreground mt-2 text-xs">
                             {billingPeriod === "monthly"
                               ? t("team.billedMonthly")
                               : t("team.billedYearly")}
@@ -352,7 +352,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                     <Button
                       onClick={handleContinue}
                       disabled={upgradeLoading}
-                      className="w-full rounded-xl bg-[#10A37F] hover:bg-[#0d8f6f] text-white"
+                      className="w-full rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground"
                       size="lg"
                     >
                       {upgradeLoading ? (
@@ -409,7 +409,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                   >
                     {/* Yearly Plan */}
                     <div className="relative">
-                      <Badge className="absolute start-3 top-0 -translate-y-1/2 px-2 py-1 text-xs font-medium rounded-xl bg-[#10A37F] text-white border-none z-10">
+                      <Badge className="absolute start-3 top-0 -translate-y-1/2 px-2 py-1 text-xs font-medium rounded-xl bg-primary text-primary-foreground border-none z-10">
                         {t("team.savePercent", { percent: discountPercentage })}
                       </Badge>
                       <label
@@ -544,7 +544,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                       <div className="flex">{t("team.productName")}</div>
                       <div className="flex">${formatNumber(fullPrice)}</div>
                     </div>
-                    <div className="text-muted-foreground/70 flex w-full justify-between text-xs">
+                    <div className="text-muted-foreground flex w-full justify-between text-xs">
                       <div className="flex">
                         {t("team.usersCount", { seats })}
                       </div>
@@ -564,7 +564,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                       </div>
                     )}
                     {billingPeriod === "yearly" && discount > 0 && (
-                      <div className="text-muted-foreground/70 flex w-full justify-between text-xs">
+                      <div className="text-muted-foreground flex w-full justify-between text-xs">
                         <div className="flex">
                           {t("team.yearlyDiscountLabel", {
                             percent: discountPercentage,
@@ -587,7 +587,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                       </div>
                     </div>
 
-                    <div className="text-muted-foreground/70 mt-2 text-xs">
+                    <div className="text-muted-foreground mt-2 text-xs">
                       {billingPeriod === "monthly"
                         ? t("team.billedMonthly")
                         : t("team.billedYearly")}
@@ -597,7 +597,7 @@ const TeamPricingDialog: React.FC<TeamPricingDialogProps> = ({
                   <Button
                     onClick={handleContinue}
                     disabled={upgradeLoading}
-                    className="mt-8 w-full rounded-xl bg-[#10A37F] hover:bg-[#0d8f6f] text-white"
+                    className="mt-8 w-full rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground"
                     size="lg"
                   >
                     {upgradeLoading ? (

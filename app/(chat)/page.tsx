@@ -72,7 +72,7 @@ const UnauthenticatedContent = () => {
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-[15vh] pb-[18vh] min-h-0">
           {/* Title */}
           <div className="mb-4 flex flex-col items-center px-4 text-center md:mb-6">
-            <h1 className="text-4xl font-bold text-foreground mb-2 md:text-5xl">
+            <h1 className="font-display text-balance text-4xl font-bold tracking-tight text-foreground mb-2 md:text-5xl">
               {t("title")}
             </h1>
             <p className="text-muted-foreground text-lg leading-tight md:text-xl">

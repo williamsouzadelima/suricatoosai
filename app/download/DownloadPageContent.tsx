@@ -15,7 +15,7 @@ function AuthenticatedHeader() {
     <header className="w-full px-6 max-sm:px-4 flex-shrink-0">
       <div className="py-[10px] flex gap-10 items-center justify-between">
         <div className="flex items-center gap-2">
-          <HackerAISVG theme="dark" scale={0.18} />
+          <HackerAISVG scale={0.18} />
         </div>
         <Button
           asChild

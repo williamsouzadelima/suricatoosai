@@ -50,19 +50,19 @@ const STATUS: Record<
 > = {
   active: {
     label: "Ativo",
-    dot: "bg-emerald-500",
+    dot: "bg-success",
     badge:
-      "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+      "border-success/30 bg-success/10 text-success",
   },
   invited: {
     label: "Convidado",
-    dot: "bg-amber-500",
+    dot: "bg-warning",
     badge:
-      "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+      "border-warning/30 bg-warning/10 text-warning",
   },
   revoked: {
     label: "Revogado",
-    dot: "bg-zinc-400",
+    dot: "bg-muted-foreground",
     badge: "border-border bg-muted text-muted-foreground",
   },
 };
@@ -280,7 +280,7 @@ export function AdminPanel({
       <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
         {/* Brand */}
         <div className="mb-6">
-          <HackerAISVG theme="dark" scale={0.16} />
+          <HackerAISVG scale={0.16} />
         </div>
 
         {/* Header */}
@@ -300,13 +300,13 @@ export function AdminPanel({
             <span
               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
                 inviteOnlyEnabled
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                  : "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                  ? "border-success/30 bg-success/10 text-success"
+                  : "border-warning/30 bg-warning/10 text-warning"
               }`}
             >
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
-                  inviteOnlyEnabled ? "bg-emerald-500" : "bg-amber-500"
+                  inviteOnlyEnabled ? "bg-success" : "bg-warning"
                 }`}
               />
               Convite {inviteOnlyEnabled ? "ligado" : "desligado"}
@@ -324,7 +324,7 @@ export function AdminPanel({
         </div>
 
         {!inviteOnlyEnabled && (
-          <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-600 dark:text-amber-400">
+          <div className="mt-4 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-warning">
             Acesso por convite está <strong>desligado</strong>. Convites e
             atividade são registrados normalmente, mas qualquer pessoa ainda
             consegue entrar até a flag ser ligada.
@@ -473,13 +473,13 @@ export function AdminPanel({
             icon={<UserCheck className="h-4 w-4" />}
             label="Ativos"
             value={counts.active}
-            accent="text-emerald-500"
+            accent="text-success"
           />
           <StatCard
             icon={<MailPlus className="h-4 w-4" />}
             label="Convidados"
             value={counts.invited}
-            accent="text-amber-500"
+            accent="text-warning"
           />
           <StatCard
             icon={<Ban className="h-4 w-4" />}

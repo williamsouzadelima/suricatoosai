@@ -166,7 +166,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
               <span>{planName}</span>
               {badgeText ? (
                 <Badge
-                  className={`border-none rounded-4xl px-2 pt-1.5 pb-1.25 text-[11px] font-semibold bg-[#DCDBFF] text-[#615EEB] dark:bg-[#444378] dark:text-[#B9B7FF] ${badgeClassName}`}
+                  className={`border-none rounded-full px-2 pt-1.5 pb-1 text-[11px] font-semibold bg-premium-bg text-premium-text ${badgeClassName}`}
                 >
                   {badgeText}
                 </Badge>
@@ -437,7 +437,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
       return {
         text: buttonText,
         disabled: upgradeLoading,
-        className: "font-semibold bg-[#615eeb] hover:bg-[#504bb8] text-white",
+        className: "font-semibold bg-primary hover:bg-primary/90 text-primary-foreground",
         variant: "default" as const,
         onClick: () =>
           handleUpgradeClick(
@@ -451,7 +451,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
       return {
         text: t("dialog.getProPlus"),
         disabled: false,
-        className: "font-semibold bg-[#615eeb] hover:bg-[#504bb8] text-white",
+        className: "font-semibold bg-primary hover:bg-primary/90 text-primary-foreground",
         variant: "default" as const,
         onClick: () =>
           navigateToAuth("/signup?intent=pricing", {
@@ -477,7 +477,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
             ? t("dialog.upgradeToUltra")
             : (pricingIntentCopy?.ultraButtonText ?? t("dialog.getUltra")),
         disabled: upgradeLoading,
-        className: "font-semibold bg-[#615eeb] hover:bg-[#504bb8] text-white",
+        className: "font-semibold bg-primary hover:bg-primary/90 text-primary-foreground",
         variant: "default" as const,
         onClick: () =>
           handleUpgradeClick(
@@ -491,7 +491,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
       return {
         text: t("dialog.getUltra"),
         disabled: false,
-        className: "font-semibold bg-[#615eeb] hover:bg-[#504bb8] text-white",
+        className: "font-semibold bg-primary hover:bg-primary/90 text-primary-foreground",
         variant: "default" as const,
         onClick: () =>
           navigateToAuth("/signup?intent=pricing", {
@@ -617,7 +617,7 @@ const PricingDialog: React.FC<PricingDialogProps> = ({
                 onButtonClick={proPlusButtonConfig.onClick}
                 isButtonDisabled={proPlusButtonConfig.disabled}
                 isButtonLoading={proPlusButtonConfig.loading}
-                customClassName="order-3 border-[#CFCEFC] bg-[#F5F5FF] dark:bg-[#282841] dark:border-[#484777] md:order-none"
+                customClassName="order-3 border-primary/25 bg-premium-bg md:order-none"
                 badgeText={t("dialog.recommended")}
                 featureHeader={PLAN_HEADERS["pro-plus"]}
               />

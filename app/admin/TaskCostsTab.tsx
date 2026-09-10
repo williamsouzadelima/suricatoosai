@@ -101,9 +101,9 @@ const fmtDate = (ms: number | null) =>
 
 function sourceBadge(source: string): string {
   if (source === "provider")
-    return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+    return "border-success/30 bg-success/10 text-success";
   if (source === "hybrid")
-    return "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400";
+    return "border-warning/30 bg-warning/10 text-warning";
   return "border-destructive/30 bg-destructive/10 text-destructive";
 }
 
@@ -269,7 +269,7 @@ export function TaskCostsTab() {
       <div className="flex flex-wrap gap-4 border-b px-5 py-3 text-sm">
         <div>
           <span className="text-muted-foreground">Custo real: </span>
-          <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+          <span className="font-semibold text-success">
             {money(totals.real)}
           </span>
         </div>
@@ -282,7 +282,7 @@ export function TaskCostsTab() {
           <span className="font-semibold">{money(totals.infra)}</span>
         </div>
         {anyCapped && (
-          <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+          <div className="flex items-center gap-1 text-warning">
             <AlertTriangle className="h-3.5 w-3.5" />
             <span className="text-xs">
               Alguns totais são parciais (limite de 3000 linhas/usuário).
@@ -332,7 +332,7 @@ export function TaskCostsTab() {
                     <div className="flex items-center gap-1.5">
                       {t.capped && (
                         <AlertTriangle
-                          className="h-3.5 w-3.5 shrink-0 text-amber-500"
+                          className="h-3.5 w-3.5 shrink-0 text-warning"
                           aria-label="Total parcial"
                         />
                       )}
@@ -348,7 +348,7 @@ export function TaskCostsTab() {
                   <td className="whitespace-nowrap px-5 py-2.5 text-right text-muted-foreground">
                     {fmtNum(t.inputTokens)} / {fmtNum(t.outputTokens)}
                   </td>
-                  <td className="whitespace-nowrap px-5 py-2.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                  <td className="whitespace-nowrap px-5 py-2.5 text-right font-semibold text-success">
                     {t.hasRealCost ? money(t.providerBilledCostDollars) : "—"}
                   </td>
                   <td className="whitespace-nowrap px-5 py-2.5 text-right">
@@ -431,7 +431,7 @@ export function TaskCostsTab() {
                 </div>
 
                 {detail.capped && (
-                  <p className="mt-3 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                  <p className="mt-3 flex items-center gap-1 text-xs text-warning">
                     <AlertTriangle className="h-3.5 w-3.5" />
                     Detalhe parcial (limite de {2000} linhas).
                   </p>
@@ -459,7 +459,7 @@ export function TaskCostsTab() {
                           <td className="whitespace-nowrap px-3 py-2 text-right text-muted-foreground">
                             {fmtNum(m.inputTokens)} / {fmtNum(m.outputTokens)}
                           </td>
-                          <td className="px-3 py-2 text-right font-medium text-emerald-600 dark:text-emerald-400">
+                          <td className="px-3 py-2 text-right font-medium text-success">
                             {m.hasRealCost
                               ? money(m.providerBilledCostDollars)
                               : "—"}
@@ -497,7 +497,7 @@ export function TaskCostsTab() {
                           <td className="whitespace-nowrap px-3 py-2 text-right text-muted-foreground">
                             {fmtNum(r.inputTokens)} / {fmtNum(r.outputTokens)}
                           </td>
-                          <td className="px-3 py-2 text-right font-medium text-emerald-600 dark:text-emerald-400">
+                          <td className="px-3 py-2 text-right font-medium text-success">
                             {r.hasRealCost
                               ? money(r.providerBilledCostDollars)
                               : "—"}
@@ -533,7 +533,7 @@ function Stat({
       <div className="text-xs text-muted-foreground">{label}</div>
       <div
         className={`mt-0.5 text-base font-semibold ${
-          accent ? "text-emerald-600 dark:text-emerald-400" : ""
+          accent ? "text-success" : ""
         }`}
       >
         {value}

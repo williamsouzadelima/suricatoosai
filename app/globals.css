@@ -16,8 +16,12 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  --font-sans: var(--font-geist-sans), "Geist Fallback", ui-sans-serif, system-ui,
+    sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono Fallback", ui-monospace,
+    monospace;
+  --font-display: var(--font-archivo), var(--font-geist-sans), ui-sans-serif,
+    system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -37,6 +41,8 @@
   --color-border: var(--border);
   --color-link: var(--link-color);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
   --color-premium-bg: var(--premium-bg);
   --color-premium-text: var(--premium-text);
   --color-premium-hover: var(--premium-hover);
@@ -48,6 +54,7 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-brand: var(--brand-coral);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -59,104 +66,114 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: #ffffff;
-  --foreground: #141414;
+  --radius: 0.75rem;
+  --background: #f4f7fc;
+  --foreground: #0e1b2e;
   --card: #ffffff;
-  --card-foreground: #000000;
+  --card-foreground: #0e1b2e;
   --popover: #ffffff;
-  --popover-foreground: #000000;
-  --primary: #ff7678;
+  --popover-foreground: #0e1b2e;
+  --primary: #2456e6;
   --primary-foreground: #ffffff;
-  --secondary: #181818;
-  --secondary-foreground: #000000;
-  --muted: #f8f8f8;
-  --muted-foreground: #666666;
-  --accent: #f8f8f8;
-  --accent-foreground: #000000;
-  --destructive: #dc2626;
-  --border: #e5e5e5;
-  --input: #e5e5e5;
-  --ring: #ff7678;
-  --chart-1: #ff4500;
-  --chart-2: #51da4c;
-  --chart-3: #0000ff;
-  --chart-4: #84cc16;
-  --chart-5: #f97316;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #000000;
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #000000;
-  --sidebar-accent: #f8f8f8;
-  --sidebar-accent-foreground: #000000;
-  --sidebar-border: #e5e5e5;
-  --sidebar-ring: #999999;
+  --secondary: #e9eff8;
+  --secondary-foreground: #0e1b2e;
+  --muted: #eef3fa;
+  --muted-foreground: #5a6b84;
+  --accent: #e7edfd;
+  --accent-foreground: #12306e;
+  --destructive: #da2c3c;
+  --success: #12996b;
+  --warning: #c9820b;
+  --border: #dbe3ef;
+  --input: #cfd9e8;
+  --ring: #2456e6;
+  --chart-1: #2456e6;
+  --chart-2: #3f6ef0;
+  --chart-3: #6f9bf5;
+  --chart-4: #12996b;
+  --chart-5: #c9820b;
+  --sidebar: #eef3f9;
+  --sidebar-foreground: #0e1b2e;
+  --sidebar-primary: #2456e6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e3ebf6;
+  --sidebar-accent-foreground: #12306e;
+  --sidebar-border: #dbe3ef;
+  --sidebar-ring: #2456e6;
+
+  /* Brand mascot coral — fixo nos dois temas (acento sentinela, uso escasso) */
+  --brand-coral: #ff7678;
 
   /* Custom chat input */
-  --fill-input-chat: #f5f5f5;
+  --fill-input-chat: #eef3fa;
 
   /* Custom link colors */
-  --link-color: #7e9fbe;
+  --link-color: #2456e6;
 
   /* Premium/Upgrade colors */
-  --premium-bg: #f1f1fb;
-  --premium-text: #5d5bd0;
-  --premium-hover: #e4e4f6;
+  --premium-bg: #e7edfd;
+  --premium-text: #2456e6;
+  --premium-hover: #d8e2fb;
 
   /* Scrollbar colors */
   --scrollbar-track: var(--background);
-  --scrollbar-thumb: rgba(0, 0, 0, 0.2);
-  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.3);
+  --scrollbar-thumb: rgba(14, 27, 46, 0.2);
+  --scrollbar-thumb-hover: rgba(14, 27, 46, 0.32);
 }
 
 .dark {
-  --background: #141414;
-  --foreground: #ffffff;
-  --card: #111111;
-  --card-foreground: #ffffff;
-  --popover: #111111;
-  --popover-foreground: #ffffff;
-  --primary: #ff7678;
+  --background: #080f1b;
+  --foreground: #e9f0fa;
+  --card: #101b2c;
+  --card-foreground: #e9f0fa;
+  --popover: #101b2c;
+  --popover-foreground: #e9f0fa;
+  --primary: #2456e6;
   --primary-foreground: #ffffff;
-  --secondary: #181818;
-  --secondary-foreground: #ffffff;
-  --muted: #222222;
-  --muted-foreground: #999999;
-  --accent: #222222;
-  --accent-foreground: #ffffff;
-  --destructive: #ef4444;
-  --border: #333333;
-  --input: #333333;
-  --ring: #ff7678;
-  --chart-1: #ff4500;
-  --chart-2: #51da4c;
-  --chart-3: #0000ff;
-  --chart-4: #84cc16;
-  --chart-5: #f97316;
-  --sidebar: #0a0a0a;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #000000;
+  --secondary: #152134;
+  --secondary-foreground: #e9f0fa;
+  --muted: #16233a;
+  --muted-foreground: #8a9bb5;
+  --accent: #182741;
+  --accent-foreground: #dbe6f7;
+  --destructive: #f0596a;
+  --success: #2bb783;
+  --warning: #e0a020;
+  --border: #21324b;
+  --input: #2c4160;
+  --ring: #3f6ef0;
+  --chart-1: #5b84f0;
+  --chart-2: #7aa0f5;
+  --chart-3: #a9c4fa;
+  --chart-4: #2bb783;
+  --chart-5: #e0a020;
+  --sidebar: #0b1524;
+  --sidebar-foreground: #e9f0fa;
+  --sidebar-primary: #2456e6;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #222222;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #333333;
-  --sidebar-ring: #666666;
+  --sidebar-accent: #182741;
+  --sidebar-accent-foreground: #dbe6f7;
+  --sidebar-border: #21324b;
+  --sidebar-ring: #3f6ef0;
+
+  /* Brand mascot coral — fixo nos dois temas */
+  --brand-coral: #ff7678;
 
   /* Custom chat input */
-  --fill-input-chat: #1a1a1a;
+  --fill-input-chat: #101b2c;
 
   /* Custom link colors */
-  --link-color: #7e9fbe;
+  --link-color: #5b84f0;
 
   /* Premium/Upgrade colors */
-  --premium-bg: #373669;
-  --premium-text: #dcdbf6;
-  --premium-hover: #414071;
+  --premium-bg: #182741;
+  --premium-text: #b9ccf7;
+  --premium-hover: #1f3357;
 
   /* Scrollbar colors */
   --scrollbar-track: var(--background);
-  --scrollbar-thumb: rgba(255, 255, 255, 0.2);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+  --scrollbar-thumb: rgba(233, 240, 250, 0.18);
+  --scrollbar-thumb-hover: rgba(233, 240, 250, 0.3);
 }
 
 @layer base {

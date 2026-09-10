@@ -329,7 +329,7 @@ export const ShareDialog = ({
 
                 {/* Floating Suricatoos Logo - bottom left corner */}
                 <div className="absolute bottom-4 right-4 z-10">
-                  <HackerAISVG theme="dark" scale={0.12} />
+                  <HackerAISVG scale={0.12} />
                 </div>
               </div>
             </div>

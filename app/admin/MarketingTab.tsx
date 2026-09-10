@@ -48,7 +48,7 @@ const toMs = (s: string): number | undefined => {
 const SCHED_STATUS: Record<string, { label: string; badge: string }> = {
   pending: {
     label: "agendada",
-    badge: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    badge: "border-warning/30 bg-warning/10 text-warning",
   },
   sending: {
     label: "enviando",
@@ -57,7 +57,7 @@ const SCHED_STATUS: Record<string, { label: string; badge: string }> = {
   sent: {
     label: "enviada",
     badge:
-      "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+      "border-success/30 bg-success/10 text-success",
   },
   failed: {
     label: "falhou",
@@ -260,7 +260,7 @@ export function MarketingTab() {
       <WelcomeCard />
 
       {!emailConfigured && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-600 dark:text-amber-400">
+        <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-warning">
           RESEND_API_KEY não está configurada no servidor — envios ficam
           bloqueados até ela existir.
         </div>

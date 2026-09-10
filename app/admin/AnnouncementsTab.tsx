@@ -53,8 +53,8 @@ const EMPTY: FormState = {
 
 const LEVELS: { value: Level; label: string; badge: string }[] = [
   { value: "info", label: "Info", badge: "border-primary/30 bg-primary/10 text-primary" },
-  { value: "warning", label: "Aviso", badge: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400" },
-  { value: "success", label: "Sucesso", badge: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+  { value: "warning", label: "Aviso", badge: "border-warning/30 bg-warning/10 text-warning" },
+  { value: "success", label: "Sucesso", badge: "border-success/30 bg-success/10 text-success" },
 ];
 
 const toLocalInput = (ms?: number) => {
@@ -331,7 +331,7 @@ export function AnnouncementsTab() {
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{a.title}</span>
                       {a.active ? (
-                        <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                        <span className="rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
                           publicado
                         </span>
                       ) : (

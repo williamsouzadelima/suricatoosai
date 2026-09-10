@@ -250,7 +250,7 @@ const FilePartRendererComponent = ({
     }) => {
       const content = (
         <div className="flex flex-row items-center gap-2">
-          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[#FF5588] flex items-center justify-center">
+          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-primary flex items-center justify-center">
             {icon}
           </div>
           <div className="overflow-hidden flex-1">

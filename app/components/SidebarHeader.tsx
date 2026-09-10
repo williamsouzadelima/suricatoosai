@@ -230,7 +230,7 @@ const SidebarHeaderContentImpl: FC<SidebarHeaderContentImplProps> = ({
               </span>
             </span>
           ) : (
-            <HackerAISVG theme="dark" scale={isMobileOverlay ? 0.11 : 0.1} />
+            <HackerAISVG scale={isMobileOverlay ? 0.11 : 0.1} />
           )}
         </Link>
 

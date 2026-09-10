@@ -32,7 +32,7 @@ function actionBadge(action: string): string {
   if (p === "campanha" || p === "aviso")
     return "border-primary/30 bg-primary/10 text-primary";
   if (p === "convite" || action === "grandfather")
-    return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+    return "border-success/30 bg-success/10 text-success";
   return "border-border bg-muted text-muted-foreground";
 }
 

@@ -156,13 +156,13 @@ export function OverviewTab({
             icon={<UserCheck className="h-4 w-4" />}
             label="Ativos"
             value={loading ? "—" : data?.users.active ?? 0}
-            accent="text-emerald-500"
+            accent="text-success"
           />
           <Stat
             icon={<MailPlus className="h-4 w-4" />}
             label="Convidados"
             value={loading ? "—" : data?.users.invited ?? 0}
-            accent="text-amber-500"
+            accent="text-warning"
           />
           <Stat
             icon={<TrendingUp className="h-4 w-4" />}
@@ -240,7 +240,7 @@ export function OverviewTab({
             icon={<Coins className="h-4 w-4" />}
             label="Custo"
             value={usage.loading ? "…" : `$${usage.cost.toFixed(2)}`}
-            accent="text-emerald-500"
+            accent="text-success"
           />
         </div>
       </div>
@@ -261,7 +261,7 @@ export function OverviewTab({
             icon={<Send className="h-4 w-4" />}
             label="E-mails (30d)"
             value={loading ? "—" : fmtNum(data?.campaigns.sent30d ?? 0)}
-            accent="text-emerald-500"
+            accent="text-success"
           />
           <Stat
             icon={<Send className="h-4 w-4" />}

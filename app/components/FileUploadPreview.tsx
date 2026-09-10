@@ -342,7 +342,7 @@ export const FileUploadPreview = ({
                           ? "bg-input-chat border-border/80"
                           : isImageFile(filePreview.file)
                             ? "bg-background"
-                            : "bg-primary"
+                            : "bg-secondary text-secondary-foreground"
                     }`}
                   >
                     <div
@@ -523,7 +523,7 @@ export const FileUploadPreview = ({
                               className={`relative h-10 w-10 shrink-0 overflow-hidden rounded-lg flex items-center justify-center ${
                                 filePreview.error
                                   ? "bg-red-500"
-                                  : "bg-[#FF5588]"
+                                  : "bg-primary"
                               }`}
                             >
                               {filePreview.uploading ? (

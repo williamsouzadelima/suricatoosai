@@ -20,6 +20,8 @@ import {
   ChevronRight,
   ChevronDown,
   Settings,
+  Sun,
+  Moon,
   CircleUserRound,
   Gauge,
   Download,
@@ -57,6 +59,7 @@ import {
   preloadSettingsDialog,
 } from "@/lib/utils/settings-dialog";
 import { ReferralRewardDialog } from "./ReferralRewardDialog";
+import { useTheme } from "next-themes";
 
 const NEXT_PUBLIC_HELP_CENTER_URL =
   process.env.NEXT_PUBLIC_HELP_CENTER_URL || "https://help.suricatoos.com/en/";
@@ -126,7 +129,7 @@ const UpgradeBanner = ({ isCollapsed }: { isCollapsed: boolean }) => {
         type="button"
         onClick={handleUpgrade}
         aria-label="Upgrade to Pro and unlock more features"
-        className="bg-muted/50 hover:bg-muted/80 border-sidebar-border hover:border-violet-500/70 dark:hover:border-violet-400/70 flex w-full cursor-pointer items-center gap-3 rounded-xl border p-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className="bg-muted/50 hover:bg-muted/80 border-sidebar-border hover:border-primary/60 flex w-full cursor-pointer items-center gap-3 rounded-xl border p-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <p className="text-foreground truncate text-sm font-medium leading-none">
@@ -147,6 +150,7 @@ const UpgradeBanner = ({ isCollapsed }: { isCollapsed: boolean }) => {
 const SidebarUserNav = ({ isCollapsed = false }: { isCollapsed?: boolean }) => {
   const { user } = useAuth();
   const { subscription } = useGlobalState();
+  const { resolvedTheme, setTheme } = useTheme();
   const activeLocale = useLocale() as Locale;
   const tLang = useTranslations("language");
   const langRouter = useRouter();
@@ -506,7 +510,7 @@ const SidebarUserNav = ({ isCollapsed = false }: { isCollapsed?: boolean }) => {
                                 ${extraUsageMonthlySpentDollars.toFixed(2)}{" "}
                                 spent
                               </span>
-                              <span className="text-muted-foreground/60">
+                              <span className="text-muted-foreground">
                                 /
                               </span>
                               <span>{extraUsageMonthlyLimitLabel}</span>
@@ -541,6 +545,25 @@ const SidebarUserNav = ({ isCollapsed = false }: { isCollapsed?: boolean }) => {
           >
             <Settings className="mr-2 h-4 w-4 text-foreground" />
             <span>Settings</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem
+            data-testid="theme-toggle"
+            onSelect={(e) => {
+              e.preventDefault();
+              setTheme(resolvedTheme === "dark" ? "light" : "dark");
+            }}
+            className="py-1.5 cursor-pointer"
+          >
+            {resolvedTheme === "dark" ? (
+              <Moon className="mr-2 h-4 w-4 text-foreground" />
+            ) : (
+              <Sun className="mr-2 h-4 w-4 text-foreground" />
+            )}
+            <span>Theme</span>
+            <span className="ml-auto text-xs text-muted-foreground">
+              {resolvedTheme === "dark" ? "Dark" : "Light"}
+            </span>
           </DropdownMenuItem>
 
           {!isStandalone && (

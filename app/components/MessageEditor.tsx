@@ -106,7 +106,7 @@ export const MessageEditor = ({
             >
               <div
                 className={`relative overflow-hidden border rounded-2xl ${
-                  isImage(file.mediaType) ? "bg-background" : "bg-primary"
+                  isImage(file.mediaType) ? "bg-background" : "bg-secondary text-secondary-foreground"
                 }`}
               >
                 {isImage(file.mediaType) && file.url ? (
@@ -122,7 +122,7 @@ export const MessageEditor = ({
                 ) : (
                   <div className="p-2 w-64">
                     <div className="flex flex-row items-center gap-2">
-                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[#FF5588] flex items-center justify-center">
+                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-primary flex items-center justify-center">
                         <File className="h-6 w-6 text-white" />
                       </div>
                       <div className="overflow-hidden flex-1">
