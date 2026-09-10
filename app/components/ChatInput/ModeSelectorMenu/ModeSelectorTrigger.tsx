@@ -8,11 +8,11 @@ import type { ChatMode } from "@/types/chat";
 const FREE_MODE_VARIANT_CLASSES: Record<ChatMode, string> = {
   ask: "bg-muted hover:bg-muted/50",
   agent:
-    "bg-red-500/10 text-red-700 hover:bg-red-500/20 dark:bg-red-400/10 dark:text-red-400 dark:hover:bg-red-400/20",
+    "bg-destructive/10 text-destructive hover:bg-destructive/20",
 };
 
 const PAID_MODE_VARIANT_CLASSES: Record<ChatMode, string> = {
-  ask: "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 dark:bg-emerald-400/10 dark:text-emerald-400 dark:hover:bg-emerald-400/20",
+  ask: "bg-success/10 text-success hover:bg-success/20",
   agent: "bg-muted text-foreground hover:bg-muted/50",
 };
 

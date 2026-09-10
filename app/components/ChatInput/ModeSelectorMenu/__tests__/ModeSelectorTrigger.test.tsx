@@ -13,7 +13,7 @@ describe("ModeSelectorTrigger", () => {
 
     expect(screen.getByTestId("mode-selector")).toHaveClass("bg-muted");
     expect(screen.getByTestId("mode-selector")).not.toHaveClass(
-      "bg-red-500/10",
+      "bg-destructive/10",
     );
 
     rerender(
@@ -23,7 +23,7 @@ describe("ModeSelectorTrigger", () => {
     );
 
     expect(screen.getByTestId("mode-selector")).toHaveClass(
-      "bg-emerald-500/10",
+      "bg-success/10",
     );
   });
 
@@ -34,7 +34,7 @@ describe("ModeSelectorTrigger", () => {
       </DropdownMenu>,
     );
 
-    expect(screen.getByTestId("mode-selector")).toHaveClass("bg-red-500/10");
+    expect(screen.getByTestId("mode-selector")).toHaveClass("bg-destructive/10");
 
     rerender(
       <DropdownMenu>
@@ -44,7 +44,7 @@ describe("ModeSelectorTrigger", () => {
 
     expect(screen.getByTestId("mode-selector")).toHaveClass("bg-muted");
     expect(screen.getByTestId("mode-selector")).not.toHaveClass(
-      "bg-emerald-500/10",
+      "bg-success/10",
     );
   });
 });

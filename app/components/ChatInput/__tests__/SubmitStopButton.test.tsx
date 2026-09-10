@@ -90,12 +90,12 @@ describe("SubmitStopButton paid mode colors", () => {
   it("uses the default submit treatment for paid Agent mode", () => {
     const button = renderButton("agent", true);
 
-    expect(button).toHaveClass("bg-primary-foreground");
-    expect(button).not.toHaveClass("bg-red-500/10");
+    expect(button).toHaveClass("bg-primary");
+    expect(button).not.toHaveClass("bg-destructive/10");
   });
 
   it("uses the green submit treatment for paid Ask mode", () => {
-    expect(renderButton("ask", true)).toHaveClass("bg-emerald-500/10");
+    expect(renderButton("ask", true)).toHaveClass("bg-success/10");
   });
 
   it("uses neutral Agent and green Ask stop treatments for paid users", () => {
@@ -125,24 +125,24 @@ describe("SubmitStopButton paid mode colors", () => {
       </TooltipProvider>,
     );
 
-    expect(screen.getByRole("button")).toHaveClass("bg-emerald-500/10");
+    expect(screen.getByRole("button")).toHaveClass("bg-success/10");
   });
 
   it("preserves the existing submit colors for free users", () => {
-    expect(renderButton("agent", false)).toHaveClass("bg-red-500/10");
+    expect(renderButton("agent", false)).toHaveClass("bg-destructive/10");
   });
 
   it("uses the neutral Agent submit treatment for free Desktop users", () => {
     const submitButton = renderButton("agent", false, false, true);
 
-    expect(submitButton).toHaveClass("bg-primary-foreground");
-    expect(submitButton).not.toHaveClass("bg-red-500/10");
+    expect(submitButton).toHaveClass("bg-primary");
+    expect(submitButton).not.toHaveClass("bg-destructive/10");
   });
 
   it("uses the neutral Agent stop treatment for free Desktop users", () => {
     const stopButton = renderButton("agent", false, true, true);
 
     expect(stopButton).toHaveClass("bg-muted");
-    expect(stopButton).not.toHaveClass("bg-red-500/10");
+    expect(stopButton).not.toHaveClass("bg-destructive/10");
   });
 });

@@ -13,13 +13,13 @@ const BASE_BUTTON_CLASSES = "rounded-full p-0 w-8 h-8 min-w-0";
 
 const FREE_STOP_BUTTON_VARIANT_CLASSES: Record<ChatMode, string> = {
   agent:
-    "bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:bg-red-400/10 dark:hover:bg-red-400/20 dark:text-red-400 focus-visible:ring-red-500",
+    "bg-destructive/10 hover:bg-destructive/20 text-destructive focus-visible:ring-destructive",
   ask: "bg-muted hover:bg-muted/70 text-foreground",
 };
 
 const PAID_STOP_BUTTON_VARIANT_CLASSES: Record<ChatMode, string> = {
   agent: "bg-muted hover:bg-muted/70 text-foreground",
-  ask: "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:bg-emerald-400/10 dark:hover:bg-emerald-400/20 dark:text-emerald-400 focus-visible:ring-emerald-500",
+  ask: "bg-success/10 hover:bg-success/20 text-success focus-visible:ring-success",
 };
 
 function getStopButtonVariantClasses(
@@ -40,10 +40,10 @@ function getSubmitButtonVariantClasses(
   useNeutralAgentStyle: boolean,
 ): string {
   if (!isPaid && mode === "agent" && !useNeutralAgentStyle) {
-    return "bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:bg-red-400/10 dark:hover:bg-red-400/20 dark:text-red-400 focus-visible:ring-red-500";
+    return "bg-destructive/10 hover:bg-destructive/20 text-destructive focus-visible:ring-destructive";
   }
   if (isPaid && mode === "ask") {
-    return "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:bg-emerald-400/10 dark:hover:bg-emerald-400/20 dark:text-emerald-400 focus-visible:ring-emerald-500";
+    return "bg-success/10 hover:bg-success/20 text-success focus-visible:ring-success";
   }
   return "";
 }

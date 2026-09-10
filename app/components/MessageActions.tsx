@@ -294,7 +294,7 @@ export const MessageActions = ({
                         onClick={() => handleFeedback("positive")}
                         className={`p-1.5 transition-opacity rounded hover:bg-secondary ${
                           existingFeedback === "positive"
-                            ? "opacity-100 text-primary-foreground"
+                            ? "opacity-100 text-primary"
                             : "opacity-70 hover:opacity-100 text-muted-foreground"
                         }`}
                         aria-label="Good response"
@@ -322,7 +322,7 @@ export const MessageActions = ({
                       className={`p-1.5 transition-opacity rounded hover:bg-secondary ${
                         existingFeedback === "negative" ||
                         isAwaitingFeedbackDetails
-                          ? "opacity-100 text-primary-foreground"
+                          ? "opacity-100 text-primary"
                           : "opacity-70 hover:opacity-100 text-muted-foreground"
                       }`}
                       aria-label="Poor response"

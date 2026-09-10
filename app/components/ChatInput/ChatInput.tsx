@@ -93,7 +93,7 @@ const ChatInputLoadingState = ({
   >
     <div className="mx-auto w-full min-w-0 max-w-full sm:min-w-[390px] sm:max-w-[768px]">
       <div
-        className="chat-input-glass-surface relative z-10 flex h-[98px] flex-col justify-center gap-2 rounded-[22px] border border-black/8 px-4 shadow-[0px_12px_32px_0px_rgba(0,0,0,0.02)] dark:border-border"
+        className="chat-input-glass-surface relative z-10 flex h-[98px] flex-col justify-center gap-2 rounded-[22px] border border-border px-4 shadow-[0px_12px_32px_0px_rgba(0,0,0,0.02)] transition-colors focus-within:border-primary/70"
         data-testid="chat-input-loading-surface"
       >
         <div className="h-3 w-32 animate-pulse rounded-full bg-muted-foreground/15 motion-reduce:animate-none" />
@@ -102,7 +102,7 @@ const ChatInputLoadingState = ({
       {showAgentControls ? (
         <div
           aria-hidden="true"
-          className="chat-input-glass-context relative z-0 mx-6 -mt-2 h-10 rounded-b-[18px] border border-t-0 border-black/8 md:hidden dark:border-border/70"
+          className="chat-input-glass-context relative z-0 mx-6 -mt-2 h-10 rounded-b-[18px] border border-t-0 border-border md:hidden"
           data-testid="chat-input-loading-controls"
         />
       ) : null}
@@ -798,12 +798,12 @@ export const ChatInput = ({
             role="status"
             aria-live="polite"
             data-testid="offline-status"
-            className="mb-2 flex flex-col gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm text-foreground sm:flex-row sm:items-center"
+            className="mb-2 flex flex-col gap-2 rounded-lg border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-foreground sm:flex-row sm:items-center"
           >
             <div className="flex min-w-0 flex-1 items-start gap-2">
               <WifiOff
                 aria-hidden="true"
-                className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
+                className="mt-0.5 h-4 w-4 shrink-0 text-warning"
               />
               <p>
                 You&apos;re offline. Keep typing—this draft will stay on this
@@ -875,7 +875,7 @@ export const ChatInput = ({
           />
         ) : (
           <div
-            className={`chat-input-glass-surface relative z-10 order-2 flex max-h-[300px] min-w-0 flex-col gap-3 overflow-hidden border border-black/8 py-3 shadow-[0px_12px_32px_0px_rgba(0,0,0,0.02)] transition-colors sm:order-1 dark:border-border ${uploadedFiles && uploadedFiles.length > 0 ? "rounded-b-[22px] border-t-0" : "rounded-[22px]"}`}
+            className={`chat-input-glass-surface relative z-10 order-2 flex max-h-[300px] min-w-0 flex-col gap-3 overflow-hidden border border-border py-3 shadow-[0px_12px_32px_0px_rgba(0,0,0,0.02)] transition-colors focus-within:border-primary/70 sm:order-1 ${uploadedFiles && uploadedFiles.length > 0 ? "rounded-b-[22px] border-t-0" : "rounded-[22px]"}`}
             data-testid="chat-input-surface"
           >
             <ChatInputTextarea
@@ -908,7 +908,7 @@ export const ChatInput = ({
             this strip whenever its own width is constrained, even on desktop. */}
         {isAgent && !showAgentApprovalPrompt && (
           <div
-            className={`chat-input-glass-context relative z-0 order-3 mx-6 -mt-2 flex h-10 min-w-0 items-center gap-2 rounded-b-[18px] border border-t-0 border-black/8 px-3 pt-2 dark:border-border/70 ${compactAgentControls ? "" : "md:hidden"}`}
+            className={`chat-input-glass-context relative z-0 order-3 mx-6 -mt-2 flex h-10 min-w-0 items-center gap-2 rounded-b-[18px] border border-t-0 border-border px-3 pt-2 ${compactAgentControls ? "" : "md:hidden"}`}
             data-compact={compactAgentControls ? "true" : "false"}
             data-testid="chat-input-agent-context"
           >
