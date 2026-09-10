@@ -27,7 +27,7 @@ export const AutoReloadDisabledAlert = ({
   return (
     <div
       role="alert"
-      className="mt-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500"
+      className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
     >
       Auto-reload was turned off after failed payment attempts. {displayReason}.{" "}
       {updateCopy}, then turn auto-reload back on.

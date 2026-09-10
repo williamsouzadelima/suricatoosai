@@ -345,8 +345,8 @@ const RemoteControlTab = () => {
                 className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg"
               >
                 <div className="relative">
-                  <Circle className="h-2.5 w-2.5 fill-green-500 text-green-500" />
-                  <Circle className="h-2.5 w-2.5 fill-green-500 text-green-500 absolute inset-0 animate-ping opacity-75" />
+                  <Circle className="h-2.5 w-2.5 fill-success text-success" />
+                  <Circle className="h-2.5 w-2.5 fill-success text-success absolute inset-0 animate-ping opacity-75" />
                 </div>
                 <Server className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -462,13 +462,13 @@ const RemoteControlTab = () => {
       ) : null}
 
       {/* Security Notice - Compact */}
-      <div className="flex items-start gap-2 p-3 bg-yellow-500/10 rounded-lg text-xs">
-        <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
-        <div className="text-yellow-800 dark:text-yellow-200 space-y-1">
+      <div className="flex items-start gap-2 p-3 bg-warning/10 rounded-lg text-xs">
+        <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+        <div className="text-foreground space-y-1">
           <span className="font-medium">
             {t("remoteControl.securityLabel")}
           </span>{" "}
-          <span className="text-yellow-700 dark:text-yellow-300">
+          <span className="text-muted-foreground">
             {t("remoteControl.securityNotice")}
           </span>
         </div>

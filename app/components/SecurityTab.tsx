@@ -113,7 +113,7 @@ const SecurityTab = () => {
             variant="destructive"
             size="sm"
             onClick={handleLogoutAll}
-            className="shrink-0 bg-red-600 text-white hover:bg-red-700"
+            className="shrink-0 bg-destructive text-white hover:bg-destructive/90"
           >
             {t("security.logoutAll")}
           </Button>

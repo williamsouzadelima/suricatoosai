@@ -236,10 +236,10 @@ const BuyExtraUsageDialogContent = ({
             aria-label="Purchase amount"
           />
           {showMinAmountError && (
-            <p className="text-sm text-red-500 mt-2">Minimum amount is $15</p>
+            <p className="text-sm text-destructive mt-2">Minimum amount is $15</p>
           )}
           {showMaxAmountError && (
-            <p className="text-sm text-red-500 mt-2">
+            <p className="text-sm text-destructive mt-2">
               Maximum amount is $999,999
             </p>
           )}

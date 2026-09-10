@@ -183,11 +183,11 @@ export const CustomizeHackerAIDialog = ({
                 placeholder={t("customize.nicknamePlaceholder")}
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
-                className={`flex w-full rounded-md border ${isNicknameOverLimit ? "border-red-500" : "border-input"} bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none`}
+                className={`flex w-full rounded-md border ${isNicknameOverLimit ? "border-destructive" : "border-input"} bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none`}
                 maxRows={1}
               />
               {isNicknameOverLimit && (
-                <div className="text-xs text-red-500 mt-1">
+                <div className="text-xs text-destructive mt-1">
                   {t("customize.charCount", {
                     count: String(nickname.length),
                     limit: String(MAX_CHAR_LIMIT),
@@ -206,11 +206,11 @@ export const CustomizeHackerAIDialog = ({
                 placeholder={t("customize.occupationPlaceholder")}
                 value={occupation}
                 onChange={(e) => setOccupation(e.target.value)}
-                className={`flex w-full rounded-md border ${isOccupationOverLimit ? "border-red-500" : "border-input"} bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none`}
+                className={`flex w-full rounded-md border ${isOccupationOverLimit ? "border-destructive" : "border-input"} bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none`}
                 maxRows={1}
               />
               {isOccupationOverLimit && (
-                <div className="text-xs text-red-500 mt-1">
+                <div className="text-xs text-destructive mt-1">
                   {t("customize.charCount", {
                     count: String(occupation.length),
                     limit: String(MAX_CHAR_LIMIT),
@@ -265,12 +265,12 @@ export const CustomizeHackerAIDialog = ({
                 placeholder={t("customize.traitsPlaceholder")}
                 value={traitsText}
                 onChange={(e) => setTraitsText(e.target.value)}
-                className={`flex w-full rounded-md border ${isTraitsOverLimit ? "border-red-500" : "border-input"} bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none`}
+                className={`flex w-full rounded-md border ${isTraitsOverLimit ? "border-destructive" : "border-input"} bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none`}
                 minRows={2}
                 maxRows={4}
               />
               {isTraitsOverLimit && (
-                <div className="text-xs text-red-500 mt-1">
+                <div className="text-xs text-destructive mt-1">
                   {t("customize.charCount", {
                     count: String(traitsText.length),
                     limit: String(MAX_CHAR_LIMIT),
@@ -304,12 +304,12 @@ export const CustomizeHackerAIDialog = ({
                 placeholder={t("customize.additionalInfoPlaceholder")}
                 value={additionalInfo}
                 onChange={(e) => setAdditionalInfo(e.target.value)}
-                className={`flex w-full rounded-md border ${isAdditionalInfoOverLimit ? "border-red-500" : "border-input"} bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none`}
+                className={`flex w-full rounded-md border ${isAdditionalInfoOverLimit ? "border-destructive" : "border-input"} bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none`}
                 minRows={3}
                 maxRows={6}
               />
               {isAdditionalInfoOverLimit && (
-                <div className="text-xs text-red-500 mt-1">
+                <div className="text-xs text-destructive mt-1">
                   {t("customize.charCount", {
                     count: String(additionalInfo.length),
                     limit: String(MAX_CHAR_LIMIT),

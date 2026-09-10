@@ -176,7 +176,9 @@ const SettingsDialog = ({
           {isMobile && (
             <div className="relative z-10 p-0">
               <div className="flex items-center justify-between px-4 py-3 border-b">
-                <h3 className="text-lg font-semibold">{t("dialog.title")}</h3>
+                <h3 className="font-display text-lg font-semibold">
+                  {t("dialog.title")}
+                </h3>
                 <div
                   className="flex h-7 w-7 items-center justify-center cursor-pointer rounded-md hover:bg-muted"
                   onClick={() => onOpenChange(false)}
@@ -214,7 +216,7 @@ const SettingsDialog = ({
                           onClick={() => setActiveTab(tab.id)}
                           className={`group flex items-center gap-1.5 px-1 py-2 text-sm leading-5 max-md:whitespace-nowrap md:h-12 md:gap-2.5 md:self-stretch md:px-4 md:rounded-lg hover:bg-muted transition-colors ${
                             activeTab === tab.id
-                              ? `${isMobile ? "font-medium" : "bg-muted font-medium"}`
+                              ? `${isMobile ? "font-medium text-link" : "bg-muted font-medium text-link"}`
                               : ""
                           } ${isMobile && activeTab === tab.id ? "relative" : ""}`}
                         >
@@ -227,7 +229,7 @@ const SettingsDialog = ({
                             <div className="truncate">{tab.label}</div>
                           </div>
                           {isMobile && activeTab === tab.id && (
-                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground"></div>
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"></div>
                           )}
                         </button>
                       );
@@ -241,7 +243,7 @@ const SettingsDialog = ({
             <div className="flex flex-col items-start self-stretch flex-1 overflow-hidden min-h-0">
               {!isMobile && (
                 <div className="gap-1 items-center px-6 py-5 hidden md:flex self-stretch border-b">
-                  <h3 className="text-lg font-medium">
+                  <h3 className="font-display text-lg font-medium tracking-tight">
                     {tabs.find((tab) => tab.id === activeTab)?.label ??
                       activeTab}
                   </h3>

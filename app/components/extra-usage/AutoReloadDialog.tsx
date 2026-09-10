@@ -107,7 +107,7 @@ const AutoReloadDialogContent = ({
               />
             </div>
             {showThresholdError && (
-              <p className="text-sm text-red-500 mt-2">
+              <p className="text-sm text-destructive mt-2">
                 Threshold must be at least $5
               </p>
             )}
@@ -134,12 +134,12 @@ const AutoReloadDialogContent = ({
               />
             </div>
             {showAmountMinError && (
-              <p className="text-sm text-red-500 mt-2">
+              <p className="text-sm text-destructive mt-2">
                 Reload amount must be at least $15
               </p>
             )}
             {showAmountGapError && (
-              <p className="text-sm text-red-500 mt-2">
+              <p className="text-sm text-destructive mt-2">
                 Reload amount must be at least $10 more than the threshold
               </p>
             )}

@@ -53,9 +53,9 @@ const formatResetDateFull = (resetTime: string | null): string => {
 };
 
 const getRemainingColorClass = (percentage: number): string => {
-  if (percentage <= 10) return "bg-red-500";
-  if (percentage <= 30) return "bg-orange-500";
-  return "bg-blue-500";
+  if (percentage <= 10) return "bg-destructive";
+  if (percentage <= 30) return "bg-warning";
+  return "bg-link";
 };
 
 const formatProjectionDate = (date: Date): string => {
@@ -162,7 +162,7 @@ const IncludedUsageCard = ({ subscription }: IncludedUsageCardProps) => {
             )}
           </div>
           {projection?.projectedExhaustionDate ? (
-            <div className="flex items-center gap-1.5 text-xs text-orange-600 dark:text-orange-400">
+            <div className="flex items-center gap-1.5 text-xs text-warning">
               <TrendingDown className="h-3 w-3 flex-shrink-0" />
               <span>
                 At this pace, runs out ~

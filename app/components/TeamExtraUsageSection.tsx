@@ -44,9 +44,9 @@ type Pool = {
 };
 
 const getUsageColorClass = (percentage: number): string => {
-  if (percentage >= 90) return "bg-red-500";
-  if (percentage >= 70) return "bg-orange-500";
-  return "bg-blue-500";
+  if (percentage >= 90) return "bg-destructive";
+  if (percentage >= 70) return "bg-warning";
+  return "bg-link";
 };
 
 /**
@@ -370,8 +370,8 @@ export const TeamExtraUsageSection = () => {
                     onClick={() => setShowAutoReloadDialog(true)}
                     className={
                       pool.autoReloadEnabled
-                        ? "text-green-500 underline hover:text-green-400"
-                        : "text-red-500 underline hover:text-red-400"
+                        ? "text-success underline hover:text-success"
+                        : "text-destructive underline hover:text-destructive"
                     }
                     aria-label="Configure auto-reload"
                   >
@@ -432,7 +432,7 @@ export const TeamExtraUsageSection = () => {
                           {m.disabled && (
                             <>
                               <span className="mx-1">·</span>
-                              <span className="text-red-500">Disabled</span>
+                              <span className="text-destructive">Disabled</span>
                             </>
                           )}
                         </p>

@@ -233,9 +233,9 @@ const ExtraUsageSection = () => {
 
   // Get color class based on usage percentage (matches UsageTab)
   const getUsageColorClass = (percentage: number): string => {
-    if (percentage >= 90) return "bg-red-500";
-    if (percentage >= 70) return "bg-orange-500";
-    return "bg-blue-500";
+    if (percentage >= 90) return "bg-destructive";
+    if (percentage >= 70) return "bg-warning";
+    return "bg-link";
   };
 
   return (
@@ -355,8 +355,8 @@ const ExtraUsageSection = () => {
                     onClick={() => setShowAutoReloadDialog(true)}
                     className={
                       autoReloadEnabled
-                        ? "text-green-500 underline hover:text-green-400"
-                        : "text-red-500 underline hover:text-red-400"
+                        ? "text-success underline hover:text-success"
+                        : "text-destructive underline hover:text-destructive"
                     }
                     aria-label="Configure auto-reload"
                     tabIndex={0}
