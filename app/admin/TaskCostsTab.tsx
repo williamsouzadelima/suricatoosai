@@ -89,6 +89,23 @@ const fmtNum = (n: number) =>
 // Sub-cent costs must not round to $0.00 — always show 4 decimals.
 const money = (n: number) => `$${(n ?? 0).toFixed(4)}`;
 
+const REAL_COST_HINT =
+  "Sem custo real: execuções anteriores a 09/09/2026, quando o custo real do OpenRouter passou a ser capturado. Só o valor Registrado existe para esta linha.";
+
+// Verde com o valor quando ha custo real; traco cinza com tooltip quando nao ha
+// (linha anterior a 09/09/2026, sem provider_billed_cost_dollars).
+function RealCost({ has, value }: { has: boolean; value: number }) {
+  if (has) return <>{money(value)}</>;
+  return (
+    <span
+      className="cursor-help font-normal text-muted-foreground"
+      title={REAL_COST_HINT}
+    >
+      —
+    </span>
+  );
+}
+
 const fmtDate = (ms: number | null) =>
   ms
     ? new Date(ms).toLocaleString("pt-BR", {
@@ -236,7 +253,9 @@ export function TaskCostsTab() {
           <p className="mt-1 text-xs text-muted-foreground">
             Custo <strong>real</strong> = créditos deduzidos do OpenRouter
             (linhas novas). <strong>Registrado</strong> = cost_dollars histórico,
-            pode subcontar. Infra = sandbox/estimativa.
+            pode subcontar. Infra = sandbox/estimativa. O traço{" "}
+            <strong>—</strong> = execução anterior a 09/09/2026 (sem custo real
+            capturado).
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -349,7 +368,7 @@ export function TaskCostsTab() {
                     {fmtNum(t.inputTokens)} / {fmtNum(t.outputTokens)}
                   </td>
                   <td className="whitespace-nowrap px-5 py-2.5 text-right font-semibold text-success">
-                    {t.hasRealCost ? money(t.providerBilledCostDollars) : "—"}
+                    <RealCost has={t.hasRealCost} value={t.providerBilledCostDollars} />
                   </td>
                   <td className="whitespace-nowrap px-5 py-2.5 text-right">
                     {money(t.costDollars)}
@@ -420,6 +439,7 @@ export function TaskCostsTab() {
                         ? money(detail.total.providerBilledCostDollars)
                         : "—"
                     }
+                    hint={detail.total.hasRealCost ? undefined : REAL_COST_HINT}
                     accent
                   />
                   <Stat
@@ -460,9 +480,7 @@ export function TaskCostsTab() {
                             {fmtNum(m.inputTokens)} / {fmtNum(m.outputTokens)}
                           </td>
                           <td className="px-3 py-2 text-right font-medium text-success">
-                            {m.hasRealCost
-                              ? money(m.providerBilledCostDollars)
-                              : "—"}
+                            <RealCost has={m.hasRealCost} value={m.providerBilledCostDollars} />
                           </td>
                           <td className="px-3 py-2 text-right">
                             {money(m.costDollars)}
@@ -498,9 +516,7 @@ export function TaskCostsTab() {
                             {fmtNum(r.inputTokens)} / {fmtNum(r.outputTokens)}
                           </td>
                           <td className="px-3 py-2 text-right font-medium text-success">
-                            {r.hasRealCost
-                              ? money(r.providerBilledCostDollars)
-                              : "—"}
+                            <RealCost has={r.hasRealCost} value={r.providerBilledCostDollars} />
                           </td>
                           <td className="px-3 py-2 text-right">
                             {money(r.costDollars)}
@@ -523,18 +539,21 @@ function Stat({
   label,
   value,
   accent,
+  hint,
 }: {
   label: string;
   value: string;
   accent?: boolean;
+  hint?: string;
 }) {
   return (
     <div className="rounded-lg border bg-muted/30 p-3">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div
+        title={hint}
         className={`mt-0.5 text-base font-semibold ${
           accent ? "text-success" : ""
-        }`}
+        } ${hint ? "cursor-help" : ""}`}
       >
         {value}
       </div>
