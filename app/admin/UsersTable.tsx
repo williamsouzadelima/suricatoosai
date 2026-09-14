@@ -171,7 +171,7 @@ export function UsersTable() {
       ) : filtered.length === 0 ? (
         <EmptyState icon={Users} title="Nenhum usuário." />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="min-w-0 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">

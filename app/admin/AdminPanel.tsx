@@ -299,6 +299,7 @@ export function AdminPanel({
   }, [filtered]);
 
   const activeLabel = ALL_NAV.find((n) => n.id === tab)?.label ?? "Visão geral";
+  const wide = tab === "custos" || tab === "usuarios";
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -398,7 +399,7 @@ export function AdminPanel({
         </div>
 
         <main className="flex-1">
-          <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+          <div className={cn("mx-auto w-full px-4 py-8 sm:px-6", wide ? "max-w-[96rem]" : "max-w-6xl")}>
             {!inviteOnlyEnabled && (
               <div className="mb-6">
                 <Callout tone="warning" icon={AlertTriangle}>
@@ -539,7 +540,7 @@ export function AdminPanel({
                       }
                     />
                   ) : (
-                    <div className="overflow-x-auto">
+                    <div className="min-w-0 overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">

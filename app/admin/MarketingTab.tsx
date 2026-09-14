@@ -443,7 +443,7 @@ export function MarketingTab() {
         ) : campaigns.length === 0 ? (
           <EmptyState icon={Mail} title="Nenhuma campanha enviada ainda." />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">

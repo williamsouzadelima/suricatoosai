@@ -329,7 +329,7 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
         {overrides.length === 0 ? (
           <EmptyState icon={Users} title="Nenhuma exceção." />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">

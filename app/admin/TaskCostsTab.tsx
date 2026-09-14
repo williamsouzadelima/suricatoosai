@@ -276,7 +276,7 @@ export function TaskCostsTab() {
       </div>
 
       {/* Totais da seleção */}
-      <div className="flex flex-wrap gap-4 border-b px-5 py-3 text-sm">
+      <div className="flex flex-wrap gap-4 border-b px-4 py-3 text-sm">
         <div>
           <span className="text-muted-foreground">Custo real: </span>
           <span className="font-semibold text-success">
@@ -315,19 +315,19 @@ export function TaskCostsTab() {
           }
         />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="min-w-0 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-5 py-3 font-medium">Task</th>
-                <th className="px-5 py-3 font-medium">Usuário</th>
-                <th className="px-5 py-3 font-medium">Modelos</th>
-                <th className="px-5 py-3 text-right font-medium">Tokens (in/out)</th>
-                <th className="px-5 py-3 text-right font-medium">Custo real</th>
-                <th className="px-5 py-3 text-right font-medium">Registrado</th>
-                <th className="px-5 py-3 text-right font-medium">Infra</th>
-                <th className="px-5 py-3 font-medium">Fonte</th>
-                <th className="px-5 py-3 font-medium">Última ativ.</th>
+                <th className="px-4 py-3 font-medium">Task</th>
+                <th className="px-4 py-3 font-medium">Usuário</th>
+                <th className="px-4 py-3 font-medium">Modelos</th>
+                <th className="px-4 py-3 text-right font-medium">Tokens (in/out)</th>
+                <th className="px-4 py-3 text-right font-medium">Custo real</th>
+                <th className="px-4 py-3 text-right font-medium">Registrado</th>
+                <th className="px-4 py-3 text-right font-medium">Infra</th>
+                <th className="px-4 py-3 font-medium">Fonte</th>
+                <th className="px-4 py-3 font-medium">Última ativ.</th>
               </tr>
             </thead>
             <tbody>
@@ -341,7 +341,7 @@ export function TaskCostsTab() {
                       : "opacity-70"
                   }`}
                 >
-                  <td className="max-w-[22rem] px-5 py-2.5">
+                  <td className="max-w-[15rem] px-4 py-2.5">
                     <div className="flex items-center gap-1.5">
                       {t.capped && (
                         <AlertTriangle
@@ -352,31 +352,31 @@ export function TaskCostsTab() {
                       <span className="truncate font-medium">{t.title}</span>
                     </div>
                   </td>
-                  <td className="max-w-[14rem] truncate px-5 py-2.5 text-muted-foreground">
+                  <td className="max-w-[14rem] truncate px-4 py-2.5 text-muted-foreground">
                     {t.userEmail}
                   </td>
-                  <td className="max-w-[12rem] truncate px-5 py-2.5 text-xs text-muted-foreground">
+                  <td className="max-w-[9rem] truncate px-4 py-2.5 text-xs text-muted-foreground">
                     {t.models.join(", ") || "—"}
                   </td>
-                  <td className="whitespace-nowrap px-5 py-2.5 text-right text-muted-foreground">
+                  <td className="whitespace-nowrap px-4 py-2.5 text-right text-muted-foreground">
                     {fmtNum(t.inputTokens)} / {fmtNum(t.outputTokens)}
                   </td>
-                  <td className="whitespace-nowrap px-5 py-2.5 text-right font-semibold text-success">
+                  <td className="whitespace-nowrap px-4 py-2.5 text-right font-semibold text-success">
                     <RealCost has={t.hasRealCost} value={t.providerBilledCostDollars} />
                   </td>
-                  <td className="whitespace-nowrap px-5 py-2.5 text-right">
+                  <td className="whitespace-nowrap px-4 py-2.5 text-right">
                     {money(t.costDollars)}
                   </td>
-                  <td className="whitespace-nowrap px-5 py-2.5 text-right text-muted-foreground">
+                  <td className="whitespace-nowrap px-4 py-2.5 text-right text-muted-foreground">
                     {money(t.nonModelCostDollars)}
                   </td>
-                  <td className="px-5 py-2.5">
+                  <td className="px-4 py-2.5">
                     <StatusBadge
                       tone={sourceTone(t.costSource)}
                       label={t.costSource}
                     />
                   </td>
-                  <td className="whitespace-nowrap px-5 py-2.5 text-muted-foreground">
+                  <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">
                     {formatDateTime(t.lastActivityAt)}
                   </td>
                 </tr>
@@ -463,7 +463,7 @@ export function TaskCostsTab() {
                 )}
 
                 <h4 className="mt-5 mb-2 text-sm font-semibold">Por modelo</h4>
-                <div className="overflow-x-auto rounded-lg border">
+                <div className="min-w-0 overflow-x-auto rounded-lg border">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -499,7 +499,7 @@ export function TaskCostsTab() {
                 <h4 className="mt-5 mb-2 text-sm font-semibold">
                   Por run ({detail.byRun.length})
                 </h4>
-                <div className="overflow-x-auto rounded-lg border">
+                <div className="min-w-0 overflow-x-auto rounded-lg border">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
