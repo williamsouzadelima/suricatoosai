@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Sparkles, Save, TestTube2 } from "lucide-react";
+import { Sparkles, Save, TestTube2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
+import { SectionHeader, Callout } from "./_ui";
 
 export function WelcomeCard() {
   const [enabled, setEnabled] = useState(false);
@@ -95,53 +98,49 @@ export function WelcomeCard() {
   if (loading) return null;
 
   return (
-    <div className="rounded-xl border bg-card p-5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <h2 className="text-base font-semibold">Boas-vindas automático</h2>
-        </div>
-        <Switch checked={enabled} onCheckedChange={setEnabled} />
-      </div>
-      <p className="mt-0.5 text-sm text-muted-foreground">
-        Enviado uma vez, no primeiro acesso de cada convidado (quando entra e vira
-        ativo).
-      </p>
-
-      {!emailConfigured && (
-        <p className="mt-2 text-xs text-warning">
-          ⚠️ RESEND_API_KEY não configurada — não será enviado até existir.
-        </p>
-      )}
-
-      <div className="mt-4 space-y-3">
-        <Input
-          placeholder="Assunto"
-          value={subject}
-          onChange={(e) => setSubject(e.target.value)}
+    <Card>
+      <CardContent className="space-y-4">
+        <SectionHeader
+          icon={Sparkles}
+          title="Boas-vindas automático"
+          description="Enviado uma vez, no primeiro acesso de cada convidado (quando entra e vira ativo)."
+          action={<Switch checked={enabled} onCheckedChange={setEnabled} />}
         />
-        <textarea
-          placeholder="Mensagem"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          rows={5}
-          className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => void save()} disabled={saving}>
-            <Save className="h-4 w-4" />
-            {saving ? "Salvando…" : "Salvar"}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => void test()}
-            disabled={testing}
-          >
-            <TestTube2 className="h-4 w-4" />
-            {testing ? "Enviando…" : `Teste${adminEmail ? ` (p/ ${adminEmail})` : ""}`}
-          </Button>
+
+        {!emailConfigured && (
+          <Callout tone="warning" icon={AlertTriangle}>
+            RESEND_API_KEY não configurada — não será enviado até existir.
+          </Callout>
+        )}
+
+        <div className="space-y-3">
+          <Input
+            placeholder="Assunto"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+          />
+          <Textarea
+            placeholder="Mensagem"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={5}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => void save()} disabled={saving}>
+              <Save className="h-4 w-4" />
+              {saving ? "Salvando…" : "Salvar"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => void test()}
+              disabled={testing}
+            >
+              <TestTube2 className="h-4 w-4" />
+              {testing ? "Enviando…" : `Teste${adminEmail ? ` (p/ ${adminEmail})` : ""}`}
+            </Button>
+          </div>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

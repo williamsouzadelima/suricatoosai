@@ -9,9 +9,24 @@ import {
   AlertTriangle,
   X,
   Loader2,
+  DollarSign,
+  Receipt,
+  Server,
+  Hash,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import {
+  SectionHeader,
+  StatusBadge,
+  StatCard,
+  Callout,
+  EmptyState,
+  formatDateTime,
+  fmtNum,
+  type Tone,
+} from "./_ui";
 import { toCsv, downloadCsv, csvName } from "@/lib/utils/csv";
 
 interface Task {
@@ -79,13 +94,6 @@ interface Detail {
   capped: boolean;
 }
 
-const fmtNum = (n: number) =>
-  n >= 1_000_000
-    ? `${(n / 1_000_000).toFixed(2)}M`
-    : n >= 1_000
-      ? `${(n / 1_000).toFixed(1)}k`
-      : String(n);
-
 // Sub-cent costs must not round to $0.00 — always show 4 decimals.
 const money = (n: number) => `$${(n ?? 0).toFixed(4)}`;
 
@@ -106,22 +114,10 @@ function RealCost({ has, value }: { has: boolean; value: number }) {
   );
 }
 
-const fmtDate = (ms: number | null) =>
-  ms
-    ? new Date(ms).toLocaleString("pt-BR", {
-        day: "2-digit",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "—";
-
-function sourceBadge(source: string): string {
-  if (source === "provider")
-    return "border-success/30 bg-success/10 text-success";
-  if (source === "hybrid")
-    return "border-warning/30 bg-warning/10 text-warning";
-  return "border-destructive/30 bg-destructive/10 text-destructive";
+function sourceTone(source: string): Tone {
+  if (source === "provider") return "success";
+  if (source === "hybrid") return "warning";
+  return "destructive";
 }
 
 export function TaskCostsTab() {
@@ -241,15 +237,10 @@ export function TaskCostsTab() {
   }, [filtered]);
 
   return (
-    <div className="mt-6 rounded-xl border bg-card">
+    <Card className="gap-0 py-0">
       <div className="flex flex-col gap-3 border-b p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold">
-            Custos por task
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
-              {items.length}
-            </span>
-          </h2>
+          <SectionHeader title="Custos por task" count={items.length} />
           <p className="mt-1 text-xs text-muted-foreground">
             Custo <strong>real</strong> = créditos deduzidos do OpenRouter
             (linhas novas). <strong>Registrado</strong> = cost_dollars histórico,
@@ -315,11 +306,14 @@ export function TaskCostsTab() {
           Carregando…
         </div>
       ) : filtered.length === 0 ? (
-        <div className="p-10 text-center text-sm text-muted-foreground">
-          {items.length === 0
-            ? "Nenhum uso registrado ainda."
-            : "Nenhum resultado para a busca."}
-        </div>
+        <EmptyState
+          icon={Search}
+          title={
+            items.length === 0
+              ? "Nenhum uso registrado ainda."
+              : "Nenhum resultado para a busca."
+          }
+        />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -377,16 +371,13 @@ export function TaskCostsTab() {
                     {money(t.nonModelCostDollars)}
                   </td>
                   <td className="px-5 py-2.5">
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-xs font-medium ${sourceBadge(
-                        t.costSource,
-                      )}`}
-                    >
-                      {t.costSource}
-                    </span>
+                    <StatusBadge
+                      tone={sourceTone(t.costSource)}
+                      label={t.costSource}
+                    />
                   </td>
                   <td className="whitespace-nowrap px-5 py-2.5 text-muted-foreground">
-                    {fmtDate(t.lastActivityAt)}
+                    {formatDateTime(t.lastActivityAt)}
                   </td>
                 </tr>
               ))}
@@ -432,29 +423,43 @@ export function TaskCostsTab() {
                 </div>
 
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <Stat
+                  <StatCard
                     label="Custo real"
+                    icon={DollarSign}
+                    tone="success"
                     value={
-                      detail.total.hasRealCost
-                        ? money(detail.total.providerBilledCostDollars)
-                        : "—"
+                      detail.total.hasRealCost ? (
+                        money(detail.total.providerBilledCostDollars)
+                      ) : (
+                        <span className="cursor-help" title={REAL_COST_HINT}>
+                          —
+                        </span>
+                      )
                     }
-                    hint={detail.total.hasRealCost ? undefined : REAL_COST_HINT}
-                    accent
                   />
-                  <Stat
+                  <StatCard
                     label="Registrado"
+                    icon={Receipt}
                     value={money(detail.total.costDollars)}
                   />
-                  <Stat label="Infra" value={money(detail.total.nonModelCostDollars)} />
-                  <Stat label="Requisições" value={String(detail.total.requests)} />
+                  <StatCard
+                    label="Infra"
+                    icon={Server}
+                    value={money(detail.total.nonModelCostDollars)}
+                  />
+                  <StatCard
+                    label="Requisições"
+                    icon={Hash}
+                    value={String(detail.total.requests)}
+                  />
                 </div>
 
                 {detail.capped && (
-                  <p className="mt-3 flex items-center gap-1 text-xs text-warning">
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    Detalhe parcial (limite de {2000} linhas).
-                  </p>
+                  <div className="mt-3">
+                    <Callout tone="warning" icon={AlertTriangle}>
+                      Detalhe parcial (limite de {2000} linhas).
+                    </Callout>
+                  </div>
                 )}
 
                 <h4 className="mt-5 mb-2 text-sm font-semibold">Por modelo</h4>
@@ -509,7 +514,7 @@ export function TaskCostsTab() {
                       {detail.byRun.map((r) => (
                         <tr key={r.runId} className="border-b last:border-0">
                           <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                            {fmtDate(r.at)}
+                            {formatDateTime(r.at)}
                           </td>
                           <td className="px-3 py-2 text-xs">{r.model}</td>
                           <td className="whitespace-nowrap px-3 py-2 text-right text-muted-foreground">
@@ -531,32 +536,6 @@ export function TaskCostsTab() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  accent,
-  hint,
-}: {
-  label: string;
-  value: string;
-  accent?: boolean;
-  hint?: string;
-}) {
-  return (
-    <div className="rounded-lg border bg-muted/30 p-3">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div
-        title={hint}
-        className={`mt-0.5 text-base font-semibold ${
-          accent ? "text-success" : ""
-        } ${hint ? "cursor-help" : ""}`}
-      >
-        {value}
-      </div>
-    </div>
+    </Card>
   );
 }

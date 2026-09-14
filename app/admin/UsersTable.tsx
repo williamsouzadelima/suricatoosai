@@ -2,11 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Search, Ban, RotateCcw, Download } from "lucide-react";
+import { Search, Ban, RotateCcw, Download, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
 import { toCsv, downloadCsv, csvName } from "@/lib/utils/csv";
 import { UserDetailModal } from "./UserDetailModal";
+import {
+  SectionHeader,
+  StatusBadge,
+  EmptyState,
+  formatDateTime,
+  fmtNum,
+} from "./_ui";
 
 export interface UserRow {
   id: string;
@@ -23,23 +31,6 @@ export interface UserRow {
   lastActivityAt: number | null;
   capped: boolean;
 }
-
-const fmtDate = (v: string | number | null) =>
-  v
-    ? new Date(v).toLocaleString("pt-BR", {
-        day: "2-digit",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "—";
-
-const fmtNum = (n: number) =>
-  n >= 1_000_000
-    ? `${(n / 1_000_000).toFixed(1)}M`
-    : n >= 1_000
-      ? `${(n / 1_000).toFixed(1)}k`
-      : String(n);
 
 export function UsersTable() {
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -147,14 +138,9 @@ export function UsersTable() {
   }, [filtered]);
 
   return (
-    <div className="rounded-xl border bg-card">
-      <div className="flex flex-col gap-3 border-b p-5 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-base font-semibold">
-          Usuários
-          <span className="ml-2 text-sm font-normal text-muted-foreground">
-            {users.length}
-          </span>
-        </h2>
+    <Card className="gap-0 py-0">
+      <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
+        <SectionHeader icon={Users} title="Usuários" count={users.length} />
         <div className="flex items-center gap-2">
           <div className="relative sm:w-72">
             <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -183,9 +169,7 @@ export function UsersTable() {
           Carregando…
         </div>
       ) : filtered.length === 0 ? (
-        <div className="p-10 text-center text-sm text-muted-foreground">
-          Nenhum usuário.
-        </div>
+        <EmptyState icon={Users} title="Nenhum usuário." />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -210,19 +194,19 @@ export function UsersTable() {
                     <div className="flex items-center gap-2 font-medium">
                       {u.email}
                       {u.suspended && (
-                        <span className="rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
-                          suspenso
-                        </span>
+                        <StatusBadge tone="destructive" label="suspenso" />
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {u.name ? `${u.name} · ` : ""}
                       {u.allowlistStatus ?? "fora da lista"} · entrou{" "}
-                      {fmtDate(u.lastSignInAt)}
+                      {formatDateTime(
+                        u.lastSignInAt ? Date.parse(u.lastSignInAt) : null,
+                      )}
                     </div>
                   </td>
                   <td className="px-5 py-3 text-muted-foreground">
-                    {fmtDate(u.lastActivityAt)}
+                    {formatDateTime(u.lastActivityAt)}
                   </td>
                   <td className="px-5 py-3 text-right tabular-nums">
                     {fmtNum(u.requests)}
@@ -275,6 +259,6 @@ export function UsersTable() {
           onChanged={load}
         />
       )}
-    </div>
+    </Card>
   );
 }

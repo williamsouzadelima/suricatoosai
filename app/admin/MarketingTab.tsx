@@ -10,11 +10,21 @@ import {
   CalendarClock,
   X,
   Download,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { WelcomeCard } from "./WelcomeCard";
 import { toCsv, downloadCsv, csvName } from "@/lib/utils/csv";
+import {
+  Callout,
+  EmptyState,
+  SectionHeader,
+  StatusBadge,
+  formatDateTime,
+  type Tone,
+} from "./_ui";
 
 type Segment = "active" | "invited" | "all";
 
@@ -45,28 +55,12 @@ const toMs = (s: string): number | undefined => {
   return Number.isFinite(t) ? t : undefined;
 };
 
-const SCHED_STATUS: Record<string, { label: string; badge: string }> = {
-  pending: {
-    label: "agendada",
-    badge: "border-warning/30 bg-warning/10 text-warning",
-  },
-  sending: {
-    label: "enviando",
-    badge: "border-primary/30 bg-primary/10 text-primary",
-  },
-  sent: {
-    label: "enviada",
-    badge:
-      "border-success/30 bg-success/10 text-success",
-  },
-  failed: {
-    label: "falhou",
-    badge: "border-destructive/30 bg-destructive/10 text-destructive",
-  },
-  canceled: {
-    label: "cancelada",
-    badge: "border-border bg-muted text-muted-foreground",
-  },
+const SCHED_STATUS: Record<string, { label: string; tone: Tone }> = {
+  pending: { label: "agendada", tone: "warning" },
+  sending: { label: "enviando", tone: "primary" },
+  sent: { label: "enviada", tone: "success" },
+  failed: { label: "falhou", tone: "destructive" },
+  canceled: { label: "cancelada", tone: "neutral" },
 };
 
 const SEGMENTS: { value: Segment; label: string }[] = [
@@ -74,14 +68,6 @@ const SEGMENTS: { value: Segment; label: string }[] = [
   { value: "invited", label: "Convidados" },
   { value: "all", label: "Todos" },
 ];
-
-const fmt = (ms: number) =>
-  new Date(ms).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 
 export function MarketingTab() {
   const [subject, setSubject] = useState("");
@@ -256,117 +242,116 @@ export function MarketingTab() {
   );
 
   return (
-    <div className="mt-6 space-y-4">
+    <div className="space-y-6">
       <WelcomeCard />
 
       {!emailConfigured && (
-        <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-warning">
+        <Callout tone="warning" icon={AlertTriangle}>
           RESEND_API_KEY não está configurada no servidor — envios ficam
           bloqueados até ela existir.
-        </div>
+        </Callout>
       )}
 
       {/* Compose */}
-      <div className="rounded-xl border bg-card p-5">
-        <div className="flex items-center gap-2">
-          <Mail className="h-4 w-4 text-primary" />
-          <h2 className="text-base font-semibold">Nova campanha</h2>
-        </div>
+      <Card>
+        <CardContent className="space-y-4">
+          <SectionHeader icon={Mail} title="Nova campanha" />
 
-        <div className="mt-4 space-y-3">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">
-              Segmento
-            </label>
-            <div className="mt-1 flex flex-wrap gap-1">
-              {SEGMENTS.map((s) => (
-                <button
-                  key={s.value}
-                  type="button"
-                  onClick={() => setSegment(s.value)}
-                  className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
-                    segment === s.value
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Users className="h-3.5 w-3.5" />
-                  {s.label}
-                  <span className="tabular-nums opacity-70">
-                    {counts[s.value] ?? 0}
-                  </span>
-                </button>
-              ))}
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">
+                Segmento
+              </label>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {SEGMENTS.map((s) => (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() => setSegment(s.value)}
+                    className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+                      segment === s.value
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Users className="h-3.5 w-3.5" />
+                    {s.label}
+                    <span className="tabular-nums opacity-70">
+                      {counts[s.value] ?? 0}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+  
+            <Input
+              placeholder="Assunto"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+            />
+            <textarea
+              placeholder="Mensagem (linhas em branco separam parágrafos)"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={8}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+            <p className="text-xs text-muted-foreground">
+              Todo e-mail inclui rodapé de descadastro automático. Descadastrados
+              são excluídos do envio.
+            </p>
+  
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                onClick={() => void sendCampaign()}
+                disabled={sending || !valid || recipientCount === 0}
+              >
+                <Send className="h-4 w-4" />
+                {sending
+                  ? "Enviando…"
+                  : `Enviar para ${recipientCount} ${recipientCount === 1 ? "pessoa" : "pessoas"}`}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => void sendTest()}
+                disabled={testing || !valid}
+              >
+                <TestTube2 className="h-4 w-4" />
+                {testing
+                  ? "Enviando…"
+                  : `Teste${adminEmail ? ` (p/ ${adminEmail})` : ""}`}
+              </Button>
+            </div>
+  
+            <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+              <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <CalendarClock className="h-4 w-4" />
+                Agendar p/ depois:
+              </span>
+              <Input
+                type="datetime-local"
+                value={scheduleAt}
+                onChange={(e) => setScheduleAt(e.target.value)}
+                className="sm:w-56"
+              />
+              <Button
+                variant="outline"
+                onClick={() => void schedule()}
+                disabled={scheduling || !valid || !scheduleAt}
+              >
+                <CalendarClock className="h-4 w-4" />
+                {scheduling ? "Agendando…" : "Agendar"}
+              </Button>
             </div>
           </div>
-
-          <Input
-            placeholder="Assunto"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-          />
-          <textarea
-            placeholder="Mensagem (linhas em branco separam parágrafos)"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={8}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          />
-          <p className="text-xs text-muted-foreground">
-            Todo e-mail inclui rodapé de descadastro automático. Descadastrados
-            são excluídos do envio.
-          </p>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              onClick={() => void sendCampaign()}
-              disabled={sending || !valid || recipientCount === 0}
-            >
-              <Send className="h-4 w-4" />
-              {sending
-                ? "Enviando…"
-                : `Enviar para ${recipientCount} ${recipientCount === 1 ? "pessoa" : "pessoas"}`}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => void sendTest()}
-              disabled={testing || !valid}
-            >
-              <TestTube2 className="h-4 w-4" />
-              {testing
-                ? "Enviando…"
-                : `Teste${adminEmail ? ` (p/ ${adminEmail})` : ""}`}
-            </Button>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 border-t pt-3">
-            <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <CalendarClock className="h-4 w-4" />
-              Agendar p/ depois:
-            </span>
-            <Input
-              type="datetime-local"
-              value={scheduleAt}
-              onChange={(e) => setScheduleAt(e.target.value)}
-              className="sm:w-56"
-            />
-            <Button
-              variant="outline"
-              onClick={() => void schedule()}
-              disabled={scheduling || !valid || !scheduleAt}
-            >
-              <CalendarClock className="h-4 w-4" />
-              {scheduling ? "Agendando…" : "Agendar"}
-            </Button>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Agendadas */}
       {scheduled.length > 0 && (
-        <div className="rounded-xl border bg-card">
+        <Card className="gap-0 py-0">
           <div className="border-b p-5">
-            <h2 className="text-base font-semibold">Agendadas</h2>
+            <SectionHeader title="Agendadas" />
           </div>
           <ul className="divide-y">
             {scheduled.map((s) => {
@@ -376,21 +361,14 @@ export function MarketingTab() {
                   key={s.id}
                   className="flex items-center gap-3 px-4 py-2.5 text-sm"
                 >
-                  <span
-                    className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${st.badge}`}
-                  >
-                    {st.label}
+                  <span className="shrink-0">
+                    <StatusBadge tone={st.tone} label={st.label} />
                   </span>
                   <span className="min-w-0 flex-1 truncate font-medium">
                     {s.subject}
                   </span>
                   <span className="shrink-0 text-xs text-muted-foreground">
-                    {new Date(s.scheduled_at).toLocaleString("pt-BR", {
-                      day: "2-digit",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatDateTime(s.scheduled_at)}
                   </span>
                   {s.status === "sent" && (
                     <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
@@ -412,56 +390,58 @@ export function MarketingTab() {
               );
             })}
           </ul>
-        </div>
+        </Card>
       )}
 
       {/* History */}
-      <div className="rounded-xl border bg-card">
-        <div className="flex items-center justify-between border-b p-5">
-          <h2 className="text-base font-semibold">Histórico</h2>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={campaigns.length === 0}
-            title="Exportar CSV"
-            onClick={() =>
-              downloadCsv(
-                csvName("campanhas"),
-                toCsv(
-                  campaigns.map((c) => ({
-                    assunto: c.subject,
-                    segmento: c.segment,
-                    total: c.total,
-                    enviados: c.sent,
-                    falhas: c.failed,
-                    por: c.created_by ?? "",
-                    quando: new Date(c.created_at).toISOString(),
-                  })),
-                  [
-                    { key: "assunto", label: "Assunto" },
-                    { key: "segmento", label: "Segmento" },
-                    { key: "total", label: "Total" },
-                    { key: "enviados", label: "Enviados" },
-                    { key: "falhas", label: "Falhas" },
-                    { key: "por", label: "Por" },
-                    { key: "quando", label: "Quando" },
-                  ],
-                ),
-              )
+      <Card className="gap-0 py-0">
+        <div className="border-b p-5">
+          <SectionHeader
+            title="Histórico"
+            action={
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={campaigns.length === 0}
+                title="Exportar CSV"
+                onClick={() =>
+                  downloadCsv(
+                    csvName("campanhas"),
+                    toCsv(
+                      campaigns.map((c) => ({
+                        assunto: c.subject,
+                        segmento: c.segment,
+                        total: c.total,
+                        enviados: c.sent,
+                        falhas: c.failed,
+                        por: c.created_by ?? "",
+                        quando: new Date(c.created_at).toISOString(),
+                      })),
+                      [
+                        { key: "assunto", label: "Assunto" },
+                        { key: "segmento", label: "Segmento" },
+                        { key: "total", label: "Total" },
+                        { key: "enviados", label: "Enviados" },
+                        { key: "falhas", label: "Falhas" },
+                        { key: "por", label: "Por" },
+                        { key: "quando", label: "Quando" },
+                      ],
+                    ),
+                  )
+                }
+              >
+                <Download className="h-4 w-4" />
+                CSV
+              </Button>
             }
-          >
-            <Download className="h-4 w-4" />
-            CSV
-          </Button>
+          />
         </div>
         {loading ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
             Carregando…
           </div>
         ) : campaigns.length === 0 ? (
-          <div className="p-10 text-center text-sm text-muted-foreground">
-            Nenhuma campanha enviada ainda.
-          </div>
+          <EmptyState icon={Mail} title="Nenhuma campanha enviada ainda." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -493,7 +473,7 @@ export function MarketingTab() {
                       )}
                     </td>
                     <td className="px-5 py-3 text-muted-foreground">
-                      {fmt(c.created_at)}
+                      {formatDateTime(c.created_at)}
                     </td>
                   </tr>
                 ))}
@@ -501,7 +481,7 @@ export function MarketingTab() {
             </table>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

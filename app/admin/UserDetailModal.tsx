@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { X, Ban, RotateCcw, ShieldOff, MailPlus } from "lucide-react";
+import { X, Ban, RotateCcw, ShieldOff, MailPlus, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { UserRow } from "./UsersTable";
+import { SectionHeader, StatusBadge, EmptyState, formatDateTime } from "./_ui";
 
 interface AuditEntry {
   actor: string;
@@ -14,24 +15,13 @@ interface AuditEntry {
   created_at: number;
 }
 
-const fmtDate = (v: string | number | null | undefined) =>
-  v
-    ? new Date(v).toLocaleString("pt-BR", {
-        day: "2-digit",
-        month: "short",
-        year: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "—";
-
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </div>
-      <div className="mt-0.5 text-sm">{value}</div>
+      <div className="mt-0.5 text-sm tabular-nums">{value}</div>
     </div>
   );
 }
@@ -142,8 +132,8 @@ export function UserDetailModal({
             <div className="flex items-center gap-2">
               <h2 className="truncate text-base font-semibold">{user.email}</h2>
               {user.suspended && (
-                <span className="shrink-0 rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
-                  suspenso
+                <span className="shrink-0">
+                  <StatusBadge tone="destructive" label="suspenso" />
                 </span>
               )}
             </div>
@@ -168,9 +158,22 @@ export function UserDetailModal({
             value={(user.inputTokens + user.outputTokens).toLocaleString("pt-BR")}
           />
           <Field label="Custo" value={`$${user.costDollars.toFixed(2)}`} />
-          <Field label="Últ. atividade" value={fmtDate(user.lastActivityAt)} />
-          <Field label="Entrou" value={fmtDate(user.lastSignInAt)} />
-          <Field label="Criado" value={fmtDate(user.createdAt)} />
+          <Field
+            label="Últ. atividade"
+            value={formatDateTime(user.lastActivityAt)}
+          />
+          <Field
+            label="Entrou"
+            value={formatDateTime(
+              user.lastSignInAt ? Date.parse(user.lastSignInAt) : null,
+            )}
+          />
+          <Field
+            label="Criado"
+            value={formatDateTime(
+              user.createdAt ? Date.parse(user.createdAt) : null,
+            )}
+          />
           <Field
             label="WorkOS ID"
             value={<span className="break-all font-mono text-xs">{user.id}</span>}
@@ -226,26 +229,22 @@ export function UserDetailModal({
         </div>
 
         {/* Audit */}
-        <div className="border-t p-5">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Histórico deste usuário
-          </h3>
+        <div className="space-y-3 border-t border-border p-5">
+          <SectionHeader icon={History} title="Histórico deste usuário" />
           {audit.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Nenhuma ação registrada.
-            </p>
+            <EmptyState icon={History} title="Nenhuma ação registrada." />
           ) : (
             <ul className="space-y-1.5">
               {audit.map((e, i) => (
                 <li key={i} className="flex items-center gap-2 text-sm">
-                  <span className="shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                    {e.action}
+                  <span className="shrink-0">
+                    <StatusBadge tone="neutral" label={e.action} dot={false} />
                   </span>
                   <span className="min-w-0 flex-1 truncate text-muted-foreground">
                     {e.detail || ""}
                   </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {fmtDate(e.created_at)}
+                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                    {formatDateTime(e.created_at)}
                   </span>
                 </li>
               ))}

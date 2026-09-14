@@ -6,6 +6,13 @@ import { Megaphone, Plus, Trash2, Pencil, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  SectionHeader,
+  StatusBadge,
+  EmptyState,
+  formatDateTime,
+} from "./_ui";
 
 type Level = "info" | "warning" | "success";
 
@@ -67,15 +74,6 @@ const toMs = (s: string): number | undefined => {
   const t = new Date(s).getTime();
   return Number.isFinite(t) ? t : undefined;
 };
-const fmt = (ms?: number) =>
-  ms
-    ? new Date(ms).toLocaleString("pt-BR", {
-        day: "2-digit",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "—";
 
 export function AnnouncementsTab() {
   const [items, setItems] = useState<Announcement[]>([]);
@@ -193,151 +191,142 @@ export function AnnouncementsTab() {
   );
 
   return (
-    <div className="mt-6 space-y-4">
+    <div className="space-y-6">
       {/* Form */}
-      <div className="rounded-xl border bg-card p-5">
-        <div className="flex items-center gap-2">
-          <Megaphone className="h-4 w-4 text-primary" />
-          <h2 className="text-base font-semibold">
-            {form.id ? "Editar aviso" : "Novo aviso"}
-          </h2>
-        </div>
-        <div className="mt-4 space-y-3">
-          <Input
-            placeholder="Título"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
+      <Card>
+        <CardContent className="space-y-4">
+          <SectionHeader
+            icon={Megaphone}
+            title={form.id ? "Editar aviso" : "Novo aviso"}
           />
-          <textarea
-            placeholder="Mensagem"
-            value={form.body}
-            onChange={(e) => setForm({ ...form, body: e.target.value })}
-            rows={2}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          />
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-1">
-              {LEVELS.map((l) => (
-                <button
-                  key={l.value}
-                  type="button"
-                  onClick={() => setForm({ ...form, level: l.value })}
-                  className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
-                    form.level === l.value
-                      ? l.badge
-                      : "border-border text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <Switch
-                checked={form.active}
-                onCheckedChange={(v) => setForm({ ...form, active: v })}
-              />
-              Ativo
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <Switch
-                checked={form.dismissible}
-                onCheckedChange={(v) => setForm({ ...form, dismissible: v })}
-              />
-              Dispensável
-            </label>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">
-                Início (opcional)
-              </label>
-              <Input
-                type="datetime-local"
-                value={form.starts_at}
-                onChange={(e) => setForm({ ...form, starts_at: e.target.value })}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">
-                Fim (opcional)
-              </label>
-              <Input
-                type="datetime-local"
-                value={form.ends_at}
-                onChange={(e) => setForm({ ...form, ends_at: e.target.value })}
-                className="mt-1"
-              />
-            </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-3">
             <Input
-              placeholder="Texto do botão (opcional)"
-              value={form.cta_label}
-              onChange={(e) => setForm({ ...form, cta_label: e.target.value })}
+              placeholder="Título"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
             />
-            <Input
-              type="url"
-              placeholder="URL do botão (https://…)"
-              value={form.cta_url}
-              onChange={(e) => setForm({ ...form, cta_url: e.target.value })}
+            <textarea
+              placeholder="Mensagem"
+              value={form.body}
+              onChange={(e) => setForm({ ...form, body: e.target.value })}
+              rows={2}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
-          </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={() => void save()} disabled={saving}>
-              <Plus className="h-4 w-4" />
-              {saving ? "Salvando…" : form.id ? "Salvar alterações" : "Criar aviso"}
-            </Button>
-            {form.id && (
-              <Button variant="ghost" onClick={() => setForm(EMPTY)}>
-                Cancelar
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-1">
+                {LEVELS.map((l) => (
+                  <button
+                    key={l.value}
+                    type="button"
+                    onClick={() => setForm({ ...form, level: l.value })}
+                    className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                      form.level === l.value
+                        ? l.badge
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <Switch
+                  checked={form.active}
+                  onCheckedChange={(v) => setForm({ ...form, active: v })}
+                />
+                Ativo
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Switch
+                  checked={form.dismissible}
+                  onCheckedChange={(v) => setForm({ ...form, dismissible: v })}
+                />
+                Dispensável
+              </label>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Início (opcional)
+                </label>
+                <Input
+                  type="datetime-local"
+                  value={form.starts_at}
+                  onChange={(e) => setForm({ ...form, starts_at: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Fim (opcional)
+                </label>
+                <Input
+                  type="datetime-local"
+                  value={form.ends_at}
+                  onChange={(e) => setForm({ ...form, ends_at: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Input
+                placeholder="Texto do botão (opcional)"
+                value={form.cta_label}
+                onChange={(e) => setForm({ ...form, cta_label: e.target.value })}
+              />
+              <Input
+                type="url"
+                placeholder="URL do botão (https://…)"
+                value={form.cta_url}
+                onChange={(e) => setForm({ ...form, cta_url: e.target.value })}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button onClick={() => void save()} disabled={saving}>
+                <Plus className="h-4 w-4" />
+                {saving ? "Salvando…" : form.id ? "Salvar alterações" : "Criar aviso"}
               </Button>
-            )}
+              {form.id && (
+                <Button variant="ghost" onClick={() => setForm(EMPTY)}>
+                  Cancelar
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* List */}
-      <div className="rounded-xl border bg-card">
+      <Card className="gap-0 py-0">
         <div className="border-b p-5">
-          <h2 className="text-base font-semibold">
-            Avisos
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
-              {items.length}
-            </span>
-          </h2>
+          <SectionHeader title="Avisos" count={items.length} />
         </div>
         {loading ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
             Carregando…
           </div>
         ) : items.length === 0 ? (
-          <div className="p-10 text-center text-sm text-muted-foreground">
-            Nenhum aviso ainda. Crie um acima.
-          </div>
+          <EmptyState
+            icon={Megaphone}
+            title="Nenhum aviso ainda"
+            description="Crie um acima."
+          />
         ) : (
           <ul className="divide-y">
             {items.map((a) => {
               const lvl = LEVELS.find((l) => l.value === a.level) ?? LEVELS[0];
               return (
                 <li key={a.id} className="flex items-start gap-3 p-4">
-                  <span
-                    className={`mt-0.5 shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${lvl.badge}`}
-                  >
-                    {lvl.label}
+                  <span className="mt-0.5 shrink-0">
+                    <StatusBadge tone={lvl.value} label={lvl.label} dot={false} />
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{a.title}</span>
                       {a.active ? (
-                        <span className="rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
-                          publicado
-                        </span>
+                        <StatusBadge tone="success" label="publicado" />
                       ) : (
-                        <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                          rascunho
-                        </span>
+                        <StatusBadge tone="neutral" label="rascunho" />
                       )}
                     </div>
                     <p className="truncate text-sm text-muted-foreground">
@@ -345,9 +334,9 @@ export function AnnouncementsTab() {
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {a.starts_at || a.ends_at
-                        ? `janela: ${fmt(a.starts_at)} → ${fmt(a.ends_at)} · `
+                        ? `janela: ${formatDateTime(a.starts_at)} → ${formatDateTime(a.ends_at)} · `
                         : ""}
-                      atualizado {fmt(a.updated_at)}
+                      atualizado {formatDateTime(a.updated_at)}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
@@ -382,7 +371,7 @@ export function AnnouncementsTab() {
             })}
           </ul>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

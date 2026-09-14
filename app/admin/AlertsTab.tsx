@@ -2,10 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Bell, Send, Save, Mail, MessageSquare } from "lucide-react";
+import {
+  Bell,
+  Send,
+  Save,
+  Mail,
+  MessageSquare,
+  AlertTriangle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Card, CardContent } from "@/components/ui/card";
+import { SectionHeader, Callout, formatDateTime } from "./_ui";
 
 interface Settings {
   teams_enabled: boolean;
@@ -108,82 +117,81 @@ export function AlertsTab({ adminEmail }: { adminEmail: string }) {
 
   if (loading) {
     return (
-      <div className="mt-6 p-8 text-center text-sm text-muted-foreground">
+      <div className="p-8 text-center text-sm text-muted-foreground">
         Carregando…
       </div>
     );
   }
 
   return (
-    <div className="mt-6 space-y-4">
-      <div className="rounded-xl border bg-card p-5">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Bell className="h-4 w-4" />
-          </div>
-          <div>
-            <h2 className="text-base font-semibold">Alertas de saúde</h2>
-            <p className="text-sm text-muted-foreground">
-              O monitor checa site, Convex, serviços e recursos a cada ~3 min e
-              avisa quando algo cai (e quando volta). Escolha os canais.
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <Card>
+        <CardContent>
+          <SectionHeader
+            icon={Bell}
+            title="Alertas de saúde"
+            description="O monitor checa site, Convex, serviços e recursos a cada ~3 min e avisa quando algo cai (e quando volta). Escolha os canais."
+          />
+        </CardContent>
+      </Card>
 
       {/* Teams */}
-      <div className="rounded-xl border bg-card p-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium">Microsoft Teams</span>
-          </div>
-          <Switch checked={teamsEnabled} onCheckedChange={setTeamsEnabled} />
-        </div>
-        <div className="mt-3">
-          <label className="text-xs font-medium text-muted-foreground">
-            URL do webhook (Teams → canal → … → Workflows/Incoming Webhook)
-          </label>
-          <Input
-            type="url"
-            placeholder="https://…webhook.office.com/…  ou  https://prod-…logic.azure.com/…"
-            value={teamsUrl}
-            onChange={(e) => setTeamsUrl(e.target.value)}
-            disabled={!teamsEnabled}
-            className="mt-1"
+      <Card>
+        <CardContent className="space-y-4">
+          <SectionHeader
+            icon={MessageSquare}
+            title="Microsoft Teams"
+            action={
+              <Switch checked={teamsEnabled} onCheckedChange={setTeamsEnabled} />
+            }
           />
-        </div>
-      </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">
+              URL do webhook (Teams → canal → … → Workflows/Incoming Webhook)
+            </label>
+            <Input
+              type="url"
+              placeholder="https://…webhook.office.com/…  ou  https://prod-…logic.azure.com/…"
+              value={teamsUrl}
+              onChange={(e) => setTeamsUrl(e.target.value)}
+              disabled={!teamsEnabled}
+              className="mt-1"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Email */}
-      <div className="rounded-xl border bg-card p-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Mail className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium">E-mail</span>
-          </div>
-          <Switch checked={emailEnabled} onCheckedChange={setEmailEnabled} />
-        </div>
-        <div className="mt-3">
-          <label className="text-xs font-medium text-muted-foreground">
-            Enviar para
-          </label>
-          <Input
-            type="email"
-            placeholder="voce@empresa.com"
-            value={emailTo}
-            onChange={(e) => setEmailTo(e.target.value)}
-            disabled={!emailEnabled}
-            className="mt-1"
+      <Card>
+        <CardContent className="space-y-4">
+          <SectionHeader
+            icon={Mail}
+            title="E-mail"
+            action={
+              <Switch checked={emailEnabled} onCheckedChange={setEmailEnabled} />
+            }
           />
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">
+              Enviar para
+            </label>
+            <Input
+              type="email"
+              placeholder="voce@empresa.com"
+              value={emailTo}
+              onChange={(e) => setEmailTo(e.target.value)}
+              disabled={!emailEnabled}
+              className="mt-1"
+            />
+          </div>
           {!emailConfigured && (
-            <p className="mt-2 text-xs text-warning">
-              ⚠️ RESEND_API_KEY não está configurada no servidor — o e-mail não
-              será enviado até ela existir.
-            </p>
+            <Callout tone="warning" icon={AlertTriangle}>
+              RESEND_API_KEY não está configurada no servidor — o e-mail não será
+              enviado até ela existir.
+            </Callout>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={() => void save()} disabled={saving}>
@@ -195,14 +203,8 @@ export function AlertsTab({ adminEmail }: { adminEmail: string }) {
           {testing ? "Enviando…" : "Enviar teste"}
         </Button>
         {updatedAt && (
-          <span className="text-xs text-muted-foreground">
-            Última alteração:{" "}
-            {new Date(updatedAt).toLocaleString("pt-BR", {
-              day: "2-digit",
-              month: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+          <span className="text-xs tabular-nums text-muted-foreground">
+            Última alteração: {formatDateTime(updatedAt)}
             {updatedBy ? ` · ${updatedBy}` : ""}
           </span>
         )}

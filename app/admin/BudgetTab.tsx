@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Save, Wallet, AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { Save, Wallet, AlertTriangle, Plus, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Card, CardContent } from "@/components/ui/card";
+import { SectionHeader, Callout, EmptyState, formatDateTime } from "./_ui";
 
 interface Settings {
   enabled: boolean;
@@ -183,34 +185,38 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
 
   if (loading) {
     return (
-      <div className="mt-6 rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
-        Carregando…
-      </div>
+      <Card className="py-0">
+        <CardContent className="p-8 text-center text-sm text-muted-foreground">
+          Carregando…
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="mt-6 space-y-4">
-      <div className="rounded-xl border bg-card">
-        <div className="flex items-center justify-between border-b p-5">
-          <div className="flex items-center gap-2">
-            <Wallet className="h-5 w-5 text-primary" />
-            <h2 className="text-base font-semibold">Orçamentos por task e usuário</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Ativar controle</span>
-            <Switch checked={enabled} onCheckedChange={setEnabled} />
-          </div>
+    <div className="space-y-6">
+      <Card className="gap-0 py-0">
+        <div className="border-b p-5">
+          <SectionHeader
+            icon={Wallet}
+            title="Orçamentos por task e usuário"
+            action={
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Ativar controle</span>
+                <Switch checked={enabled} onCheckedChange={setEnabled} />
+              </div>
+            }
+          />
         </div>
 
-        <div className="space-y-5 p-5">
-          <p className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
+        <CardContent className="space-y-5 p-5">
+          <Callout>
             Threshold sobre o <strong>custo real</strong> (OpenRouter). Padrão de fábrica:
             desligado. Com <strong>bloqueio</strong> ligado, um novo run é{" "}
             <strong>recusado</strong> quando o custo real já acumulado (da task ou do usuário
             no período) passou do teto — <strong>não corta</strong> um run em andamento (corte
             mid-run por task é refinamento futuro). Alertas disparam a partir do % de aviso.
-          </p>
+          </Callout>
 
           {/* POR TASK */}
           <fieldset className="rounded-lg border p-4" disabled={!enabled}>
@@ -279,17 +285,16 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
             </label>
           </div>
           {(alertTeams && !teamsConfigured) || (alertEmail && !emailConfigured) ? (
-            <p className="flex items-center gap-1 text-xs text-warning">
-              <AlertTriangle className="h-3.5 w-3.5" />
+            <Callout icon={AlertTriangle}>
               Configure os destinos (webhook Teams / e-mail) na aba <strong>Alertas</strong> — os
               alertas de orçamento reusam esses canais.
-            </p>
+            </Callout>
           ) : null}
 
           <div className="flex items-center justify-between border-t pt-4">
             <span className="text-xs text-muted-foreground">
               {updatedAt
-                ? `Última alteração: ${updatedBy ?? "?"} em ${new Date(updatedAt).toLocaleString("pt-BR")}`
+                ? `Última alteração: ${updatedBy ?? "?"} em ${formatDateTime(updatedAt)}`
                 : "Nunca salvo."}
             </span>
             <Button onClick={() => void save()} disabled={saving}>
@@ -297,13 +302,13 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
               {saving ? "Salvando…" : "Salvar"}
             </Button>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* OVERRIDES */}
-      <div className="rounded-xl border bg-card">
+      <Card className="gap-0 py-0">
         <div className="border-b p-5">
-          <h3 className="text-sm font-semibold">Exceções por usuário</h3>
+          <SectionHeader title="Exceções por usuário" />
           <p className="mt-1 text-xs text-muted-foreground">
             Eleve o teto de um usuário com engajamento pesado, ou isente-o do controle.
             O <code>user_id</code> aparece na aba Usuários.
@@ -322,7 +327,7 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
           </Button>
         </div>
         {overrides.length === 0 ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">Nenhuma exceção.</div>
+          <EmptyState icon={Users} title="Nenhuma exceção." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -342,8 +347,8 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
                       <div className="font-medium">{o.email ?? o.user_id}</div>
                       {o.email && <div className="text-xs text-muted-foreground">{o.user_id}</div>}
                     </td>
-                    <td className="px-5 py-2 text-right">{capStr(o.per_task_cap_dollars) ? `$${o.per_task_cap_dollars}` : "—"}</td>
-                    <td className="px-5 py-2 text-right">{capStr(o.per_user_cap_dollars) ? `$${o.per_user_cap_dollars}` : "—"}</td>
+                    <td className="px-5 py-2 text-right tabular-nums">{capStr(o.per_task_cap_dollars) ? `$${o.per_task_cap_dollars}` : "—"}</td>
+                    <td className="px-5 py-2 text-right tabular-nums">{capStr(o.per_user_cap_dollars) ? `$${o.per_user_cap_dollars}` : "—"}</td>
                     <td className="px-5 py-2">{o.disabled ? "sim" : "—"}</td>
                     <td className="px-5 py-2 text-right">
                       <Button variant="ghost" size="sm" onClick={() => void removeOverride(o.user_id)}>
@@ -356,7 +361,7 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
             </table>
           </div>
         )}
-      </div>
+      </Card>
       <p className="px-1 text-xs text-muted-foreground">Admin: {adminEmail}</p>
     </div>
   );
