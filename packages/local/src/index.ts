@@ -644,8 +644,23 @@ export class LocalSandboxClient {
           );
           this.requestExit(1, new Error("Centrifugo connection limit reached"));
         } else {
+          // Any non-shutdown, non-4503 "disconnected" event means the Centrifuge
+          // client has stopped for good: terminal disconnect codes (e.g. 3501
+          // "bad request") are non-reconnectable, so the SDK will NOT retry on
+          // its own. Previously this branch only logged, leaving the process
+          // "alive but dead" (connected=false forever) and never triggering the
+          // systemd Restart=always. Exit(1) so the service manager restarts us
+          // with a fresh connection + subscription.
           console.log(
-            chalk.yellow(`⚠️  Disconnected from Centrifugo: ${ctx.reason}`),
+            chalk.yellow(
+              `⚠️  Disconnected from Centrifugo: ${ctx.reason}. Exiting so the service manager can reconnect.`,
+            ),
+          );
+          this.requestExit(
+            1,
+            new Error(
+              `Disconnected from Centrifugo: ${ctx.reason ?? "unknown"}`,
+            ),
           );
         }
       }
