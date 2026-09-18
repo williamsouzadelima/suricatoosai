@@ -95,10 +95,10 @@ importers:
         version: 3.1117.0
       '@convex-dev/aggregate':
         specifier: ^0.2.2
-        version: 0.2.2(convex@1.45.0(react@19.2.8))
+        version: 0.2.2(convex@1.46.0(react@19.2.8))
       '@convex-dev/workos':
         specifier: ^0.0.3
-        version: 0.0.3(convex@1.45.0(react@19.2.8))(react@19.2.8)
+        version: 0.0.3(convex@1.46.0(react@19.2.8))(react@19.2.8)
       '@dnd-kit/core':
         specifier: 6.3.1
         version: 6.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -107,7 +107,7 @@ importers:
         version: 2.7.1
       '@langchain/community':
         specifier: ^1.1.29
-        version: 1.1.29(fc25d84b6409625ea73709c611d96160)
+        version: 1.1.29(92f46ed9f59430bdfa1826370281ccff)
       '@legendapp/list':
         specifier: 3.3.8
         version: 3.3.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -226,8 +226,8 @@ importers:
         specifier: ^2.1.1
         version: 2.1.1
       convex:
-        specifier: 1.45.0
-        version: 1.45.0(react@19.2.8)
+        specifier: 1.46.0
+        version: 1.46.0(react@19.2.8)
       date-fns:
         specifier: 4.4.0
         version: 4.4.0
@@ -4912,8 +4912,8 @@ packages:
       react:
         optional: true
 
-  convex@1.45.0:
-    resolution: {integrity: sha512-AV3B56Ptu/14d76g3urBJ50dwpiZa6uJaLT84OWox5aCwZIJiuAamdjv3lLHDzs8vv5kC31anEZohhUe3qJ2bA==}
+  convex@1.46.0:
+    resolution: {integrity: sha512-dhBwDQTZDOhi5SUGAX17EWNehCdNq6/UFrSL0eLZuGfMkdsQbCVWVRZCzbZ5CF+/pgvoGxtApbEoTSipqL4JTw==}
     engines: {node: '>=20.0.0', npm: '>=7.0.0'}
     hasBin: true
     peerDependencies:
@@ -9128,14 +9128,14 @@ snapshots:
     dependencies:
       '@bufbuild/protobuf': 2.12.1
 
-  '@convex-dev/aggregate@0.2.2(convex@1.45.0(react@19.2.8))':
+  '@convex-dev/aggregate@0.2.2(convex@1.46.0(react@19.2.8))':
     dependencies:
-      convex: 1.45.0(react@19.2.8)
+      convex: 1.46.0(react@19.2.8)
 
-  '@convex-dev/workos@0.0.3(convex@1.45.0(react@19.2.8))(react@19.2.8)':
+  '@convex-dev/workos@0.0.3(convex@1.46.0(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@workos-inc/authkit-react': 0.16.1(react@19.2.8)
-      convex: 1.45.0(react@19.2.8)
+      convex: 1.46.0(react@19.2.8)
       react: 19.2.8
 
   '@cspotcode/source-map-support@0.8.1':
@@ -9999,7 +9999,7 @@ snapshots:
       - openai
       - ws
 
-  '@langchain/community@1.1.29(fc25d84b6409625ea73709c611d96160)':
+  '@langchain/community@1.1.29(92f46ed9f59430bdfa1826370281ccff)':
     dependencies:
       '@browserbasehq/stagehand': 1.14.0(@playwright/test@1.62.1)(deepmerge@4.3.1)(dotenv@17.4.2)(openai@6.49.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.6.12)(ws@8.21.3)(zod@4.4.3))(zod@4.4.3)
       '@ibm-cloud/watsonx-ai': 1.6.12
@@ -10026,7 +10026,7 @@ snapshots:
       '@smithy/util-utf8': 4.2.2
       '@upstash/ratelimit': 2.0.8(@upstash/redis@1.38.2)
       '@upstash/redis': 1.38.2
-      convex: 1.45.0(react@19.2.8)
+      convex: 1.46.0(react@19.2.8)
       d3-dsv: 3.0.1
       fast-xml-parser: 5.7.1
       google-auth-library: 10.5.0
@@ -12689,7 +12689,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  convex@1.45.0(react@19.2.8):
+  convex@1.46.0(react@19.2.8):
     dependencies:
       esbuild: 0.27.0
       prettier: 3.9.6
