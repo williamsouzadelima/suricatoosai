@@ -42,6 +42,7 @@ type RefreshTokenResult =
         | "token_regenerated"
         | "presence_sweep"
         | "command_unresponsive"
+        | "user_revoked"
         | null;
       msSinceDisconnected: number | null;
       msSinceLastHeartbeat: number | null;

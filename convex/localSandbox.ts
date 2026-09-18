@@ -331,6 +331,7 @@ const refreshCentrifugoTokenReturns = v.union(
       v.literal("token_regenerated"),
       v.literal("presence_sweep"),
       v.literal("command_unresponsive"),
+      v.literal("user_revoked"),
       v.null(),
     ),
     msSinceDisconnected: v.union(v.number(), v.null()),
@@ -349,7 +350,8 @@ type ConnectionRow = {
     | "desktop_kicked_by_new_session"
     | "token_regenerated"
     | "presence_sweep"
-    | "command_unresponsive";
+    | "command_unresponsive"
+    | "user_revoked";
   disconnected_at?: number;
   last_heartbeat: number;
   created_at: number;
