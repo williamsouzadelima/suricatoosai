@@ -635,7 +635,16 @@
       "resetting": "Restableciendo...",
       "resetToken": "Restablecer token",
       "securityLabel": "Seguridad:",
-      "securityNotice": "Los comandos se ejecutan directamente en tu SO. Deténlos en cualquier momento con Ctrl+C."
+      "securityNotice": "Los comandos se ejecutan directamente en tu SO. Deténlos en cualquier momento con Ctrl+C.",
+      "revoke": "Revocar",
+      "revokeAria": "Revocar el conector {name}",
+      "revokedHeading": "Revocados",
+      "revokedBlocked": "Bloqueado para reconectar",
+      "allowAgain": "Permitir de nuevo",
+      "connectorRevoked": "Conector revocado. No podrá reconectarse hasta que lo permitas de nuevo.",
+      "connectorAllowed": "Conector permitido de nuevo.",
+      "failedRevoke": "No se pudo revocar el conector",
+      "failedAllow": "No se pudo permitir el conector"
     },
     "team": {
       "failedFetchData": "No se pudieron obtener los datos del equipo",

@@ -635,7 +635,16 @@
       "resetting": "Resetting...",
       "resetToken": "Reset token",
       "securityLabel": "Security:",
-      "securityNotice": "Commands run directly on your OS. Stop anytime with Ctrl+C."
+      "securityNotice": "Commands run directly on your OS. Stop anytime with Ctrl+C.",
+      "revoke": "Revoke",
+      "revokeAria": "Revoke connector {name}",
+      "revokedHeading": "Revoked",
+      "revokedBlocked": "Blocked from reconnecting",
+      "allowAgain": "Allow again",
+      "connectorRevoked": "Connector revoked. It cannot reconnect until you allow it again.",
+      "connectorAllowed": "Connector allowed again.",
+      "failedRevoke": "Failed to revoke connector",
+      "failedAllow": "Failed to allow connector"
     },
     "team": {
       "failedFetchData": "Failed to fetch team data",

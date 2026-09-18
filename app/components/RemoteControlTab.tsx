@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useTranslations } from "next-intl";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ import {
   ExternalLink,
   LoaderCircle,
   Check,
+  Trash2,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { runCommand, convexUrlFlag } from "@/lib/utils/sandbox-command";
@@ -175,6 +177,9 @@ const RemoteControlTab = () => {
 
   const tokenResult = useMutation(api.localSandbox.getToken);
   const regenerateToken = useMutation(api.localSandbox.regenerateToken);
+  const revokeConnection = useMutation(api.localSandbox.revokeConnection);
+  const unrevokeConnection = useMutation(api.localSandbox.unrevokeConnection);
+  const revokedConnectors = useQuery(api.localSandbox.listRevokedConnectors);
   const hideConnectSetup = useCallback(() => setShowConnectSetup(false), []);
 
   useAutoSelectNewRemoteConnection({
@@ -313,6 +318,26 @@ const RemoteControlTab = () => {
     }
   };
 
+  const handleRevokeConnection = async (connectionId: string) => {
+    try {
+      await revokeConnection({ connectionId });
+      toast.success(t("remoteControl.connectorRevoked"));
+    } catch (error) {
+      console.error("Failed to revoke connector:", error);
+      toast.error(t("remoteControl.failedRevoke"));
+    }
+  };
+
+  const handleAllowConnector = async (connectionName: string) => {
+    try {
+      await unrevokeConnection({ connectionName });
+      toast.success(t("remoteControl.connectorAllowed"));
+    } catch (error) {
+      console.error("Failed to allow connector:", error);
+      toast.error(t("remoteControl.failedAllow"));
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* Section Header */}
@@ -359,6 +384,20 @@ const RemoteControlTab = () => {
                       : t("remoteControl.remoteControlConnected")}
                   </div>
                 </div>
+                {!conn.isDesktop ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 shrink-0 px-2 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleRevokeConnection(conn.connectionId)}
+                    aria-label={t("remoteControl.revokeAria", {
+                      name: conn.osInfo?.hostname || conn.name,
+                    })}
+                    title={t("remoteControl.revoke")}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                ) : null}
               </div>
             ))}
             {!showConnectSetup ? (
@@ -387,6 +426,42 @@ const RemoteControlTab = () => {
           </div>
         )}
       </div>
+
+      {/* Revoked Connectors */}
+      {revokedConnectors && revokedConnectors.length > 0 ? (
+        <div className="space-y-3">
+          <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            {t("remoteControl.revokedHeading")}
+          </h4>
+          <div className="space-y-2">
+            {revokedConnectors.map((revoked) => (
+              <div
+                key={revoked.connectionName}
+                className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg"
+              >
+                <Server className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm">
+                    {revoked.connectionName}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {t("remoteControl.revokedBlocked")}
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 shrink-0 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => handleAllowConnector(revoked.connectionName)}
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  {t("remoteControl.allowAgain")}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {/* Quick Connect */}
       {activeConnections.length === 0 || showConnectSetup ? (
