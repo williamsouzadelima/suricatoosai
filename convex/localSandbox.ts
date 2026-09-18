@@ -105,6 +105,20 @@ async function collectConnectedLocalConnections(
     .sort((left, right) => left._creationTime - right._creationTime);
 }
 
+async function isConnectorRevoked(
+  db: DatabaseReader,
+  userId: string,
+  connectionName: string,
+): Promise<boolean> {
+  const revoked = await db
+    .query("local_sandbox_revoked_connectors")
+    .withIndex("by_user_and_name", (q) =>
+      q.eq("user_id", userId).eq("connection_name", connectionName),
+    )
+    .first();
+  return revoked !== null;
+}
+
 export const getToken = mutation({
   args: {},
   returns: v.object({
@@ -243,6 +257,18 @@ export const connect = mutation({
     }
 
     const userId = tokenRecord.user_id;
+
+    // Reject connectors the user has revoked. The per-user token stays valid for
+    // the user's other machines; only this connector name is blocked until it is
+    // allowed again in Remote Control settings.
+    if (await isConnectorRevoked(ctx.db, userId, args.connectionName)) {
+      return {
+        success: false,
+        error:
+          "This connector has been revoked. Allow it again in Remote Control settings to reconnect.",
+      };
+    }
+
     const centrifugoWsUrl = process.env.CENTRIFUGO_WS_URL;
     if (!centrifugoWsUrl) {
       return { success: false, error: "Centrifugo not configured" };
@@ -745,5 +771,127 @@ export const listConnectionsForBackend = query({
       isDesktop: conn.client_version === "desktop",
       capabilities: conn.capabilities ?? { commands: true, pty: true },
     }));
+  },
+});
+
+// ============================================================================
+// CONNECTOR REVOCATION (user-facing)
+// ============================================================================
+
+/**
+ * Revoke a connector by connection id. Records a revocation keyed on the
+ * connector's name so it cannot reconnect via `connect` until un-revoked, and
+ * kicks the live connection (its next Centrifugo refresh fails once it is no
+ * longer "connected", dropping it from the connections list). The per-user
+ * token is left untouched, so the user's other machines keep working.
+ */
+export const revokeConnection = mutation({
+  args: { connectionId: v.string() },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, { connectionId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Unauthorized: User not authenticated",
+      });
+    }
+    const userId = identity.subject;
+
+    const connection = await ctx.db
+      .query("local_sandbox_connections")
+      .withIndex("by_connection_id", (q) => q.eq("connection_id", connectionId))
+      .first();
+
+    if (!connection || connection.user_id !== userId) {
+      return { success: false };
+    }
+
+    const existing = await ctx.db
+      .query("local_sandbox_revoked_connectors")
+      .withIndex("by_user_and_name", (q) =>
+        q
+          .eq("user_id", userId)
+          .eq("connection_name", connection.connection_name),
+      )
+      .first();
+    if (!existing) {
+      await ctx.db.insert("local_sandbox_revoked_connectors", {
+        user_id: userId,
+        connection_name: connection.connection_name,
+        revoked_at: Date.now(),
+      });
+    }
+
+    if (connection.status === "connected") {
+      await ctx.db.patch(connection._id, {
+        status: "disconnected",
+        disconnected_at: Date.now(),
+        disconnect_reason: "user_revoked",
+      });
+    }
+
+    return { success: true };
+  },
+});
+
+/**
+ * Un-revoke a connector by name, allowing that machine to reconnect again.
+ */
+export const unrevokeConnection = mutation({
+  args: { connectionName: v.string() },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, { connectionName }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Unauthorized: User not authenticated",
+      });
+    }
+    const userId = identity.subject;
+
+    const existing = await ctx.db
+      .query("local_sandbox_revoked_connectors")
+      .withIndex("by_user_and_name", (q) =>
+        q.eq("user_id", userId).eq("connection_name", connectionName),
+      )
+      .first();
+    if (existing) {
+      await ctx.db.delete(existing._id);
+    }
+    return { success: true };
+  },
+});
+
+/**
+ * List the current user's revoked connectors (most recent first).
+ */
+export const listRevokedConnectors = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      connectionName: v.string(),
+      revokedAt: v.number(),
+    }),
+  ),
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return [];
+    }
+    const userId = identity.subject;
+
+    const rows = await ctx.db
+      .query("local_sandbox_revoked_connectors")
+      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+      .collect();
+
+    return rows
+      .map((row) => ({
+        connectionName: row.connection_name,
+        revokedAt: row.revoked_at,
+      }))
+      .sort((left, right) => right.revokedAt - left.revokedAt);
   },
 });

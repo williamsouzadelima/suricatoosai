@@ -23,6 +23,9 @@ let mockSelectedModel: "auto" | "hackerai-standard" | "hackerai-pro";
 
 const mockGetToken = jest.fn<() => Promise<{ token: string }>>();
 const mockRegenerateToken = jest.fn<() => Promise<{ token: string }>>();
+const mockRevokeConnection = jest.fn<() => Promise<{ success: boolean }>>();
+const mockUnrevokeConnection = jest.fn<() => Promise<{ success: boolean }>>();
+let mockRevokedConnectors: { connectionName: string; revokedAt: number }[] = [];
 const mockWriteText = jest.fn<(text: string) => Promise<void>>();
 const mockSetChatMode = jest.fn((mode: "ask" | "agent") => {
   mockChatMode = mode;
@@ -41,14 +44,22 @@ jest.mock("@/convex/_generated/api", () => ({
     localSandbox: {
       getToken: "getToken",
       regenerateToken: "regenerateToken",
+      revokeConnection: "revokeConnection",
+      unrevokeConnection: "unrevokeConnection",
+      listRevokedConnectors: "listRevokedConnectors",
     },
   },
 }));
 
 jest.mock("convex/react", () => ({
-  useMutation: jest.fn((mutation: string) =>
-    mutation === "getToken" ? mockGetToken : mockRegenerateToken,
-  ),
+  useMutation: jest.fn((mutation: string) => {
+    if (mutation === "getToken") return mockGetToken;
+    if (mutation === "regenerateToken") return mockRegenerateToken;
+    if (mutation === "revokeConnection") return mockRevokeConnection;
+    if (mutation === "unrevokeConnection") return mockUnrevokeConnection;
+    return jest.fn();
+  }),
+  useQuery: jest.fn(() => mockRevokedConnectors),
 }));
 
 jest.mock("@/app/contexts/GlobalState", () => ({
@@ -113,10 +124,57 @@ describe("RemoteControlTab", () => {
     mockSelectedModel = "hackerai-pro";
     mockGetToken.mockResolvedValue({ token: "test-token" });
     mockRegenerateToken.mockResolvedValue({ token: "regenerated-token" });
+    mockRevokeConnection.mockResolvedValue({ success: true });
+    mockUnrevokeConnection.mockResolvedValue({ success: true });
+    mockRevokedConnectors = [];
     mockWriteText.mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: { writeText: mockWriteText },
+    });
+  });
+
+  it("revokes a remote connector when its revoke button is clicked", async () => {
+    mockConnections = [remoteConnection];
+
+    render(<RemoteControlTab />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Revoke connector devbox" }),
+    );
+
+    await waitFor(() => {
+      expect(mockRevokeConnection).toHaveBeenCalledWith({
+        connectionId: "conn-remote-1",
+      });
+    });
+    expect(toast.success).toHaveBeenCalledWith(
+      "Connector revoked. It cannot reconnect until you allow it again.",
+    );
+  });
+
+  it("does not render a revoke button for the desktop app connection", () => {
+    mockConnections = [desktopConnection];
+
+    render(<RemoteControlTab />);
+
+    expect(
+      screen.queryByRole("button", { name: "Revoke connector bobbys-mac" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("lists revoked connectors and re-enables them", async () => {
+    mockRevokedConnectors = [{ connectionName: "old-box", revokedAt: 123 }];
+
+    render(<RemoteControlTab />);
+
+    expect(screen.getByText("old-box")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Allow again" }));
+
+    await waitFor(() => {
+      expect(mockUnrevokeConnection).toHaveBeenCalledWith({
+        connectionName: "old-box",
+      });
     });
   });
 

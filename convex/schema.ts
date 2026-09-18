@@ -981,6 +981,7 @@ export default defineSchema({
         v.literal("token_regenerated"),
         v.literal("presence_sweep"),
         v.literal("command_unresponsive"),
+        v.literal("user_revoked"),
       ),
     ),
   })
@@ -989,6 +990,17 @@ export default defineSchema({
     .index("by_user_and_status", ["user_id", "status"])
     .index("by_user_and_status_and_mode", ["user_id", "status", "mode"])
     .index("by_status_and_created_at", ["status", "created_at"]),
+
+  // Per-connector revocations. A revoked connector name cannot re-establish a
+  // connection through localSandbox.connect until it is un-revoked — even
+  // though the per-user token stays valid for the user's other machines.
+  local_sandbox_revoked_connectors: defineTable({
+    user_id: v.string(),
+    connection_name: v.string(),
+    revoked_at: v.number(),
+  })
+    .index("by_user_id", ["user_id"])
+    .index("by_user_and_name", ["user_id", "connection_name"]),
 
   // Per-request usage logs for the usage dashboard
   usage_logs: defineTable({
