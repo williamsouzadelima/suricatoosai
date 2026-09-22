@@ -1189,11 +1189,13 @@ export class LocalSandboxClient {
     }
   }
 
-  // Self-update, Chrome-style: install the new global package, then restart into
-  // it. If the install fails we stay on the current version (no brick). If a
-  // service manager (systemd sets INVOCATION_ID) supervises us we just exit and
-  // let it relaunch the fresh binary; otherwise we re-exec a detached copy so an
-  // unsupervised (npx) agent still comes back.
+  // Self-update, Chrome-style: install the new global package, then exit so the
+  // service manager relaunches us into it. If the install fails we stay on the
+  // current version (no brick). We exit(1) (not 0) so we restart under BOTH
+  // Restart=always and Restart=on-failure. The agent MUST run under a supervisor
+  // that restarts it on exit; we do NOT self-respawn, which would double up under
+  // non-systemd supervisors (pm2 / Docker restart:always / nssm / launchd) that
+  // also relaunch the process.
   private async performAgentUpdate(targetVersion: string): Promise<void> {
     if (this.isUpdating) return;
     this.isUpdating = true;
@@ -1230,30 +1232,7 @@ export class LocalSandboxClient {
       chalk.green("✓ Agent updated. Restarting into the new version..."),
     );
 
-    if (!process.env.INVOCATION_ID) {
-      try {
-        const child = spawn(
-          "suricatoos-local",
-          ["--token", this.config.token, "--name", this.config.name],
-          {
-            detached: true,
-            stdio: "ignore",
-            shell: process.platform === "win32",
-          },
-        );
-        child.unref();
-      } catch (err) {
-        console.error(
-          chalk.red(
-            `Failed to respawn updated agent: ${
-              err instanceof Error ? err.message : String(err)
-            }`,
-          ),
-        );
-      }
-    }
-
-    this.requestExit(0, new Error("Agent updated; restarting"));
+    this.requestExit(1, new Error("Agent updated; restarting into new version"));
   }
 
   async cleanup(): Promise<void> {

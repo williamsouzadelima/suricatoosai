@@ -8,9 +8,29 @@ import { SignJWT } from "jose";
 // Remote Control UI flags older connectors and requestAgentUpdate targets it.
 const LATEST_AGENT_VERSION = "0.1.2";
 
+function parseVersion(v: string): number[] | null {
+  const parts = v.split(".").map((p) => Number.parseInt(p, 10));
+  if (parts.length === 0 || parts.some((n) => !Number.isFinite(n))) return null;
+  return parts;
+}
+
+// True only when the client is strictly OLDER than the latest (semver), so a
+// newer-than-latest agent — e.g. in the window between publishing to npm and
+// deploying Convex — is never flagged and never downgraded. Non-semver values
+// (legacy "1.0.0", garbage) are not flagged. The desktop app self-updates via
+// Tauri, so it is never flagged here.
 function agentUpdateAvailable(clientVersion: string): boolean {
-  // The desktop app self-updates via Tauri, not npm — never flag it here.
-  return clientVersion !== "desktop" && clientVersion !== LATEST_AGENT_VERSION;
+  if (clientVersion === "desktop") return false;
+  const client = parseVersion(clientVersion);
+  const latest = parseVersion(LATEST_AGENT_VERSION);
+  if (!client || !latest) return false;
+  const len = Math.max(client.length, latest.length);
+  for (let i = 0; i < len; i += 1) {
+    const a = client[i] ?? 0;
+    const b = latest[i] ?? 0;
+    if (a !== b) return a < b;
+  }
+  return false;
 }
 
 /**
