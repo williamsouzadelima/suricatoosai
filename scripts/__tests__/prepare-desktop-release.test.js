@@ -143,7 +143,7 @@ fi
       release,
       version,
       `desktop-v${version}`,
-      "hackerai-tech/hackerai",
+      "williamsouzadelima/suricatoosai",
     ],
     {
       encoding: "utf8",
@@ -179,11 +179,11 @@ describe("prepare-desktop-release", () => {
       expect(latest.version).toBe("0.0.57");
       expect(latest.pub_date).toBe("2026-07-17T00:00:00Z");
       expect(latest.platforms["darwin-aarch64"]).toEqual({
-        url: "https://github.com/hackerai-tech/hackerai/releases/download/desktop-v0.0.57/Suricatoos-aarch64.app.tar.gz",
+        url: "https://github.com/williamsouzadelima/suricatoosai/releases/download/desktop-v0.0.57/Suricatoos-aarch64.app.tar.gz",
         signature: signatureFor("mac-arm-updater"),
       });
       expect(latest.platforms["darwin-x86_64"]).toEqual({
-        url: "https://github.com/hackerai-tech/hackerai/releases/download/desktop-v0.0.57/Suricatoos-x86_64.app.tar.gz",
+        url: "https://github.com/williamsouzadelima/suricatoosai/releases/download/desktop-v0.0.57/Suricatoos-x86_64.app.tar.gz",
         signature: signatureFor("mac-x64-updater"),
       });
       expect(latest.platforms["windows-x86_64"].signature).toBe(
