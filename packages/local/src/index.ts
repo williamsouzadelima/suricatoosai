@@ -1189,13 +1189,15 @@ export class LocalSandboxClient {
     }
   }
 
-  // Self-update, Chrome-style: install the new global package, then exit so the
-  // service manager relaunches us into it. If the install fails we stay on the
-  // current version (no brick). We exit(1) (not 0) so we restart under BOTH
-  // Restart=always and Restart=on-failure. The agent MUST run under a supervisor
-  // that restarts it on exit; we do NOT self-respawn, which would double up under
-  // non-systemd supervisors (pm2 / Docker restart:always / nssm / launchd) that
-  // also relaunch the process.
+  // Self-update, Chrome-style: install the new global package, then hand off to
+  // the service manager. Under a supervisor (systemd sets INVOCATION_ID) exit(1)
+  // so it relaunches us into the new version (restarts under BOTH Restart=always
+  // and Restart=on-failure). WITHOUT a supervisor (e.g. `npx @suricatoos/local
+  // --token …`, the documented usage) the new version is installed on disk but
+  // we keep running the current one and ask the user to restart — better than
+  // exiting into nothing, and we never self-respawn (which would double up under
+  // non-systemd supervisors: pm2 / Docker restart:always / nssm / launchd).
+  // Failed install → stay on the current version (no brick).
   private async performAgentUpdate(targetVersion: string): Promise<void> {
     if (this.isUpdating) return;
     this.isUpdating = true;
@@ -1228,11 +1230,27 @@ export class LocalSandboxClient {
       return;
     }
 
-    console.log(
-      chalk.green("✓ Agent updated. Restarting into the new version..."),
-    );
-
-    this.requestExit(1, new Error("Agent updated; restarting into new version"));
+    if (process.env.INVOCATION_ID) {
+      // Supervised (systemd): exit(1) → the service manager relaunches us into
+      // the freshly installed version.
+      console.log(
+        chalk.green("✓ Agent updated. Restarting into the new version..."),
+      );
+      this.requestExit(
+        1,
+        new Error("Agent updated; restarting into new version"),
+      );
+    } else {
+      // Unsupervised: nothing would relaunch us, so don't exit — the new version
+      // is on disk and takes effect on the next manual restart. Visible, not a
+      // silent death, and no duplicate agent.
+      console.log(
+        chalk.yellow(
+          "✓ New agent version installed. Restart the agent to switch to it.",
+        ),
+      );
+      this.isUpdating = false;
+    }
   }
 
   async cleanup(): Promise<void> {
