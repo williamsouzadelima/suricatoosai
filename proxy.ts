@@ -67,7 +67,7 @@ function getRedirectUri(): string | undefined {
 
 function isDesktopApp(request: NextRequest): boolean {
   const userAgent = request.headers.get("user-agent") || "";
-  return userAgent.includes("HackerAI-Desktop");
+  return userAgent.includes("Suricatoos-Desktop");
 }
 
 function isUnauthenticatedPath(pathname: string): boolean {

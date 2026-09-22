@@ -20,7 +20,7 @@ pub struct ShellConfig {
 /// Get the shell for the current platform.
 ///
 /// - **Windows:** prefer `bash.exe` from Git for Windows (POSIX semantics, no
-///   cmd.exe quoting quirks). Override with `HACKERAI_BASH_PATH`. Falls back
+///   cmd.exe quoting quirks). Override with `SURICATOOS_BASH_PATH`. Falls back
 ///   to `cmd /C` when git-bash is not installed.
 /// - **Unix:** the user's `$SHELL` as a login shell so PATH from
 ///   `.zshrc` / `.bashrc` / `.profile` is sourced — needed to find
@@ -74,7 +74,7 @@ pub fn get_shell_config() -> ShellConfig {
 }
 
 /// Locate `bash.exe` from Git for Windows. Tries:
-///   1. `HACKERAI_BASH_PATH` env override
+///   1. `SURICATOOS_BASH_PATH` env override
 ///   2. Common install locations
 ///   3. `where git` → `<gitDir>/../../bin/bash.exe`
 #[cfg(windows)]
@@ -82,7 +82,7 @@ fn find_git_bash() -> Option<String> {
     use std::path::PathBuf;
     use std::process::Command as StdCommand;
 
-    if let Ok(p) = std::env::var("HACKERAI_BASH_PATH") {
+    if let Ok(p) = std::env::var("SURICATOOS_BASH_PATH") {
         if PathBuf::from(&p).exists() {
             return Some(p);
         }

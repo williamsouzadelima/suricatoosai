@@ -1,6 +1,6 @@
 import type { ChatMode } from "@/types";
 
-const HACKERAI_DESKTOP_USER_AGENT_TOKEN = "Suricatoos-Desktop";
+const SURICATOOS_DESKTOP_USER_AGENT_TOKEN = "Suricatoos-Desktop";
 
 export const LEGACY_DESKTOP_AGENT_UPDATE_MESSAGE =
   "Agent mode now requires the latest Suricatoos Desktop app. Please update Suricatoos Desktop, then try again.";
@@ -8,7 +8,7 @@ export const LEGACY_DESKTOP_AGENT_UPDATE_MESSAGE =
 export function isHackerAIDesktopUserAgent(
   userAgent: string | null | undefined = getBrowserUserAgent(),
 ): boolean {
-  return userAgent?.includes(HACKERAI_DESKTOP_USER_AGENT_TOKEN) ?? false;
+  return userAgent?.includes(SURICATOOS_DESKTOP_USER_AGENT_TOKEN) ?? false;
 }
 
 export function isLegacyDesktopAgentClient({

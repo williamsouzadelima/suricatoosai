@@ -1571,7 +1571,7 @@ fn save_update_check_timestamp(app: &tauri::AppHandle) {
 }
 
 fn get_allowed_hosts() -> Vec<String> {
-    match std::env::var("HACKERAI_ALLOWED_HOSTS") {
+    match std::env::var("SURICATOOS_ALLOWED_HOSTS") {
         Ok(hosts) => hosts.split(',').map(|s| s.trim().to_string()).collect(),
         Err(_) => vec!["ai.suricatoos.com".to_string(), "localhost".to_string()],
     }
@@ -1632,7 +1632,7 @@ fn consume_pending_desktop_auth_state(app: &tauri::AppHandle, desktop_state: &st
 }
 
 fn handle_auth_deep_link(app: &tauri::AppHandle, url: &url::Url) {
-    if url.scheme() != "hackerai" {
+    if url.scheme() != "suricatoos" {
         return;
     }
 
@@ -1862,7 +1862,7 @@ mod tests {
 
     fn unique_test_dir(label: &str) -> PathBuf {
         std::env::temp_dir().join(format!(
-            "hackerai-desktop-{}-{}",
+            "suricatoos-desktop-{}-{}",
             label,
             uuid::Uuid::new_v4().simple()
         ))
@@ -2113,7 +2113,7 @@ pub fn run() {
             );
             for arg in args.iter().skip(1) {
                 if let Ok(url) = url::Url::parse(arg) {
-                    if url.scheme() == "hackerai" {
+                    if url.scheme() == "suricatoos" {
                         log::info!(
                             "Processing deep link from CLI arg: {}",
                             deep_link_log_label(&url)

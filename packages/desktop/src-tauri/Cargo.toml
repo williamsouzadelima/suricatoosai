@@ -1,5 +1,5 @@
 [package]
-name = "hackerai-desktop"
+name = "suricatoos-desktop"
 version = "0.0.0"
 description = "Suricatoos Desktop Application"
 authors = ["Suricatoos"]
@@ -7,11 +7,11 @@ edition = "2021"
 rust-version = "1.78"
 
 [lib]
-name = "hackerai_desktop_lib"
+name = "suricatoos_desktop_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [[bin]]
-name = "hackerai-desktop"
+name = "suricatoos-desktop"
 path = "src/main.rs"
 
 [build-dependencies]

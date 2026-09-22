@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2/capability",
   "identifier": "default",
-  "description": "Default capabilities for HackerAI Desktop",
+  "description": "Default capabilities for Suricatoos Desktop",
   "windows": ["main"],
   "remote": {
     "urls": ["http://localhost:*", "https://ai.suricatoos.com/*"]
@@ -27,8 +27,8 @@
       "allow": [
         { "path": "$HOME/**" },
         { "path": "$DOWNLOAD/**" },
-        { "path": "/tmp/hackerai-upload/**" },
-        { "path": "/tmp/hackerai/**" }
+        { "path": "/tmp/suricatoos-upload/**" },
+        { "path": "/tmp/suricatoos/**" }
       ]
     }
   ]
