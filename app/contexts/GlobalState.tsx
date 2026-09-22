@@ -224,6 +224,8 @@ interface LocalSandboxConnection {
   };
   lastSeen: number;
   isDesktop: boolean;
+  clientVersion: string;
+  updateAvailable: boolean;
   capabilities: {
     commands: boolean;
     pty: boolean;

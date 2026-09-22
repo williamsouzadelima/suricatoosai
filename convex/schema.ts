@@ -969,6 +969,12 @@ export default defineSchema({
     last_heartbeat: v.number(),
     status: v.union(v.literal("connected"), v.literal("disconnected")),
     created_at: v.number(),
+    // Agent auto-update: set by localSandbox.requestAgentUpdate (the Remote
+    // Control "Update" button); the agent reads-and-clears it via pollAgentUpdate
+    // and self-updates to target_agent_version.
+    update_requested: v.optional(v.boolean()),
+    target_agent_version: v.optional(v.string()),
+    update_requested_at: v.optional(v.number()),
     // Set whenever status flips to "disconnected" so refresh-time errors can
     // report the cause (presence sweep, token regen, desktop kick, etc.) and
     // the lag between disconnect and the failed refresh attempt.

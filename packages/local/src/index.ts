@@ -44,6 +44,13 @@ const IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
 // Idle check interval: check every 5 minutes
 const IDLE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
+// Agent version — KEEP IN SYNC with packages/local/package.json "version".
+// Reported to the server so the Remote Control UI can flag "update available".
+const AGENT_VERSION = "0.1.2";
+
+// How often the agent polls the server for a pending update (Update button).
+const UPDATE_POLL_INTERVAL_MS = 20 * 1000; // 20s
+
 // Production Convex URL - hardcoded for the published package
 const PRODUCTION_CONVEX_URL = "https://dutiful-sheep-343.convex.cloud";
 
@@ -53,6 +60,7 @@ const api = {
     connect: "localSandbox:connect" as const,
     disconnect: "localSandbox:disconnect" as const,
     refreshCentrifugoToken: "localSandbox:refreshCentrifugoToken" as const,
+    pollAgentUpdate: "localSandbox:pollAgentUpdate" as const,
   },
 };
 
@@ -290,6 +298,8 @@ export class LocalSandboxClient {
   private isShuttingDown = false;
   private lastActivityTime: number;
   private idleCheckInterval?: NodeJS.Timeout;
+  private updatePollInterval?: NodeJS.Timeout;
+  private isUpdating = false;
   private processRunner: ProcessRunner;
   private activeStreamCommands: Map<string, ChildProcess> = new Map();
   private publishQueue?: CentrifugoPublishQueue;
@@ -417,7 +427,7 @@ export class LocalSandboxClient {
         {
           token: this.config.token,
           connectionName: this.config.name,
-          clientVersion: "1.0.0",
+          clientVersion: AGENT_VERSION,
           osInfo: this.getOsInfo(),
           capabilities: this.getCapabilities(),
         } as never,
@@ -449,6 +459,7 @@ export class LocalSandboxClient {
       console.log(chalk.bold(chalk.green("🎉 Local sandbox is ready!")));
       console.log(chalk.gray(`Connection: ${this.connectionId}`));
       this.startIdleCheck();
+      this.startUpdatePoll();
     } catch (error: unknown) {
       const err = error as { data?: { message?: string }; message?: string };
       const errorMessage =
@@ -1138,6 +1149,113 @@ export class LocalSandboxClient {
     }
   }
 
+  private startUpdatePoll(): void {
+    this.updatePollInterval = setInterval(() => {
+      void this.checkForAgentUpdate();
+    }, UPDATE_POLL_INTERVAL_MS);
+  }
+
+  private stopUpdatePoll(): void {
+    if (this.updatePollInterval) {
+      clearInterval(this.updatePollInterval);
+      this.updatePollInterval = undefined;
+    }
+  }
+
+  // Poll the server for a pending update (set by the Remote Control "Update"
+  // button). Read-and-clear on the server, so a failed update won't loop.
+  private async checkForAgentUpdate(): Promise<void> {
+    if (this.isShuttingDown || this.isUpdating || !this.connectionId) return;
+    try {
+      const directive = (await this.convexHttp.mutation(
+        api.localSandbox.pollAgentUpdate as never,
+        {
+          token: this.config.token,
+          connectionId: this.connectionId,
+        } as never,
+      )) as { updateRequested: boolean; targetVersion: string | null };
+      if (directive?.updateRequested) {
+        await this.performAgentUpdate(directive.targetVersion ?? "latest");
+      }
+    } catch (error) {
+      // Non-fatal: keep running on the current version if the poll fails.
+      console.warn(
+        chalk.yellow(
+          `Agent update check failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        ),
+      );
+    }
+  }
+
+  // Self-update, Chrome-style: install the new global package, then restart into
+  // it. If the install fails we stay on the current version (no brick). If a
+  // service manager (systemd sets INVOCATION_ID) supervises us we just exit and
+  // let it relaunch the fresh binary; otherwise we re-exec a detached copy so an
+  // unsupervised (npx) agent still comes back.
+  private async performAgentUpdate(targetVersion: string): Promise<void> {
+    if (this.isUpdating) return;
+    this.isUpdating = true;
+
+    const spec =
+      targetVersion && targetVersion !== "latest"
+        ? `@suricatoos/local@${targetVersion}`
+        : "@suricatoos/local@latest";
+    console.log(chalk.cyan(`⬇️  Updating agent to ${spec} ...`));
+
+    const installed = await new Promise<boolean>((resolve) => {
+      const child = spawn("npm", ["install", "-g", spec], {
+        stdio: "inherit",
+        shell: process.platform === "win32",
+      });
+      child.on("error", (err) => {
+        console.error(chalk.red(`Agent update: npm failed to start: ${err.message}`));
+        resolve(false);
+      });
+      child.on("exit", (code) => resolve(code === 0));
+    });
+
+    if (!installed) {
+      console.error(
+        chalk.red(
+          "Agent update failed (npm install non-zero). Staying on current version.",
+        ),
+      );
+      this.isUpdating = false;
+      return;
+    }
+
+    console.log(
+      chalk.green("✓ Agent updated. Restarting into the new version..."),
+    );
+
+    if (!process.env.INVOCATION_ID) {
+      try {
+        const child = spawn(
+          "suricatoos-local",
+          ["--token", this.config.token, "--name", this.config.name],
+          {
+            detached: true,
+            stdio: "ignore",
+            shell: process.platform === "win32",
+          },
+        );
+        child.unref();
+      } catch (err) {
+        console.error(
+          chalk.red(
+            `Failed to respawn updated agent: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          ),
+        );
+      }
+    }
+
+    this.requestExit(0, new Error("Agent updated; restarting"));
+  }
+
   async cleanup(): Promise<void> {
     if (this.cleanupPromise) return this.cleanupPromise;
     this.cleanupPromise = this.performCleanup().catch((error) => {
@@ -1152,6 +1270,7 @@ export class LocalSandboxClient {
 
     this.isShuttingDown = true;
     this.stopIdleCheck();
+    this.stopUpdatePoll();
 
     // Stop all PTY sessions
     this.processRunner.stopAll();
