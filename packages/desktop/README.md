@@ -1,10 +1,10 @@
-# HackerAI Desktop
+# Suricatoos Desktop
 
-Native desktop application for HackerAI built with [Tauri](https://tauri.app/).
+Native desktop application for Suricatoos built with [Tauri](https://tauri.app/).
 
 ## Overview
 
-The desktop app wraps the HackerAI web application in a native shell, providing:
+The desktop app wraps the Suricatoos web application in a native shell, providing:
 
 - **Native window** with system integration
 - **Auto-updates** via Tauri's updater plugin
@@ -52,7 +52,7 @@ pnpm install
 pnpm dev
 ```
 
-This opens the desktop app pointing to `https://hackerai.co`.
+This opens the desktop app pointing to `https://ai.suricatoos.com`.
 
 ### Run with local web server
 
@@ -98,7 +98,7 @@ pnpm build
 │                    Tauri Desktop App                        │
 ├─────────────────────────────────────────────────────────────┤
 │  Rust Backend (src-tauri/)     │  WebView                   │
-│  └─ main.rs/lib.rs             │  └─ Loads hackerai.co      │
+│  └─ main.rs/lib.rs             │  └─ Loads ai.suricatoos.com      │
 │     └─ Plugin registration     │     (uses web auth flow)   │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -163,7 +163,7 @@ git push origin desktop-v0.1.0
 Generate a key pair:
 
 ```bash
-pnpm tauri signer generate -w ~/.tauri/hackerai.key
+pnpm tauri signer generate -w ~/.tauri/suricatoos.key
 ```
 
 Set in CI:

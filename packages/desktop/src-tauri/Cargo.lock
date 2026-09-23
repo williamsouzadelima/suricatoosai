@@ -1751,7 +1751,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hackerai-desktop"
+name = "suricatoos-desktop"
 version = "0.0.0"
 dependencies = [
  "base64 0.22.1",

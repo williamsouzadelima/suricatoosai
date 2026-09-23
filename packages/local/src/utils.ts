@@ -51,7 +51,7 @@ export function getDefaultShell(platform: string): ShellConfig {
   if (platform === "win32") {
     // Prefer git-bash when available: it gives POSIX semantics (&&, pipes,
     // quoting) and sidesteps cmd.exe's quoting quirks entirely. Falls back
-    // to cmd.exe when git-bash isn't installed. Override with HACKERAI_BASH_PATH.
+    // to cmd.exe when git-bash isn't installed. Override with SURICATOOS_BASH_PATH.
     const bash = findGitBash();
     if (bash) {
       return { shell: bash, shellFlag: "-c" };
@@ -64,13 +64,13 @@ export function getDefaultShell(platform: string): ShellConfig {
 
 /**
  * Locate `bash.exe` from Git for Windows. Tries, in order:
- *   1. `HACKERAI_BASH_PATH` environment override
+ *   1. `SURICATOOS_BASH_PATH` environment override
  *   2. Common install locations
  *   3. `where git` → resolve `<gitDir>/../../bin/bash.exe`
  * Returns null if not found.
  */
 export function findGitBash(): string | null {
-  const override = process.env.HACKERAI_BASH_PATH;
+  const override = process.env.SURICATOOS_BASH_PATH;
   if (override && existsSync(override)) return override;
 
   const candidates = [
