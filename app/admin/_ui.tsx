@@ -66,6 +66,27 @@ export function fmtNum(n: number): string {
   return String(n);
 }
 
+/** Duração humana compacta a partir de ms. <1s / 45s / 3min 20s / 2h 5min / 1d 3h. */
+export function fmtDuration(ms?: number | null): string {
+  if (ms == null || !Number.isFinite(ms) || ms < 0) return "—";
+  const totalSec = Math.round(ms / 1000);
+  if (totalSec < 1) return "<1s";
+  if (totalSec < 60) return `${totalSec}s`;
+  const totalMin = Math.floor(totalSec / 60);
+  if (totalMin < 60) {
+    const s = totalSec % 60;
+    return s ? `${totalMin}min ${s}s` : `${totalMin}min`;
+  }
+  const totalHr = Math.floor(totalMin / 60);
+  if (totalHr < 24) {
+    const m = totalMin % 60;
+    return m ? `${totalHr}h ${m}min` : `${totalHr}h`;
+  }
+  const d = Math.floor(totalHr / 24);
+  const h = totalHr % 24;
+  return h ? `${d}d ${h}h` : `${d}d`;
+}
+
 /** Pílula de contagem ao lado de um título. */
 export function CountPill({ n }: { n: number }) {
   return (
@@ -103,7 +124,9 @@ export function SectionHeader({
             {count != null && <CountPill n={count} />}
           </h2>
           {description && (
-            <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {description}
+            </p>
           )}
         </div>
       </div>
@@ -196,7 +219,9 @@ export function StatCard({
           {loading ? <Skeleton className="h-8 w-16" /> : value}
         </div>
         {/* 2ª linha sempre reservada p/ os tiles alinharem */}
-        <div className="mt-1.5 min-h-4 text-xs text-muted-foreground">{sub}</div>
+        <div className="mt-1.5 min-h-4 text-xs text-muted-foreground">
+          {sub}
+        </div>
       </CardContent>
     </Card>
   );
@@ -260,7 +285,10 @@ export function MiniBarChart({
               <div
                 className="w-full rounded-sm bg-gradient-to-t from-primary to-chart-1 transition-opacity"
                 style={{
-                  height: d.count > 0 ? `${Math.max(6, (d.count / max) * 100)}%` : "0%",
+                  height:
+                    d.count > 0
+                      ? `${Math.max(6, (d.count / max) * 100)}%`
+                      : "0%",
                 }}
               />
               {d.count > 0 && (

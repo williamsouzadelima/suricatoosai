@@ -132,6 +132,7 @@ export const getTaskCosts = query({
       models: v.array(v.string()),
       costSource: v.string(),
       lastActivityAt: v.union(v.number(), v.null()),
+      firstActivityAt: v.union(v.number(), v.null()),
       capped: v.boolean(),
     }),
   ),
@@ -153,6 +154,7 @@ export const getTaskCosts = query({
       models: Set<string>;
       costSources: Set<string>;
       lastActivityAt: number | null;
+      firstActivityAt: number | null;
       capped: boolean;
     };
 
@@ -186,6 +188,7 @@ export const getTaskCosts = query({
             models: new Set(),
             costSources: new Set(),
             lastActivityAt: null,
+            firstActivityAt: null,
             capped,
           };
           byChat.set(key, agg);
@@ -203,8 +206,17 @@ export const getTaskCosts = query({
         }
         agg.models.add(r.model);
         if (r.cost_source) agg.costSources.add(r.cost_source);
-        if (agg.lastActivityAt === null || r._creationTime > agg.lastActivityAt) {
+        if (
+          agg.lastActivityAt === null ||
+          r._creationTime > agg.lastActivityAt
+        ) {
           agg.lastActivityAt = r._creationTime;
+        }
+        if (
+          agg.firstActivityAt === null ||
+          r._creationTime < agg.firstActivityAt
+        ) {
+          agg.firstActivityAt = r._creationTime;
         }
         agg.capped = agg.capped || capped;
       }
@@ -241,6 +253,7 @@ export const getTaskCosts = query({
         models: Array.from(agg.models),
         costSource: worstCostSource(agg.costSources),
         lastActivityAt: agg.lastActivityAt,
+        firstActivityAt: agg.firstActivityAt,
         capped: agg.capped,
       });
     }
@@ -295,6 +308,8 @@ export const getTaskCostDetail = query({
         hasRealCost: v.boolean(),
       }),
     ),
+    firstActivityAt: v.union(v.number(), v.null()),
+    lastActivityAt: v.union(v.number(), v.null()),
     capped: v.boolean(),
   }),
   handler: async (ctx, args) => {
@@ -346,9 +361,17 @@ export const getTaskCostDetail = query({
     const byRun = new Map<string, RunAgg>();
 
     let userId: string | null = null;
+    let taskFirstAt: number | null = null;
+    let taskLastAt: number | null = null;
 
     for (const r of rows) {
       if (userId === null) userId = r.user_id;
+      if (taskFirstAt === null || r._creationTime < taskFirstAt) {
+        taskFirstAt = r._creationTime;
+      }
+      if (taskLastAt === null || r._creationTime > taskLastAt) {
+        taskLastAt = r._creationTime;
+      }
       const real =
         typeof r.provider_billed_cost_dollars === "number"
           ? r.provider_billed_cost_dollars
@@ -412,7 +435,21 @@ export const getTaskCostDetail = query({
       .withIndex("by_chat_id", (q) => q.eq("id", args.chatId))
       .first();
 
-    const byRunArr = Array.from(byRun.values()).sort((a, b) => b.at - a.at);
+    // Início EXATO da task: a linha mais antiga pode estar fora da janela de
+    // DETAIL_ROW_CAP (que retém as mais recentes), então uma leitura O(1) pelo
+    // índice by_chat em ordem crescente devolve o verdadeiro começo. O fim (mais
+    // recente) já está garantido dentro da janela lida acima (taskLastAt). Assim
+    // a duração da task no detalhe é sempre exata — nunca um limite inferior.
+    const oldestRow = await ctx.db
+      .query("usage_logs")
+      .withIndex("by_chat", (q) => q.eq("chat_id", args.chatId))
+      .order("asc")
+      .first();
+    const firstActivityAt = oldestRow?._creationTime ?? taskFirstAt;
+
+    const byRunArr = Array.from(byRun.values())
+      .sort((a, b) => b.at - a.at)
+      .slice(0, 200);
 
     return {
       chatId: args.chatId,
@@ -422,7 +459,9 @@ export const getTaskCostDetail = query({
       byModel: Array.from(byModel.values()).sort(
         (a, b) => b.costDollars - a.costDollars,
       ),
-      byRun: byRunArr.slice(0, 200),
+      byRun: byRunArr,
+      firstActivityAt,
+      lastActivityAt: taskLastAt,
       capped,
     };
   },

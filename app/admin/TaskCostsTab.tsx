@@ -13,6 +13,7 @@ import {
   Receipt,
   Server,
   Hash,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ import {
   EmptyState,
   formatDateTime,
   fmtNum,
+  fmtDuration,
   type Tone,
 } from "./_ui";
 import { toCsv, downloadCsv, csvName } from "@/lib/utils/csv";
@@ -46,6 +48,7 @@ interface Task {
   models: string[];
   costSource: string;
   lastActivityAt: number | null;
+  firstActivityAt: number | null;
   capped: boolean;
 }
 
@@ -91,6 +94,8 @@ interface Detail {
   };
   byModel: ModelRow[];
   byRun: RunRow[];
+  firstActivityAt: number | null;
+  lastActivityAt: number | null;
   capped: boolean;
 }
 
@@ -211,9 +216,18 @@ export function TaskCostsTab() {
           custo_registrado_usd: t.costDollars.toFixed(6),
           custo_infra_usd: t.nonModelCostDollars.toFixed(6),
           fonte: t.costSource,
+          inicio_atividade: t.firstActivityAt
+            ? new Date(t.firstActivityAt).toISOString()
+            : "",
           ultima_atividade: t.lastActivityAt
             ? new Date(t.lastActivityAt).toISOString()
             : "",
+          duracao_seg:
+            t.requests > 1 &&
+            t.firstActivityAt != null &&
+            t.lastActivityAt != null
+              ? Math.round((t.lastActivityAt - t.firstActivityAt) / 1000)
+              : "",
           parcial: t.capped ? "sim" : "",
         })),
         [
@@ -229,7 +243,9 @@ export function TaskCostsTab() {
           { key: "custo_registrado_usd", label: "Custo registrado (US$)" },
           { key: "custo_infra_usd", label: "Custo infra (US$)" },
           { key: "fonte", label: "Fonte" },
+          { key: "inicio_atividade", label: "Início atividade" },
           { key: "ultima_atividade", label: "Última atividade" },
+          { key: "duracao_seg", label: "Duração (s)" },
           { key: "parcial", label: "Parcial (cap)" },
         ],
       ),
@@ -243,8 +259,8 @@ export function TaskCostsTab() {
           <SectionHeader title="Custos por task" count={items.length} />
           <p className="mt-1 text-xs text-muted-foreground">
             Custo <strong>real</strong> = créditos deduzidos do OpenRouter
-            (linhas novas). <strong>Registrado</strong> = cost_dollars histórico,
-            pode subcontar. Infra = sandbox/estimativa. O traço{" "}
+            (linhas novas). <strong>Registrado</strong> = cost_dollars
+            histórico, pode subcontar. Infra = sandbox/estimativa. O traço{" "}
             <strong>—</strong> = execução anterior a 09/09/2026 (sem custo real
             capturado).
           </p>
@@ -322,11 +338,14 @@ export function TaskCostsTab() {
                 <th className="px-4 py-3 font-medium">Task</th>
                 <th className="px-4 py-3 font-medium">Usuário</th>
                 <th className="px-4 py-3 font-medium">Modelos</th>
-                <th className="px-4 py-3 text-right font-medium">Tokens (in/out)</th>
+                <th className="px-4 py-3 text-right font-medium">
+                  Tokens (in/out)
+                </th>
                 <th className="px-4 py-3 text-right font-medium">Custo real</th>
                 <th className="px-4 py-3 text-right font-medium">Registrado</th>
                 <th className="px-4 py-3 text-right font-medium">Infra</th>
                 <th className="px-4 py-3 font-medium">Fonte</th>
+                <th className="px-4 py-3 text-right font-medium">Duração</th>
                 <th className="px-4 py-3 font-medium">Última ativ.</th>
               </tr>
             </thead>
@@ -336,9 +355,7 @@ export function TaskCostsTab() {
                   key={`${t.userId}:${t.chatId ?? "none"}`}
                   onClick={() => void openDetail(t.chatId)}
                   className={`border-b last:border-0 ${
-                    t.chatId
-                      ? "cursor-pointer hover:bg-muted/40"
-                      : "opacity-70"
+                    t.chatId ? "cursor-pointer hover:bg-muted/40" : "opacity-70"
                   }`}
                 >
                   <td className="max-w-[15rem] px-4 py-2.5">
@@ -362,7 +379,10 @@ export function TaskCostsTab() {
                     {fmtNum(t.inputTokens)} / {fmtNum(t.outputTokens)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-right font-semibold text-success">
-                    <RealCost has={t.hasRealCost} value={t.providerBilledCostDollars} />
+                    <RealCost
+                      has={t.hasRealCost}
+                      value={t.providerBilledCostDollars}
+                    />
                   </td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-right">
                     {money(t.costDollars)}
@@ -375,6 +395,27 @@ export function TaskCostsTab() {
                       tone={sourceTone(t.costSource)}
                       label={t.costSource}
                     />
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-muted-foreground">
+                    {t.requests > 1 &&
+                    t.firstActivityAt != null &&
+                    t.lastActivityAt != null ? (
+                      <span
+                        title={`Tempo entre o 1º e o último request cobrado${
+                          t.capped ? " (parcial: total limitado)" : ""
+                        }`}
+                      >
+                        {t.capped ? "≥ " : ""}
+                        {fmtDuration(t.lastActivityAt - t.firstActivityAt)}
+                      </span>
+                    ) : (
+                      <span
+                        className="cursor-help"
+                        title="Duração não medida: request único (a latência por request não é registrada)."
+                      >
+                        n/d
+                      </span>
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">
                     {formatDateTime(t.lastActivityAt)}
@@ -409,8 +450,40 @@ export function TaskCostsTab() {
                   <div>
                     <h3 className="text-lg font-semibold">{detail.title}</h3>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {detail.userEmail ?? detail.userId ?? "—"} · {detail.chatId}
+                      {detail.userEmail ?? detail.userId ?? "—"} ·{" "}
+                      {detail.chatId}
                     </p>
+                    {detail.firstActivityAt != null &&
+                      detail.lastActivityAt != null && (
+                        <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                          <Clock className="h-3.5 w-3.5 shrink-0" />
+                          {detail.total.requests > 1 ? (
+                            <>
+                              <span
+                                className="font-medium text-foreground"
+                                title="Duração total da task: do 1º ao último request cobrado."
+                              >
+                                {fmtDuration(
+                                  detail.lastActivityAt -
+                                    detail.firstActivityAt,
+                                )}
+                              </span>
+                              <span>
+                                · {formatDateTime(detail.firstActivityAt)} →{" "}
+                                {formatDateTime(detail.lastActivityAt)}
+                              </span>
+                            </>
+                          ) : (
+                            <span
+                              className="cursor-help"
+                              title="Duração não medida: request único (a latência por request não é registrada)."
+                            >
+                              Duração n/d ·{" "}
+                              {formatDateTime(detail.lastActivityAt)}
+                            </span>
+                          )}
+                        </p>
+                      )}
                   </div>
                   <button
                     type="button"
@@ -468,10 +541,18 @@ export function TaskCostsTab() {
                     <thead>
                       <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
                         <th className="px-3 py-2 font-medium">Modelo</th>
-                        <th className="px-3 py-2 text-right font-medium">Req</th>
-                        <th className="px-3 py-2 text-right font-medium">In/Out</th>
-                        <th className="px-3 py-2 text-right font-medium">Real</th>
-                        <th className="px-3 py-2 text-right font-medium">Registrado</th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          Req
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          In/Out
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          Real
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          Registrado
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -485,7 +566,10 @@ export function TaskCostsTab() {
                             {fmtNum(m.inputTokens)} / {fmtNum(m.outputTokens)}
                           </td>
                           <td className="px-3 py-2 text-right font-medium text-success">
-                            <RealCost has={m.hasRealCost} value={m.providerBilledCostDollars} />
+                            <RealCost
+                              has={m.hasRealCost}
+                              value={m.providerBilledCostDollars}
+                            />
                           </td>
                           <td className="px-3 py-2 text-right">
                             {money(m.costDollars)}
@@ -505,9 +589,15 @@ export function TaskCostsTab() {
                       <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
                         <th className="px-3 py-2 font-medium">Quando</th>
                         <th className="px-3 py-2 font-medium">Modelo</th>
-                        <th className="px-3 py-2 text-right font-medium">In/Out</th>
-                        <th className="px-3 py-2 text-right font-medium">Real</th>
-                        <th className="px-3 py-2 text-right font-medium">Registrado</th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          In/Out
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          Real
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          Registrado
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -521,7 +611,10 @@ export function TaskCostsTab() {
                             {fmtNum(r.inputTokens)} / {fmtNum(r.outputTokens)}
                           </td>
                           <td className="px-3 py-2 text-right font-medium text-success">
-                            <RealCost has={r.hasRealCost} value={r.providerBilledCostDollars} />
+                            <RealCost
+                              has={r.hasRealCost}
+                              value={r.providerBilledCostDollars}
+                            />
                           </td>
                           <td className="px-3 py-2 text-right">
                             {money(r.costDollars)}
