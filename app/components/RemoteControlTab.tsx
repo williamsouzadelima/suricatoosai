@@ -434,8 +434,24 @@ const RemoteControlTab = () => {
                   </div>
                 </div>
                 <span
-                  className="shrink-0 rounded-md border bg-background px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground"
-                  title={conn.isDesktop ? "Desktop app" : "Connector version"}
+                  className={`shrink-0 rounded-md border px-1.5 py-0.5 font-mono text-[10px] leading-none ${
+                    conn.isDesktop || conn.clientVersion === "1.0.0"
+                      ? // Desktop (updates via Tauri) or legacy pre-auto-update
+                        // connectors ("1.0.0") — neutral.
+                        "border-border bg-muted text-muted-foreground"
+                      : conn.updateAvailable
+                        ? "border-warning/30 bg-warning/10 text-warning"
+                        : "border-success/30 bg-success/10 text-success"
+                  }`}
+                  title={
+                    conn.isDesktop
+                      ? "Desktop app"
+                      : conn.clientVersion === "1.0.0"
+                        ? "Versão legada (sem auto-update) — bootstrap manual p/ 0.1.x"
+                        : conn.updateAvailable
+                          ? "Update disponível"
+                          : "Atualizado"
+                  }
                 >
                   {conn.isDesktop
                     ? conn.appVersion || appVersion
