@@ -644,7 +644,12 @@
       "connectorRevoked": "Connector revoked. It cannot reconnect until you allow it again.",
       "connectorAllowed": "Connector allowed again.",
       "failedRevoke": "Failed to revoke connector",
-      "failedAllow": "Failed to allow connector"
+      "failedAllow": "Failed to allow connector",
+      "update": "Update",
+      "updating": "Updating…",
+      "updateAvailable": "Update available",
+      "updateStarted": "Update started — the agent will update and restart shortly.",
+      "failedUpdate": "Failed to start the update"
     },
     "team": {
       "failedFetchData": "Failed to fetch team data",

@@ -644,7 +644,12 @@
       "connectorRevoked": "Conector revocado. No podrá reconectarse hasta que lo permitas de nuevo.",
       "connectorAllowed": "Conector permitido de nuevo.",
       "failedRevoke": "No se pudo revocar el conector",
-      "failedAllow": "No se pudo permitir el conector"
+      "failedAllow": "No se pudo permitir el conector",
+      "update": "Actualizar",
+      "updating": "Actualizando…",
+      "updateAvailable": "Actualización disponible",
+      "updateStarted": "Actualización iniciada — el agente se actualizará y reiniciará en breve.",
+      "failedUpdate": "No se pudo iniciar la actualización"
     },
     "team": {
       "failedFetchData": "No se pudieron obtener los datos del equipo",

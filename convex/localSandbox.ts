@@ -4,6 +4,35 @@ import { validateServiceKey } from "./lib/utils";
 import { DatabaseReader } from "./_generated/server";
 import { SignJWT } from "jose";
 
+// Latest agent (@suricatoos/local) version — bump on each agent release so the
+// Remote Control UI flags older connectors and requestAgentUpdate targets it.
+const LATEST_AGENT_VERSION = "0.1.2";
+
+function parseVersion(v: string): number[] | null {
+  const parts = v.split(".").map((p) => Number.parseInt(p, 10));
+  if (parts.length === 0 || parts.some((n) => !Number.isFinite(n))) return null;
+  return parts;
+}
+
+// True only when the client is strictly OLDER than the latest (semver), so a
+// newer-than-latest agent — e.g. in the window between publishing to npm and
+// deploying Convex — is never flagged and never downgraded. Non-semver values
+// (legacy "1.0.0", garbage) are not flagged. The desktop app self-updates via
+// Tauri, so it is never flagged here.
+function agentUpdateAvailable(clientVersion: string): boolean {
+  if (clientVersion === "desktop") return false;
+  const client = parseVersion(clientVersion);
+  const latest = parseVersion(LATEST_AGENT_VERSION);
+  if (!client || !latest) return false;
+  const len = Math.max(client.length, latest.length);
+  for (let i = 0; i < len; i += 1) {
+    const a = client[i] ?? 0;
+    const b = latest[i] ?? 0;
+    if (a !== b) return a < b;
+  }
+  return false;
+}
+
 /**
  * Internal mutation: purge disconnected sandbox connections older than cutoff.
  * Disconnected rows accumulate otherwise since they're never garbage-collected
@@ -703,6 +732,8 @@ export const listConnections = query({
       ),
       lastSeen: v.number(),
       isDesktop: v.boolean(),
+      clientVersion: v.string(),
+      updateAvailable: v.boolean(),
       capabilities: v.object({
         commands: v.boolean(),
         pty: v.boolean(),
@@ -726,6 +757,8 @@ export const listConnections = query({
       osInfo: conn.os_info,
       lastSeen: conn.last_heartbeat,
       isDesktop: conn.client_version === "desktop",
+      clientVersion: conn.client_version,
+      updateAvailable: agentUpdateAvailable(conn.client_version),
       capabilities: conn.capabilities ?? { commands: true, pty: true },
     }));
   },
@@ -750,6 +783,8 @@ export const listConnectionsForBackend = query({
       ),
       lastSeen: v.number(),
       isDesktop: v.boolean(),
+      clientVersion: v.string(),
+      updateAvailable: v.boolean(),
       capabilities: v.object({
         commands: v.boolean(),
         pty: v.boolean(),
@@ -771,8 +806,86 @@ export const listConnectionsForBackend = query({
       osInfo: conn.os_info,
       lastSeen: conn.last_heartbeat,
       isDesktop: conn.client_version === "desktop",
+      clientVersion: conn.client_version,
+      updateAvailable: agentUpdateAvailable(conn.client_version),
       capabilities: conn.capabilities ?? { commands: true, pty: true },
     }));
+  },
+});
+
+// ============================================================================
+// AGENT AUTO-UPDATE (Remote Control "Update" button)
+// ============================================================================
+
+/**
+ * Flag a connector for update (Remote Control "Update" button). The agent picks
+ * it up on its next poll (pollAgentUpdate) and self-updates. The per-user token
+ * is untouched.
+ */
+export const requestAgentUpdate = mutation({
+  args: { connectionId: v.string() },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, { connectionId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Unauthorized: User not authenticated",
+      });
+    }
+    const userId = identity.subject;
+
+    const connection = await ctx.db
+      .query("local_sandbox_connections")
+      .withIndex("by_connection_id", (q) => q.eq("connection_id", connectionId))
+      .first();
+
+    if (!connection || connection.user_id !== userId) {
+      return { success: false };
+    }
+
+    await ctx.db.patch(connection._id, {
+      update_requested: true,
+      target_agent_version: LATEST_AGENT_VERSION,
+      update_requested_at: Date.now(),
+    });
+    return { success: true };
+  },
+});
+
+/**
+ * Called by the agent (token-authed) on a short poll. Reads-and-clears the
+ * pending-update flag so a failed update never loops.
+ */
+export const pollAgentUpdate = mutation({
+  args: { token: v.string(), connectionId: v.string() },
+  returns: v.object({
+    updateRequested: v.boolean(),
+    targetVersion: v.union(v.string(), v.null()),
+  }),
+  handler: async (ctx, { token, connectionId }) => {
+    const tokenResult = await validateToken(ctx.db, token);
+    if (!tokenResult.valid) {
+      return { updateRequested: false, targetVersion: null };
+    }
+
+    const connection = await ctx.db
+      .query("local_sandbox_connections")
+      .withIndex("by_connection_id", (q) => q.eq("connection_id", connectionId))
+      .first();
+
+    if (
+      !connection ||
+      connection.user_id !== tokenResult.userId ||
+      !connection.update_requested
+    ) {
+      return { updateRequested: false, targetVersion: null };
+    }
+
+    const targetVersion =
+      connection.target_agent_version ?? LATEST_AGENT_VERSION;
+    await ctx.db.patch(connection._id, { update_requested: false });
+    return { updateRequested: true, targetVersion };
   },
 });
 

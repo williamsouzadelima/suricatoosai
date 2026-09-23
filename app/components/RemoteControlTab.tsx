@@ -17,6 +17,7 @@ import {
   Check,
   Trash2,
   RotateCcw,
+  ArrowUpCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { runCommand, convexUrlFlag } from "@/lib/utils/sandbox-command";
@@ -160,6 +161,7 @@ const RemoteControlTab = () => {
   const [isResettingToken, setIsResettingToken] = useState(false);
   const [isCommandCopied, setIsCommandCopied] = useState(false);
   const [showConnectSetup, setShowConnectSetup] = useState(false);
+  const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
   const copiedResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -180,6 +182,7 @@ const RemoteControlTab = () => {
   const revokeConnection = useMutation(api.localSandbox.revokeConnection);
   const unrevokeConnection = useMutation(api.localSandbox.unrevokeConnection);
   const revokedConnectors = useQuery(api.localSandbox.listRevokedConnectors);
+  const requestAgentUpdate = useMutation(api.localSandbox.requestAgentUpdate);
   const hideConnectSetup = useCallback(() => setShowConnectSetup(false), []);
 
   useAutoSelectNewRemoteConnection({
@@ -338,6 +341,31 @@ const RemoteControlTab = () => {
     }
   };
 
+  const clearUpdating = (connectionId: string) =>
+    setUpdatingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(connectionId);
+      return next;
+    });
+
+  const handleUpdateAgent = async (connectionId: string) => {
+    setUpdatingIds((prev) => new Set(prev).add(connectionId));
+    try {
+      await requestAgentUpdate({ connectionId });
+      toast.success(t("remoteControl.updateStarted"));
+    } catch (error) {
+      console.error("Failed to request agent update:", error);
+      toast.error(t("remoteControl.failedUpdate"));
+      clearUpdating(connectionId);
+      return;
+    }
+    // Fallback: the agent picks up the request on its next poll, updates, and
+    // reconnects on the new version (updateAvailable flips false, hiding the
+    // button reactively). Clear the local spinner after ~90s in case it never
+    // comes back.
+    setTimeout(() => clearUpdating(connectionId), 90_000);
+  };
+
   return (
     <div className="space-y-5">
       {/* Section Header */}
@@ -384,6 +412,25 @@ const RemoteControlTab = () => {
                       : t("remoteControl.remoteControlConnected")}
                   </div>
                 </div>
+                {!conn.isDesktop && conn.updateAvailable ? (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="h-7 shrink-0 gap-1 px-2 text-xs"
+                    onClick={() => handleUpdateAgent(conn.connectionId)}
+                    disabled={updatingIds.has(conn.connectionId)}
+                    title={t("remoteControl.updateAvailable")}
+                  >
+                    {updatingIds.has(conn.connectionId) ? (
+                      <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <ArrowUpCircle className="h-3.5 w-3.5" />
+                    )}
+                    {updatingIds.has(conn.connectionId)
+                      ? t("remoteControl.updating")
+                      : t("remoteControl.update")}
+                  </Button>
+                ) : null}
                 {!conn.isDesktop ? (
                   <Button
                     variant="ghost"
