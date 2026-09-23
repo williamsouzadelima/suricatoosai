@@ -506,6 +506,7 @@ export const connectDesktop = mutation({
         files: v.optional(v.boolean()),
       }),
     ),
+    appVersion: v.optional(v.string()),
   },
   returns: v.object({
     connectionId: v.string(),
@@ -549,6 +550,7 @@ export const connectDesktop = mutation({
       connection_name: args.connectionName,
       container_id: undefined,
       client_version: "desktop",
+      app_version: args.appVersion,
       mode: "dangerous",
       os_info: args.osInfo,
       capabilities: args.capabilities ?? { commands: true, pty: true },
@@ -733,6 +735,7 @@ export const listConnections = query({
       lastSeen: v.number(),
       isDesktop: v.boolean(),
       clientVersion: v.string(),
+      appVersion: v.union(v.string(), v.null()),
       updateAvailable: v.boolean(),
       capabilities: v.object({
         commands: v.boolean(),
@@ -758,6 +761,7 @@ export const listConnections = query({
       lastSeen: conn.last_heartbeat,
       isDesktop: conn.client_version === "desktop",
       clientVersion: conn.client_version,
+      appVersion: conn.app_version ?? null,
       updateAvailable: agentUpdateAvailable(conn.client_version),
       capabilities: conn.capabilities ?? { commands: true, pty: true },
     }));
@@ -784,6 +788,7 @@ export const listConnectionsForBackend = query({
       lastSeen: v.number(),
       isDesktop: v.boolean(),
       clientVersion: v.string(),
+      appVersion: v.union(v.string(), v.null()),
       updateAvailable: v.boolean(),
       capabilities: v.object({
         commands: v.boolean(),
@@ -807,6 +812,7 @@ export const listConnectionsForBackend = query({
       lastSeen: conn.last_heartbeat,
       isDesktop: conn.client_version === "desktop",
       clientVersion: conn.client_version,
+      appVersion: conn.app_version ?? null,
       updateAvailable: agentUpdateAvailable(conn.client_version),
       capabilities: conn.capabilities ?? { commands: true, pty: true },
     }));

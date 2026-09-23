@@ -438,8 +438,8 @@ const RemoteControlTab = () => {
                   title={conn.isDesktop ? "Desktop app" : "Connector version"}
                 >
                   {conn.isDesktop
-                    ? appVersion
-                      ? `v${appVersion}`
+                    ? conn.appVersion || appVersion
+                      ? `v${conn.appVersion || appVersion}`
                       : "Desktop"
                     : `v${conn.clientVersion}`}
                 </span>

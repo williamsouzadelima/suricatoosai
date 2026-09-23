@@ -225,6 +225,7 @@ interface LocalSandboxConnection {
   lastSeen: number;
   isDesktop: boolean;
   clientVersion: string;
+  appVersion: string | null;
   updateAvailable: boolean;
   capabilities: {
     commands: boolean;

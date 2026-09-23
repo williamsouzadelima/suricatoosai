@@ -944,6 +944,9 @@ export default defineSchema({
     connection_name: v.string(),
     container_id: v.optional(v.string()),
     client_version: v.string(),
+    // Desktop app's own version (Tauri), reported on connect via connectDesktop.
+    // client_version stays "desktop" (the marker for isDesktop / update-exclusion).
+    app_version: v.optional(v.string()),
     // Keep accepting legacy cloud rows until production data has been purged.
     // No current writer creates them, and connection queries exclude them.
     mode: v.union(

@@ -175,6 +175,17 @@ function isUnauthenticatedError(error: unknown): boolean {
   return (data as { code?: string }).code === "UNAUTHORIZED";
 }
 
+// The desktop app's own version (Tauri). Reported to the backend on connect so
+// the Remote Control UI can show it from any client, not just inside the app.
+async function getDesktopAppVersion(): Promise<string | undefined> {
+  try {
+    const { getVersion } = await import("@tauri-apps/api/app");
+    return await getVersion();
+  } catch {
+    return undefined;
+  }
+}
+
 interface DesktopBridgeConfig {
   connectDesktop: (args: {
     connectionName: string;
@@ -189,6 +200,7 @@ interface DesktopBridgeConfig {
       pty: boolean;
       files?: boolean;
     };
+    appVersion?: string;
   }) => Promise<{
     connectionId: string;
     centrifugoToken: string;
@@ -356,6 +368,7 @@ export class DesktopSandboxBridge {
         connectionName: osInfo?.hostname || "Desktop",
         osInfo,
         capabilities: { commands: true, pty: true, files: true },
+        appVersion: await getDesktopAppVersion(),
       });
 
     this.connectionId = connectionId;
