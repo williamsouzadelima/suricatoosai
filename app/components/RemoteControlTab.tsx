@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import { runCommand, convexUrlFlag } from "@/lib/utils/sandbox-command";
 import { useGlobalState } from "@/app/contexts/GlobalState";
+import { isTauriEnvironment } from "@/app/hooks/useTauri";
 import type {
   ChatMode,
   SandboxPreference,
@@ -205,6 +206,26 @@ const RemoteControlTab = () => {
     },
     [],
   );
+
+  // Desktop rows report clientVersion "desktop" (a marker), not their real
+  // version — read the running app's version from Tauri to show it on the badge.
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isTauriEnvironment()) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { getVersion } = await import("@tauri-apps/api/app");
+        const version = await getVersion();
+        if (!cancelled) setAppVersion(version);
+      } catch {
+        // Tauri API unavailable — leave the desktop badge as a plain label.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const activeConnections = connections ?? [];
 
@@ -412,6 +433,16 @@ const RemoteControlTab = () => {
                       : t("remoteControl.remoteControlConnected")}
                   </div>
                 </div>
+                <span
+                  className="shrink-0 rounded-md border bg-background px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground"
+                  title={conn.isDesktop ? "Desktop app" : "Connector version"}
+                >
+                  {conn.isDesktop
+                    ? appVersion
+                      ? `v${appVersion}`
+                      : "Desktop"
+                    : `v${conn.clientVersion}`}
+                </span>
                 {!conn.isDesktop && conn.updateAvailable ? (
                   <Button
                     variant="default"
