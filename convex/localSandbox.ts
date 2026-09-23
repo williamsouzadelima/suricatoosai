@@ -6,7 +6,7 @@ import { SignJWT } from "jose";
 
 // Latest agent (@suricatoos/local) version — bump on each agent release so the
 // Remote Control UI flags older connectors and requestAgentUpdate targets it.
-const LATEST_AGENT_VERSION = "0.1.2";
+const LATEST_AGENT_VERSION = "0.1.4";
 
 function parseVersion(v: string): number[] | null {
   const parts = v.split(".").map((p) => Number.parseInt(p, 10));
