@@ -277,6 +277,35 @@ export const getReportForDownload = query({
   },
 });
 
+/**
+ * Metadados p/ download pela ROTA-PROXY autenticada (serviceKey + userId).
+ * A rota Next gateia via getInternalUser e passa o WorkOS user.id (=== user_id).
+ * Retorna também client/engagement/org para a trilha de auditoria.
+ */
+export const getReportForDownloadBackend = query({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    reportId: v.id("reports"),
+  },
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const r = await ctx.db.get(args.reportId);
+    if (!r || r.user_id !== args.userId) return null;
+    return {
+      s3Key: r.s3_key ?? null,
+      status: r.status,
+      format: r.format,
+      audience: r.audience,
+      version: r.version,
+      title: r.title,
+      clientId: r.client_id,
+      engagementId: r.engagement_id,
+      organizationId: r.organization_id ?? null,
+    };
+  },
+});
+
 /** Lista reativa dos relatórios do engajamento (identity + posse) — p/ a UI. */
 export const listReportsForEngagement = query({
   args: { engagementId: v.id("engagements") },

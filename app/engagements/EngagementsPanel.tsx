@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import {
   Plus,
@@ -557,14 +557,12 @@ function ReportsSection({ engagementId }: { engagementId: Id<"engagements"> }) {
   const reports = useQuery(api.reports.listReportsForEngagement, {
     engagementId,
   });
-  const getDownloadUrl = useAction(api.reportActions.getReportDownloadUrl);
 
   const [audience, setAudience] = useState<ReportAudience>("technical");
   const [formats, setFormats] = useState<Set<ReportFormat>>(
     () => new Set<ReportFormat>(["pdf"]),
   );
   const [generating, setGenerating] = useState(false);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const toggleFormat = (f: ReportFormat) => {
     setFormats((prev) => {
@@ -609,19 +607,14 @@ function ReportsSection({ engagementId }: { engagementId: Id<"engagements"> }) {
     }
   };
 
-  const download = async (reportId: Id<"reports">) => {
-    setDownloadingId(reportId);
-    try {
-      const { url } = await getDownloadUrl({ reportId });
-      window.open(url, "_blank", "noopener,noreferrer");
-    } catch (e) {
-      toast.error(
-        e instanceof Error && e.message ? e.message : "Download indisponível.",
-      );
-      console.error(e);
-    } finally {
-      setDownloadingId(null);
-    }
+  // Download por rota-proxy autenticada (sessão WorkOS via cookie); a rota
+  // grava auditoria antes de servir e faz stream do S3 (sem bearer no browser).
+  const download = (reportId: Id<"reports">) => {
+    window.open(
+      `/api/reports/${reportId}/download`,
+      "_blank",
+      "noopener,noreferrer",
+    );
   };
 
   // Agrupa as linhas (uma por formato) por report_group_id, mais recentes no topo.
@@ -766,14 +759,9 @@ function ReportsSection({ engagementId }: { engagementId: Id<"engagements"> }) {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => void download(r._id)}
-                            disabled={downloadingId === r._id}
+                            onClick={() => download(r._id)}
                           >
-                            {downloadingId === r._id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Download className="h-3.5 w-3.5" />
-                            )}
+                            <Download className="h-3.5 w-3.5" />
                             Baixar
                           </Button>
                         )}
