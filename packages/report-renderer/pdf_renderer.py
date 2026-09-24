@@ -189,6 +189,8 @@ def render_pdf(model, out_path):
                 meta_bits.append(f"CWE: {esc(f['cwe'])}")
             if meta_bits:
                 S.append(Paragraph("   ".join(meta_bits), ss["Small"]))
+            if f.get("narrative"):
+                S.append(Paragraph(f'<b><font color="#{T.PRIMARY}">Narrativa:</font></b> {esc(_clip(f["narrative"],3000))}', ss["Body2"]))
             for label, key in [("Descrição", "description"), ("Impacto", "impact"), ("Remediação", "remediation")]:
                 if f.get(key):
                     S.append(Paragraph(f'<b><font color="#{T.PRIMARY}">{label}:</font></b> {esc(_clip(f[key],2000))}', ss["Body2"]))
@@ -197,14 +199,26 @@ def render_pdf(model, out_path):
                 for i, s in enumerate(f["reproductionSteps"][:12], 1):
                     S.append(Paragraph(f"{i}. {esc(_clip(s,400))}", ss["Body2"]))
             if sec.get("showPoc"):
-                ev = f.get("evidence") or []
-                if any(e.get("snippet") or e.get("imagePath") for e in ev):
-                    S.append(Paragraph(f'<b><font color="#{T.PRIMARY}">Evidência:</font></b>', ss["Body2"]))
-                for e in ev[:8]:
-                    if e.get("label"):
-                        S.append(Paragraph(f'<b>{esc(_clip(e["label"],120))}</b>', ss["Small"]))
+                ev = sorted(
+                    f.get("evidence") or [],
+                    key=lambda e: e.get("stepIndex") if e.get("stepIndex") is not None else 1_000_000,
+                )
+                if any(e.get("snippet") or e.get("imagePath") or e.get("command") for e in ev):
+                    S.append(Paragraph(f'<b><font color="#{T.PRIMARY}">Cadeia de evidência:</font></b>', ss["Body2"]))
+                for i, e in enumerate(ev[:20], 1):
+                    n = e.get("stepIndex") or i
+                    head = f"<b>{n}.</b>"
+                    if e.get("toolName"):
+                        head += f' <font face="Courier">[{esc(e["toolName"])}]</font>'
+                    if e.get("label") and e.get("label") != e.get("toolName"):
+                        head += f' {esc(_clip(e["label"],80))}'
+                    S.append(Paragraph(head, ss["Small"]))
+                    if e.get("command"):
+                        S.append(Paragraph(f'<font face="Courier" size="8">$ {esc(_clip(e["command"],600))}</font>', ss["Small"]))
                     if e.get("snippet"):
-                        S.append(Paragraph(esc(_clip(e["snippet"], 1500)), ss["Small"]))
+                        S.append(Paragraph(f'<font face="Courier" size="8">{esc(_clip(e["snippet"],1500))}</font>', ss["Small"]))
+                    if e.get("resultSummary"):
+                        S.append(Paragraph(f'<font color="#{T.SUCCESS}"><b>&#8594; prova:</b></font> {esc(_clip(e["resultSummary"],400))}', ss["Small"]))
                     if e.get("imagePath"):
                         _append_image_pdf(S, ss, e["imagePath"], e.get("label"))
         elif t in ("findingsTable", "remediationMatrix"):

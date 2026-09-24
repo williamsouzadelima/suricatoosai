@@ -15,9 +15,9 @@ import { validateServiceKey } from "./lib/utils";
  */
 
 const MAX_MSGS = 400;
-const PER_MSG_CLAMP = 4000;
-const TOOL_OUTPUT_CLAMP = 2000;
-const TOOL_INPUT_CLAMP = 400;
+const PER_MSG_CLAMP = 12000;
+const TOOL_OUTPUT_CLAMP = 6000;
+const TOOL_INPUT_CLAMP = 1200;
 
 function toText(value: unknown, clamp: number): string {
   if (value == null) return "";
@@ -65,10 +65,28 @@ function flattenMessage(
         typeof p.toolName === "string"
           ? p.toolName
           : t.replace(/^tool-/, "") || "tool";
-      const input = p.input ? toText(p.input, TOOL_INPUT_CLAMP) : "";
+      // Extrai o COMANDO real do input quando presente (terminal/http/etc.),
+      // em vez de despejar o JSON inteiro — é isso que dá contexto ao achado.
+      const inputObj =
+        p.input && typeof p.input === "object"
+          ? (p.input as Record<string, unknown>)
+          : null;
+      const cmd =
+        inputObj && typeof inputObj.command === "string"
+          ? inputObj.command
+          : inputObj && typeof inputObj.cmd === "string"
+            ? inputObj.cmd
+            : inputObj && typeof inputObj.url === "string"
+              ? `${inputObj.method ?? "GET"} ${inputObj.url}`
+              : null;
+      const inputText = cmd
+        ? `comando: ${toText(cmd, TOOL_INPUT_CLAMP)}`
+        : p.input
+          ? `entrada: ${toText(p.input, TOOL_INPUT_CLAMP)}`
+          : "";
       const output = toolOutputText(p, toolClamp);
       chunks.push(
-        `[ferramenta ${name}]${input ? ` entrada: ${input}` : ""}${
+        `[ferramenta ${name}]${inputText ? ` ${inputText}` : ""}${
           output ? `\nsaída: ${output}` : ""
         }`,
       );

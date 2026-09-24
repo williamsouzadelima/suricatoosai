@@ -17,6 +17,11 @@ export type ReportEvidenceView = {
   sourceType: string;
   label?: string;
   snippet?: string;
+  /** Cadeia estruturada: passo, ferramenta, comando, o que a saída prova. */
+  stepIndex?: number;
+  toolName?: string;
+  command?: string;
+  resultSummary?: string;
   /**
    * Caminho LOCAL (relativo à raiz do renderer no sandbox) de uma evidência em
    * imagem, quando houver. O job do trigger baixa o arquivo do S3 e preenche
@@ -38,6 +43,8 @@ export type ReportFindingView = {
   description?: string;
   impact?: string;
   remediation?: string;
+  /** Narrativa (storytelling) do achado. */
+  narrative?: string;
   reproductionSteps?: string[];
   evidence: ReportEvidenceView[];
 };

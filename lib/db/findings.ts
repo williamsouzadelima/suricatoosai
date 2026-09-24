@@ -28,6 +28,11 @@ export type CapturedEvidenceItem = {
   s3_key?: string;
   media_type?: string;
   sandbox_path?: string;
+  /** Cadeia estruturada: passo, ferramenta, comando, resumo do resultado. */
+  step_index?: number;
+  tool_name?: string;
+  command?: string;
+  result_summary?: string;
 };
 
 export type CaptureFindingParams = {
@@ -40,6 +45,7 @@ export type CaptureFindingParams = {
   description?: string;
   impact?: string;
   remediation?: string;
+  narrative?: string;
   reproductionSteps?: string[];
   cwe?: string;
   cvssVector?: string;
@@ -92,6 +98,7 @@ export async function captureFinding(
     description: params.description,
     impact: params.impact,
     remediation: params.remediation,
+    narrative: params.narrative,
     reproductionSteps: params.reproductionSteps,
     cwe: params.cwe,
     cvssVector: params.cvssVector,

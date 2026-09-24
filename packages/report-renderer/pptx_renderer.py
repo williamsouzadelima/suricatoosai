@@ -227,32 +227,53 @@ def _image_slide(prs, title, path, caption=None):
 
 
 def _evidence_slides(prs, f):
-    ev = f.get("evidence") or []
-    texts = [e for e in ev if e.get("snippet")]
+    ev = sorted(
+        f.get("evidence") or [],
+        key=lambda e: e.get("stepIndex") if e.get("stepIndex") is not None else 1_000_000,
+    )
+    chain = [e for e in ev if e.get("snippet") or e.get("command")]
     imgs = [e for e in ev if e.get("imagePath")]
-    if texts:
-        slide, y = _title_slide(prs, _clip(f"Evidencia — {f.get('title','')}", 70))
+
+    if f.get("narrative"):
+        slide, y = _title_slide(prs, _clip(f"Narrativa — {f.get('title','')}", 70))
+        _text(slide, ML, y, CW, Inches(5.2), _clip(f["narrative"], 1400),
+              size=14, color=T.INK)
+
+    if chain:
+        slide, y = _title_slide(
+            prs, _clip(f"Cadeia de evidencia — {f.get('title','')}", 70))
         tb = slide.shapes.add_textbox(ML, y, CW, Inches(5.4))
         tf = tb.text_frame
         tf.word_wrap = True
         first = True
-        for e in texts[:6]:
-            if e.get("label"):
-                p = tf.paragraphs[0] if first else tf.add_paragraph()
-                first = False
-                r = p.add_run()
-                r.text = _clip(e["label"], 90)
-                r.font.size = Pt(11)
-                r.font.bold = True
-                r.font.color.rgb = _rgb(T.PRIMARY)
+
+        def _line(text, size, bold, color, before=0, mono=False):
+            nonlocal first
             p = tf.paragraphs[0] if first else tf.add_paragraph()
             first = False
             r = p.add_run()
-            r.text = _clip(e.get("snippet", ""), 600)
-            r.font.size = Pt(10)
+            r.text = text
+            r.font.size = Pt(size)
+            r.font.bold = bold
             r.font.name = T.FONT_BODY
-            r.font.color.rgb = _rgb(T.INK)
-            p.space_after = Pt(8)
+            r.font.color.rgb = _rgb(color)
+            if before:
+                p.space_before = Pt(before)
+
+        for i, e in enumerate(chain[:6], 1):
+            n = e.get("stepIndex") or i
+            head = f"{n}."
+            if e.get("toolName"):
+                head += f"  [{e['toolName']}]"
+            _line(head, 12, True, T.PRIMARY, before=6)
+            if e.get("command"):
+                _line("$ " + _clip(e["command"], 180), 10, False, T.MUTED)
+            if e.get("snippet"):
+                _line(_clip(e["snippet"], 340), 10, False, T.INK)
+            if e.get("resultSummary"):
+                _line("-> prova: " + _clip(e["resultSummary"], 180), 10, False,
+                      T.SUCCESS)
+
     for e in imgs[:4]:
         _image_slide(prs, _clip(f"Evidencia Visual — {f.get('title','')}", 70),
                      e.get("imagePath"), e.get("label"))

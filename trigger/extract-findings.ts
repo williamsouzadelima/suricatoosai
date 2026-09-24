@@ -26,9 +26,38 @@ export const EXTRACT_FINDINGS_TASK_ID = "extract-findings-from-chat";
 const EXTRACTION_MODEL_KEY = "model-grok-4.6" satisfies ModelName;
 
 const MAX_FINDINGS = 40;
-const PROMPT_CHAR_BUDGET = 120_000;
+const MAX_CHAIN = 30;
+const PROMPT_CHAR_BUDGET = 300_000;
 
 const severityEnum = z.enum(["info", "low", "medium", "high", "critical"]);
+
+// Um passo da CADEIA de evidência: o que foi feito, com que ferramenta/comando,
+// o que a saída mostrou (verbatim) e o que isso PROVA. É o que dá contexto.
+const chainStepSchema = z.object({
+  step: z.number().int().optional().describe("Ordem do passo (1, 2, 3...)."),
+  tool_name: z
+    .string()
+    .optional()
+    .describe("Ferramenta usada (ex.: curl, sqlmap, nmap, terminal, http)."),
+  command: z
+    .string()
+    .optional()
+    .describe("Comando/requisição EXATO executado (verbatim)."),
+  output_snippet: z
+    .string()
+    .optional()
+    .describe("Trecho VERBATIM da SAÍDA/resposta que comprova o passo."),
+  significance: z
+    .string()
+    .optional()
+    .describe("O que este passo PROVA / por que importa para o achado."),
+  file_name: z
+    .string()
+    .optional()
+    .describe(
+      "Nome EXATO de um print/arquivo da lista 'Arquivos desta task', quando o passo tiver um artefato salvo.",
+    ),
+});
 
 const extractedFindingSchema = z.object({
   title: z.string().describe("Título conciso do achado."),
@@ -42,27 +71,22 @@ const extractedFindingSchema = z.object({
   description: z.string().optional(),
   impact: z.string().optional(),
   remediation: z.string().optional(),
+  narrative: z
+    .string()
+    .optional()
+    .describe(
+      "Storytelling do achado em prosa: do recon/descoberta até a prova de exploração, encadeando os passos com contexto de negócio.",
+    ),
   reproduction_steps: z.array(z.string()).optional(),
   cwe: z.string().optional(),
   cvss_vector: z.string().optional(),
   confidence: z.enum(["low", "medium", "high"]).optional(),
-  evidence: z
-    .array(
-      z.object({
-        label: z.string().optional(),
-        snippet: z
-          .string()
-          .optional()
-          .describe("Trecho VERBATIM da transcrição que sustenta o achado."),
-        file_name: z
-          .string()
-          .optional()
-          .describe(
-            "Nome EXATO de um arquivo/print da lista 'Arquivos desta task', quando a evidência for um arquivo salvo (ex.: screenshot).",
-          ),
-      }),
-    )
-    .optional(),
+  evidence_chain: z
+    .array(chainStepSchema)
+    .optional()
+    .describe(
+      "Cadeia CRONOLÓGICA de evidências: cada passo com ferramenta, comando, saída verbatim e significado. É a prova organizada do achado.",
+    ),
 });
 
 const extractionSchema = z.object({
@@ -96,16 +120,22 @@ function buildPrompt(
         .map((f) => `- ${f.name} (${f.mediaType})`)
         .join("\n")
     : "(nenhum)";
-  return `Você é um pentester sênior revisando a transcrição de uma task de pentest JÁ CONCLUÍDA (título: "${title}"). Extraia os ACHADOS de segurança distintos que tenham SUPORTE explícito na transcrição.
+  return `Você é um pentester sênior escrevendo o relatório a partir da transcrição de uma task de pentest JÁ CONCLUÍDA (título: "${title}"). Extraia os ACHADOS de segurança distintos que tenham SUPORTE explícito na transcrição, com EVIDÊNCIA ORGANIZADA e CONTEXTUALIZADA.
 
 Regras:
-- NÃO invente. Só reporte o que a transcrição sustenta; cite o trecho como evidência (verbatim) em evidence[].snippet.
-- Se um achado for sustentado por um print/arquivo salvo, referencie o NOME EXATO do arquivo (da lista abaixo) em evidence[].file_name.
-- Um achado por vulnerabilidade distinta; não combine itens não relacionados.
+- NÃO invente. Só reporte o que a transcrição sustenta.
+- Para CADA achado, reconstrua a EVIDÊNCIA como uma CADEIA CRONOLÓGICA (evidence_chain), um passo por ação relevante, em ordem (recon → identificação → exploração → prova). Cada passo deve ter, quando existir na transcrição:
+  * tool_name: a ferramenta (curl, sqlmap, nmap, terminal, http, etc.).
+  * command: o comando/requisição EXATO (verbatim), com método e URL/params.
+  * output_snippet: o trecho VERBATIM da saída/resposta que comprova (status, corpo, token, erro, etc.).
+  * significance: o que aquele passo PROVA e por que importa.
+  * file_name: se houver um print/arquivo salvo que sustente o passo, o NOME EXATO da lista abaixo.
+- narrative: escreva o STORYTELLING do achado em prosa — como foi descoberto e explorado, do recon à prova, com impacto de negócio. É o fio que conecta a cadeia.
 - Preencha severity sempre; description/impact/remediation/CWE/CVSS quando a transcrição permitir.
+- Um achado por vulnerabilidade distinta; não combine itens não relacionados.
 - Se nada de segurança relevante foi encontrado, retorne uma lista vazia.
 
-=== ARQUIVOS DESTA TASK ===
+=== ARQUIVOS DESTA TASK (prints/saídas salvas) ===
 ${fileList}
 
 === TRANSCRIÇÃO ===
@@ -138,7 +168,7 @@ export const extractFindingsFromChat = schemaTask({
       model: myProvider.languageModel(EXTRACTION_MODEL_KEY),
       output: Output.object({ schema: extractionSchema }),
       temperature: 0,
-      maxOutputTokens: 8_000,
+      maxOutputTokens: 16_000,
       maxRetries: 1,
       prompt: buildPrompt(
         transcript.title,
@@ -168,30 +198,40 @@ export const extractFindingsFromChat = schemaTask({
           description: f.description,
           impact: f.impact,
           remediation: f.remediation,
+          narrative: f.narrative,
           reproductionSteps: f.reproduction_steps,
           cwe: f.cwe,
           cvssVector: f.cvss_vector,
           confidence: f.confidence,
           origin: "agent",
-          evidence: (f.evidence ?? []).map((e): CapturedEvidenceItem => {
-            const fl = e.file_name ? fileByName.get(e.file_name) : undefined;
-            if (fl) {
-              // Evidência em ARQUIVO (print/saída salva na task).
-              return {
-                source_type: "file",
-                label: e.label ?? fl.name,
-                snippet: e.snippet,
-                file_id: fl.fileId,
-                s3_key: fl.s3Key ?? undefined,
-                media_type: fl.mediaType,
+          evidence: (f.evidence_chain ?? [])
+            .slice(0, MAX_CHAIN)
+            .map((s, i): CapturedEvidenceItem => {
+              const fl = s.file_name ? fileByName.get(s.file_name) : undefined;
+              const base = {
+                step_index: s.step ?? i + 1,
+                tool_name: s.tool_name,
+                command: s.command,
+                snippet: s.output_snippet,
+                result_summary: s.significance,
+                label: s.tool_name ?? s.file_name,
               };
-            }
-            return {
-              source_type: "tool_output",
-              label: e.label,
-              snippet: e.snippet,
-            };
-          }),
+              if (fl) {
+                // Passo com ARTEFATO (print/saída salva) → evidência em arquivo.
+                return {
+                  ...base,
+                  source_type: "file",
+                  label: base.label ?? fl.name,
+                  file_id: fl.fileId,
+                  s3_key: fl.s3Key ?? undefined,
+                  media_type: fl.mediaType,
+                };
+              }
+              return {
+                ...base,
+                source_type: s.command ? "command" : "tool_output",
+              };
+            }),
         });
         if (res.success) {
           captured += 1;

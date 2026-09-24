@@ -58,11 +58,20 @@ export const getReportInputForBackend = query({
 
     const findings = [];
     for (const f of published) {
-      const ev = await ctx.db
+      const evRaw = await ctx.db
         .query("evidence")
         .withIndex("by_finding_and_captured", (q) => q.eq("finding_id", f._id))
         .order("desc")
         .take(EVIDENCE_PER_FINDING);
+      // Ordena pela cadeia (step_index; sem índice → pelo tempo de captura).
+      const ev = evRaw
+        .slice()
+        .sort(
+          (a, b) =>
+            (a.step_index ?? Number.MAX_SAFE_INTEGER) -
+              (b.step_index ?? Number.MAX_SAFE_INTEGER) ||
+            a.captured_at - b.captured_at,
+        );
       findings.push({
         ref: f.finding_id,
         title: f.title,
@@ -75,11 +84,16 @@ export const getReportInputForBackend = query({
         description: f.description,
         impact: f.impact,
         remediation: f.remediation,
+        narrative: f.narrative,
         reproductionSteps: f.reproduction_steps ?? [],
         evidence: ev.map((e) => ({
           sourceType: e.source_type,
           label: e.label,
           snippet: e.snippet,
+          stepIndex: e.step_index ?? null,
+          toolName: e.tool_name ?? null,
+          command: e.command ?? null,
+          resultSummary: e.result_summary ?? null,
           fileId: e.file_id ?? null,
           s3Key: e.s3_key ?? null,
           mediaType: e.media_type ?? null,

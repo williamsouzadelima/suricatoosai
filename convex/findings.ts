@@ -64,6 +64,10 @@ const evidenceItemArg = v.object({
   tool_call_id: v.optional(v.string()),
   subagent_id: v.optional(v.string()),
   media_type: v.optional(v.string()),
+  step_index: v.optional(v.number()),
+  tool_name: v.optional(v.string()),
+  command: v.optional(v.string()),
+  result_summary: v.optional(v.string()),
 });
 
 const MAX_SNIPPET_CHARS = 8000; // ~ mantém a linha bem abaixo do teto de 1MB
@@ -113,6 +117,10 @@ async function insertEvidence(
     tool_call_id?: string;
     subagent_id?: string;
     media_type?: string;
+    step_index?: number;
+    tool_name?: string;
+    command?: string;
+    result_summary?: string;
   },
 ): Promise<void> {
   const now = Date.now();
@@ -133,6 +141,10 @@ async function insertEvidence(
     label: item.label,
     snippet: clampSnippet(item.snippet),
     media_type: item.media_type,
+    step_index: item.step_index,
+    tool_name: item.tool_name,
+    command: clampText(item.command),
+    result_summary: clampText(item.result_summary),
     captured_at: now,
     created_at: now,
   });
@@ -198,6 +210,7 @@ export const captureFindingForBackend = mutation({
     impact: v.optional(v.string()),
     remediation: v.optional(v.string()),
     reproductionSteps: v.optional(v.array(v.string())),
+    narrative: v.optional(v.string()),
     cwe: v.optional(v.string()),
     cvssVector: v.optional(v.string()),
     cvssScore: v.optional(v.number()),
@@ -248,6 +261,8 @@ export const captureFindingForBackend = mutation({
         patch.impact = clampText(args.impact);
       if (!mergeable.remediation && args.remediation)
         patch.remediation = clampText(args.remediation);
+      if (!mergeable.narrative && args.narrative)
+        patch.narrative = clampText(args.narrative);
       if (!mergeable.cwe && args.cwe) patch.cwe = args.cwe;
       if (!mergeable.cvss_vector && args.cvssVector)
         patch.cvss_vector = args.cvssVector;
@@ -302,6 +317,7 @@ export const captureFindingForBackend = mutation({
       impact: clampText(args.impact),
       remediation: clampText(args.remediation),
       reproduction_steps: clampSteps(args.reproductionSteps),
+      narrative: clampText(args.narrative),
       severity: args.severity,
       cvss_vector: args.cvssVector,
       cvss_score: args.cvssScore,
@@ -438,6 +454,7 @@ export const updateFinding = mutation({
     impact: v.optional(v.string()),
     remediation: v.optional(v.string()),
     reproductionSteps: v.optional(v.array(v.string())),
+    narrative: v.optional(v.string()),
     cwe: v.optional(v.string()),
     cvssVector: v.optional(v.string()),
     cvssScore: v.optional(v.number()),
@@ -461,6 +478,7 @@ export const updateFinding = mutation({
     if (args.description !== undefined) patch.description = args.description;
     if (args.impact !== undefined) patch.impact = args.impact;
     if (args.remediation !== undefined) patch.remediation = args.remediation;
+    if (args.narrative !== undefined) patch.narrative = args.narrative;
     if (args.reproductionSteps !== undefined)
       patch.reproduction_steps = args.reproductionSteps;
     if (args.cwe !== undefined) patch.cwe = args.cwe;

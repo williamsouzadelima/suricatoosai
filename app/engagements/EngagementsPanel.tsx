@@ -959,12 +959,25 @@ function FindingEvidence({
     description?: string;
     impact?: string;
     remediation?: string;
+    narrative?: string;
     weakness_class: string;
     cvss_vector?: string;
     cwe?: string;
   };
 }) {
-  const evidence = useQuery(api.findings.listEvidenceForFinding, { findingId });
+  const evidenceRaw = useQuery(api.findings.listEvidenceForFinding, {
+    findingId,
+  });
+  // Ordena pela cadeia (step_index; sem índice → pelo tempo de captura).
+  const evidence = useMemo(() => {
+    if (!evidenceRaw) return evidenceRaw;
+    return evidenceRaw.slice().sort((a, b) => {
+      const sa = a.step_index ?? Number.MAX_SAFE_INTEGER;
+      const sb = b.step_index ?? Number.MAX_SAFE_INTEGER;
+      return sa - sb || a.captured_at - b.captured_at;
+    });
+  }, [evidenceRaw]);
+
   return (
     <div className="mt-3 space-y-3 rounded-lg border bg-muted/20 p-3 text-sm">
       <div className="grid gap-2 sm:grid-cols-2">
@@ -972,6 +985,9 @@ function FindingEvidence({
         <Detail label="CVSS" value={finding.cvss_vector} />
         <Detail label="CWE" value={finding.cwe} />
       </div>
+      {finding.narrative && (
+        <Detail label="Narrativa" value={finding.narrative} block />
+      )}
       {finding.description && (
         <Detail label="Descrição" value={finding.description} block />
       )}
@@ -983,7 +999,7 @@ function FindingEvidence({
       )}
       <div>
         <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Evidência ({evidence?.length ?? 0})
+          Cadeia de evidência ({evidence?.length ?? 0})
         </div>
         {evidence === undefined ? (
           <div className="text-xs text-muted-foreground">Carregando…</div>
@@ -992,21 +1008,50 @@ function FindingEvidence({
             Sem evidência — aprovar exige ao menos uma evidência.
           </Callout>
         ) : (
-          <div className="space-y-2">
-            {evidence.map((ev) => (
-              <div key={ev._id} className="rounded border bg-background p-2">
-                <div className="text-xs font-medium text-muted-foreground">
-                  {ev.source_type}
-                  {ev.label ? ` · ${ev.label}` : ""}
+          <ol className="space-y-2">
+            {evidence.map((ev, i) => (
+              <li key={ev._id} className="rounded border bg-background p-2.5">
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
+                    {ev.step_index ?? i + 1}
+                  </span>
+                  {ev.tool_name && (
+                    <span className="rounded bg-muted px-1.5 py-0.5 font-mono font-medium">
+                      {ev.tool_name}
+                    </span>
+                  )}
+                  <span className="text-muted-foreground">
+                    {ev.source_type}
+                    {ev.label ? ` · ${ev.label}` : ""}
+                  </span>
+                  {ev.file_id && (
+                    <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                      📎 arquivo
+                    </span>
+                  )}
                 </div>
+                {ev.command && (
+                  <pre className="mt-1.5 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/60 p-1.5 font-mono text-xs">
+                    <span className="select-none text-muted-foreground">
+                      ${" "}
+                    </span>
+                    {ev.command}
+                  </pre>
+                )}
                 {ev.snippet && (
-                  <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words text-xs">
+                  <pre className="mt-1 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/30 p-1.5 text-xs">
                     {ev.snippet}
                   </pre>
                 )}
-              </div>
+                {ev.result_summary && (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    <span className="font-medium text-success">→ prova:</span>{" "}
+                    {ev.result_summary}
+                  </div>
+                )}
+              </li>
             ))}
-          </div>
+          </ol>
         )}
       </div>
     </div>

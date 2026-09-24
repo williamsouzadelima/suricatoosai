@@ -1685,6 +1685,9 @@ export default defineSchema({
     impact: v.optional(v.string()),
     remediation: v.optional(v.string()),
     reproduction_steps: v.optional(v.array(v.string())),
+    // Narrativa (storytelling) do achado: como foi descoberto e explorado,
+    // encadeando os passos/evidências num contexto de negócio.
+    narrative: v.optional(v.string()),
     severity: severityValidator,
     cvss_version: v.optional(v.union(v.literal("3.1"), v.literal("4.0"))),
     cvss_vector: v.optional(v.string()),
@@ -1735,6 +1738,12 @@ export default defineSchema({
     label: v.optional(v.string()),
     snippet: v.optional(v.string()),
     media_type: v.optional(v.string()),
+    // Cadeia estruturada da evidência (ordem + contexto), para não virar um
+    // saco plano de trechos: passo, ferramenta, comando, resumo do resultado.
+    step_index: v.optional(v.number()),
+    tool_name: v.optional(v.string()),
+    command: v.optional(v.string()),
+    result_summary: v.optional(v.string()),
     redacted: v.optional(v.boolean()),
     captured_at: v.number(),
     created_at: v.number(),

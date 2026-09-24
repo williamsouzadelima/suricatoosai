@@ -165,6 +165,9 @@ def _finding_card(doc, sec):
         meta.append(f"CWE: {f['cwe']}")
     if meta:
         _para(doc, "   ".join(meta), size=10, color=T.MUTED, after=4)
+    if f.get("narrative"):
+        _para(doc, "NARRATIVA:", size=10, bold=True, color=T.PRIMARY, after=1)
+        _para(doc, _clip(f["narrative"], 3000), size=10, color=T.INK, after=4)
     for label, key in [("Descricao", "description"), ("Impacto", "impact"),
                        ("Remediacao", "remediation")]:
         if f.get(key):
@@ -192,16 +195,44 @@ def _embed_image_docx(doc, path, caption=None):
         _para(doc, _clip(caption, 120), size=8, color=T.MUTED, after=4)
 
 
-def _evidence_docx(doc, f):
+def _ev_sorted(f):
     ev = f.get("evidence") or []
-    if not any(e.get("snippet") or e.get("imagePath") for e in ev):
+    return sorted(
+        ev,
+        key=lambda e: e.get("stepIndex") if e.get("stepIndex") is not None else 1_000_000,
+    )
+
+
+def _evidence_docx(doc, f):
+    ev = _ev_sorted(f)
+    if not any(
+        e.get("snippet") or e.get("imagePath") or e.get("command") for e in ev
+    ):
         return
-    _para(doc, "EVIDENCIA:", size=10, bold=True, color=T.PRIMARY, after=2)
-    for e in ev[:8]:
-        if e.get("label"):
-            _para(doc, _clip(e["label"], 120), size=9, bold=True, color=T.INK, after=1)
+    _para(doc, "CADEIA DE EVIDENCIA:", size=10, bold=True, color=T.PRIMARY, after=2)
+    for i, e in enumerate(ev[:20], 1):
+        n = e.get("stepIndex") or i
+        head = f"{n}."
+        if e.get("toolName"):
+            head += f"  [{e['toolName']}]"
+        if e.get("label") and e.get("label") != e.get("toolName"):
+            head += f"  {_clip(e['label'], 80)}"
+        _para(doc, head, size=10, bold=True, color=T.INK, after=1)
+        if e.get("command"):
+            p = doc.add_paragraph()
+            p.paragraph_format.space_after = Pt(1)
+            _run(p, "$ " + _clip(e["command"], 600), size=9, color=T.MUTED,
+                 font="Consolas")
         if e.get("snippet"):
-            _para(doc, _clip(e["snippet"], 1200), size=9, color=T.MUTED, after=2)
+            p = doc.add_paragraph()
+            p.paragraph_format.space_after = Pt(1)
+            _run(p, _clip(e["snippet"], 1500), size=9, color=T.MUTED,
+                 font="Consolas")
+        if e.get("resultSummary"):
+            pp = doc.add_paragraph()
+            pp.paragraph_format.space_after = Pt(3)
+            _run(pp, "-> prova: ", size=9, bold=True, color=T.SUCCESS)
+            _run(pp, _clip(e["resultSummary"], 400), size=9, color=T.INK)
         if e.get("imagePath"):
             _embed_image_docx(doc, e["imagePath"], e.get("label"))
 
