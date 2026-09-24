@@ -238,7 +238,11 @@ export const resolveEngagementForChatBackend = mutation({
       .first();
     if (chat?.engagement_id) {
       const eng = await ctx.db.get(chat.engagement_id);
-      if (eng) return { engagementId: eng._id, clientId: eng.client_id };
+      // Só devolve o engajamento existente quando pertence ao próprio userId;
+      // senão cai no provisionamento lazy sob args.userId (evita cross-tenant).
+      if (eng && eng.user_id === args.userId) {
+        return { engagementId: eng._id, clientId: eng.client_id };
+      }
     }
 
     // Cliente "Não atribuído" (lazy)

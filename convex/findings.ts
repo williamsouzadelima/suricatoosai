@@ -67,6 +67,25 @@ const evidenceItemArg = v.object({
 });
 
 const MAX_SNIPPET_CHARS = 8000; // ~ mantém a linha bem abaixo do teto de 1MB
+const MAX_NARRATIVE_CHARS = 20000; // description/impact/remediation
+const MAX_REPRO_STEPS = 50;
+const MAX_REPRO_STEP_CHARS = 4000;
+
+function clampText(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  return value.length > MAX_NARRATIVE_CHARS
+    ? value.slice(0, MAX_NARRATIVE_CHARS)
+    : value;
+}
+
+function clampSteps(steps: string[] | undefined): string[] | undefined {
+  if (steps === undefined) return undefined;
+  return steps
+    .slice(0, MAX_REPRO_STEPS)
+    .map((s) =>
+      s.length > MAX_REPRO_STEP_CHARS ? s.slice(0, MAX_REPRO_STEP_CHARS) : s,
+    );
+}
 
 function generateFindingId(): string {
   return `F-${Math.random().toString(36).substring(2, 7)}`;
@@ -119,6 +138,31 @@ async function insertEvidence(
   });
 }
 
+/** Evita reinserir evidência idêntica ao mesclar recapturas (contém acúmulo). */
+async function evidenceAlreadyPresent(
+  ctx: MutationCtx,
+  findingId: Id<"findings">,
+  item: {
+    source_type: Doc<"evidence">["source_type"];
+    tool_call_id?: string;
+    message_id?: string;
+    label?: string;
+  },
+): Promise<boolean> {
+  const recent = await ctx.db
+    .query("evidence")
+    .withIndex("by_finding_and_captured", (q) => q.eq("finding_id", findingId))
+    .order("desc")
+    .take(500);
+  return recent.some(
+    (e) =>
+      e.source_type === item.source_type &&
+      e.tool_call_id === item.tool_call_id &&
+      e.message_id === item.message_id &&
+      e.label === item.label,
+  );
+}
+
 async function requireOwnedFinding(
   ctx: MutationCtx,
   findingId: Id<"findings">,
@@ -143,7 +187,6 @@ export const captureFindingForBackend = mutation({
   args: {
     serviceKey: v.string(),
     userId: v.string(),
-    clientId: v.id("clients"),
     engagementId: v.id("engagements"),
     dedupFingerprint: v.string(),
     origin: originArg,
@@ -160,7 +203,6 @@ export const captureFindingForBackend = mutation({
     cvssScore: v.optional(v.number()),
     confidence: v.optional(confidenceArg),
     verdict: v.optional(verdictArg),
-    organizationId: v.optional(v.string()),
     sourceChatId: v.optional(v.string()),
     sourceMessageId: v.optional(v.string()),
     sourceToolCallId: v.optional(v.string()),
@@ -173,6 +215,16 @@ export const captureFindingForBackend = mutation({
       return { success: false, error: "Título e ativo são obrigatórios" };
     }
 
+    // Fonte da verdade da tenancy é o engajamento: exige posse do userId e
+    // deriva client_id/organization_id DELE (nunca de args separados, que
+    // poderiam divergir ou apontar para outro tenant).
+    const engagement = await ctx.db.get(args.engagementId);
+    if (!engagement || engagement.user_id !== args.userId) {
+      return { success: false, error: "Engajamento inexistente ou sem acesso" };
+    }
+    const clientId = engagement.client_id;
+    const organizationId = engagement.organization_id;
+
     const dupes = await ctx.db
       .query("findings")
       .withIndex("by_engagement_and_fingerprint", (q) =>
@@ -182,23 +234,28 @@ export const captureFindingForBackend = mutation({
       )
       .collect();
     const mergeable = dupes.find(
-      (f) => f.status === "draft" || f.status === "in_review",
+      (f) =>
+        (f.status === "draft" || f.status === "in_review") &&
+        f.user_id === args.userId,
     );
 
     if (mergeable) {
       // Completa apenas campos ainda vazios; não sobrescreve curadoria.
       const patch: Record<string, unknown> = { updated_at: Date.now() };
       if (!mergeable.description && args.description)
-        patch.description = args.description;
-      if (!mergeable.impact && args.impact) patch.impact = args.impact;
+        patch.description = clampText(args.description);
+      if (!mergeable.impact && args.impact)
+        patch.impact = clampText(args.impact);
       if (!mergeable.remediation && args.remediation)
-        patch.remediation = args.remediation;
+        patch.remediation = clampText(args.remediation);
       if (!mergeable.cwe && args.cwe) patch.cwe = args.cwe;
       if (!mergeable.cvss_vector && args.cvssVector)
         patch.cvss_vector = args.cvssVector;
       await ctx.db.patch(mergeable._id, patch);
       for (const item of args.evidence ?? []) {
-        await insertEvidence(ctx, mergeable, item);
+        if (!(await evidenceAlreadyPresent(ctx, mergeable._id, item))) {
+          await insertEvidence(ctx, mergeable, item);
+        }
       }
       return {
         success: true,
@@ -228,8 +285,8 @@ export const captureFindingForBackend = mutation({
     const now = Date.now();
     const findingId = await ctx.db.insert("findings", {
       user_id: args.userId,
-      organization_id: args.organizationId,
-      client_id: args.clientId,
+      organization_id: organizationId,
+      client_id: clientId,
       engagement_id: args.engagementId,
       finding_id: findingRef,
       origin: args.origin,
@@ -241,10 +298,10 @@ export const captureFindingForBackend = mutation({
       affected_asset: args.affectedAsset.trim(),
       weakness_class: args.weaknessClass.trim(),
       cwe: args.cwe,
-      description: args.description,
-      impact: args.impact,
-      remediation: args.remediation,
-      reproduction_steps: args.reproductionSteps,
+      description: clampText(args.description),
+      impact: clampText(args.impact),
+      remediation: clampText(args.remediation),
+      reproduction_steps: clampSteps(args.reproductionSteps),
       severity: args.severity,
       cvss_vector: args.cvssVector,
       cvss_score: args.cvssScore,
@@ -345,6 +402,9 @@ export const dismissFinding = mutation({
     await ctx.db.patch(finding._id, {
       status: "dismissed",
       dismiss_reason: args.reason,
+      approved_by: undefined,
+      approved_at: undefined,
+      published_at: undefined,
       updated_at: Date.now(),
     });
     return null;
@@ -358,6 +418,9 @@ export const reopenFinding = mutation({
     await ctx.db.patch(finding._id, {
       status: "in_review",
       dismiss_reason: undefined,
+      approved_by: undefined,
+      approved_at: undefined,
+      published_at: undefined,
       updated_at: Date.now(),
     });
     return null;
@@ -457,7 +520,7 @@ export const listFindingsForEngagement = query({
 });
 
 export const listEvidenceForFinding = query({
-  args: { findingId: v.id("findings") },
+  args: { findingId: v.id("findings"), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
@@ -469,7 +532,7 @@ export const listEvidenceForFinding = query({
         q.eq("finding_id", args.findingId),
       )
       .order("desc")
-      .collect();
+      .take(Math.min(args.limit ?? 200, 500));
   },
 });
 
