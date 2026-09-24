@@ -26,19 +26,26 @@ function toText(value: unknown, clamp: number): string {
 }
 
 /** Extrai o texto de saída de uma tool part do AI SDK (formatos variados). */
-function toolOutputText(part: Record<string, unknown>): string {
+function toolOutputText(
+  part: Record<string, unknown>,
+  clamp: number = TOOL_OUTPUT_CLAMP,
+): string {
   const out = part.output ?? part.result;
   if (out == null) return "";
-  if (typeof out === "string") return toText(out, TOOL_OUTPUT_CLAMP);
+  if (typeof out === "string") return toText(out, clamp);
   if (typeof out === "object") {
     const value = (out as Record<string, unknown>).value ?? out;
-    return toText(value, TOOL_OUTPUT_CLAMP);
+    return toText(value, clamp);
   }
-  return toText(out, TOOL_OUTPUT_CLAMP);
+  return toText(out, clamp);
 }
 
 /** Achata content + parts numa string legível e limitada. */
-function flattenMessage(m: Doc<"messages">): string {
+function flattenMessage(
+  m: Doc<"messages">,
+  perMsgClamp: number = PER_MSG_CLAMP,
+  toolClamp: number = TOOL_OUTPUT_CLAMP,
+): string {
   const chunks: string[] = [];
   if (typeof m.content === "string" && m.content.trim()) {
     chunks.push(m.content.trim());
@@ -51,7 +58,7 @@ function flattenMessage(m: Doc<"messages">): string {
     if (t === "text" && typeof p.text === "string") {
       if (p.text.trim()) chunks.push(p.text.trim());
     } else if (t === "reasoning") {
-      // Ignora raciocínio (economiza orçamento do prompt).
+      // Ignora raciocínio (economiza orçamento do prompt/tela).
       continue;
     } else if (t.startsWith("tool-") || t === "dynamic-tool") {
       const name =
@@ -59,7 +66,7 @@ function flattenMessage(m: Doc<"messages">): string {
           ? p.toolName
           : t.replace(/^tool-/, "") || "tool";
       const input = p.input ? toText(p.input, TOOL_INPUT_CLAMP) : "";
-      const output = toolOutputText(p);
+      const output = toolOutputText(p, toolClamp);
       chunks.push(
         `[ferramenta ${name}]${input ? ` entrada: ${input}` : ""}${
           output ? `\nsaída: ${output}` : ""
@@ -68,10 +75,49 @@ function flattenMessage(m: Doc<"messages">): string {
     }
   }
   const joined = chunks.join("\n");
-  return joined.length > PER_MSG_CLAMP
-    ? joined.slice(0, PER_MSG_CLAMP) + "…"
+  return joined.length > perMsgClamp
+    ? joined.slice(0, perMsgClamp) + "…"
     : joined;
 }
+
+const VIEW_PER_MSG_CLAMP = 8000;
+const VIEW_TOOL_CLAMP = 4000;
+
+/**
+ * Transcrição de uma task para EXIBIÇÃO na UI do engajamento (identity + posse).
+ * Read-only, achatada e limitada; para fidelidade total o usuário abre /c/[id].
+ */
+export const getChatTranscriptForView = query({
+  args: { chatId: v.string(), limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    const chat = await ctx.db
+      .query("chats")
+      .withIndex("by_chat_id", (q) => q.eq("id", args.chatId))
+      .first();
+    if (!chat || chat.user_id !== identity.subject) return null;
+    const limit = Math.min(Math.max(args.limit ?? MAX_MSGS, 1), 500);
+    const msgs = await ctx.db
+      .query("messages")
+      .withIndex("by_chat_id", (q) => q.eq("chat_id", args.chatId))
+      .order("asc")
+      .take(limit);
+    const messages = msgs
+      .filter((m) => !m.is_hidden && m.role !== "system")
+      .map((m) => ({
+        role: m.role,
+        id: m.id,
+        text: flattenMessage(m, VIEW_PER_MSG_CLAMP, VIEW_TOOL_CLAMP),
+      }))
+      .filter((m) => m.text.length > 0);
+    return {
+      title: chat.title,
+      messageCount: messages.length,
+      messages,
+    };
+  },
+});
 
 export const getChatTranscriptForBackend = query({
   args: {

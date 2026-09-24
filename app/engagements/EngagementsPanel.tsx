@@ -15,6 +15,7 @@ import {
   Download,
   Loader2,
   Sparkles,
+  ExternalLink,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -251,6 +252,7 @@ function EngagementDetail({
 
   const [pickChatId, setPickChatId] = useState<string>("");
   const [capturingChatId, setCapturingChatId] = useState<string | null>(null);
+  const [expandedChatId, setExpandedChatId] = useState<string | null>(null);
 
   // Captura RETROATIVA por IA: anexa o chat ao engajamento e dispara o job que
   // lê a transcrição e grava achados em rascunho para curadoria.
@@ -566,37 +568,68 @@ function EngagementDetail({
             />
           ) : (
             <div className="divide-y">
-              {chats.map((c) => (
-                <div
-                  key={c.id}
-                  className="flex items-center justify-between gap-2 px-4 py-2.5 text-sm"
-                >
-                  <span className="min-w-0 flex-1 truncate">{c.title}</span>
-                  {c.active_trigger_run_id ? (
-                    <span className="flex items-center gap-1 text-xs text-success">
-                      <Radio className="h-3 w-3" /> ativo
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">
-                      {formatDateTime(c.update_time)}
-                    </span>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void captureFromChat(c.id)}
-                    disabled={capturingChatId === c.id}
-                    title="Extrair achados desta task por IA"
-                  >
-                    {capturingChatId === c.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-3.5 w-3.5" />
+              {chats.map((c) => {
+                const expanded = expandedChatId === c.id;
+                return (
+                  <div key={c.id} className="px-4 py-2.5 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        onClick={() =>
+                          setExpandedChatId(expanded ? null : c.id)
+                        }
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                        title="Ver a transcrição da task"
+                      >
+                        {expanded ? (
+                          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        )}
+                        <span className="min-w-0 flex-1 truncate">
+                          {c.title}
+                        </span>
+                      </button>
+                      {c.active_trigger_run_id ? (
+                        <span className="flex items-center gap-1 text-xs text-success">
+                          <Radio className="h-3 w-3" /> ativo
+                        </span>
+                      ) : (
+                        <span className="hidden text-xs text-muted-foreground sm:inline">
+                          {formatDateTime(c.update_time)}
+                        </span>
+                      )}
+                      <a
+                        href={`/c/${c.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-8 items-center gap-1 rounded-md border px-2 text-xs text-muted-foreground hover:bg-muted/40"
+                        title="Abrir a task completa"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" /> Abrir
+                      </a>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void captureFromChat(c.id)}
+                        disabled={capturingChatId === c.id}
+                        title="Extrair achados desta task por IA"
+                      >
+                        {capturingChatId === c.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3.5 w-3.5" />
+                        )}
+                        Capturar
+                      </Button>
+                    </div>
+                    {expanded && (
+                      <div className="mt-2">
+                        <ChatTranscriptView chatId={c.id} />
+                      </div>
                     )}
-                    Capturar
-                  </Button>
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           )}
         </Card>
@@ -869,6 +902,51 @@ function ReportsSection({ engagementId }: { engagementId: Id<"engagements"> }) {
         </div>
       )}
     </Card>
+  );
+}
+
+const CHAT_ROLE_LABEL: Record<string, string> = {
+  user: "Operador",
+  assistant: "Agente",
+  system: "Sistema",
+};
+
+function ChatTranscriptView({ chatId }: { chatId: string }) {
+  const transcript = useQuery(api.engagementCapture.getChatTranscriptForView, {
+    chatId,
+  });
+  if (transcript === undefined) {
+    return (
+      <div className="rounded-lg border bg-muted/20 p-3 text-xs text-muted-foreground">
+        Carregando transcrição…
+      </div>
+    );
+  }
+  if (transcript === null) {
+    return (
+      <Callout tone="warning">Sem acesso à transcrição desta task.</Callout>
+    );
+  }
+  if (transcript.messages.length === 0) {
+    return (
+      <div className="rounded-lg border bg-muted/20 p-3 text-xs text-muted-foreground">
+        Task sem conteúdo textual (ou muito antiga).
+      </div>
+    );
+  }
+  return (
+    <div className="max-h-[28rem] space-y-3 overflow-y-auto rounded-lg border bg-muted/20 p-3">
+      {transcript.messages.map((m) => (
+        <div key={m.id}>
+          <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+            {CHAT_ROLE_LABEL[m.role] ?? m.role}
+          </div>
+          <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed">
+            {m.text}
+          </pre>
+        </div>
+      ))}
+    </div>
   );
 }
 
