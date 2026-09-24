@@ -1,6 +1,6 @@
 import { query } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { validateServiceKey } from "./lib/utils";
 
 /**
@@ -145,11 +145,36 @@ export const getChatTranscriptForBackend = query({
       .filter((m) => !m.is_hidden && m.role !== "system")
       .map((m) => ({ role: m.role, id: m.id, text: flattenMessage(m) }))
       .filter((m) => m.text.length > 0);
+
+    // Arquivos anexados na task (prints/saídas salvas) — para o job referenciar
+    // por nome e anexá-los como evidência em arquivo (evidence.file_id/s3_key).
+    const fileIds = new Set<Id<"files">>();
+    for (const m of msgs) {
+      for (const fid of m.file_ids ?? []) fileIds.add(fid);
+    }
+    const files: {
+      fileId: Id<"files">;
+      name: string;
+      mediaType: string;
+      s3Key: string | null;
+    }[] = [];
+    for (const fid of [...fileIds].slice(0, 40)) {
+      const f = await ctx.db.get(fid);
+      if (!f) continue;
+      files.push({
+        fileId: fid,
+        name: f.name,
+        mediaType: f.media_type,
+        s3Key: f.s3_key ?? null,
+      });
+    }
+
     return {
       title: chat.title,
       engagementId: chat.engagement_id ?? null,
       messageCount: messages.length,
       messages,
+      files,
     };
   },
 });

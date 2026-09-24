@@ -5,7 +5,7 @@ import { z } from "zod";
 import { myProvider, type ModelName } from "@/lib/ai/providers";
 import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
-import { captureFinding } from "@/lib/db/findings";
+import { captureFinding, type CapturedEvidenceItem } from "@/lib/db/findings";
 
 /**
  * Extração RETROATIVA de achados de uma task (chat) já concluída.
@@ -52,7 +52,14 @@ const extractedFindingSchema = z.object({
         label: z.string().optional(),
         snippet: z
           .string()
+          .optional()
           .describe("Trecho VERBATIM da transcrição que sustenta o achado."),
+        file_name: z
+          .string()
+          .optional()
+          .describe(
+            "Nome EXATO de um arquivo/print da lista 'Arquivos desta task', quando a evidência for um arquivo salvo (ex.: screenshot).",
+          ),
       }),
     )
     .optional(),
@@ -70,6 +77,7 @@ const payloadSchema = z.object({
 function buildPrompt(
   title: string,
   messages: { role: string; text: string }[],
+  files: { name: string; mediaType: string }[],
 ): string {
   let budget = PROMPT_CHAR_BUDGET;
   const lines: string[] = [];
@@ -82,13 +90,23 @@ function buildPrompt(
     lines.push(line);
     budget -= line.length + 1;
   }
+  const fileList = files.length
+    ? files
+        .slice(0, 40)
+        .map((f) => `- ${f.name} (${f.mediaType})`)
+        .join("\n")
+    : "(nenhum)";
   return `Você é um pentester sênior revisando a transcrição de uma task de pentest JÁ CONCLUÍDA (título: "${title}"). Extraia os ACHADOS de segurança distintos que tenham SUPORTE explícito na transcrição.
 
 Regras:
-- NÃO invente. Só reporte o que a transcrição sustenta; cite o trecho como evidência (verbatim).
+- NÃO invente. Só reporte o que a transcrição sustenta; cite o trecho como evidência (verbatim) em evidence[].snippet.
+- Se um achado for sustentado por um print/arquivo salvo, referencie o NOME EXATO do arquivo (da lista abaixo) em evidence[].file_name.
 - Um achado por vulnerabilidade distinta; não combine itens não relacionados.
 - Preencha severity sempre; description/impact/remediation/CWE/CVSS quando a transcrição permitir.
 - Se nada de segurança relevante foi encontrado, retorne uma lista vazia.
+
+=== ARQUIVOS DESTA TASK ===
+${fileList}
 
 === TRANSCRIÇÃO ===
 ${lines.join("\n")}
@@ -122,10 +140,18 @@ export const extractFindingsFromChat = schemaTask({
       temperature: 0,
       maxOutputTokens: 8_000,
       maxRetries: 1,
-      prompt: buildPrompt(transcript.title, transcript.messages),
+      prompt: buildPrompt(
+        transcript.title,
+        transcript.messages,
+        transcript.files,
+      ),
     });
     const findings = (result.output?.findings ?? []).slice(0, MAX_FINDINGS);
     metadata.set("extracted", findings.length);
+
+    // Nome do arquivo → metadados, para anexar prints/saídas como evidência.
+    const fileByName = new Map<string, (typeof transcript.files)[number]>();
+    for (const fl of transcript.files) fileByName.set(fl.name, fl);
 
     metadata.set("phase", "saving");
     let captured = 0;
@@ -147,11 +173,25 @@ export const extractFindingsFromChat = schemaTask({
           cvssVector: f.cvss_vector,
           confidence: f.confidence,
           origin: "agent",
-          evidence: (f.evidence ?? []).map((e) => ({
-            source_type: "tool_output" as const,
-            label: e.label,
-            snippet: e.snippet,
-          })),
+          evidence: (f.evidence ?? []).map((e): CapturedEvidenceItem => {
+            const fl = e.file_name ? fileByName.get(e.file_name) : undefined;
+            if (fl) {
+              // Evidência em ARQUIVO (print/saída salva na task).
+              return {
+                source_type: "file",
+                label: e.label ?? fl.name,
+                snippet: e.snippet,
+                file_id: fl.fileId,
+                s3_key: fl.s3Key ?? undefined,
+                media_type: fl.mediaType,
+              };
+            }
+            return {
+              source_type: "tool_output",
+              label: e.label,
+              snippet: e.snippet,
+            };
+          }),
         });
         if (res.success) {
           captured += 1;
