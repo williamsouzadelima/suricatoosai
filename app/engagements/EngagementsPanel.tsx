@@ -16,6 +16,7 @@ import {
   Loader2,
   Sparkles,
   ExternalLink,
+  Upload,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -283,6 +284,53 @@ function EngagementDetail({
     }
   };
 
+  const [ingestingBundle, setIngestingBundle] = useState(false);
+
+  // Importa um BUNDLE de evidências (tar.gz/zip): presigned → PUT no S3 →
+  // dispara a task que extrai os artefatos e monta os achados.
+  const ingestBundle = async (file: File) => {
+    setIngestingBundle(true);
+    try {
+      const urlRes = await fetch("/api/engagements/bundle-upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name, size: file.size }),
+      });
+      if (!urlRes.ok) {
+        const j = (await urlRes.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error || "Falha ao preparar upload.");
+      }
+      const { uploadUrl, s3Key, contentType } = (await urlRes.json()) as {
+        uploadUrl: string;
+        s3Key: string;
+        contentType: string;
+      };
+      const put = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": contentType },
+        body: file,
+      });
+      if (!put.ok) throw new Error("Falha ao enviar o bundle ao S3.");
+      const ing = await fetch("/api/engagements/ingest-bundle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ engagementId, s3Key, filename: file.name }),
+      });
+      if (!ing.ok) {
+        const j = (await ing.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error || "Falha ao iniciar a ingestão.");
+      }
+      toast.success(
+        "Bundle enviado. Os achados aparecem em rascunho em alguns minutos.",
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao importar bundle.");
+      console.error(e);
+    } finally {
+      setIngestingBundle(false);
+    }
+  };
+
   const submit = useMutation(api.findings.submitForReview);
   const approve = useMutation(api.findings.approveFinding);
   const publish = useMutation(api.findings.publishFinding);
@@ -470,6 +518,50 @@ function EngagementDetail({
             })}
           </div>
         )}
+      </Card>
+
+      {/* Importar bundle de evidências */}
+      <Card className="gap-0 py-0">
+        <div className="flex flex-col gap-2 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <Upload className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <div>
+              <div className="text-sm font-medium">
+                Importar bundle de evidências
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Suba o .tar.gz/.zip da task (scripts, saídas, screenshots, .md).
+                A IA usa o relatório .md como fonte e anexa os artefatos reais
+                na cadeia de cada achado.
+              </div>
+            </div>
+          </div>
+          <label
+            className={`inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm font-medium ${
+              ingestingBundle
+                ? "pointer-events-none opacity-60"
+                : "hover:bg-muted/40"
+            }`}
+          >
+            {ingestingBundle ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4" />
+            )}
+            {ingestingBundle ? "Enviando…" : "Escolher bundle"}
+            <input
+              type="file"
+              accept=".tar.gz,.tgz,.zip,application/gzip,application/zip,application/x-gzip"
+              className="hidden"
+              disabled={ingestingBundle}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void ingestBundle(file);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        </div>
       </Card>
 
       {/* Relatórios */}
