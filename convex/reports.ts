@@ -257,6 +257,25 @@ export const markReportFailedForBackend = mutation({
   },
 });
 
+/** Metadados de um relatório para download (identity + posse). */
+export const getReportForDownload = query({
+  args: { reportId: v.id("reports") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    const r = await ctx.db.get(args.reportId);
+    if (!r || r.user_id !== identity.subject) return null;
+    return {
+      s3Key: r.s3_key ?? null,
+      status: r.status,
+      format: r.format,
+      audience: r.audience,
+      version: r.version,
+      title: r.title,
+    };
+  },
+});
+
 /** Lista reativa dos relatórios do engajamento (identity + posse) — p/ a UI. */
 export const listReportsForEngagement = query({
   args: { engagementId: v.id("engagements") },
