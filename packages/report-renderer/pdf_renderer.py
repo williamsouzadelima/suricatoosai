@@ -13,7 +13,10 @@ from reportlab.platypus import (
     TableStyle,
     PageBreak,
     HRFlowable,
+    Image,
 )
+from reportlab.lib.utils import ImageReader
+import os
 
 import theme as T
 
@@ -56,6 +59,26 @@ def _band(score):
     if score >= 3:
         return "6F9BF5"
     return T.SUCCESS
+
+
+def _append_image_pdf(S, ss, path, caption=None):
+    if not path or not os.path.exists(path):
+        return
+    try:
+        iw, ih = ImageReader(path).getSize()
+        maxw, maxh = 160 * mm, 120 * mm
+        scale = min(maxw / iw, maxh / ih, 1.0)
+        img = Image(path, width=iw * scale, height=ih * scale)
+        img.hAlign = "CENTER"
+        S.append(Spacer(1, 2 * mm))
+        S.append(img)
+        if caption:
+            safe = (_clip(caption, 120).replace("&", "&amp;")
+                    .replace("<", "&lt;").replace(">", "&gt;"))
+            S.append(Paragraph(safe, ss["Small"]))
+        S.append(Spacer(1, 3 * mm))
+    except Exception:
+        return
 
 
 def render_pdf(model, out_path):
@@ -173,6 +196,17 @@ def render_pdf(model, out_path):
                 S.append(Paragraph(f'<b><font color="#{T.PRIMARY}">Reprodução:</font></b>', ss["Body2"]))
                 for i, s in enumerate(f["reproductionSteps"][:12], 1):
                     S.append(Paragraph(f"{i}. {esc(_clip(s,400))}", ss["Body2"]))
+            if sec.get("showPoc"):
+                ev = f.get("evidence") or []
+                if any(e.get("snippet") or e.get("imagePath") for e in ev):
+                    S.append(Paragraph(f'<b><font color="#{T.PRIMARY}">Evidência:</font></b>', ss["Body2"]))
+                for e in ev[:8]:
+                    if e.get("label"):
+                        S.append(Paragraph(f'<b>{esc(_clip(e["label"],120))}</b>', ss["Small"]))
+                    if e.get("snippet"):
+                        S.append(Paragraph(esc(_clip(e["snippet"], 1500)), ss["Small"]))
+                    if e.get("imagePath"):
+                        _append_image_pdf(S, ss, e["imagePath"], e.get("label"))
         elif t in ("findingsTable", "remediationMatrix"):
             findings = sec.get("findings", [])
             rem = t == "remediationMatrix"

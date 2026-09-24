@@ -826,6 +826,18 @@ export const captureFindingEvidenceItemSchema = z.object({
     .string()
     .optional()
     .describe("ID da mensagem de origem, se aplicável."),
+  file_path: z
+    .string()
+    .optional()
+    .describe(
+      "Caminho de um arquivo NO SANDBOX (ex.: screenshot /tmp/poc.png) para anexar como EVIDÊNCIA VISUAL. O sistema faz upload e embute a imagem no relatório técnico. Tire o print/salve o arquivo antes de referenciá-lo.",
+    ),
+  media_type: z
+    .string()
+    .optional()
+    .describe(
+      "Tipo de mídia do arquivo (ex.: image/png). Opcional; inferido da extensão se omitido.",
+    ),
 });
 
 export const captureFindingToolInputSchema = z.object({
@@ -873,6 +885,7 @@ export const captureFindingTool = tool({
 - O achado é gravado em RASCUNHO. Você NUNCA o aprova nem publica — quem faz isso é o analista humano na tela de curadoria. Apenas capture com qualidade.
 - Achados com o mesmo (título|ativo|classe) no mesmo engajamento são deduplicados automaticamente; recapturar só anexa evidência nova.
 - Inclua evidência concreta em 'evidence' (trecho da saída, requisição/resposta, comando) — cole só o trecho relevante (é truncado ~8KB).
+- Para EVIDÊNCIA VISUAL, salve/tire o screenshot no sandbox e passe 'file_path' no item de evidência (ex.: /tmp/poc.png); o sistema faz upload e embute a imagem no relatório técnico.
 - Preencha 'severity' sempre; description/impact/remediation/CWE/CVSS quando souber.
 </comportamento>`,
   inputSchema: captureFindingToolInputSchema,

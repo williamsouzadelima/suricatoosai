@@ -2,7 +2,11 @@ import { schemaTask } from "@trigger.dev/sdk";
 import { metadata } from "@trigger.dev/sdk";
 import { ConvexHttpClient } from "convex/browser";
 import { Sandbox } from "@e2b/code-interpreter";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { api } from "@/convex/_generated/api";
@@ -67,39 +71,12 @@ export const generateEngagementReport = schemaTask({
     const { client, serviceKey } = getClient();
     const { s3, bucket } = getS3();
 
-    // 1) Insumo (só achados aprovados/publicados) + monta o ReportModel em TS.
+    // 1) Insumo (só achados aprovados/publicados).
     const input = await client.query(api.reports.getReportInputForBackend, {
       serviceKey,
       userId: payload.userId,
       engagementId: payload.engagementId as Id<"engagements">,
     });
-    const reportInput: ReportInput = {
-      client: input.client,
-      engagement: input.engagement,
-      author: payload.generatedBy,
-      generatedAt: Date.now(),
-      version: payload.version,
-      findings: input.findings.map((f) => ({
-        ref: f.ref,
-        title: f.title,
-        severity: f.severity,
-        affectedAsset: f.affectedAsset,
-        weaknessClass: f.weaknessClass,
-        cwe: f.cwe ?? undefined,
-        cvssVector: f.cvssVector ?? undefined,
-        cvssScore: f.cvssScore ?? undefined,
-        description: f.description ?? undefined,
-        impact: f.impact ?? undefined,
-        remediation: f.remediation ?? undefined,
-        reproductionSteps: f.reproductionSteps ?? [],
-        evidence: f.evidence.map((e) => ({
-          sourceType: e.sourceType,
-          label: e.label ?? undefined,
-          snippet: e.snippet ?? undefined,
-        })),
-      })),
-    };
-    const model = buildReportModel(payload.audience, reportInput);
 
     // 2) Sandbox E2B dedicado (NÃO o do engajamento). Escreve o renderer + model.
     const sbx = await Sandbox.create({
@@ -111,6 +88,73 @@ export const generateEngagementReport = schemaTask({
     });
     try {
       const base = "/home/user/report-renderer";
+
+      // 2a) Baixa as evidências em imagem do S3 para dentro do sandbox e mapeia
+      //     s3Key → caminho local (relativo ao renderer). Bounded p/ limitar o job.
+      const MAX_IMAGES = 40;
+      const imagePathByS3 = new Map<string, string>();
+      let imgIdx = 0;
+      for (const f of input.findings) {
+        for (const e of f.evidence) {
+          if (imgIdx >= MAX_IMAGES) break;
+          const key = e.s3Key;
+          const mt = e.mediaType;
+          if (!key || !mt || !mt.startsWith("image/") || imagePathByS3.has(key))
+            continue;
+          try {
+            const obj = await s3.send(
+              new GetObjectCommand({ Bucket: bucket, Key: key }),
+            );
+            const bytes = await obj.Body?.transformToByteArray();
+            if (!bytes) continue;
+            const ext = mt.split("/")[1]?.split("+")[0] || "png";
+            const rel = `evidence/img_${imgIdx}.${ext}`;
+            const ab = bytes.buffer.slice(
+              bytes.byteOffset,
+              bytes.byteOffset + bytes.byteLength,
+            ) as ArrayBuffer;
+            await sbx.files.write(`${base}/${rel}`, ab);
+            imagePathByS3.set(key, rel);
+            imgIdx++;
+          } catch (imgErr) {
+            console.error(
+              "report: falha ao baixar evidência de imagem",
+              imgErr,
+            );
+          }
+        }
+      }
+
+      // 2b) Monta o ReportModel em TS, já com imagePath resolvido.
+      const reportInput: ReportInput = {
+        client: input.client,
+        engagement: input.engagement,
+        author: payload.generatedBy,
+        generatedAt: Date.now(),
+        version: payload.version,
+        findings: input.findings.map((f) => ({
+          ref: f.ref,
+          title: f.title,
+          severity: f.severity,
+          affectedAsset: f.affectedAsset,
+          weaknessClass: f.weaknessClass,
+          cwe: f.cwe ?? undefined,
+          cvssVector: f.cvssVector ?? undefined,
+          cvssScore: f.cvssScore ?? undefined,
+          description: f.description ?? undefined,
+          impact: f.impact ?? undefined,
+          remediation: f.remediation ?? undefined,
+          reproductionSteps: f.reproductionSteps ?? [],
+          evidence: f.evidence.map((e) => ({
+            sourceType: e.sourceType,
+            label: e.label ?? undefined,
+            snippet: e.snippet ?? undefined,
+            imagePath: e.s3Key ? imagePathByS3.get(e.s3Key) : undefined,
+          })),
+        })),
+      };
+      const model = buildReportModel(payload.audience, reportInput);
+
       for (const [fn, src] of Object.entries(RENDERER_SOURCES)) {
         await sbx.files.write(`${base}/${fn}`, src);
       }

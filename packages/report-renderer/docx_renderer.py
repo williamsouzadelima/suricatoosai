@@ -6,6 +6,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
+import os
 
 import theme as T
 
@@ -175,6 +176,34 @@ def _finding_card(doc, sec):
         _para(doc, "REPRODUCAO:", size=10, bold=True, color=T.PRIMARY, after=2)
         for i, s in enumerate(f["reproductionSteps"][:12], 1):
             _para(doc, f"{i}. {_clip(s,300)}", size=10, color=T.INK, after=1)
+    if sec.get("showPoc"):
+        _evidence_docx(doc, f)
+
+
+def _embed_image_docx(doc, path, caption=None):
+    if not path or not os.path.exists(path):
+        return
+    try:
+        doc.add_picture(path, width=Inches(6.0))
+        doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+    except Exception:
+        return
+    if caption:
+        _para(doc, _clip(caption, 120), size=8, color=T.MUTED, after=4)
+
+
+def _evidence_docx(doc, f):
+    ev = f.get("evidence") or []
+    if not any(e.get("snippet") or e.get("imagePath") for e in ev):
+        return
+    _para(doc, "EVIDENCIA:", size=10, bold=True, color=T.PRIMARY, after=2)
+    for e in ev[:8]:
+        if e.get("label"):
+            _para(doc, _clip(e["label"], 120), size=9, bold=True, color=T.INK, after=1)
+        if e.get("snippet"):
+            _para(doc, _clip(e["snippet"], 1200), size=9, color=T.MUTED, after=2)
+        if e.get("imagePath"):
+            _embed_image_docx(doc, e["imagePath"], e.get("label"))
 
 
 def _table(doc, findings, remediation=False):

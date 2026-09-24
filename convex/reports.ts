@@ -82,6 +82,7 @@ export const getReportInputForBackend = query({
           snippet: e.snippet,
           fileId: e.file_id ?? null,
           s3Key: e.s3_key ?? null,
+          mediaType: e.media_type ?? null,
         })),
       });
     }

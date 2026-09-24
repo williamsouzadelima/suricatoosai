@@ -66,3 +66,7 @@ packages/desktop/src-tauri/target/
 *.log
 public/_hackerai_icons_backup/
 packages/desktop/src-tauri/icons/_hackerai_backup/
+
+# Python bytecode do renderer de relatórios
+__pycache__/
+*.pyc

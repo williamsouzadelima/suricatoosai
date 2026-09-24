@@ -6,6 +6,7 @@ from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.enum.shapes import MSO_SHAPE
+import os
 
 import theme as T
 
@@ -200,6 +201,61 @@ def _finding_card(prs, sec):
         steps = "\n".join(f"{i+1}. {_clip(s,140)}" for i, s in enumerate(f["reproductionSteps"][:6]))
         _text(slide, ML, yy, CW, Inches(0.3), "REPRODUCAO", size=10, bold=True, color=T.PRIMARY)
         _text(slide, ML, yy + Inches(0.28), CW, Inches(1.4), steps, size=11, color=T.INK)
+    # Evidencia (texto + imagem) em slides dedicados — so em relatorios com PoC.
+    if sec.get("showPoc"):
+        _evidence_slides(prs, f)
+
+
+def _image_slide(prs, title, path, caption=None):
+    if not path or not os.path.exists(path):
+        return
+    slide, y = _title_slide(prs, title)
+    try:
+        pic = slide.shapes.add_picture(path, ML, y)
+    except Exception:
+        return
+    max_w = int(CW)
+    max_h = int(Inches(5.3))
+    scale = min(max_w / pic.width, max_h / pic.height, 1.0)
+    pic.width = int(pic.width * scale)
+    pic.height = int(pic.height * scale)
+    pic.left = int(ML + (int(CW) - pic.width) / 2)
+    pic.top = int(y)
+    if caption:
+        _text(slide, ML, int(y) + pic.height + Inches(0.1), CW, Inches(0.4),
+              _clip(caption, 120), size=11, color=T.MUTED)
+
+
+def _evidence_slides(prs, f):
+    ev = f.get("evidence") or []
+    texts = [e for e in ev if e.get("snippet")]
+    imgs = [e for e in ev if e.get("imagePath")]
+    if texts:
+        slide, y = _title_slide(prs, _clip(f"Evidencia — {f.get('title','')}", 70))
+        tb = slide.shapes.add_textbox(ML, y, CW, Inches(5.4))
+        tf = tb.text_frame
+        tf.word_wrap = True
+        first = True
+        for e in texts[:6]:
+            if e.get("label"):
+                p = tf.paragraphs[0] if first else tf.add_paragraph()
+                first = False
+                r = p.add_run()
+                r.text = _clip(e["label"], 90)
+                r.font.size = Pt(11)
+                r.font.bold = True
+                r.font.color.rgb = _rgb(T.PRIMARY)
+            p = tf.paragraphs[0] if first else tf.add_paragraph()
+            first = False
+            r = p.add_run()
+            r.text = _clip(e.get("snippet", ""), 600)
+            r.font.size = Pt(10)
+            r.font.name = T.FONT_BODY
+            r.font.color.rgb = _rgb(T.INK)
+            p.space_after = Pt(8)
+    for e in imgs[:4]:
+        _image_slide(prs, _clip(f"Evidencia Visual — {f.get('title','')}", 70),
+                     e.get("imagePath"), e.get("label"))
 
 
 def _table(prs, findings, title, remediation=False):

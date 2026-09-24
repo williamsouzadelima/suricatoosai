@@ -17,6 +17,13 @@ export type ReportEvidenceView = {
   sourceType: string;
   label?: string;
   snippet?: string;
+  /**
+   * Caminho LOCAL (relativo à raiz do renderer no sandbox) de uma evidência em
+   * imagem, quando houver. O job do trigger baixa o arquivo do S3 e preenche
+   * este campo antes de montar o modelo; os renderers embutem a imagem. Ausente
+   * fora do job (ex.: amostras locais) → renderer ignora graciosamente.
+   */
+  imagePath?: string;
 };
 
 export type ReportFindingView = {

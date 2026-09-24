@@ -2,6 +2,7 @@ import "server-only";
 
 import { getConvexClient } from "./convex-client";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { createFindingFingerprint } from "@/lib/ai/subagents/fingerprint";
 
 /**
@@ -22,6 +23,11 @@ export type CapturedEvidenceItem = {
   snippet?: string;
   tool_call_id?: string;
   message_id?: string;
+  /** Evidência em arquivo (imagem etc.), resolvida no tool após upload. */
+  file_id?: Id<"files">;
+  s3_key?: string;
+  media_type?: string;
+  sandbox_path?: string;
 };
 
 export type CaptureFindingParams = {
