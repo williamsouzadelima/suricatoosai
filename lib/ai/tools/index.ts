@@ -17,6 +17,7 @@ import {
   createUpdateNote,
   createDeleteNote,
 } from "./notes";
+import { createCaptureFinding } from "./findings";
 // match tool removed — usage analytics showed it wasn't being used enough to justify
 // the added complexity. The agent should use run_terminal_cmd with rg instead.
 // import { createMatch } from "./match";
@@ -265,6 +266,7 @@ export const createTools = (
         list_notes: createListNotes(context),
         update_note: createUpdateNote(context),
         delete_note: createDeleteNote(context),
+        capture_finding: createCaptureFinding(context),
       }),
       ...(process.env.PERPLEXITY_API_KEY && {
         web_search: createWebSearch(context),

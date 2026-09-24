@@ -799,6 +799,89 @@ Use to delete test or scratch notes created during experimentation
 
 export type DeleteNoteToolInput = z.infer<typeof deleteNoteToolInputSchema>;
 
+export const findingSeveritySchema = z.enum([
+  "info",
+  "low",
+  "medium",
+  "high",
+  "critical",
+]);
+
+export const captureFindingEvidenceItemSchema = z.object({
+  source_type: z
+    .enum(["tool_output", "command", "file", "http", "note", "manual"])
+    .describe("Origem da evidência (saída de terminal, comando, HTTP, etc.)."),
+  label: z.string().optional().describe("Rótulo curto da evidência."),
+  snippet: z
+    .string()
+    .optional()
+    .describe(
+      "Trecho textual da evidência (truncado ~8KB). Cole só a prova relevante, não a saída inteira.",
+    ),
+  tool_call_id: z
+    .string()
+    .optional()
+    .describe("ID da tool call que produziu a evidência, se aplicável."),
+  message_id: z
+    .string()
+    .optional()
+    .describe("ID da mensagem de origem, se aplicável."),
+});
+
+export const captureFindingToolInputSchema = z.object({
+  title: z
+    .string()
+    .describe("Título conciso do achado (ex.: 'SQLi no login /api/auth')."),
+  affected_asset: z
+    .string()
+    .describe("Ativo afetado (host, URL, endpoint, parâmetro, componente)."),
+  weakness_class: z
+    .string()
+    .describe("Classe da fraqueza (ex.: 'SQL Injection', 'IDOR', 'XSS')."),
+  severity: findingSeveritySchema.describe(
+    "Severidade: info | low | medium | high | critical.",
+  ),
+  description: z.string().optional().describe("Descrição técnica (markdown)."),
+  impact: z.string().optional().describe("Impacto de negócio/segurança."),
+  remediation: z.string().optional().describe("Como remediar."),
+  reproduction_steps: z
+    .array(z.string())
+    .optional()
+    .describe("Passos de reprodução, um por item."),
+  cwe: z.string().optional().describe("CWE, ex.: 'CWE-89'."),
+  cvss_vector: z.string().optional().describe("Vetor CVSS 3.1/4.0, se souber."),
+  confidence: z
+    .enum(["low", "medium", "high"])
+    .optional()
+    .describe("Confiança na validade do achado."),
+  evidence: z
+    .array(captureFindingEvidenceItemSchema)
+    .optional()
+    .describe("Evidências que sustentam o achado (trechos/rótulos)."),
+});
+
+export const captureFindingTool = tool({
+  description: `Registra um ACHADO de segurança estruturado no engajamento atual (Cliente → Engajamento → Achado), com evidência, para curadoria e geração de relatório dentro da plataforma.
+
+<quando_usar>
+- Sempre que confirmar (ou suspeitar com boa confiança de) uma vulnerabilidade/fraqueza durante o engajamento.
+- Assim que tiver a evidência em mãos — não espere o fim do teste.
+- Um achado por vulnerabilidade distinta; não combine itens não relacionados.
+</quando_usar>
+
+<comportamento>
+- O achado é gravado em RASCUNHO. Você NUNCA o aprova nem publica — quem faz isso é o analista humano na tela de curadoria. Apenas capture com qualidade.
+- Achados com o mesmo (título|ativo|classe) no mesmo engajamento são deduplicados automaticamente; recapturar só anexa evidência nova.
+- Inclua evidência concreta em 'evidence' (trecho da saída, requisição/resposta, comando) — cole só o trecho relevante (é truncado ~8KB).
+- Preencha 'severity' sempre; description/impact/remediation/CWE/CVSS quando souber.
+</comportamento>`,
+  inputSchema: captureFindingToolInputSchema,
+});
+
+export type CaptureFindingToolInput = z.infer<
+  typeof captureFindingToolInputSchema
+>;
+
 export type AgentToolSchemaMode = "agent" | "ask";
 
 export const createAgentToolSchemaSet = ({
@@ -824,6 +907,8 @@ export const createAgentToolSchemaSet = ({
     ...(hasPerplexityApiKey ? { web_search: webSearchTool } : {}),
     ...(hasJinaApiKey ? { open_url: openUrlTool } : {}),
   };
+  // capture_finding é agent-only (não entra no modo "ask").
+  const findings = notesEnabled ? { capture_finding: captureFindingTool } : {};
 
   if (mode === "ask") {
     return {
@@ -839,6 +924,7 @@ export const createAgentToolSchemaSet = ({
     file: createFileToolSchema({ supportsView: true }),
     todo_write: todoWriteTool,
     ...notes,
+    ...findings,
     ...networkTools,
   };
 };
