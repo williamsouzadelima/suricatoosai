@@ -2,7 +2,7 @@ import { schemaTask } from "@trigger.dev/sdk";
 import { metadata } from "@trigger.dev/sdk";
 import { generateText, Output } from "ai";
 import { z } from "zod";
-import { GROK_4_6_SLUG, myProvider } from "@/lib/ai/providers";
+import { myProvider, type ModelName } from "@/lib/ai/providers";
 import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
 import { captureFinding } from "@/lib/db/findings";
@@ -20,6 +20,10 @@ import { captureFinding } from "@/lib/db/findings";
  */
 
 export const EXTRACT_FINDINGS_TASK_ID = "extract-findings-from-chat";
+
+// Chave REGISTRADA no myProvider (customProvider) — não aceita slug cru.
+// "model-grok-4.6" é a mesma usada pelo user-research (transcrição → estruturado).
+const EXTRACTION_MODEL_KEY = "model-grok-4.6" satisfies ModelName;
 
 const MAX_FINDINGS = 40;
 const PROMPT_CHAR_BUDGET = 120_000;
@@ -113,7 +117,7 @@ export const extractFindingsFromChat = schemaTask({
 
     metadata.set("phase", "extracting");
     const result = await generateText({
-      model: myProvider.languageModel(GROK_4_6_SLUG),
+      model: myProvider.languageModel(EXTRACTION_MODEL_KEY),
       output: Output.object({ schema: extractionSchema }),
       temperature: 0,
       maxOutputTokens: 8_000,
