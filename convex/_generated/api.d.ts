@@ -21,6 +21,7 @@ import type * as chatStreams from "../chatStreams.js";
 import type * as chats from "../chats.js";
 import type * as clients from "../clients.js";
 import type * as engagements from "../engagements.js";
+import type * as engagementCapture from "../engagementCapture.js";
 import type * as findings from "../findings.js";
 import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
@@ -93,6 +94,7 @@ declare const fullApi: ApiFromModules<{
   chats: typeof chats;
   clients: typeof clients;
   engagements: typeof engagements;
+  engagementCapture: typeof engagementCapture;
   findings: typeof findings;
   constants: typeof constants;
   crons: typeof crons;

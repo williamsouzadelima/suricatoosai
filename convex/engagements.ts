@@ -204,6 +204,42 @@ export const attachChatToEngagement = mutation({
   },
 });
 
+/**
+ * Anexa um chat a um engajamento pela rota Next (serviceKey + userId explícito;
+ * a rota gateia via getInternalUser e passa o WorkOS user.id). Exige posse do
+ * engajamento E do chat pelo mesmo userId (anti cross-tenant).
+ */
+export const attachChatToEngagementForBackend = mutation({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    chatId: v.string(),
+    engagementId: v.id("engagements"),
+  },
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const engagement = await ctx.db.get(args.engagementId);
+    if (!engagement || engagement.user_id !== args.userId) {
+      throw new ConvexError({
+        code: "ACCESS_DENIED",
+        message: "Engajamento sem acesso",
+      });
+    }
+    const chat = await ctx.db
+      .query("chats")
+      .withIndex("by_chat_id", (q) => q.eq("id", args.chatId))
+      .first();
+    if (!chat || chat.user_id !== args.userId) {
+      throw new ConvexError({
+        code: "ACCESS_DENIED",
+        message: "Chat sem acesso",
+      });
+    }
+    await ctx.db.patch(chat._id, { engagement_id: args.engagementId });
+    return { chatId: args.chatId, engagementId: args.engagementId };
+  },
+});
+
 export const detachChatFromEngagement = mutation({
   args: { chatId: v.string() },
   handler: async (ctx, args) => {

@@ -14,6 +14,7 @@ import {
   FileText,
   Download,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -243,6 +244,42 @@ function EngagementDetail({
   const chats = useQuery(api.engagements.getChatsForEngagement, {
     engagementId,
   });
+  const recentChats = useQuery(
+    api.engagementCapture.listRecentChatsForCapture,
+    {},
+  );
+
+  const [pickChatId, setPickChatId] = useState<string>("");
+  const [capturingChatId, setCapturingChatId] = useState<string | null>(null);
+
+  // Captura RETROATIVA por IA: anexa o chat ao engajamento e dispara o job que
+  // lê a transcrição e grava achados em rascunho para curadoria.
+  const captureFromChat = async (chatId: string) => {
+    if (!chatId) return;
+    setCapturingChatId(chatId);
+    try {
+      const res = await fetch("/api/engagements/extract-findings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatId, engagementId }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error || "Falha ao iniciar extração.");
+      }
+      toast.success(
+        "Extração iniciada. Os achados aparecem em rascunho em instantes.",
+      );
+      setPickChatId("");
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Falha ao iniciar extração.",
+      );
+      console.error(e);
+    } finally {
+      setCapturingChatId(null);
+    }
+  };
 
   const submit = useMutation(api.findings.submitForReview);
   const approve = useMutation(api.findings.approveFinding);
@@ -481,6 +518,42 @@ function EngagementDetail({
             <MessagesSquare className="h-4 w-4 text-muted-foreground" />
             <SectionHeader title="Chats anexados" count={chats?.length} />
           </div>
+
+          {/* Captura retroativa: escolher uma task concluída → anexa + IA extrai achados */}
+          <div className="flex flex-wrap items-end gap-2 border-b p-4">
+            <div className="min-w-0 flex-1">
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                Capturar achados de uma task concluída (IA)
+              </label>
+              <select
+                className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                value={pickChatId}
+                onChange={(e) => setPickChatId(e.target.value)}
+              >
+                <option value="">Escolher task (chat)…</option>
+                {(recentChats ?? [])
+                  .filter((c) => !c.engagementId)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title}
+                      {c.active ? " (ativo)" : ""}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <Button
+              onClick={() => void captureFromChat(pickChatId)}
+              disabled={!pickChatId || capturingChatId === pickChatId}
+            >
+              {pickChatId && capturingChatId === pickChatId ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              Capturar (IA)
+            </Button>
+          </div>
+
           {chats === undefined ? (
             <div className="p-6 text-center text-sm text-muted-foreground">
               Carregando…
@@ -489,7 +562,7 @@ function EngagementDetail({
             <EmptyState
               icon={MessagesSquare}
               title="Nenhum chat anexado."
-              description="O agente anexa o chat ao capturar um achado; você também pode anexar manualmente (em breve)."
+              description="Escolha uma task concluída acima para anexar e extrair os achados por IA — ou o agente anexa o chat automaticamente ao capturar um achado ao vivo."
             />
           ) : (
             <div className="divide-y">
@@ -498,7 +571,7 @@ function EngagementDetail({
                   key={c.id}
                   className="flex items-center justify-between gap-2 px-4 py-2.5 text-sm"
                 >
-                  <span className="truncate">{c.title}</span>
+                  <span className="min-w-0 flex-1 truncate">{c.title}</span>
                   {c.active_trigger_run_id ? (
                     <span className="flex items-center gap-1 text-xs text-success">
                       <Radio className="h-3 w-3" /> ativo
@@ -508,6 +581,20 @@ function EngagementDetail({
                       {formatDateTime(c.update_time)}
                     </span>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void captureFromChat(c.id)}
+                    disabled={capturingChatId === c.id}
+                    title="Extrair achados desta task por IA"
+                  >
+                    {capturingChatId === c.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                    Capturar
+                  </Button>
                 </div>
               ))}
             </div>
