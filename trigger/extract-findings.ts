@@ -23,7 +23,13 @@ export const EXTRACT_FINDINGS_TASK_ID = "extract-findings-from-chat";
 
 // Chave REGISTRADA no myProvider (customProvider) — não aceita slug cru.
 // "model-grok-4.6" é a mesma usada pelo user-research (transcrição → estruturado).
-const EXTRACTION_MODEL_KEY = "model-grok-4.6" satisfies ModelName;
+// Cadeia de fallback (mesmo motivo do ingest): se o primário estiver em
+// capacidade/erro, tenta o próximo — não deixa a extração falhar por isso.
+const EXTRACTION_MODEL_KEYS = [
+  "model-grok-4.6",
+  "model-deepseek-v4-pro",
+  "model-glm-5.3",
+] satisfies ModelName[];
 
 const MAX_FINDINGS = 40;
 const MAX_CHAIN = 30;
@@ -164,19 +170,37 @@ export const extractFindingsFromChat = schemaTask({
     }
 
     metadata.set("phase", "extracting");
-    const result = await generateText({
-      model: myProvider.languageModel(EXTRACTION_MODEL_KEY),
-      output: Output.object({ schema: extractionSchema }),
-      temperature: 0,
-      maxOutputTokens: 16_000,
-      maxRetries: 1,
-      prompt: buildPrompt(
-        transcript.title,
-        transcript.messages,
-        transcript.files,
-      ),
-    });
-    const findings = (result.output?.findings ?? []).slice(0, MAX_FINDINGS);
+    const extractPrompt = buildPrompt(
+      transcript.title,
+      transcript.messages,
+      transcript.files,
+    );
+    const extract = async () => {
+      let lastErr: unknown;
+      for (const key of EXTRACTION_MODEL_KEYS) {
+        try {
+          metadata.set("model", key);
+          const r = await generateText({
+            model: myProvider.languageModel(key),
+            output: Output.object({ schema: extractionSchema }),
+            temperature: 0,
+            maxOutputTokens: 16_000,
+            maxRetries: 1,
+            prompt: extractPrompt,
+          });
+          return r.output;
+        } catch (e) {
+          lastErr = e;
+          console.error(
+            `extract: modelo ${key} em capacidade/erro — tentando o próximo`,
+            e,
+          );
+        }
+      }
+      throw lastErr ?? new Error("Todos os modelos falharam na extração.");
+    };
+    const extracted = await extract();
+    const findings = (extracted?.findings ?? []).slice(0, MAX_FINDINGS);
     metadata.set("extracted", findings.length);
 
     // Nome do arquivo → metadados, para anexar prints/saídas como evidência.

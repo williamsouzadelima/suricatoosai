@@ -21,7 +21,21 @@ const TOOL_INPUT_CLAMP = 1200;
 
 function toText(value: unknown, clamp: number): string {
   if (value == null) return "";
-  const s = typeof value === "string" ? value : JSON.stringify(value);
+  let s: string;
+  if (typeof value === "string") {
+    s = value;
+  } else {
+    // parts é v.any(): pode conter BigInt (Int64), ciclos ou objetos exóticos —
+    // JSON.stringify lançaria e derrubaria a query inteira (Server Error).
+    try {
+      s = JSON.stringify(value, (_k, v) =>
+        typeof v === "bigint" ? v.toString() : v,
+      );
+    } catch {
+      s = String(value);
+    }
+  }
+  if (s == null) return "";
   return s.length > clamp ? s.slice(0, clamp) + "…" : s;
 }
 
