@@ -7,6 +7,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HackerAISVG } from "@/components/icons/hackerai-svg";
 
 /**
  * Casca compartilhada dos painéis internos (/admin, /engagements): sidebar navy
@@ -107,18 +108,11 @@ export function AppShell({
     <div className="grid h-screen grid-cols-1 bg-background md:grid-cols-[248px_1fr]">
       {/* Sidebar */}
       <aside className="internal-sidebar hidden flex-col gap-1 px-3.5 py-[18px] text-[#c7d3e6] md:flex">
-        <div className="flex items-center gap-2.5 px-2 pb-4 pt-1.5">
-          <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-gradient-to-br from-primary to-[#3f6ef0] font-display text-sm font-extrabold text-white shadow-[0_6px_16px_-6px_rgba(36,86,230,0.7)]">
-            S
-          </div>
-          <div className="leading-tight">
-            <div className="font-display text-[15px] font-bold text-white">
-              Suricatoos
-            </div>
-            <div className="-mt-0.5 text-[11px] text-[#7d8ca8]">
-              Offensive Security
-            </div>
-          </div>
+        <div className="flex flex-col gap-1.5 px-2 pb-5 pt-2">
+          <HackerAISVG theme="dark" scale={0.135} />
+          <span className="pl-0.5 text-[11px] font-medium tracking-wide text-[#7d8ca8]">
+            Offensive Security
+          </span>
         </div>
 
         {NAV.map((g) => (

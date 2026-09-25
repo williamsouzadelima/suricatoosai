@@ -18,9 +18,15 @@ import {
   ExternalLink,
   Upload,
   Trash2,
+  Server,
+  Paperclip,
+  ListOrdered,
+  Image as ImageIcon,
+  type LucideIcon,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,6 +66,27 @@ const STATUS_LABEL: Record<FindingStatus, string> = {
   approved: "Aprovado",
   published: "Publicado",
   dismissed: "Descartado",
+};
+const SEV_LABEL: Record<Severity, string> = {
+  critical: "Crítico",
+  high: "Alto",
+  medium: "Médio",
+  low: "Baixo",
+  info: "Info",
+};
+const SEV_STRIPE: Record<Severity, string> = {
+  critical: "bg-destructive",
+  high: "bg-[#e8590c]",
+  medium: "bg-warning",
+  low: "bg-primary",
+  info: "bg-muted-foreground",
+};
+const SEV_PILL: Record<Severity, string> = {
+  critical: "text-destructive bg-destructive/10 border-destructive/25",
+  high: "text-[#e8590c] bg-[#e8590c]/10 border-[#e8590c]/25",
+  medium: "text-warning bg-warning/10 border-warning/25",
+  low: "text-primary bg-primary/10 border-primary/25",
+  info: "text-muted-foreground bg-muted border-border",
 };
 
 export function EngagementsPanel({
@@ -500,34 +527,66 @@ function EngagementDetail({
             description="Achados capturados pelo agente (capture_finding) aparecem aqui em rascunho."
           />
         ) : (
-          <div className="divide-y">
+          <div className="space-y-2.5 p-4">
             {findings.map((f) => {
               const status = f.status as FindingStatus;
               const severity = f.severity as Severity;
               const expanded = expandedFindingId === f._id;
+              const cvss =
+                typeof (f as { cvss_score?: number }).cvss_score === "number"
+                  ? (f as { cvss_score?: number }).cvss_score
+                  : undefined;
+              const ref = (f as { finding_id?: string }).finding_id;
               return (
-                <div key={f._id} className="p-4">
-                  <div className="flex flex-wrap items-center gap-2">
+                <div
+                  key={f._id}
+                  className={cn(
+                    "relative overflow-hidden rounded-xl border bg-card shadow-[var(--shadow-soft)] transition-shadow hover:shadow-[var(--shadow-card)]",
+                    expanded && "ring-1 ring-primary/20",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "absolute inset-y-3 left-0 w-1 rounded-r-full",
+                      SEV_STRIPE[severity],
+                    )}
+                  />
+                  <div className="flex flex-wrap items-center gap-2.5 py-3.5 pl-5 pr-4">
                     <button
                       onClick={() =>
                         setExpandedFindingId(expanded ? null : f._id)
                       }
-                      className="flex flex-1 items-center gap-2 text-left"
+                      className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
                     >
-                      {expanded ? (
-                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      )}
-                      <StatusBadge
-                        tone={SEVERITY_TONE[severity]}
-                        label={severity}
-                        dot={false}
+                      <ChevronRight
+                        className={cn(
+                          "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                          expanded && "rotate-90",
+                        )}
                       />
-                      <span className="font-medium">{f.title}</span>
-                      <span className="text-xs text-muted-foreground">
+                      <span
+                        className={cn(
+                          "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+                          SEV_PILL[severity],
+                        )}
+                      >
+                        {SEV_LABEL[severity]}
+                      </span>
+                      {ref && (
+                        <span className="shrink-0 font-mono text-[11.5px] text-muted-foreground">
+                          {ref}
+                        </span>
+                      )}
+                      <span className="truncate font-medium">{f.title}</span>
+                      <span className="hidden shrink-0 items-center gap-1.5 text-xs text-muted-foreground sm:inline-flex">
+                        <Server className="h-3.5 w-3.5" />
                         {f.affected_asset}
                       </span>
+                      {cvss !== undefined && (
+                        <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold text-muted-foreground">
+                          CVSS {cvss.toFixed(1)}
+                        </span>
+                      )}
                     </button>
                     <StatusBadge
                       tone={STATUS_TONE[status]}
@@ -607,7 +666,9 @@ function EngagementDetail({
                     </div>
                   </div>
                   {expanded && (
-                    <FindingEvidence findingId={f._id} finding={f} />
+                    <div className="px-4 pb-4">
+                      <FindingEvidence findingId={f._id} finding={f} />
+                    </div>
                   )}
                 </div>
               );
@@ -1297,51 +1358,52 @@ function FindingEvidence({
   );
 
   return (
-    <div className="mt-3 space-y-3 rounded-lg border bg-muted/20 p-3 text-sm">
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Detail label="Classe" value={finding.weakness_class} />
-        <Detail label="CVSS" value={finding.cvss_vector} />
-        <Detail label="CWE" value={finding.cwe} />
+    <div className="space-y-4 rounded-xl border bg-muted/40 p-4">
+      <div className="flex flex-wrap gap-2">
+        <MetaChip label="Classe" value={finding.weakness_class} />
+        <MetaChip label="CVSS" value={finding.cvss_vector} mono />
+        <MetaChip label="CWE" value={finding.cwe} mono />
       </div>
       {finding.narrative && (
-        <Detail label="Narrativa" value={finding.narrative} block />
+        <EvBlock label="Narrativa" text={finding.narrative} />
       )}
       {finding.description && (
-        <Detail label="Descrição" value={finding.description} block />
+        <EvBlock label="Descrição" text={finding.description} />
       )}
-      {finding.impact && (
-        <Detail label="Impacto" value={finding.impact} block />
-      )}
+      {finding.impact && <EvBlock label="Impacto" text={finding.impact} />}
       {finding.remediation && (
-        <Detail label="Remediação" value={finding.remediation} block />
+        <EvBlock label="Remediação" text={finding.remediation} />
       )}
+
       {imageEvidence.length > 0 && (
         <div>
-          <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-primary">
-            Evidência Visual ({imageEvidence.length})
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <SubHead
+            icon={ImageIcon}
+            label="Evidência visual"
+            n={imageEvidence.length}
+          />
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
             {imageEvidence.map((ev) => (
               <a
                 key={ev._id}
                 href={`/api/evidence/${ev._id}/image`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group block overflow-hidden rounded-lg border bg-background"
                 title="Abrir em tamanho real"
+                className="group relative block overflow-hidden rounded-xl border bg-[#0e1b2e] shadow-[var(--shadow-soft)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)]"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`/api/evidence/${ev._id}/image`}
                   alt={ev.label ?? "screenshot"}
                   loading="lazy"
-                  className="h-32 w-full bg-muted object-cover transition group-hover:opacity-90"
+                  className="aspect-[16/10] w-full object-cover"
                   onError={(e) => {
                     const a = e.currentTarget.closest("a");
                     if (a) (a as HTMLElement).style.display = "none";
                   }}
                 />
-                <div className="truncate px-2 py-1 text-[10px] text-muted-foreground">
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-[#080f1b]/85 to-transparent px-2 pb-1.5 pt-5 font-mono text-[9.5px] text-[#cdd9ec]">
                   {ev.label ?? "screenshot"}
                 </div>
               </a>
@@ -1349,10 +1411,13 @@ function FindingEvidence({
           </div>
         </div>
       )}
+
       <div>
-        <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Cadeia de evidência ({evidence?.length ?? 0})
-        </div>
+        <SubHead
+          icon={ListOrdered}
+          label="Cadeia de evidência"
+          n={evidence?.length ?? 0}
+        />
         {evidence === undefined ? (
           <div className="text-xs text-muted-foreground">Carregando…</div>
         ) : evidence.length === 0 ? (
@@ -1360,72 +1425,119 @@ function FindingEvidence({
             Sem evidência — aprovar exige ao menos uma evidência.
           </Callout>
         ) : (
-          <ol className="space-y-2">
+          <div className="relative pl-1">
             {evidence.map((ev, i) => (
-              <li key={ev._id} className="rounded border bg-background p-2.5">
-                <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
-                    {ev.step_index ?? i + 1}
-                  </span>
-                  {ev.tool_name && (
-                    <span className="rounded bg-muted px-1.5 py-0.5 font-mono font-medium">
-                      {ev.tool_name}
+              <div
+                key={ev._id}
+                className="relative flex gap-3.5 pb-4 last:pb-0"
+              >
+                {i < evidence.length - 1 && (
+                  <span className="absolute bottom-0 left-[13px] top-8 w-0.5 bg-border" />
+                )}
+                <span className="z-[1] flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-primary bg-card text-xs font-bold text-primary shadow-[var(--shadow-soft)]">
+                  {ev.step_index ?? i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                    {ev.tool_name && (
+                      <span className="rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-primary">
+                        {ev.tool_name}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {ev.source_type}
+                      {ev.label ? ` · ${ev.label}` : ""}
                     </span>
+                    {ev.file_id && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        <Paperclip className="h-3 w-3" /> arquivo
+                      </span>
+                    )}
+                  </div>
+                  {ev.command && (
+                    <pre className="overflow-auto rounded-lg bg-[#0e1b2e] px-3 py-2 font-mono text-[11.5px] leading-relaxed text-[#d5e0f2]">
+                      <span className="select-none text-[#5f7fb0]">$ </span>
+                      {ev.command}
+                    </pre>
                   )}
-                  <span className="text-muted-foreground">
-                    {ev.source_type}
-                    {ev.label ? ` · ${ev.label}` : ""}
-                  </span>
-                  {ev.file_id && (
-                    <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
-                      📎 arquivo
-                    </span>
+                  {ev.snippet && (
+                    <pre className="mt-1.5 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg border bg-card px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                      {ev.snippet}
+                    </pre>
+                  )}
+                  {ev.result_summary && (
+                    <div className="mt-1.5 flex gap-1.5 text-xs">
+                      <span className="font-semibold text-success">
+                        → prova:
+                      </span>
+                      <span className="text-foreground/80">
+                        {ev.result_summary}
+                      </span>
+                    </div>
                   )}
                 </div>
-                {ev.command && (
-                  <pre className="mt-1.5 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/60 p-1.5 font-mono text-xs">
-                    <span className="select-none text-muted-foreground">
-                      ${" "}
-                    </span>
-                    {ev.command}
-                  </pre>
-                )}
-                {ev.snippet && (
-                  <pre className="mt-1 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/30 p-1.5 text-xs">
-                    {ev.snippet}
-                  </pre>
-                )}
-                {ev.result_summary && (
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    <span className="font-medium text-success">→ prova:</span>{" "}
-                    {ev.result_summary}
-                  </div>
-                )}
-              </li>
+              </div>
             ))}
-          </ol>
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-function Detail({
+function MetaChip({
   label,
   value,
-  block,
+  mono,
 }: {
   label: string;
   value?: string;
-  block?: boolean;
+  mono?: boolean;
 }) {
   if (!value) return null;
   return (
-    <div className={block ? "" : "min-w-0"}>
-      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="inline-flex items-center gap-2 rounded-lg border bg-card px-2.5 py-1.5 shadow-[var(--shadow-soft)]">
+      <span className="text-[9.5px] font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </span>
-      <div className="whitespace-pre-wrap break-words">{value}</div>
+      <span
+        className={cn("break-all text-xs text-foreground", mono && "font-mono")}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function EvBlock({ label, text }: { label: string; text: string }) {
+  return (
+    <div>
+      <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+        {label}
+      </div>
+      <p className="whitespace-pre-wrap break-words text-[13.5px] leading-relaxed text-foreground/80">
+        {text}
+      </p>
+    </div>
+  );
+}
+
+function SubHead({
+  icon: Icon,
+  label,
+  n,
+}: {
+  icon: LucideIcon;
+  label: string;
+  n: number;
+}) {
+  return (
+    <div className="mb-2.5 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+      <span className="rounded-full bg-primary px-1.5 text-[11px] font-bold text-primary-foreground">
+        {n}
+      </span>
     </div>
   );
 }
