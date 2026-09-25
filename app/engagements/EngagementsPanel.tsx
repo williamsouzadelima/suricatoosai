@@ -33,6 +33,7 @@ import {
   formatDateTime,
   type Tone,
 } from "@/app/admin/_ui";
+import { ReportBrandCard } from "./ReportBrandCard";
 
 type Severity = "info" | "low" | "medium" | "high" | "critical";
 type FindingStatus =
@@ -173,6 +174,9 @@ export function EngagementsPanel() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Marca dos relatórios (colapsável) */}
+      <ReportBrandCard />
 
       {/* Lista de engajamentos */}
       <Card className="gap-0 py-0">

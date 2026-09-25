@@ -1646,7 +1646,7 @@ export default defineSchema({
   // definido cai para DEFAULT_BRAND (Suricatoos) no builder. Portal-ready.
   report_brands: defineTable({
     user_id: v.optional(v.string()),
-    organization_id: v.string(),
+    organization_id: v.optional(v.string()),
     name: v.optional(v.string()),
     wordmark: v.optional(v.string()),
     tagline: v.optional(v.string()),
@@ -1656,7 +1656,9 @@ export default defineSchema({
     accent: v.optional(v.string()),
     classification: v.optional(v.string()),
     updated_at: v.number(),
-  }).index("by_org", ["organization_id"]),
+  })
+    .index("by_org", ["organization_id"])
+    .index("by_user", ["user_id"]),
 
   engagements: defineTable({
     user_id: v.string(),

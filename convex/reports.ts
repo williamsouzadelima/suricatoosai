@@ -47,38 +47,42 @@ export const getReportInputForBackend = query({
     }
     const client = await ctx.db.get(engagement.client_id);
 
-    // Marca por organização (MSSP). Campos ausentes caem para DEFAULT_BRAND no
-    // builder (lib/reports). Sem org ou sem override → undefined → padrão.
-    let brand:
-      | {
-          name?: string;
-          wordmark?: string;
-          tagline?: string;
-          contact?: string;
-          docCodePrefix?: string;
-          primary?: string;
-          accent?: string;
-          classification?: string;
-        }
-      | undefined;
+    // Marca do relatório: org (MSSP) → fallback pelo dono do engajamento →
+    // DEFAULT_BRAND no builder (lib/reports). Campos ausentes caem para o padrão.
+    const mapBrandRow = (row: {
+      name?: string;
+      wordmark?: string;
+      tagline?: string;
+      contact?: string;
+      doc_code_prefix?: string;
+      primary?: string;
+      accent?: string;
+      classification?: string;
+    }) => ({
+      name: row.name,
+      wordmark: row.wordmark,
+      tagline: row.tagline,
+      contact: row.contact,
+      docCodePrefix: row.doc_code_prefix,
+      primary: row.primary,
+      accent: row.accent,
+      classification: row.classification,
+    });
+    let brand: ReturnType<typeof mapBrandRow> | undefined;
     if (engagement.organization_id) {
       const orgId = engagement.organization_id;
       const row = await ctx.db
         .query("report_brands")
         .withIndex("by_org", (q) => q.eq("organization_id", orgId))
         .first();
-      if (row) {
-        brand = {
-          name: row.name,
-          wordmark: row.wordmark,
-          tagline: row.tagline,
-          contact: row.contact,
-          docCodePrefix: row.doc_code_prefix,
-          primary: row.primary,
-          accent: row.accent,
-          classification: row.classification,
-        };
-      }
+      if (row) brand = mapBrandRow(row);
+    }
+    if (!brand) {
+      const row = await ctx.db
+        .query("report_brands")
+        .withIndex("by_user", (q) => q.eq("user_id", args.userId))
+        .first();
+      if (row) brand = mapBrandRow(row);
     }
 
     // Inclui todos os achados NÃO descartados (rascunho/revisão/aprovado/
@@ -157,6 +161,86 @@ export const getReportInputForBackend = query({
       findingCount: findings.length,
       findings,
     };
+  },
+});
+
+/** Normaliza cor hex p/ o renderer (sem '#', maiúsculas, 6 dígitos). */
+function normalizeHex(s?: string): string | undefined {
+  const t = (s ?? "").trim().replace(/^#/, "").toUpperCase();
+  return /^[0-9A-F]{6}$/.test(t) ? t : undefined;
+}
+
+/**
+ * Marca dos relatórios do analista (por user_id; portal-ready com
+ * organization_id). Lida pela UI interna (rota /api/report-brand, gateada por
+ * getInternalUser). Campos vazios → padrão (DEFAULT_BRAND no builder).
+ */
+export const getReportBrandForBackend = query({
+  args: { serviceKey: v.string(), userId: v.string() },
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const row = await ctx.db
+      .query("report_brands")
+      .withIndex("by_user", (q) => q.eq("user_id", args.userId))
+      .first();
+    if (!row) return null;
+    return {
+      name: row.name ?? null,
+      wordmark: row.wordmark ?? null,
+      tagline: row.tagline ?? null,
+      contact: row.contact ?? null,
+      docCodePrefix: row.doc_code_prefix ?? null,
+      primary: row.primary ?? null,
+      accent: row.accent ?? null,
+      classification: row.classification ?? null,
+      organizationId: row.organization_id ?? null,
+      updatedAt: row.updated_at,
+    };
+  },
+});
+
+export const upsertReportBrandForBackend = mutation({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    organizationId: v.optional(v.string()),
+    name: v.optional(v.string()),
+    wordmark: v.optional(v.string()),
+    tagline: v.optional(v.string()),
+    contact: v.optional(v.string()),
+    docCodePrefix: v.optional(v.string()),
+    primary: v.optional(v.string()),
+    accent: v.optional(v.string()),
+    classification: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const clean = (s?: string) => {
+      const t = (s ?? "").trim();
+      return t === "" ? undefined : t;
+    };
+    const fields = {
+      user_id: args.userId,
+      organization_id: clean(args.organizationId),
+      name: clean(args.name),
+      wordmark: clean(args.wordmark),
+      tagline: clean(args.tagline),
+      contact: clean(args.contact),
+      doc_code_prefix: clean(args.docCodePrefix),
+      primary: normalizeHex(args.primary),
+      accent: normalizeHex(args.accent),
+      classification: clean(args.classification),
+      updated_at: Date.now(),
+    };
+    const existing = await ctx.db
+      .query("report_brands")
+      .withIndex("by_user", (q) => q.eq("user_id", args.userId))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, fields);
+      return existing._id;
+    }
+    return await ctx.db.insert("report_brands", fields);
   },
 });
 
