@@ -554,6 +554,26 @@ export const listEvidenceForFinding = query({
   },
 });
 
+/**
+ * Metadados de uma evidência em arquivo para a ROTA de imagem (serviceKey +
+ * userId; a rota gateia por getInternalUser). Devolve s3_key + media_type se a
+ * evidência pertence ao usuário e é um arquivo.
+ */
+export const getEvidenceFileForBackend = query({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    evidenceId: v.id("evidence"),
+  },
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const ev = await ctx.db.get(args.evidenceId);
+    if (!ev || ev.user_id !== args.userId) return null;
+    if (!ev.s3_key) return null;
+    return { s3Key: ev.s3_key, mediaType: ev.media_type ?? null };
+  },
+});
+
 /** Feed cronológico crescente de evidência do engajamento (visão ao vivo). */
 export const streamEngagementEvidence = query({
   args: {

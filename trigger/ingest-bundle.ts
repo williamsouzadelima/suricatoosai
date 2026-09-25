@@ -172,6 +172,19 @@ export const ingestEvidenceBundle = schemaTask({
         })
         .filter((f) => f.name && !f.name.startsWith("."));
       const fileNames = new Set(files.map((f) => f.name));
+      // Fallback por basename: os prints costumam viver em subpastas
+      // (screenshots/, webapp_evidence/); o modelo às vezes referencia só o
+      // nome do arquivo. Mapeia basename → caminho completo (1º vence).
+      const byBasename = new Map<string, string>();
+      for (const f of files) {
+        const base = f.name.split("/").pop();
+        if (base && !byBasename.has(base)) byBasename.set(base, f.name);
+      }
+      const resolveArtifact = (art: string): string | null => {
+        if (fileNames.has(art)) return art;
+        const base = art.split("/").pop();
+        return (base && byBasename.get(base)) || null;
+      };
       metadata.set("files", files.length);
 
       // .md de relatório/achados = FONTE dos achados.
@@ -225,17 +238,20 @@ export const ingestEvidenceBundle = schemaTask({
               result_summary: s.significance,
               label: s.tool_name,
             };
-            const art = s.artifact_name;
-            if (art && fileNames.has(art)) {
-              const e = ext(art);
-              const full = `/home/user/b/${art}`;
+            const rel = s.artifact_name
+              ? resolveArtifact(s.artifact_name)
+              : null;
+            if (rel) {
+              const e = ext(rel);
+              const full = `/home/user/b/${rel}`;
+              const base = rel.split("/").pop() ?? rel;
               if (IMAGE_EXT.has(e) && images < MAX_IMAGES) {
                 try {
                   const imgBytes = await sbx.files.read(full, {
                     format: "bytes",
                   });
                   const buf = Buffer.from(imgBytes);
-                  const key = `users/${payload.userId}/evidence/${Date.now()}-${images}-${art.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+                  const key = `users/${payload.userId}/evidence/${Date.now()}-${images}-${base.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
                   await s3.send(
                     new PutObjectCommand({
                       Bucket: bucket,
@@ -248,7 +264,7 @@ export const ingestEvidenceBundle = schemaTask({
                     api.fileActions.saveSandboxGeneratedFile,
                     {
                       s3Key: key,
-                      name: art,
+                      name: base,
                       mediaType: MIME[e] ?? "application/octet-stream",
                       size: buf.length,
                       serviceKey,
@@ -259,10 +275,10 @@ export const ingestEvidenceBundle = schemaTask({
                   item.file_id = saved.fileId;
                   item.s3_key = key;
                   item.media_type = MIME[e];
-                  item.label = s.tool_name ?? art;
+                  item.label = s.tool_name ?? base;
                   images += 1;
                 } catch (imgErr) {
-                  console.error("ingest: falha ao anexar imagem", art, imgErr);
+                  console.error("ingest: falha ao anexar imagem", rel, imgErr);
                 }
               } else if (!IMAGE_EXT.has(e)) {
                 // Artefato de texto (script / saída): usa o conteúdo real.
@@ -275,7 +291,7 @@ export const ingestEvidenceBundle = schemaTask({
                   if (!s.output_snippet) {
                     item.snippet = content.slice(0, TEXT_ARTIFACT_CLAMP);
                   }
-                  item.label = s.tool_name ?? art;
+                  item.label = s.tool_name ?? base;
                 } catch {
                   /* ignora */
                 }
@@ -341,7 +357,7 @@ function buildPrompt(
 REGRA PRINCIPAL: os arquivos .md abaixo são a FONTE DA VERDADE dos achados. Extraia os achados EXATAMENTE como escritos (título, severidade, ativo, impacto, remediação) — não invente nem contradiga.
 
 Para CADA achado, monte a EVIDÊNCIA como uma CADEIA CRONOLÓGICA (evidence_chain), referenciando os ARQUIVOS REAIS do bundle:
-- artifact_name: o NOME EXATO do arquivo (da lista) que sustenta o passo — o script de exploit (.py), a saída (_output.txt/.json), ou o screenshot (.png). Prefira SEMPRE apontar um arquivo real.
+- artifact_name: o NOME do arquivo (da lista) que sustenta o passo — o script de exploit (.py), a saída (_output.txt/.json), ou o SCREENSHOT (.png). Prefira SEMPRE apontar um arquivo real. Os screenshots costumam estar em subpastas (screenshots/, screenshots_ev/, webapp_evidence/); pode referenciar pelo nome do arquivo. SEMPRE que houver um screenshot relevante para o achado, inclua-o como passo de PROVA VISUAL.
 - tool_name: a ferramenta do passo (curl, sqlmap, nmap, python, etc.).
 - command: o comando/requisição, se souber pela transcrição do .md (senão, deixe — será extraído do script).
 - significance: o que o passo PROVA.

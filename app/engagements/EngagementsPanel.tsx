@@ -1141,6 +1141,19 @@ function FindingEvidence({
                     {ev.result_summary}
                   </div>
                 )}
+                {ev.file_id &&
+                  (ev.media_type ?? "image/").startsWith("image/") && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={`/api/evidence/${ev._id}/image`}
+                      alt={ev.label ?? "evidência"}
+                      loading="lazy"
+                      className="mt-2 max-h-96 w-auto max-w-full rounded border"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  )}
               </li>
             ))}
           </ol>
