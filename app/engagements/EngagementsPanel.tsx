@@ -1270,6 +1270,14 @@ function FindingEvidence({
     });
   }, [evidenceRaw]);
 
+  const imageEvidence = useMemo(
+    () =>
+      (evidence ?? []).filter(
+        (e) => e.file_id && (e.media_type ?? "image/").startsWith("image/"),
+      ),
+    [evidence],
+  );
+
   return (
     <div className="mt-3 space-y-3 rounded-lg border bg-muted/20 p-3 text-sm">
       <div className="grid gap-2 sm:grid-cols-2">
@@ -1288,6 +1296,40 @@ function FindingEvidence({
       )}
       {finding.remediation && (
         <Detail label="Remediação" value={finding.remediation} block />
+      )}
+      {imageEvidence.length > 0 && (
+        <div>
+          <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-primary">
+            Evidência Visual ({imageEvidence.length})
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {imageEvidence.map((ev) => (
+              <a
+                key={ev._id}
+                href={`/api/evidence/${ev._id}/image`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group block overflow-hidden rounded-lg border bg-background"
+                title="Abrir em tamanho real"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/evidence/${ev._id}/image`}
+                  alt={ev.label ?? "screenshot"}
+                  loading="lazy"
+                  className="h-32 w-full bg-muted object-cover transition group-hover:opacity-90"
+                  onError={(e) => {
+                    const a = e.currentTarget.closest("a");
+                    if (a) (a as HTMLElement).style.display = "none";
+                  }}
+                />
+                <div className="truncate px-2 py-1 text-[10px] text-muted-foreground">
+                  {ev.label ?? "screenshot"}
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
       )}
       <div>
         <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -1341,19 +1383,6 @@ function FindingEvidence({
                     {ev.result_summary}
                   </div>
                 )}
-                {ev.file_id &&
-                  (ev.media_type ?? "image/").startsWith("image/") && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={`/api/evidence/${ev._id}/image`}
-                      alt={ev.label ?? "evidência"}
-                      loading="lazy"
-                      className="mt-2 max-h-96 w-auto max-w-full rounded border"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  )}
               </li>
             ))}
           </ol>
