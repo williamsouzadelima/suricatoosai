@@ -132,7 +132,14 @@ def _stat_tiles(doc, stats):
 def _cover(doc, sec, meta):
     brand = meta.get("brand", {})
     used_logo = False
-    if brand.get("wordmark", "") == "Suricatoos":
+    logo_path = brand.get("logoPath")
+    if logo_path and os.path.exists(logo_path):
+        try:
+            doc.add_picture(logo_path, width=Inches(2.6))
+            used_logo = True
+        except Exception:
+            used_logo = False
+    if not used_logo and brand.get("wordmark", "") == "Suricatoos":
         lp = logo.write_logo(dark=False)
         if lp and os.path.exists(lp):
             try:

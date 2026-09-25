@@ -295,7 +295,22 @@ def render_pdf(model, out_path):
         if t == "cover":
             S.append(Spacer(1, 30 * mm))
             used_logo = False
-            if brand.get("wordmark", "") == "Suricatoos":
+            logo_path = brand.get("logoPath")
+            if logo_path and os.path.exists(logo_path):
+                try:
+                    iw, ih = ImageReader(logo_path).getSize()
+                    w = 60 * mm
+                    h = w * ih / iw
+                    if h > 24 * mm:
+                        h = 24 * mm
+                        w = h * iw / ih
+                    im = Image(logo_path, width=w, height=h)
+                    im.hAlign = "LEFT"
+                    S.append(im)
+                    used_logo = True
+                except Exception:
+                    used_logo = False
+            if not used_logo and brand.get("wordmark", "") == "Suricatoos":
                 lp = logo.write_logo(dark=False)
                 if lp and os.path.exists(lp):
                     try:

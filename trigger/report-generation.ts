@@ -125,6 +125,33 @@ export const generateEngagementReport = schemaTask({
         }
       }
 
+      // 2a-bis) Logo da marca (se houver) → caminho local p/ a capa.
+      let brandLogoPath: string | undefined;
+      if (input.brandLogo?.s3Key) {
+        try {
+          const obj = await s3.send(
+            new GetObjectCommand({
+              Bucket: bucket,
+              Key: input.brandLogo.s3Key,
+            }),
+          );
+          const bytes = await obj.Body?.transformToByteArray();
+          if (bytes) {
+            const mt = input.brandLogo.mediaType || "image/png";
+            const ext = mt.split("/")[1]?.split("+")[0] || "png";
+            const rel = `brand/logo.${ext}`;
+            const ab = bytes.buffer.slice(
+              bytes.byteOffset,
+              bytes.byteOffset + bytes.byteLength,
+            ) as ArrayBuffer;
+            await sbx.files.write(`${base}/${rel}`, ab);
+            brandLogoPath = rel;
+          }
+        } catch (logoErr) {
+          console.error("report: falha ao baixar logo da marca", logoErr);
+        }
+      }
+
       // 2b) Monta o ReportModel em TS, já com imagePath resolvido.
       const reportInput: ReportInput = {
         client: input.client,
@@ -132,7 +159,13 @@ export const generateEngagementReport = schemaTask({
         author: payload.generatedBy,
         generatedAt: Date.now(),
         version: payload.version,
-        brand: input.brand ?? undefined,
+        brand:
+          input.brand || brandLogoPath
+            ? {
+                ...(input.brand ?? {}),
+                ...(brandLogoPath ? { logoPath: brandLogoPath } : {}),
+              }
+            : undefined,
         findings: input.findings.map((f) => ({
           ref: f.ref,
           title: f.title,

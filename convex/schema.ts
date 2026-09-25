@@ -1655,6 +1655,8 @@ export default defineSchema({
     primary: v.optional(v.string()),
     accent: v.optional(v.string()),
     classification: v.optional(v.string()),
+    logo_s3_key: v.optional(v.string()),
+    logo_media_type: v.optional(v.string()),
     updated_at: v.number(),
   })
     .index("by_org", ["organization_id"])

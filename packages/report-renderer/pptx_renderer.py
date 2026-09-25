@@ -114,9 +114,16 @@ def _cover(prs, sec, meta):
     _rect(slide, 0, 0, SW, SH, T.INK)
     brand = meta.get("brand", {})
     accent = brand.get("accent") or T.CORAL
-    # Wordmark (topo-esq): logo embutido so p/ a marca padrao; senao texto.
+    # Wordmark (topo-esq): logo custom da marca > logo Suricatoos embutido > texto.
     used_logo = False
-    if brand.get("wordmark", "") == "Suricatoos":
+    logo_path = brand.get("logoPath")
+    if logo_path and os.path.exists(logo_path):
+        try:
+            slide.shapes.add_picture(logo_path, ML, Inches(0.5), height=Inches(0.6))
+            used_logo = True
+        except Exception:
+            used_logo = False
+    if not used_logo and brand.get("wordmark", "") == "Suricatoos":
         lp = logo.write_logo(dark=True)
         if lp and os.path.exists(lp):
             try:

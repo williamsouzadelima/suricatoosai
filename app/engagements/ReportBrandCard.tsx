@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Palette, Loader2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Palette,
+  Loader2,
+  Upload,
+  Trash2,
+  ImageIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,6 +27,8 @@ type BrandForm = {
   tagline: string;
   classification: string;
 };
+
+const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
 
 const withHash = (hex?: string | null, fallback = "") =>
   hex ? (hex.startsWith("#") ? hex : `#${hex}`) : fallback;
@@ -65,6 +75,10 @@ export function ReportBrandCard() {
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [form, setForm] = useState<BrandForm>(EMPTY);
+  const [logoSet, setLogoSet] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open || loaded) return;
@@ -85,6 +99,7 @@ export function ReportBrandCard() {
             classification: b.classification ?? "",
           });
         }
+        setLogoSet(Boolean(b?.logoS3Key));
         setLoaded(true);
       })
       .catch(() => toast.error("Falha ao carregar a marca."))
@@ -109,6 +124,64 @@ export function ReportBrandCard() {
       console.error(e);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleLogoFile = async (file: File) => {
+    if (!LOGO_TYPES.includes(file.type)) {
+      toast.error("Use PNG, JPEG, WEBP ou SVG.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Logo acima de 5 MB.");
+      return;
+    }
+    setUploadingLogo(true);
+    try {
+      const urlRes = await fetch("/api/report-brand/logo-upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type,
+          size: file.size,
+        }),
+      });
+      if (!urlRes.ok) throw new Error("upload-url");
+      const { uploadUrl, s3Key, contentType } = await urlRes.json();
+      const put = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": contentType },
+        body: file,
+      });
+      if (!put.ok) throw new Error("put");
+      const setRes = await fetch("/api/report-brand/logo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ s3Key, mediaType: contentType }),
+      });
+      if (!setRes.ok) throw new Error("set");
+      setLogoPreview(URL.createObjectURL(file));
+      setLogoSet(true);
+      toast.success("Logo enviado. Vale para os próximos relatórios.");
+    } catch (e) {
+      toast.error("Falha ao enviar o logo.");
+      console.error(e);
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const removeLogo = async () => {
+    try {
+      const res = await fetch("/api/report-brand/logo", { method: "DELETE" });
+      if (!res.ok) throw new Error(String(res.status));
+      setLogoSet(false);
+      setLogoPreview(null);
+      toast.success("Logo removido.");
+    } catch (e) {
+      toast.error("Falha ao remover o logo.");
+      console.error(e);
     }
   };
 
@@ -195,6 +268,54 @@ export function ReportBrandCard() {
                 />
               </div>
 
+              {/* Logo */}
+              <div className="flex flex-col gap-2">
+                <label className="block text-xs font-medium text-muted-foreground">
+                  Logo (PNG/JPEG/WEBP/SVG, até 5 MB) — vazio usa o wordmark
+                </label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void handleLogoFile(f);
+                      e.currentTarget.value = "";
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploadingLogo}
+                  >
+                    {uploadingLogo ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                    Enviar logo
+                  </Button>
+                  {logoSet && (
+                    <>
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <ImageIcon className="h-3.5 w-3.5" /> Logo definido
+                      </span>
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        onClick={() => void removeLogo()}
+                        className="text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" /> Remover
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Field
                   label="Assinatura (tagline)"
@@ -215,12 +336,21 @@ export function ReportBrandCard() {
                 className="rounded-lg p-4"
                 style={{ backgroundColor: "#0E1B2E" }}
               >
-                <div
-                  className="text-sm font-bold"
-                  style={{ color: form.accent }}
-                >
-                  {wordmark}
-                </div>
+                {logoPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logoPreview}
+                    alt="Prévia do logo"
+                    style={{ maxHeight: 28, maxWidth: 220 }}
+                  />
+                ) : (
+                  <div
+                    className="text-sm font-bold"
+                    style={{ color: form.accent }}
+                  >
+                    {wordmark}
+                  </div>
+                )}
                 <div
                   className="mt-0.5 text-[10px] font-semibold tracking-wide"
                   style={{ color: form.accent }}

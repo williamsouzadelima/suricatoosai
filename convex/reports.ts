@@ -69,20 +69,31 @@ export const getReportInputForBackend = query({
       classification: row.classification,
     });
     let brand: ReturnType<typeof mapBrandRow> | undefined;
+    let brandLogo: { s3Key: string; mediaType?: string } | undefined;
+    const applyBrandRow = (
+      row: Parameters<typeof mapBrandRow>[0] & {
+        logo_s3_key?: string;
+        logo_media_type?: string;
+      },
+    ) => {
+      brand = mapBrandRow(row);
+      if (row.logo_s3_key)
+        brandLogo = { s3Key: row.logo_s3_key, mediaType: row.logo_media_type };
+    };
     if (engagement.organization_id) {
       const orgId = engagement.organization_id;
       const row = await ctx.db
         .query("report_brands")
         .withIndex("by_org", (q) => q.eq("organization_id", orgId))
         .first();
-      if (row) brand = mapBrandRow(row);
+      if (row) applyBrandRow(row);
     }
     if (!brand) {
       const row = await ctx.db
         .query("report_brands")
         .withIndex("by_user", (q) => q.eq("user_id", args.userId))
         .first();
-      if (row) brand = mapBrandRow(row);
+      if (row) applyBrandRow(row);
     }
 
     // Inclui todos os achados NÃO descartados (rascunho/revisão/aprovado/
@@ -146,6 +157,7 @@ export const getReportInputForBackend = query({
     return {
       client: { name: client?.name ?? "(cliente)" },
       brand,
+      brandLogo,
       engagement: {
         name: engagement.name,
         code: engagement.code,
@@ -193,9 +205,45 @@ export const getReportBrandForBackend = query({
       primary: row.primary ?? null,
       accent: row.accent ?? null,
       classification: row.classification ?? null,
+      logoS3Key: row.logo_s3_key ?? null,
+      logoMediaType: row.logo_media_type ?? null,
       organizationId: row.organization_id ?? null,
       updatedAt: row.updated_at,
     };
+  },
+});
+
+/**
+ * Define (ou limpa, com s3Key vazio) o logo da marca do analista. Separado do
+ * upsert de texto para uma gravação de texto NUNCA apagar o logo por engano.
+ */
+export const setReportBrandLogoForBackend = mutation({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    s3Key: v.optional(v.string()),
+    mediaType: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const key = (args.s3Key ?? "").trim();
+    const logoFields = {
+      logo_s3_key: key === "" ? undefined : key,
+      logo_media_type: key === "" ? undefined : (args.mediaType ?? undefined),
+      updated_at: Date.now(),
+    };
+    const existing = await ctx.db
+      .query("report_brands")
+      .withIndex("by_user", (q) => q.eq("user_id", args.userId))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, logoFields);
+      return existing._id;
+    }
+    return await ctx.db.insert("report_brands", {
+      user_id: args.userId,
+      ...logoFields,
+    });
   },
 });
 

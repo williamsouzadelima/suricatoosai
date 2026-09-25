@@ -28,6 +28,12 @@ export type ReportBrand = {
   primary: string; // cor primária (hex sem '#')
   accent: string; // cor de destaque (hex sem '#')
   classification: string; // "CONFIDENCIAL · USO RESTRITO"
+  /**
+   * Caminho LOCAL do logo (relativo à raiz do renderer no sandbox), resolvido
+   * pelo job do trigger a partir do S3. Ausente → wordmark (logo Suricatoos p/
+   * a marca padrão; texto para as demais).
+   */
+  logoPath?: string;
 };
 
 export type ReportEvidenceView = {
