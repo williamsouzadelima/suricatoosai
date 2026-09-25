@@ -293,6 +293,28 @@ export const upsertReportBrandForBackend = mutation({
 });
 
 /**
+ * Saúde do pipeline p/ o watchdog do trigger: quantos relatórios estão presos
+ * (queued/rendering há mais de olderThanMs). >0 sem run é sinal de worker mudo.
+ * serviceKey-only (rodado por um script no host, sem identidade).
+ */
+export const countStuckReportsForBackend = query({
+  args: { serviceKey: v.string(), olderThanMs: v.number() },
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const cutoff = Date.now() - args.olderThanMs;
+    let stuck = 0;
+    for (const status of ["queued", "rendering"] as const) {
+      const rows = await ctx.db
+        .query("reports")
+        .withIndex("by_status", (q) => q.eq("status", status))
+        .collect();
+      for (const r of rows) if (r.updated_at < cutoff) stuck++;
+    }
+    return stuck;
+  },
+});
+
+/**
  * Cria a solicitação de relatório (uma linha reports por formato, mesmo
  * report_group_id + version). serviceKey + userId (a rota gateia via
  * getInternalUser e passa o WorkOS user.id, que === engagement.user_id).
