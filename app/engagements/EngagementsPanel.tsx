@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import {
   Plus,
@@ -17,6 +17,7 @@ import {
   Sparkles,
   ExternalLink,
   Upload,
+  Trash2,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -770,11 +771,40 @@ function ReportsSection({ engagementId }: { engagementId: Id<"engagements"> }) {
     engagementId,
   });
 
+  const deleteReportGroup = useAction(
+    api.reportActions.deleteReportGroupWithFiles,
+  );
+
   const [audience, setAudience] = useState<ReportAudience>("technical");
   const [formats, setFormats] = useState<Set<ReportFormat>>(
     () => new Set<ReportFormat>(["pdf"]),
   );
   const [generating, setGenerating] = useState(false);
+  const [deletingGroup, setDeletingGroup] = useState<string | null>(null);
+
+  const removeGroup = async (
+    groupId: string,
+    audienceLabel: string,
+    version: number,
+  ) => {
+    if (
+      !window.confirm(
+        `Remover o relatório ${audienceLabel} v${version} (todos os formatos)? Esta ação não pode ser desfeita.`,
+      )
+    ) {
+      return;
+    }
+    setDeletingGroup(groupId);
+    try {
+      await deleteReportGroup({ reportGroupId: groupId });
+      toast.success("Relatório removido.");
+    } catch (e) {
+      toast.error("Falha ao remover o relatório.");
+      console.error(e);
+    } finally {
+      setDeletingGroup(null);
+    }
+  };
 
   const toggleFormat = (f: ReportFormat) => {
     setFormats((prev) => {
@@ -947,6 +977,26 @@ function ReportsSection({ engagementId }: { engagementId: Id<"engagements"> }) {
                 <span className="text-xs text-muted-foreground">
                   v{g.version} · {formatDateTime(g.created_at)}
                 </span>
+                <button
+                  onClick={() =>
+                    void removeGroup(
+                      g.id,
+                      AUDIENCE_LABEL[g.audience as ReportAudience] ??
+                        g.audience,
+                      g.version,
+                    )
+                  }
+                  disabled={deletingGroup === g.id}
+                  title="Remover este relatório (todos os formatos)"
+                  className="ml-auto inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                >
+                  {deletingGroup === g.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                  Remover
+                </button>
               </div>
               <div className="flex flex-wrap gap-2">
                 {g.rows

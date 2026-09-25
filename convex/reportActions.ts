@@ -3,7 +3,7 @@
 import { action } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { api } from "./_generated/api";
-import { generateS3DownloadUrl } from "./s3Utils";
+import { generateS3DownloadUrl, deleteS3Object } from "./s3Utils";
 
 /**
  * URL de download de um relatório pronto (identity + posse, via getReportForDownload).
@@ -35,5 +35,37 @@ export const getReportDownloadUrl = action({
     const url = await generateS3DownloadUrl(report.s3Key);
     const filename = `${report.audience}_v${report.version}.${report.format}`;
     return { url, filename };
+  },
+});
+
+/**
+ * Remove um grupo de relatório (todas as versões/formatos de um "gerar"): apaga
+ * os arquivos no S3 (best-effort) e as linhas no Convex. Identity + posse.
+ */
+export const deleteReportGroupWithFiles = action({
+  args: { reportGroupId: v.string() },
+  handler: async (ctx, args): Promise<{ deleted: number }> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Não autenticado",
+      });
+    }
+    const rows = await ctx.runQuery(api.reports.getReportGroupForDeletion, {
+      reportGroupId: args.reportGroupId,
+    });
+    for (const r of rows) {
+      if (r.s3Key) {
+        try {
+          await deleteS3Object(r.s3Key);
+        } catch (e) {
+          console.error("deleteReportGroup: falha ao apagar S3", r.s3Key, e);
+        }
+      }
+    }
+    return await ctx.runMutation(api.reports.deleteReportGroup, {
+      reportGroupId: args.reportGroupId,
+    });
   },
 });

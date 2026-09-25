@@ -337,3 +337,45 @@ export const listReportsForEngagement = query({
       .take(120);
   },
 });
+
+/** s3_keys de um grupo de relatório (identity + posse) — p/ a action limpar o S3. */
+export const getReportGroupForDeletion = query({
+  args: { reportGroupId: v.string() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const rows = await ctx.db
+      .query("reports")
+      .withIndex("by_group", (q) => q.eq("report_group_id", args.reportGroupId))
+      .collect();
+    return rows
+      .filter((r) => r.user_id === identity.subject)
+      .map((r) => ({ id: r._id, s3Key: r.s3_key ?? null }));
+  },
+});
+
+/** Remove todas as linhas de um grupo de relatório (identity + posse). */
+export const deleteReportGroup = mutation({
+  args: { reportGroupId: v.string() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Não autenticado",
+      });
+    }
+    const rows = await ctx.db
+      .query("reports")
+      .withIndex("by_group", (q) => q.eq("report_group_id", args.reportGroupId))
+      .collect();
+    let deleted = 0;
+    for (const r of rows) {
+      if (r.user_id === identity.subject) {
+        await ctx.db.delete(r._id);
+        deleted += 1;
+      }
+    }
+    return { deleted };
+  },
+});
