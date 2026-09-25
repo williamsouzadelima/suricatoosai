@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import {
@@ -936,6 +936,36 @@ function ReportsSection({ engagementId }: { engagementId: Id<"engagements"> }) {
     );
   };
 
+  const [reprocessing, setReprocessing] = useState<string | null>(null);
+  const reprocess = async (reportGroupId: string) => {
+    setReprocessing(reportGroupId);
+    try {
+      const res = await fetch("/api/reports/reprocess", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reportGroupId }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error || "Falha ao reprocessar.");
+      }
+      toast.success("Reprocessando… o status atualiza abaixo.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao reprocessar.");
+      console.error(e);
+    } finally {
+      setReprocessing(null);
+    }
+  };
+
+  // Relógio para o "há X min" (re-render a cada 20s).
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowTs(Date.now()), 20_000);
+    return () => clearInterval(id);
+  }, []);
+  const minsAgo = (ms: number) => Math.max(0, Math.floor((nowTs - ms) / 60000));
+
   // Agrupa as linhas (uma por formato) por report_group_id, mais recentes no topo.
   const groups = useMemo(() => {
     const map = new Map<
@@ -1045,79 +1075,122 @@ function ReportsSection({ engagementId }: { engagementId: Id<"engagements"> }) {
         />
       ) : (
         <div className="divide-y">
-          {groups.map((g) => (
-            <div key={g.id} className="p-4">
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="font-medium">
-                  {AUDIENCE_LABEL[g.audience as ReportAudience] ?? g.audience}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  v{g.version} · {formatDateTime(g.created_at)}
-                </span>
-                <button
-                  onClick={() =>
-                    void removeGroup(
-                      g.id,
-                      AUDIENCE_LABEL[g.audience as ReportAudience] ??
-                        g.audience,
-                      g.version,
-                    )
-                  }
-                  disabled={deletingGroup === g.id}
-                  title="Remover este relatório (todos os formatos)"
-                  className="ml-auto inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                >
-                  {deletingGroup === g.id ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-3.5 w-3.5" />
+          {groups.map((g) => {
+            const allReady = g.rows.every((r) => r.status === "ready");
+            const anyPending = g.rows.some(
+              (r) => r.status === "queued" || r.status === "rendering",
+            );
+            const anyFailed = g.rows.some((r) => r.status === "failed");
+            const mins = minsAgo(g.created_at);
+            const stuck = anyPending && mins >= 3;
+            return (
+              <div key={g.id} className="p-4">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="font-medium">
+                    {AUDIENCE_LABEL[g.audience as ReportAudience] ?? g.audience}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    v{g.version} · {formatDateTime(g.created_at)}
+                  </span>
+                  {anyPending && (
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${
+                        stuck
+                          ? "bg-warning/15 text-warning"
+                          : "bg-primary/10 text-primary"
+                      }`}
+                    >
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      {stuck ? "Sem progresso" : "Gerando"} · há {mins} min
+                    </span>
                   )}
-                  Remover
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {g.rows
-                  .slice()
-                  .sort((a, b) => a.format.localeCompare(b.format))
-                  .map((r) => {
-                    const status = r.status as ReportStatus;
-                    const ready = status === "ready";
-                    return (
-                      <div
-                        key={r._id}
-                        className="flex items-center gap-2 rounded-lg border px-3 py-2"
+                  {anyFailed && !anyPending && (
+                    <span className="inline-flex items-center rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] text-destructive">
+                      Falhou
+                    </span>
+                  )}
+                  <div className="ml-auto flex items-center gap-2">
+                    {!allReady && (
+                      <button
+                        onClick={() => void reprocess(g.id)}
+                        disabled={reprocessing === g.id}
+                        title="Redisparar a geração (útil se travou na fila)"
+                        className="inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs text-primary hover:bg-primary/10 disabled:opacity-50"
                       >
-                        <span className="text-xs font-semibold uppercase">
-                          {r.format}
-                        </span>
-                        <StatusBadge
-                          tone={REPORT_STATUS_TONE[status] ?? "neutral"}
-                          label={REPORT_STATUS_LABEL[status] ?? status}
-                        />
-                        {ready && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => download(r._id)}
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                            Baixar
-                          </Button>
+                        {reprocessing === g.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3.5 w-3.5" />
                         )}
-                        {status === "failed" && r.error && (
-                          <span
-                            className="max-w-[16rem] truncate text-xs text-destructive"
-                            title={r.error}
-                          >
-                            {r.error}
+                        Reprocessar
+                      </button>
+                    )}
+                    <button
+                      onClick={() =>
+                        void removeGroup(
+                          g.id,
+                          AUDIENCE_LABEL[g.audience as ReportAudience] ??
+                            g.audience,
+                          g.version,
+                        )
+                      }
+                      disabled={deletingGroup === g.id}
+                      title="Remover este relatório (todos os formatos)"
+                      className="inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                    >
+                      {deletingGroup === g.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                      Remover
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {g.rows
+                    .slice()
+                    .sort((a, b) => a.format.localeCompare(b.format))
+                    .map((r) => {
+                      const status = r.status as ReportStatus;
+                      const ready = status === "ready";
+                      return (
+                        <div
+                          key={r._id}
+                          className="flex items-center gap-2 rounded-lg border px-3 py-2"
+                        >
+                          <span className="text-xs font-semibold uppercase">
+                            {r.format}
                           </span>
-                        )}
-                      </div>
-                    );
-                  })}
+                          <StatusBadge
+                            tone={REPORT_STATUS_TONE[status] ?? "neutral"}
+                            label={REPORT_STATUS_LABEL[status] ?? status}
+                          />
+                          {ready && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => download(r._id)}
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              Baixar
+                            </Button>
+                          )}
+                          {status === "failed" && r.error && (
+                            <span
+                              className="max-w-[16rem] truncate text-xs text-destructive"
+                              title={r.error}
+                            >
+                              {r.error}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </Card>

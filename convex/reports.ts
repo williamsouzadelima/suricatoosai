@@ -186,6 +186,43 @@ export const createReportRequest = mutation({
   },
 });
 
+/**
+ * Parâmetros de um grupo de relatório para REPROCESSAR (serviceKey + userId; a
+ * rota gateia por getInternalUser). Também reseta os formatos para "queued".
+ */
+export const getReportGroupParamsBackend = mutation({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    reportGroupId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const rows = await ctx.db
+      .query("reports")
+      .withIndex("by_group", (q) => q.eq("report_group_id", args.reportGroupId))
+      .collect();
+    const owned = rows.filter((r) => r.user_id === args.userId);
+    if (owned.length === 0) return null;
+    const first = owned[0];
+    // Reseta para a fila (a task remarca rendering→ready).
+    for (const r of owned) {
+      await ctx.db.patch(r._id, {
+        status: "queued",
+        error: undefined,
+        updated_at: Date.now(),
+      });
+    }
+    return {
+      engagementId: first.engagement_id,
+      audience: first.audience,
+      version: first.version,
+      formats: owned.map((r) => r.format),
+      generatedBy: first.generated_by,
+    };
+  },
+});
+
 export const setReportTriggerRunForBackend = mutation({
   args: {
     serviceKey: v.string(),
