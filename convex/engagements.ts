@@ -32,7 +32,6 @@ const scopeItemArg = v.object({
 });
 
 const UNASSIGNED_SLUG = "nao-atribuido";
-const TRIAGE_NAME = "Triagem";
 
 async function assertOwnedEngagement(
   ctx: QueryCtx,
@@ -303,28 +302,21 @@ export const resolveEngagementForChatBackend = mutation({
       });
     }
 
-    // Engajamento "Triagem" (lazy): primeiro do cliente com esse nome, senão cria.
-    const existing = await ctx.db
-      .query("engagements")
-      .withIndex("by_client_and_updated", (q) => q.eq("client_id", clientId))
-      .order("desc")
-      .collect();
-    const triage = existing.find((e) => e.name === TRIAGE_NAME);
-    let engagementId: Id<"engagements">;
-    if (triage) {
-      engagementId = triage._id;
-    } else {
-      engagementId = await ctx.db.insert("engagements", {
-        user_id: args.userId,
-        client_id: clientId,
-        name: TRIAGE_NAME,
-        status: "active",
-        created_at: now,
-        updated_at: now,
-      });
-    }
-
-    // Anexa o chat ao engajamento de triagem (se o chat existir e for do user).
+    // Engajamento POR TASK: cada chat/task ganha o seu próprio engajamento,
+    // criado na primeira resolução (eager no início da task ou na 1ª captura).
+    // Nomeado pelo título do chat quando houver. Idempotente: se um run
+    // concorrente já criou e anexou, o `chat.engagement_id` acima já retorna.
+    const title = (chat?.title ?? "").trim();
+    const engName =
+      title || `Engajamento · ${new Date(now).toISOString().slice(0, 10)}`;
+    const engagementId = await ctx.db.insert("engagements", {
+      user_id: args.userId,
+      client_id: clientId,
+      name: engName,
+      status: "active",
+      created_at: now,
+      updated_at: now,
+    });
     if (chat && chat.user_id === args.userId && !chat.engagement_id) {
       await ctx.db.patch(chat._id, { engagement_id: engagementId });
     }
