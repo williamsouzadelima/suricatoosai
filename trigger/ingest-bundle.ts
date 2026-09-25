@@ -25,7 +25,13 @@ import { createFindingFingerprint } from "@/lib/ai/subagents/fingerprint";
 
 export const INGEST_BUNDLE_TASK_ID = "ingest-evidence-bundle";
 
-const MODEL_KEY = "model-grok-4.6" satisfies ModelName;
+// Cadeia de fallback: se o provedor primário estiver em capacidade/erro, tenta
+// o próximo. Evita que a ingestão falhe só porque o Grok está sobrecarregado.
+const MODEL_KEYS = [
+  "model-grok-4.6",
+  "model-deepseek-v4-pro",
+  "model-glm-5.3",
+] satisfies ModelName[];
 const MAX_FINDINGS = 60;
 const MAX_CHAIN = 30;
 const MAX_IMAGES = 80;
@@ -209,15 +215,33 @@ export const ingestEvidenceBundle = schemaTask({
         .slice(0, MANIFEST_BUDGET);
 
       metadata.set("phase", "structuring");
-      const result = await generateText({
-        model: myProvider.languageModel(MODEL_KEY),
-        output: Output.object({ schema: ingestSchema }),
-        temperature: 0,
-        maxOutputTokens: 24_000,
-        maxRetries: 1,
-        prompt: buildPrompt(payload.filename, mdCorpus, manifest),
-      });
-      const findings = (result.output?.findings ?? []).slice(0, MAX_FINDINGS);
+      const structPrompt = buildPrompt(payload.filename, mdCorpus, manifest);
+      const structure = async () => {
+        let lastErr: unknown;
+        for (const key of MODEL_KEYS) {
+          try {
+            metadata.set("model", key);
+            const r = await generateText({
+              model: myProvider.languageModel(key),
+              output: Output.object({ schema: ingestSchema }),
+              temperature: 0,
+              maxOutputTokens: 24_000,
+              maxRetries: 1,
+              prompt: structPrompt,
+            });
+            return r.output;
+          } catch (e) {
+            lastErr = e;
+            console.error(
+              `ingest: modelo ${key} em capacidade/erro — tentando o próximo`,
+              e,
+            );
+          }
+        }
+        throw lastErr ?? new Error("Todos os modelos falharam na estruturação.");
+      };
+      const structured = await structure();
+      const findings = (structured?.findings ?? []).slice(0, MAX_FINDINGS);
       metadata.set("extracted", findings.length);
 
       // 1) Sobe TODOS os screenshots do bundle UMA vez (não depende do LLM).
