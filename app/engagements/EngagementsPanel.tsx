@@ -34,6 +34,7 @@ import {
   type Tone,
 } from "@/app/admin/_ui";
 import { ReportBrandCard } from "./ReportBrandCard";
+import { AppShell } from "@/components/internal/app-shell";
 
 type Severity = "info" | "low" | "medium" | "high" | "critical";
 type FindingStatus =
@@ -61,7 +62,13 @@ const STATUS_LABEL: Record<FindingStatus, string> = {
   dismissed: "Descartado",
 };
 
-export function EngagementsPanel() {
+export function EngagementsPanel({
+  userEmail,
+  userRole,
+}: {
+  userEmail?: string;
+  userRole?: string;
+}) {
   const clients = useQuery(api.clients.listClients);
   const engagements = useQuery(api.engagements.listEngagements, {});
 
@@ -109,127 +116,134 @@ export function EngagementsPanel() {
   };
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-5 px-4 py-6">
-      <SectionHeader
-        icon={ShieldAlert}
-        title="Engajamentos"
-        description="Clientes, engajamentos, achados e evidência em tempo real. Os achados capturados pelo agente entram como rascunho para sua curadoria."
-      />
-
-      {/* Criação rápida */}
-      <Card className="gap-0 py-0">
-        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex flex-1 items-end gap-2">
-            <div className="flex-1">
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Novo cliente
-              </label>
-              <Input
-                placeholder="Nome do cliente"
-                value={newClientName}
-                onChange={(e) => setNewClientName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleCreateClient()}
-              />
-            </div>
-            <Button variant="outline" onClick={() => void handleCreateClient()}>
-              <Plus className="h-4 w-4" /> Cliente
-            </Button>
-          </div>
-          <div className="flex flex-1 items-end gap-2">
-            <div className="flex-1">
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Novo engajamento
-              </label>
-              <div className="flex gap-2">
-                <select
-                  className="h-9 rounded-md border bg-background px-2 text-sm"
-                  value={newEngClientId}
-                  onChange={(e) =>
-                    setNewEngClientId(e.target.value as Id<"clients"> | "")
-                  }
-                >
-                  <option value="">Cliente…</option>
-                  {(clients ?? []).map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+    <AppShell
+      active="engagements"
+      title="Engajamentos"
+      description="Clientes, engajamentos, achados e evidência em tempo real. Os achados capturados pelo agente entram como rascunho para sua curadoria."
+      icon={ShieldAlert}
+      breadcrumb={["Engajamentos"]}
+      userEmail={userEmail}
+      userRole={userRole}
+    >
+      <div className="flex flex-col gap-5">
+        {/* Criação rápida */}
+        <Card className="gap-0 py-0">
+          <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-1 items-end gap-2">
+              <div className="flex-1">
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                  Novo cliente
+                </label>
                 <Input
-                  placeholder="Nome do engajamento"
-                  value={newEngName}
-                  onChange={(e) => setNewEngName(e.target.value)}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" && handleCreateEngagement()
-                  }
+                  placeholder="Nome do cliente"
+                  value={newClientName}
+                  onChange={(e) => setNewClientName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreateClient()}
                 />
               </div>
-            </div>
-            <Button
-              variant="outline"
-              onClick={() => void handleCreateEngagement()}
-            >
-              <Plus className="h-4 w-4" /> Engajamento
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Marca dos relatórios (colapsável) */}
-      <ReportBrandCard />
-
-      {/* Lista de engajamentos */}
-      <Card className="gap-0 py-0">
-        <div className="border-b p-5">
-          <SectionHeader
-            title="Selecionar engajamento"
-            count={engagements?.length}
-          />
-        </div>
-        {engagements === undefined ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            Carregando…
-          </div>
-        ) : engagements.length === 0 ? (
-          <EmptyState
-            icon={ShieldAlert}
-            title="Nenhum engajamento ainda."
-            description="Crie um cliente e um engajamento acima. O agente também cria um engajamento de Triagem automaticamente ao capturar o primeiro achado."
-          />
-        ) : (
-          <div className="flex flex-wrap gap-2 p-4">
-            {engagements.map((e) => (
-              <button
-                key={e._id}
-                onClick={() =>
-                  setSelectedEngagementId(
-                    selectedEngagementId === e._id ? null : e._id,
-                  )
-                }
-                className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                  selectedEngagementId === e._id
-                    ? "border-primary bg-primary/10"
-                    : "hover:bg-muted/40"
-                }`}
+              <Button
+                variant="outline"
+                onClick={() => void handleCreateClient()}
               >
-                <div className="font-medium">{e.name}</div>
-                <div className="text-xs text-muted-foreground">
-                  {clientNameById.get(e.client_id) ?? "—"} · {e.status}
+                <Plus className="h-4 w-4" /> Cliente
+              </Button>
+            </div>
+            <div className="flex flex-1 items-end gap-2">
+              <div className="flex-1">
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                  Novo engajamento
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    className="h-9 rounded-md border bg-background px-2 text-sm"
+                    value={newEngClientId}
+                    onChange={(e) =>
+                      setNewEngClientId(e.target.value as Id<"clients"> | "")
+                    }
+                  >
+                    <option value="">Cliente…</option>
+                    {(clients ?? []).map((c) => (
+                      <option key={c._id} value={c._id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Input
+                    placeholder="Nome do engajamento"
+                    value={newEngName}
+                    onChange={(e) => setNewEngName(e.target.value)}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && handleCreateEngagement()
+                    }
+                  />
                 </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </Card>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => void handleCreateEngagement()}
+              >
+                <Plus className="h-4 w-4" /> Engajamento
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-      {selectedEngagementId && (
-        <EngagementDetail
-          engagementId={selectedEngagementId}
-          expandedFindingId={expandedFindingId}
-          setExpandedFindingId={setExpandedFindingId}
-        />
-      )}
-    </div>
+        {/* Marca dos relatórios (colapsável) */}
+        <ReportBrandCard />
+
+        {/* Lista de engajamentos */}
+        <Card className="gap-0 py-0">
+          <div className="border-b p-5">
+            <SectionHeader
+              title="Selecionar engajamento"
+              count={engagements?.length}
+            />
+          </div>
+          {engagements === undefined ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              Carregando…
+            </div>
+          ) : engagements.length === 0 ? (
+            <EmptyState
+              icon={ShieldAlert}
+              title="Nenhum engajamento ainda."
+              description="Crie um cliente e um engajamento acima. O agente também cria um engajamento de Triagem automaticamente ao capturar o primeiro achado."
+            />
+          ) : (
+            <div className="flex flex-wrap gap-2 p-4">
+              {engagements.map((e) => (
+                <button
+                  key={e._id}
+                  onClick={() =>
+                    setSelectedEngagementId(
+                      selectedEngagementId === e._id ? null : e._id,
+                    )
+                  }
+                  className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                    selectedEngagementId === e._id
+                      ? "border-primary bg-primary/10"
+                      : "hover:bg-muted/40"
+                  }`}
+                >
+                  <div className="font-medium">{e.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {clientNameById.get(e.client_id) ?? "—"} · {e.status}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {selectedEngagementId && (
+          <EngagementDetail
+            engagementId={selectedEngagementId}
+            expandedFindingId={expandedFindingId}
+            setExpandedFindingId={setExpandedFindingId}
+          />
+        )}
+      </div>
+    </AppShell>
   );
 }
 

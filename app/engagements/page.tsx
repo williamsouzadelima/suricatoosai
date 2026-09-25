@@ -15,5 +15,10 @@ export default async function EngagementsPage() {
     // Não é staff interno (owner/analyst) ou não está logado: esconde tudo.
     redirect("/");
   }
-  return <EngagementsPanel />;
+  return (
+    <EngagementsPanel
+      userEmail={staff.user.email ?? undefined}
+      userRole={staff.role}
+    />
+  );
 }
