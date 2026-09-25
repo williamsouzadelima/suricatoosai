@@ -32,6 +32,8 @@ export async function GET(
   { params }: { params: Promise<{ reportId: string }> },
 ) {
   const { reportId } = await params;
+  // ?inline=1 → serve inline (prévia no navegador, ex.: PDF) em vez de anexo.
+  const inline = req.nextUrl.searchParams.get("inline") === "1";
   const staff = await getInternalUser();
   if (!staff) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -126,7 +128,7 @@ export async function GET(
     return new Response(body.transformToWebStream(), {
       headers: {
         "Content-Type": MIME[report.format] ?? "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${filename}"`,
         "Cache-Control": "no-store",
       },
     });

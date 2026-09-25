@@ -22,6 +22,8 @@ import {
   Paperclip,
   ListOrdered,
   BarChart3,
+  Eye,
+  X,
   Image as ImageIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -1127,6 +1129,21 @@ function ReportsSection({ engagementId }: { engagementId: Id<"engagements"> }) {
     );
   };
 
+  // Prévia: PDF abre inline no navegador (páginas reais); docx/pptx abrem a
+  // prévia web do conteúdo (mesmo conteúdo dos 3 formatos) com as evidências.
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const openPreview = (format: string, reportId: Id<"reports">) => {
+    if (format === "pdf") {
+      window.open(
+        `/api/reports/${reportId}/download?inline=1`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+    } else {
+      setPreviewOpen(true);
+    }
+  };
+
   const [reprocessing, setReprocessing] = useState<string | null>(null);
   const reprocess = async (reportGroupId: string) => {
     setReprocessing(reportGroupId);
@@ -1358,14 +1375,25 @@ function ReportsSection({ engagementId }: { engagementId: Id<"engagements"> }) {
                             label={REPORT_STATUS_LABEL[status] ?? status}
                           />
                           {ready && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => download(r._id)}
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                              Baixar
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => openPreview(r.format, r._id)}
+                                title="Pré-visualizar páginas e evidências"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                Prévia
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => download(r._id)}
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                                Baixar
+                              </Button>
+                            </>
                           )}
                           {status === "failed" && r.error && (
                             <span
@@ -1384,7 +1412,318 @@ function ReportsSection({ engagementId }: { engagementId: Id<"engagements"> }) {
           })}
         </div>
       )}
+      {previewOpen && (
+        <ReportPreviewModal
+          engagementId={engagementId}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
     </Card>
+  );
+}
+
+type PreviewEvidence = {
+  evidenceId: string;
+  sourceType: string;
+  label: string | null;
+  stepIndex: number | null;
+  toolName: string | null;
+  command: string | null;
+  snippet: string | null;
+  resultSummary: string | null;
+  isImage: boolean;
+};
+type PreviewFinding = {
+  ref: string;
+  title: string;
+  severity: Severity;
+  affectedAsset: string;
+  cvssScore: number | null;
+  cvssVector: string | null;
+  narrative: string | null;
+  impact: string | null;
+  remediation: string | null;
+  evidence: PreviewEvidence[];
+};
+type PreviewData = {
+  client: string;
+  engagement: string;
+  total: number;
+  bySeverity: Record<string, number>;
+  maxCvss: number;
+  findings: PreviewFinding[];
+};
+
+function ReportPreviewModal({
+  engagementId,
+  onClose,
+}: {
+  engagementId: Id<"engagements">;
+  onClose: () => void;
+}) {
+  const [data, setData] = useState<PreviewData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/reports/preview?engagementId=${engagementId}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((j) => {
+        if (alive) setData(j.preview as PreviewData);
+      })
+      .catch(() => alive && setError(true))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [engagementId]);
+
+  const maxSev = data ? Math.max(1, ...Object.values(data.bySeverity)) : 1;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-[#0e1b2e]/60 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="my-6 h-fit w-full max-w-4xl overflow-hidden rounded-2xl bg-card shadow-[var(--shadow-elevated)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Cabeçalho estilo capa */}
+        <div className="relative bg-gradient-to-br from-[#0f1f38] to-[#0b1626] p-6 text-white">
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white"
+            aria-label="Fechar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-brand">
+            Prévia do relatório · páginas & evidências
+          </div>
+          <h2 className="mt-1 font-display text-xl font-bold">
+            {data ? `${data.engagement}` : "Carregando…"}
+          </h2>
+          {data && <p className="text-sm text-[#c9d3e6]">{data.client}</p>}
+        </div>
+
+        {loading ? (
+          <div className="flex items-center gap-2 p-8 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Carregando conteúdo…
+          </div>
+        ) : error || !data ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">
+            Falha ao carregar a prévia.
+          </div>
+        ) : (
+          <div className="space-y-5 p-6">
+            {/* KPIs + distribuição */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-xl border p-4">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Achados
+                </div>
+                <div className="mt-1 font-display text-2xl font-bold">
+                  {data.total}
+                </div>
+              </div>
+              <div className="rounded-xl border p-4">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Críticos
+                </div>
+                <div className="mt-1 font-display text-2xl font-bold text-destructive">
+                  {data.bySeverity.critical ?? 0}
+                </div>
+              </div>
+              <div className="rounded-xl border p-4">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Maior CVSS
+                </div>
+                <div className="mt-1 font-display text-2xl font-bold">
+                  {data.maxCvss > 0 ? data.maxCvss.toFixed(1) : "—"}
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2 rounded-xl border p-4">
+              {(
+                ["critical", "high", "medium", "low", "info"] as Severity[]
+              ).map((s) => (
+                <div key={s} className="flex items-center gap-3">
+                  <span
+                    className={cn(
+                      "inline-flex w-[74px] shrink-0 justify-center rounded-full border px-2 py-0.5 text-xs font-semibold",
+                      SEV_PILL[s],
+                    )}
+                  >
+                    {SEV_LABEL[s]}
+                  </span>
+                  <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={cn("h-full rounded-full", SEV_STRIPE[s])}
+                      style={{
+                        width: `${(data.bySeverity[s] ?? 0) > 0 ? Math.max(4, ((data.bySeverity[s] ?? 0) / maxSev) * 100) : 0}%`,
+                      }}
+                    />
+                  </div>
+                  <span className="w-6 shrink-0 text-right font-mono text-sm font-semibold tabular-nums">
+                    {data.bySeverity[s] ?? 0}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Achados com evidência */}
+            {data.findings.length === 0 ? (
+              <div className="rounded-xl border p-6 text-center text-sm text-muted-foreground">
+                Sem achados neste relatório.
+              </div>
+            ) : (
+              data.findings.map((f) => (
+                <div
+                  key={f.ref}
+                  className="relative overflow-hidden rounded-xl border shadow-[var(--shadow-soft)]"
+                >
+                  <span
+                    className={cn(
+                      "absolute inset-y-3 left-0 w-1 rounded-r-full",
+                      SEV_STRIPE[f.severity],
+                    )}
+                  />
+                  <div className="flex flex-wrap items-center gap-2.5 py-3.5 pl-5 pr-4">
+                    <span
+                      className={cn(
+                        "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+                        SEV_PILL[f.severity],
+                      )}
+                    >
+                      {SEV_LABEL[f.severity]}
+                    </span>
+                    <span className="shrink-0 font-mono text-[11.5px] text-muted-foreground">
+                      {f.ref}
+                    </span>
+                    <span className="font-medium">{f.title}</span>
+                    <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:inline-flex">
+                      <Server className="h-3.5 w-3.5" />
+                      {f.affectedAsset}
+                    </span>
+                    {f.cvssScore != null && (
+                      <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold text-muted-foreground">
+                        CVSS {f.cvssScore.toFixed(1)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-3 border-t bg-muted/40 p-4">
+                    {f.narrative && (
+                      <EvBlock label="Narrativa" text={f.narrative} />
+                    )}
+                    {f.impact && <EvBlock label="Impacto" text={f.impact} />}
+                    {f.evidence.some((e) => e.isImage) && (
+                      <div>
+                        <SubHead
+                          icon={ImageIcon}
+                          label="Evidência visual"
+                          n={f.evidence.filter((e) => e.isImage).length}
+                        />
+                        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+                          {f.evidence
+                            .filter((e) => e.isImage)
+                            .map((e) => (
+                              <a
+                                key={e.evidenceId}
+                                href={`/api/evidence/${e.evidenceId}/image`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group relative block overflow-hidden rounded-xl border bg-[#0e1b2e] shadow-[var(--shadow-soft)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)]"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={`/api/evidence/${e.evidenceId}/image`}
+                                  alt={e.label ?? "screenshot"}
+                                  loading="lazy"
+                                  className="aspect-[16/10] w-full object-cover"
+                                  onError={(ev) => {
+                                    const a = ev.currentTarget.closest("a");
+                                    if (a)
+                                      (a as HTMLElement).style.display = "none";
+                                  }}
+                                />
+                                <div className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-[#080f1b]/85 to-transparent px-2 pb-1.5 pt-5 font-mono text-[9.5px] text-[#cdd9ec]">
+                                  {e.label ?? "screenshot"}
+                                </div>
+                              </a>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                    {f.evidence.length > 0 && (
+                      <div>
+                        <SubHead
+                          icon={ListOrdered}
+                          label="Cadeia de evidência"
+                          n={f.evidence.length}
+                        />
+                        <div className="relative pl-1">
+                          {f.evidence.map((e, i) => (
+                            <div
+                              key={e.evidenceId}
+                              className="relative flex gap-3.5 pb-4 last:pb-0"
+                            >
+                              {i < f.evidence.length - 1 && (
+                                <span className="absolute bottom-0 left-[13px] top-8 w-0.5 bg-border" />
+                              )}
+                              <span className="z-[1] flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-primary bg-card text-xs font-bold text-primary shadow-[var(--shadow-soft)]">
+                                {e.stepIndex ?? i + 1}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                                  {e.toolName && (
+                                    <span className="rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-primary">
+                                      {e.toolName}
+                                    </span>
+                                  )}
+                                  <span className="text-xs text-muted-foreground">
+                                    {e.sourceType}
+                                    {e.label ? ` · ${e.label}` : ""}
+                                  </span>
+                                </div>
+                                {e.command && (
+                                  <pre className="overflow-auto rounded-lg bg-[#0e1b2e] px-3 py-2 font-mono text-[11.5px] leading-relaxed text-[#d5e0f2]">
+                                    <span className="select-none text-[#5f7fb0]">
+                                      $
+                                    </span>
+                                    {e.command}
+                                  </pre>
+                                )}
+                                {e.snippet && (
+                                  <pre className="mt-1.5 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg border bg-card px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                                    {e.snippet}
+                                  </pre>
+                                )}
+                                {e.resultSummary && (
+                                  <div className="mt-1.5 flex gap-1.5 text-xs">
+                                    <span className="font-semibold text-success">
+                                      → prova:
+                                    </span>
+                                    <span className="text-foreground/80">
+                                      {e.resultSummary}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

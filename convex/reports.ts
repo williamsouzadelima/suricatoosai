@@ -550,6 +550,105 @@ export const getReportForDownloadBackend = query({
   },
 });
 
+/**
+ * Conteúdo do relatório para PRÉVIA na tela (não gera arquivo): meta + KPIs +
+ * achados não-descartados (ordem de severidade) com cadeia de evidência e
+ * marcação de quais evidências são imagem (servidas por /api/evidence/[id]/image).
+ * Keyed por engajamento — o conteúdo é o mesmo p/ docx/pptx/pdf.
+ */
+export const getReportPreviewForBackend = query({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    engagementId: v.id("engagements"),
+  },
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const engagement = await ctx.db.get(args.engagementId);
+    if (!engagement || engagement.user_id !== args.userId) {
+      throw new ConvexError({ code: "ACCESS_DENIED", message: "Sem acesso" });
+    }
+    const client = await ctx.db.get(engagement.client_id);
+    const raw = (
+      await ctx.db
+        .query("findings")
+        .withIndex("by_engagement_and_updated", (q) =>
+          q.eq("engagement_id", args.engagementId),
+        )
+        .collect()
+    ).filter((f) => f.status !== "dismissed");
+    const sevRank: Record<string, number> = {
+      critical: 0,
+      high: 1,
+      medium: 2,
+      low: 3,
+      info: 4,
+    };
+    raw.sort((a, b) => (sevRank[a.severity] ?? 9) - (sevRank[b.severity] ?? 9));
+    const bySeverity: Record<string, number> = {
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      info: 0,
+    };
+    let maxCvss = 0;
+    const findings = [];
+    for (const f of raw) {
+      bySeverity[f.severity] = (bySeverity[f.severity] ?? 0) + 1;
+      if (typeof f.cvss_score === "number" && f.cvss_score > maxCvss)
+        maxCvss = f.cvss_score;
+      const evRaw = await ctx.db
+        .query("evidence")
+        .withIndex("by_finding_and_captured", (q) => q.eq("finding_id", f._id))
+        .order("desc")
+        .take(EVIDENCE_PER_FINDING);
+      const ev = evRaw
+        .slice()
+        .sort(
+          (a, b) =>
+            (a.step_index ?? Number.MAX_SAFE_INTEGER) -
+              (b.step_index ?? Number.MAX_SAFE_INTEGER) ||
+            a.captured_at - b.captured_at,
+        );
+      findings.push({
+        ref: f.finding_id,
+        title: f.title,
+        severity: f.severity,
+        affectedAsset: f.affected_asset,
+        weaknessClass: f.weakness_class,
+        cvssScore: f.cvss_score ?? null,
+        cvssVector: f.cvss_vector ?? null,
+        cwe: f.cwe ?? null,
+        narrative: f.narrative ?? null,
+        description: f.description ?? null,
+        impact: f.impact ?? null,
+        remediation: f.remediation ?? null,
+        status: f.status,
+        evidence: ev.map((e) => ({
+          evidenceId: e._id,
+          sourceType: e.source_type,
+          label: e.label ?? null,
+          stepIndex: e.step_index ?? null,
+          toolName: e.tool_name ?? null,
+          command: e.command ?? null,
+          snippet: e.snippet ?? null,
+          resultSummary: e.result_summary ?? null,
+          isImage: !!(e.file_id && (e.media_type ?? "").startsWith("image/")),
+        })),
+      });
+    }
+    return {
+      client: client?.name ?? "(cliente)",
+      engagement: engagement.name,
+      total: raw.length,
+      bySeverity,
+      maxCvss,
+      findings,
+    };
+  },
+});
+
 /** Lista reativa dos relatórios do engajamento (identity + posse) — p/ a UI. */
 export const listReportsForEngagement = query({
   args: { engagementId: v.id("engagements") },
