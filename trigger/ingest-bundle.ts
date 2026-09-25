@@ -220,18 +220,116 @@ export const ingestEvidenceBundle = schemaTask({
       const findings = (result.output?.findings ?? []).slice(0, MAX_FINDINGS);
       metadata.set("extracted", findings.length);
 
+      // 1) Sobe TODOS os screenshots do bundle UMA vez (não depende do LLM).
+      metadata.set("phase", "uploading-images");
+      const norm = (s: string) =>
+        (s || "")
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .replace(/[^a-z0-9]+/g, " ");
+      type UpImg = {
+        fileId: Id<"files">;
+        s3Key: string;
+        mediaType: string;
+        name: string;
+      };
+      const uploaded: UpImg[] = [];
+      const imgFiles = files
+        .filter((f) => IMAGE_EXT.has(ext(f.name)))
+        .slice(0, MAX_IMAGES);
+      for (const [idx, f] of imgFiles.entries()) {
+        try {
+          const e = ext(f.name);
+          const base = f.name.split("/").pop() ?? f.name;
+          const imgBytes = await sbx.files.read(`/home/user/b/${f.name}`, {
+            format: "bytes",
+          });
+          const buf = Buffer.from(imgBytes);
+          const key = `users/${payload.userId}/evidence/${Date.now()}-${idx}-${base.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+          await s3.send(
+            new PutObjectCommand({
+              Bucket: bucket,
+              Key: key,
+              Body: buf,
+              ContentType: MIME[e] ?? "application/octet-stream",
+            }),
+          );
+          const saved = await client.action(
+            api.fileActions.saveSandboxGeneratedFile,
+            {
+              s3Key: key,
+              name: base,
+              mediaType: MIME[e] ?? "application/octet-stream",
+              size: buf.length,
+              serviceKey,
+              userId: payload.userId,
+            },
+          );
+          uploaded.push({
+            fileId: saved.fileId,
+            s3Key: key,
+            mediaType: MIME[e] ?? "application/octet-stream",
+            name: base,
+          });
+        } catch (imgErr) {
+          console.error("ingest: falha ao subir imagem", f.name, imgErr);
+        }
+      }
+      metadata.set("images", uploaded.length);
+
+      // 2) Associa cada screenshot ao achado de melhor correspondência (nome);
+      //    sem match → o achado mais severo (garante que o print apareça).
+      const sevOrder = ["critical", "high", "medium", "low", "info"];
+      const findingKw = findings.map((f) => {
+        const toks = new Set<string>();
+        for (const src of [f.title, f.weakness_class, f.affected_asset]) {
+          for (const t of norm(src).split(" ")) if (t.length >= 4) toks.add(t);
+        }
+        return toks;
+      });
+      let severest = 0;
+      findings.forEach((f, i) => {
+        if (
+          sevOrder.indexOf(f.severity) <
+          sevOrder.indexOf(findings[severest].severity)
+        )
+          severest = i;
+      });
+      const imagesByFinding = new Map<number, UpImg[]>();
+      for (const img of uploaded) {
+        const base = norm(img.name);
+        let best = -1;
+        let bestScore = 0;
+        findingKw.forEach((kw, i) => {
+          let score = 0;
+          for (const t of kw) if (base.includes(t)) score += 1;
+          if (score > bestScore) {
+            bestScore = score;
+            best = i;
+          }
+        });
+        const target = best >= 0 ? best : findings.length ? severest : -1;
+        if (target >= 0) {
+          const arr = imagesByFinding.get(target) ?? [];
+          if (arr.length < 8) {
+            arr.push(img);
+            imagesByFinding.set(target, arr);
+          }
+        }
+      }
+
+      // 3) Grava cada achado: cadeia textual do LLM + evidência visual anexada.
       metadata.set("phase", "saving");
       let captured = 0;
-      let images = 0;
-      for (const f of findings) {
+      for (const [fi, f] of findings.entries()) {
         try {
-          const evidence = [];
-          for (const [i, s] of (f.evidence_chain ?? [])
-            .slice(0, MAX_CHAIN)
-            .entries()) {
+          const evidence: Record<string, unknown>[] = [];
+          let step = 0;
+          for (const s of (f.evidence_chain ?? []).slice(0, MAX_CHAIN)) {
             const item: Record<string, unknown> = {
               source_type: s.command ? "command" : "tool_output",
-              step_index: s.step ?? i + 1,
+              step_index: ++step,
               tool_name: s.tool_name,
               command: s.command,
               snippet: s.output_snippet,
@@ -241,63 +339,36 @@ export const ingestEvidenceBundle = schemaTask({
             const rel = s.artifact_name
               ? resolveArtifact(s.artifact_name)
               : null;
-            if (rel) {
-              const e = ext(rel);
-              const full = `/home/user/b/${rel}`;
-              const base = rel.split("/").pop() ?? rel;
-              if (IMAGE_EXT.has(e) && images < MAX_IMAGES) {
-                try {
-                  const imgBytes = await sbx.files.read(full, {
-                    format: "bytes",
-                  });
-                  const buf = Buffer.from(imgBytes);
-                  const key = `users/${payload.userId}/evidence/${Date.now()}-${images}-${base.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-                  await s3.send(
-                    new PutObjectCommand({
-                      Bucket: bucket,
-                      Key: key,
-                      Body: buf,
-                      ContentType: MIME[e] ?? "application/octet-stream",
-                    }),
-                  );
-                  const saved = await client.action(
-                    api.fileActions.saveSandboxGeneratedFile,
-                    {
-                      s3Key: key,
-                      name: base,
-                      mediaType: MIME[e] ?? "application/octet-stream",
-                      size: buf.length,
-                      serviceKey,
-                      userId: payload.userId,
-                    },
-                  );
-                  item.source_type = "file";
-                  item.file_id = saved.fileId;
-                  item.s3_key = key;
-                  item.media_type = MIME[e];
-                  item.label = s.tool_name ?? base;
-                  images += 1;
-                } catch (imgErr) {
-                  console.error("ingest: falha ao anexar imagem", rel, imgErr);
+            // Imagens sao anexadas deterministicamente (passo 2); aqui so texto.
+            if (rel && !IMAGE_EXT.has(ext(rel))) {
+              try {
+                const content = await sbx.files.read(`/home/user/b/${rel}`);
+                const e = ext(rel);
+                if ((e === "py" || e === "js" || e === "sh") && !s.command) {
+                  item.command = content.slice(0, CMD_CLAMP);
+                  item.source_type = "command";
                 }
-              } else if (!IMAGE_EXT.has(e)) {
-                // Artefato de texto (script / saída): usa o conteúdo real.
-                try {
-                  const content = await sbx.files.read(full);
-                  if ((e === "py" || e === "js" || e === "sh") && !s.command) {
-                    item.command = content.slice(0, CMD_CLAMP);
-                    item.source_type = "command";
-                  }
-                  if (!s.output_snippet) {
-                    item.snippet = content.slice(0, TEXT_ARTIFACT_CLAMP);
-                  }
-                  item.label = s.tool_name ?? base;
-                } catch {
-                  /* ignora */
+                if (!s.output_snippet) {
+                  item.snippet = content.slice(0, TEXT_ARTIFACT_CLAMP);
                 }
+                item.label = s.tool_name ?? rel.split("/").pop() ?? rel;
+              } catch {
+                /* ignora */
               }
             }
             evidence.push(item);
+          }
+          for (const img of imagesByFinding.get(fi) ?? []) {
+            evidence.push({
+              source_type: "file",
+              step_index: ++step,
+              tool_name: "screenshot",
+              label: img.name,
+              result_summary: "Evidência visual.",
+              file_id: img.fileId,
+              s3_key: img.s3Key,
+              media_type: img.mediaType,
+            });
           }
 
           const dedupFingerprint = createFindingFingerprint({
@@ -338,7 +409,7 @@ export const ingestEvidenceBundle = schemaTask({
       return {
         findings: findings.length,
         captured,
-        images,
+        images: uploaded.length,
         files: files.length,
       };
     } finally {

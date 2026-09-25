@@ -47,6 +47,10 @@ export const getReportInputForBackend = query({
     }
     const client = await ctx.db.get(engagement.client_id);
 
+    // Inclui todos os achados NÃO descartados (rascunho/revisão/aprovado/
+    // publicado). O relatório é gerado pelo analista sob demanda; findings
+    // descartados (dismissed) ficam de fora. (v2 portal do cliente pode
+    // restringir a aprovados/publicados.)
     const published = (
       await ctx.db
         .query("findings")
@@ -54,7 +58,7 @@ export const getReportInputForBackend = query({
           q.eq("engagement_id", args.engagementId),
         )
         .collect()
-    ).filter((f) => f.status === "approved" || f.status === "published");
+    ).filter((f) => f.status !== "dismissed");
 
     const findings = [];
     for (const f of published) {
