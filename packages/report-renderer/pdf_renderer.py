@@ -1,4 +1,9 @@
-"""Renderer PDF (reportlab Platypus) do ReportModel. Vetorial, sem chromium."""
+"""Renderer PDF (reportlab Platypus) do ReportModel — estilo "dossie".
+
+Casca de dossie: capa com codigo de documento + faixa de KPIs, rodape (canvas)
+com classificacao + docCode + numero de pagina, divisorias de PARTE. Marca
+configuravel por MSSP (aplicada ANTES de montar os estilos). Vetorial, sem
+chromium."""
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
@@ -31,10 +36,25 @@ def _clip(s, n):
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
+def _esc(s):
+    return (str(s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+
+
+def _apply_brand(meta):
+    brand = meta.get("brand") or {}
+    if brand.get("primary"):
+        T.PRIMARY = brand["primary"]
+    if brand.get("accent"):
+        T.CORAL = brand["accent"]
+    if brand.get("wordmark"):
+        T.WORDMARK = brand["wordmark"]
+
+
 def _styles():
     ss = getSampleStyleSheet()
     ss.add(ParagraphStyle("Cover", parent=ss["Title"], fontName="Helvetica-Bold",
-                          fontSize=30, textColor=C(T.INK), spaceAfter=8, leading=34))
+                          fontSize=30, textColor=C(T.INK), spaceAfter=8, leading=34,
+                          alignment=TA_LEFT))
     ss.add(ParagraphStyle("Wordmark", parent=ss["Normal"], fontName="Helvetica-Bold",
                           fontSize=18, textColor=C(T.CORAL)))
     ss.add(ParagraphStyle("H1", parent=ss["Heading1"], fontName="Helvetica-Bold",
@@ -62,6 +82,38 @@ def _band(score):
     return T.SUCCESS
 
 
+def _footer_factory(meta):
+    def draw(canvas, doc):
+        if doc.page <= 1:
+            return
+        canvas.saveState()
+        canvas.setFont("Helvetica", 7)
+        canvas.setFillColor(C(T.MUTED))
+        canvas.drawString(18 * mm, 8 * mm, _clip(meta.get("classification", ""), 80))
+        canvas.drawRightString(A4[0] - 18 * mm, 8 * mm,
+                               f'{meta.get("docCode", "")} · {doc.page}')
+        canvas.restoreState()
+    return draw
+
+
+def _stat_table(ss, stats):
+    stats = (stats or [])[:4]
+    if not stats:
+        return None
+    lab = [Paragraph(_esc(s.get("label", "")).upper(), ss["KpiLabel"]) for s in stats]
+    val = [Paragraph(_esc(s.get("value", "")), ss["KpiVal"]) for s in stats]
+    w = (170.0 / len(stats)) * mm
+    tbl = Table([lab, val], colWidths=[w] * len(stats))
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), C(T.SURFACE_ALT)),
+        ("BOX", (0, 0), (-1, -1), 0.5, C(T.BORDER)),
+        ("INNERGRID", (0, 0), (-1, -1), 0.5, C(T.SURFACE)),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+    ]))
+    return tbl
+
+
 def _append_image_pdf(S, ss, path, caption=None):
     if not path or not os.path.exists(path):
         return
@@ -74,45 +126,205 @@ def _append_image_pdf(S, ss, path, caption=None):
         S.append(Spacer(1, 2 * mm))
         S.append(img)
         if caption:
-            safe = (_clip(caption, 120).replace("&", "&amp;")
-                    .replace("<", "&lt;").replace(">", "&gt;"))
-            S.append(Paragraph(safe, ss["Small"]))
+            S.append(Paragraph(_esc(_clip(caption, 120)), ss["Small"]))
         S.append(Spacer(1, 3 * mm))
     except Exception:
         return
 
 
+def _part_divider(ss, sec):
+    out = [PageBreak(), Spacer(1, 40 * mm)]
+    out.append(Paragraph(_esc(sec.get("part", "")),
+                         ParagraphStyle("pdpart", parent=ss["Small"],
+                                        fontName="Helvetica-Bold", fontSize=12,
+                                        textColor=C(T.CORAL))))
+    out.append(Paragraph(_esc(sec.get("title", "")),
+                         ParagraphStyle("pdtitle", parent=ss["Cover"], fontSize=26)))
+    if sec.get("subtitle"):
+        out.append(Paragraph(_esc(sec["subtitle"]),
+                             ParagraphStyle("pdsub", parent=ss["Body2"],
+                                            fontSize=13, textColor=C(T.MUTED))))
+    return out
+
+
+def _stat_band(ss, sec):
+    out = []
+    if sec.get("headline"):
+        out.append(Paragraph(_esc(_clip(sec["headline"], 200)),
+                             ParagraphStyle("sbh", parent=ss["Cover"], fontSize=18,
+                                            spaceAfter=6)))
+    st = _stat_table(ss, sec.get("stats"))
+    if st:
+        out += [st, Spacer(1, 5 * mm)]
+    if sec.get("body"):
+        out.append(Paragraph(_esc(_clip(sec["body"], 1500)), ss["Body2"]))
+    return out
+
+
+def _attack_chain(ss, sec):
+    out = [Paragraph("Cadeia de Ataque", ss["H1"]),
+           HRFlowable(width="18%", thickness=2, color=C(T.CORAL), spaceAfter=6)]
+    boxstyle = ParagraphStyle("chainbox", parent=ss["Small"], fontSize=8,
+                              textColor=C(T.INK), leading=10)
+    arrstyle = ParagraphStyle("arr", parent=ss["Small"], alignment=TA_CENTER)
+    for lane in (sec.get("lanes") or [])[:6]:
+        out.append(Paragraph(_esc(_clip(lane.get("title", ""), 120)), ss["CardTitle"]))
+        steps = (lane.get("steps") or [])[:5]
+        cells = []
+        widths = []
+        for i, s in enumerate(steps):
+            cells.append(Paragraph(
+                f'<b><font color="#{T.PRIMARY}">{_esc(_clip(s.get("label", ""), 22))}</font></b>'
+                f'<br/><font size="7" color="#{T.MUTED}">{_esc(_clip(s.get("detail", ""), 40))}</font>',
+                boxstyle))
+            widths.append(28 * mm)
+            if i < len(steps) - 1:
+                cells.append(Paragraph(f'<font color="#{T.CORAL}" size="14">&#8594;</font>',
+                                       arrstyle))
+                widths.append(6 * mm)
+        if cells:
+            tbl = Table([cells], colWidths=widths)
+            sc = [("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                  ("TOPPADDING", (0, 0), (-1, -1), 5),
+                  ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                  ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                  ("RIGHTPADDING", (0, 0), (-1, -1), 4)]
+            for ci in range(0, len(cells), 2):
+                sc.append(("BACKGROUND", (ci, 0), (ci, 0), C(T.SURFACE_ALT)))
+                sc.append(("LINEABOVE", (ci, 0), (ci, 0), 1.2, C(T.PRIMARY)))
+            tbl.setStyle(TableStyle(sc))
+            out.append(tbl)
+        out.append(Spacer(1, 4 * mm))
+    return out
+
+
+def _roadmap(ss, sec):
+    out = [Paragraph("Plano de Remediação por Fase", ss["H1"]),
+           HRFlowable(width="18%", thickness=2, color=C(T.CORAL), spaceAfter=6)]
+    data = [[Paragraph('<font color="white"><b>Janela</b></font>', ss["Body2"]),
+             Paragraph('<font color="white"><b>Foco</b></font>', ss["Body2"]),
+             Paragraph('<font color="white"><b>Ações</b></font>', ss["Body2"])]]
+    for ph in (sec.get("phases") or [])[:4]:
+        acts = "<br/>".join("• " + _esc(_clip(a, 90))
+                            for a in (ph.get("actions") or [])[:6])
+        data.append([Paragraph(f'<b>{_esc(ph.get("window", ""))}</b>', ss["Small"]),
+                     Paragraph(_esc(ph.get("label", "")), ss["Small"]),
+                     Paragraph(acts, ss["Small"])])
+    tbl = Table(data, colWidths=[26 * mm, 34 * mm, 114 * mm], repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), C(T.PRIMARY)),
+        ("GRID", (0, 0), (-1, -1), 0.4, C(T.BORDER)),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    out += [tbl, Spacer(1, 5 * mm)]
+    return out
+
+
+def _cost_incident(ss, sec):
+    out = [Paragraph("Custo da Remediação × Custo do Incidente", ss["H1"]),
+           HRFlowable(width="18%", thickness=2, color=C(T.CORAL), spaceAfter=6)]
+    remlist = "<br/>".join("• " + _esc(_clip(r, 90))
+                           for r in (sec.get("remediation") or [])[:6])
+    inc_parts = []
+    for it in (sec.get("incident") or [])[:4]:
+        line = f'<b><font color="#{T.DESTRUCTIVE}">• {_esc(_clip(it.get("label", ""), 60))}</font></b>'
+        if it.get("detail"):
+            line += f'<br/><font size="8" color="#{T.MUTED}">   {_esc(_clip(it["detail"], 90))}</font>'
+        inc_parts.append(line)
+    inclist = "<br/>".join(inc_parts)
+    header = [Paragraph('<font color="white"><b>REMEDIAÇÃO — INVESTIMENTO</b></font>', ss["Body2"]),
+              Paragraph('<font color="white"><b>INCIDENTE NÃO REMEDIADO — RISCO</b></font>', ss["Body2"])]
+    body = [Paragraph(remlist, ss["Small"]), Paragraph(inclist, ss["Small"])]
+    tbl = Table([header, body], colWidths=[87 * mm, 87 * mm])
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, 0), C(T.SUCCESS)),
+        ("BACKGROUND", (1, 0), (1, 0), C(T.DESTRUCTIVE)),
+        ("BOX", (0, 0), (-1, -1), 0.5, C(T.BORDER)),
+        ("INNERGRID", (0, 0), (-1, -1), 0.5, C(T.BORDER)),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    out += [tbl, Spacer(1, 5 * mm)]
+    return out
+
+
+def _partner_value(ss, sec):
+    out = [Paragraph(_esc(_clip(sec.get("title", "Parceria"), 80)), ss["H1"]),
+           HRFlowable(width="18%", thickness=2, color=C(T.CORAL), spaceAfter=6)]
+    for p in (sec.get("points") or [])[:6]:
+        out.append(Paragraph(
+            f'<b><font color="#{T.PRIMARY}">{_esc(_clip(p.get("title", ""), 60))}</font></b>',
+            ss["Body2"]))
+        out.append(Paragraph(_esc(_clip(p.get("body", ""), 400)), ss["Body2"]))
+    return out
+
+
+def _next_steps(ss, sec, brand):
+    out = [Paragraph("Próximos Passos", ss["H1"]),
+           HRFlowable(width="18%", thickness=2, color=C(T.CORAL), spaceAfter=6)]
+    for i, s in enumerate((sec.get("steps") or [])[:6], 1):
+        out.append(Paragraph(f'<b>{i}.</b>  {_esc(_clip(s, 200))}',
+                             ParagraphStyle("ns", parent=ss["Body2"], fontSize=12,
+                                            spaceAfter=4)))
+    contact = " · ".join([x for x in [brand.get("name", ""), brand.get("contact", ""),
+                                      brand.get("tagline", "")] if x])
+    if contact:
+        out.append(Spacer(1, 4 * mm))
+        out.append(Paragraph(_esc(contact), ss["Small"]))
+    return out
+
+
 def render_pdf(model, out_path):
+    meta = model.get("meta", {})
+    _apply_brand(meta)
     ss = _styles()
     S = []
-    meta = model.get("meta", {})
     title = None
+    brand = meta.get("brand", {})
 
     def esc(s):
-        return (str(s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+        return _esc(s)
 
     for sec in model.get("sections", []):
         t = sec.get("type")
         if t == "cover":
-            S.append(Spacer(1, 55 * mm))
-            _lp = logo.write_logo(dark=False)
-            if _lp and os.path.exists(_lp):
-                try:
-                    im = Image(_lp, width=80 * mm, height=80 * mm * 155.0 / 900.0)
-                    im.hAlign = "CENTER"
-                    S.append(im)
-                except Exception:
-                    S.append(Paragraph(esc(T.WORDMARK), ss["Wordmark"]))
-            else:
-                S.append(Paragraph(esc(T.WORDMARK), ss["Wordmark"]))
+            S.append(Spacer(1, 30 * mm))
+            used_logo = False
+            if brand.get("wordmark", "") == "Suricatoos":
+                lp = logo.write_logo(dark=False)
+                if lp and os.path.exists(lp):
+                    try:
+                        im = Image(lp, width=70 * mm, height=70 * mm * 155.0 / 900.0)
+                        im.hAlign = "LEFT"
+                        S.append(im)
+                        used_logo = True
+                    except Exception:
+                        used_logo = False
+            if not used_logo:
+                S.append(Paragraph(esc(brand.get("wordmark", T.WORDMARK)), ss["Wordmark"]))
+            S.append(Spacer(1, 4 * mm))
+            S.append(Paragraph(
+                f'<b><font color="#{T.CORAL}">{esc(meta.get("classification", ""))}   ·   {esc(meta.get("docCode", ""))}</font></b>',
+                ss["Small"]))
+            S.append(Paragraph(f'<b>{esc(meta.get("volume", ""))}</b>', ss["Small"]))
             S.append(Spacer(1, 8 * mm))
             S.append(Paragraph(esc(sec.get("title", "")), ss["Cover"]))
             if sec.get("subtitle"):
                 S.append(Paragraph(esc(sec["subtitle"]),
-                                   ParagraphStyle("sub", parent=ss["Body2"], fontSize=13, textColor=C(T.MUTED))))
-            S.append(Spacer(1, 70 * mm))
-            S.append(Paragraph(esc(meta.get("classification", "")), ss["Small"]))
+                                   ParagraphStyle("sub", parent=ss["Body2"], fontSize=13,
+                                                  textColor=C(T.MUTED))))
+            S.append(Spacer(1, 14 * mm))
+            st = _stat_table(ss, sec.get("stats"))
+            if st:
+                S.append(st)
             S.append(PageBreak())
+        elif t == "partDivider":
+            S += _part_divider(ss, sec)
         elif t == "divider":
             S.append(PageBreak())
         elif t == "heading":
@@ -124,12 +336,14 @@ def render_pdf(model, out_path):
         elif t == "bullets":
             for it in sec.get("items", []):
                 S.append(Paragraph("• " + esc(_clip(it, 300)), ss["Body2"]))
+        elif t == "statBand":
+            S += _stat_band(ss, sec)
         elif t == "kpis":
             k = sec.get("kpis", {})
             bysev = k.get("bySeverity", {})
             data = [
                 [Paragraph("TOTAL", ss["KpiLabel"]), Paragraph("RISCO", ss["KpiLabel"]),
-                 Paragraph("CVSS MEDIO", ss["KpiLabel"]), Paragraph("CRIT+ALTO", ss["KpiLabel"])],
+                 Paragraph("CVSS MÉDIO", ss["KpiLabel"]), Paragraph("CRIT+ALTO", ss["KpiLabel"])],
                 [Paragraph(str(k.get("total", 0)), ss["KpiVal"]),
                  Paragraph(str(k.get("riskScore", 0)), ss["KpiVal"]),
                  Paragraph(str(k.get("avgCvss") if k.get("avgCvss") is not None else "-"), ss["KpiVal"]),
@@ -182,6 +396,8 @@ def render_pdf(model, out_path):
             S.append(tbl)
             S.append(Paragraph("Probabilidade (linhas) × Impacto (colunas)", ss["Small"]))
             S.append(Spacer(1, 5 * mm))
+        elif t == "attackChain":
+            S += _attack_chain(ss, sec)
         elif t == "findingCard":
             f = sec["finding"]
             sev = f.get("severity", "info")
@@ -235,18 +451,20 @@ def render_pdf(model, out_path):
             findings = sec.get("findings", [])
             rem = t == "remediationMatrix"
             headers = (["Ref", "Sev", "Ativo", "Remediação"] if rem
-                       else ["Ref", "Sev", "Título", "Ativo"])
+                       else ["Ref", "Sev", "Título", "Ativo", "CVSS"])
             data = [headers]
             for f in findings:
                 sev = f.get("severity", "info")
+                cvss = f.get("cvssScore")
+                cvss_s = f"{cvss:.1f}" if isinstance(cvss, (int, float)) else "—"
                 data.append(
                     [f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev),
                      _clip(f.get("affectedAsset", ""), 40), _clip(f.get("remediation", ""), 110)]
                     if rem else
                     [f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev),
-                     _clip(f.get("title", ""), 60), _clip(f.get("affectedAsset", ""), 40)])
+                     _clip(f.get("title", ""), 58), _clip(f.get("affectedAsset", ""), 34), cvss_s])
             widths = ([16 * mm, 18 * mm, 45 * mm, 86 * mm] if rem
-                      else [16 * mm, 18 * mm, 75 * mm, 56 * mm])
+                      else [15 * mm, 17 * mm, 70 * mm, 42 * mm, 16 * mm])
             tbl = Table(data, colWidths=widths, repeatRows=1)
             tbl.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), C(T.PRIMARY)),
@@ -260,6 +478,14 @@ def render_pdf(model, out_path):
             ]))
             S.append(tbl)
             S.append(Spacer(1, 5 * mm))
+        elif t == "roadmap":
+            S += _roadmap(ss, sec)
+        elif t == "costVsIncident":
+            S += _cost_incident(ss, sec)
+        elif t == "partnerValue":
+            S += _partner_value(ss, sec)
+        elif t == "nextSteps":
+            S += _next_steps(ss, sec, brand)
         elif t == "callout":
             col = T.CALLOUT_COLOR.get(sec.get("tone", "info"), T.PRIMARY)
             tbl = Table([[Paragraph(f'<font color="#{col}"><b>{esc(_clip(sec.get("text",""),600))}</b></font>', ss["Body2"])]],
@@ -277,4 +503,5 @@ def render_pdf(model, out_path):
     doc = SimpleDocTemplate(out_path, pagesize=A4, leftMargin=18 * mm,
                             rightMargin=18 * mm, topMargin=16 * mm, bottomMargin=16 * mm,
                             title="Relatório")
-    doc.build(S)
+    foot = _footer_factory(meta)
+    doc.build(S, onFirstPage=foot, onLaterPages=foot)

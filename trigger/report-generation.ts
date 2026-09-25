@@ -132,6 +132,7 @@ export const generateEngagementReport = schemaTask({
         author: payload.generatedBy,
         generatedAt: Date.now(),
         version: payload.version,
+        brand: input.brand ?? undefined,
         findings: input.findings.map((f) => ({
           ref: f.ref,
           title: f.title,

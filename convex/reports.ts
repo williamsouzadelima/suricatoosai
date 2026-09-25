@@ -47,6 +47,40 @@ export const getReportInputForBackend = query({
     }
     const client = await ctx.db.get(engagement.client_id);
 
+    // Marca por organização (MSSP). Campos ausentes caem para DEFAULT_BRAND no
+    // builder (lib/reports). Sem org ou sem override → undefined → padrão.
+    let brand:
+      | {
+          name?: string;
+          wordmark?: string;
+          tagline?: string;
+          contact?: string;
+          docCodePrefix?: string;
+          primary?: string;
+          accent?: string;
+          classification?: string;
+        }
+      | undefined;
+    if (engagement.organization_id) {
+      const orgId = engagement.organization_id;
+      const row = await ctx.db
+        .query("report_brands")
+        .withIndex("by_org", (q) => q.eq("organization_id", orgId))
+        .first();
+      if (row) {
+        brand = {
+          name: row.name,
+          wordmark: row.wordmark,
+          tagline: row.tagline,
+          contact: row.contact,
+          docCodePrefix: row.doc_code_prefix,
+          primary: row.primary,
+          accent: row.accent,
+          classification: row.classification,
+        };
+      }
+    }
+
     // Inclui todos os achados NÃO descartados (rascunho/revisão/aprovado/
     // publicado). O relatório é gerado pelo analista sob demanda; findings
     // descartados (dismissed) ficam de fora. (v2 portal do cliente pode
@@ -107,6 +141,7 @@ export const getReportInputForBackend = query({
 
     return {
       client: { name: client?.name ?? "(cliente)" },
+      brand,
       engagement: {
         name: engagement.name,
         code: engagement.code,
