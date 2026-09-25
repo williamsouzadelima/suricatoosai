@@ -21,6 +21,7 @@ import {
   Server,
   Paperclip,
   ListOrdered,
+  BarChart3,
   Image as ImageIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -87,6 +88,20 @@ const SEV_PILL: Record<Severity, string> = {
   medium: "text-warning bg-warning/10 border-warning/25",
   low: "text-primary bg-primary/10 border-primary/25",
   info: "text-muted-foreground bg-muted border-border",
+};
+const ENG_STATUS_TONE: Record<string, Tone> = {
+  planned: "neutral",
+  active: "success",
+  review: "warning",
+  reporting: "primary",
+  closed: "neutral",
+};
+const ENG_STATUS_LABEL: Record<string, string> = {
+  planned: "Planejado",
+  active: "Ativo",
+  review: "Em revisão",
+  reporting: "Relatório",
+  closed: "Fechado",
 };
 
 export function EngagementsPanel({
@@ -155,6 +170,13 @@ export function EngagementsPanel({
       <div className="flex flex-col gap-5">
         {/* Criação rápida */}
         <Card className="gap-0 py-0">
+          <div className="border-b p-5">
+            <SectionHeader
+              icon={Sparkles}
+              title="Ações rápidas"
+              description="Cadastre um cliente ou abra um novo engajamento de pentest."
+            />
+          </div>
           <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex flex-1 items-end gap-2">
               <div className="flex-1">
@@ -237,27 +259,40 @@ export function EngagementsPanel({
               description="Crie um cliente e um engajamento acima. O agente também cria um engajamento de Triagem automaticamente ao capturar o primeiro achado."
             />
           ) : (
-            <div className="flex flex-wrap gap-2 p-4">
-              {engagements.map((e) => (
-                <button
-                  key={e._id}
-                  onClick={() =>
-                    setSelectedEngagementId(
-                      selectedEngagementId === e._id ? null : e._id,
-                    )
-                  }
-                  className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                    selectedEngagementId === e._id
-                      ? "border-primary bg-primary/10"
-                      : "hover:bg-muted/40"
-                  }`}
-                >
-                  <div className="font-medium">{e.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {clientNameById.get(e.client_id) ?? "—"} · {e.status}
-                  </div>
-                </button>
-              ))}
+            <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+              {engagements.map((e) => {
+                const active = selectedEngagementId === e._id;
+                const st = e.status as string;
+                return (
+                  <button
+                    key={e._id}
+                    onClick={() =>
+                      setSelectedEngagementId(active ? null : e._id)
+                    }
+                    className={cn(
+                      "group rounded-xl border bg-card p-4 text-left shadow-[var(--shadow-soft)] transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)]",
+                      active &&
+                        "border-primary ring-1 ring-primary shadow-[var(--shadow-card)]",
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 font-medium leading-snug">
+                        {e.name}
+                      </div>
+                      <StatusBadge
+                        tone={ENG_STATUS_TONE[st] ?? "neutral"}
+                        label={ENG_STATUS_LABEL[st] ?? st}
+                      />
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Server className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">
+                        {clientNameById.get(e.client_id) ?? "—"}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </Card>
@@ -427,13 +462,32 @@ function EngagementDetail({
   };
 
   const counts = useMemo(() => {
-    const c = { total: 0, published: 0, approved: 0, review: 0, draft: 0 };
+    const sev: Record<Severity, number> = {
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      info: 0,
+    };
+    const c = {
+      total: 0,
+      published: 0,
+      approved: 0,
+      review: 0,
+      draft: 0,
+      sev,
+      maxCvss: 0,
+    };
     for (const f of findings ?? []) {
       c.total += 1;
       if (f.status === "published") c.published += 1;
       else if (f.status === "approved") c.approved += 1;
       else if (f.status === "in_review") c.review += 1;
       else if (f.status === "draft") c.draft += 1;
+      const s = f.severity as Severity;
+      if (s in sev) sev[s] += 1;
+      const cv = (f as { cvss_score?: number }).cvss_score;
+      if (typeof cv === "number" && cv > c.maxCvss) c.maxCvss = cv;
     }
     return c;
   }, [findings]);
@@ -451,31 +505,78 @@ function EngagementDetail({
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatCard
           label="Achados"
           value={String(counts.total)}
           icon={ShieldAlert}
+          tone="primary"
+          sub={`${counts.approved + counts.published} curados`}
+        />
+        <StatCard
+          label="Críticos"
+          value={String(counts.sev.critical)}
+          icon={ShieldAlert}
+          tone="destructive"
+          sub={`${counts.sev.high} altos`}
+        />
+        <StatCard
+          label="Maior CVSS"
+          value={counts.maxCvss > 0 ? counts.maxCvss.toFixed(1) : "—"}
+          icon={Sparkles}
+          tone="warning"
         />
         <StatCard
           label="Rascunho / revisão"
           value={String(counts.draft + counts.review)}
           icon={RefreshCw}
           tone="warning"
-        />
-        <StatCard
-          label="Aprovados"
-          value={String(counts.approved)}
-          icon={ShieldAlert}
-          tone="success"
-        />
-        <StatCard
-          label="Publicados"
-          value={String(counts.published)}
-          icon={ShieldAlert}
-          tone="brand"
+          sub="aguardando curadoria"
         />
       </div>
+
+      {counts.total > 0 && (
+        <Card className="gap-0 py-0">
+          <div className="p-5 pb-3">
+            <SectionHeader
+              icon={BarChart3}
+              title="Distribuição por severidade"
+              count={counts.total}
+            />
+          </div>
+          <div className="space-y-2.5 px-5 pb-5">
+            {(["critical", "high", "medium", "low", "info"] as Severity[]).map(
+              (s) => {
+                const n = counts.sev[s];
+                const max = Math.max(1, ...Object.values(counts.sev));
+                return (
+                  <div key={s} className="flex items-center gap-3">
+                    <span
+                      className={cn(
+                        "inline-flex w-[74px] shrink-0 justify-center rounded-full border px-2 py-0.5 text-xs font-semibold",
+                        SEV_PILL[s],
+                      )}
+                    >
+                      {SEV_LABEL[s]}
+                    </span>
+                    <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={cn("h-full rounded-full", SEV_STRIPE[s])}
+                        style={{
+                          width: `${n > 0 ? Math.max(4, (n / max) * 100) : 0}%`,
+                        }}
+                      />
+                    </div>
+                    <span className="w-6 shrink-0 text-right font-mono text-sm font-semibold tabular-nums">
+                      {n}
+                    </span>
+                  </div>
+                );
+              },
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Achados */}
       <Card className="gap-0 py-0">
@@ -741,25 +842,36 @@ function EngagementDetail({
           ) : liveEvidence.length === 0 ? (
             <EmptyState icon={Radio} title="Sem evidência ainda." />
           ) : (
-            <div className="max-h-96 divide-y overflow-y-auto">
-              {liveEvidence.map((ev) => (
-                <div key={ev._id} className="px-4 py-2.5 text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {ev.source_type}
-                      {ev.label ? ` · ${ev.label}` : ""}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatDateTime(ev.captured_at)}
-                    </span>
+            <div className="max-h-[26rem] space-y-3 overflow-y-auto p-4">
+              {liveEvidence.map((ev) => {
+                const tool = (ev as { tool_name?: string }).tool_name;
+                return (
+                  <div
+                    key={ev._id}
+                    className="rounded-xl border bg-card p-3 shadow-[var(--shadow-soft)]"
+                  >
+                    <div className="flex items-center gap-2">
+                      {tool && (
+                        <span className="rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-primary">
+                          {tool}
+                        </span>
+                      )}
+                      <span className="truncate text-xs text-muted-foreground">
+                        {ev.source_type}
+                        {ev.label ? ` · ${ev.label}` : ""}
+                      </span>
+                      <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
+                        {formatDateTime(ev.captured_at)}
+                      </span>
+                    </div>
+                    {ev.snippet && (
+                      <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#0e1b2e] px-3 py-2 font-mono text-[11px] leading-relaxed text-[#d5e0f2]">
+                        {ev.snippet}
+                      </pre>
+                    )}
                   </div>
-                  {ev.snippet && (
-                    <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-xs">
-                      {ev.snippet}
-                    </pre>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>
