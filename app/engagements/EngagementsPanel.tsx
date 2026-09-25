@@ -338,7 +338,31 @@ function EngagementDetail({
   const dismiss = useMutation(api.findings.dismissFinding);
   const reopen = useMutation(api.findings.reopenFinding);
   const approveAll = useMutation(api.findings.approveAllForEngagement);
+  const clearFindings = useMutation(api.findings.clearFindingsForEngagement);
   const [approvingAll, setApprovingAll] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  const handleClearFindings = async () => {
+    if (
+      !window.confirm(
+        "Limpar TODOS os achados e evidências deste engajamento? Esta ação não pode ser desfeita (use para reingerir do zero).",
+      )
+    ) {
+      return;
+    }
+    setClearing(true);
+    try {
+      const res = await clearFindings({ engagementId });
+      toast.success(
+        `${res.findings} achado(s) e ${res.evidence} evidência(s) removidos.`,
+      );
+    } catch (e) {
+      toast.error("Falha ao limpar achados.");
+      console.error(e);
+    } finally {
+      setClearing(false);
+    }
+  };
 
   const handleApproveAll = async () => {
     setApprovingAll(true);
@@ -412,21 +436,40 @@ function EngagementDetail({
       <Card className="gap-0 py-0">
         <div className="flex items-center justify-between gap-2 border-b p-5">
           <SectionHeader title="Achados" count={findings?.length} />
-          {counts.draft + counts.review > 0 && (
-            <Button
-              size="sm"
-              onClick={() => void handleApproveAll()}
-              disabled={approvingAll}
-              title="Aprovar todos os achados com evidência (para entrarem no relatório)"
-            >
-              {approvingAll ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <ShieldAlert className="h-4 w-4" />
-              )}
-              Aprovar todos
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {counts.draft + counts.review > 0 && (
+              <Button
+                size="sm"
+                onClick={() => void handleApproveAll()}
+                disabled={approvingAll}
+                title="Aprovar todos os achados com evidência (para entrarem no relatório)"
+              >
+                {approvingAll ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ShieldAlert className="h-4 w-4" />
+                )}
+                Aprovar todos
+              </Button>
+            )}
+            {(findings?.length ?? 0) > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void handleClearFindings()}
+                disabled={clearing}
+                title="Apagar todos os achados e evidências deste engajamento"
+                className="text-muted-foreground hover:text-destructive"
+              >
+                {clearing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                Limpar achados
+              </Button>
+            )}
+          </div>
         </div>
         {findings === undefined ? (
           <div className="p-6 text-center text-sm text-muted-foreground">

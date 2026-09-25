@@ -453,6 +453,50 @@ export const approveAllForEngagement = mutation({
   },
 });
 
+/**
+ * Apaga TODOS os achados + evidências do engajamento (identity + posse). Para
+ * recomeçar do zero (ex.: re-ingestão limpa). Irreversível. Os arquivos de
+ * imagem no S3 ficam órfãos (inacessíveis sem a linha de evidência).
+ */
+export const clearFindingsForEngagement = mutation({
+  args: { engagementId: v.id("engagements") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Não autenticado",
+      });
+    }
+    const engagement = await ctx.db.get(args.engagementId);
+    if (!engagement || engagement.user_id !== identity.subject) {
+      throw new ConvexError({ code: "ACCESS_DENIED", message: "Sem acesso" });
+    }
+    const findings = await ctx.db
+      .query("findings")
+      .withIndex("by_engagement_and_updated", (q) =>
+        q.eq("engagement_id", args.engagementId),
+      )
+      .collect();
+    let removedFindings = 0;
+    let removedEvidence = 0;
+    for (const f of findings) {
+      if (f.user_id !== identity.subject) continue;
+      const es = await ctx.db
+        .query("evidence")
+        .withIndex("by_finding_and_captured", (q) => q.eq("finding_id", f._id))
+        .collect();
+      for (const ev of es) {
+        await ctx.db.delete(ev._id);
+        removedEvidence += 1;
+      }
+      await ctx.db.delete(f._id);
+      removedFindings += 1;
+    }
+    return { findings: removedFindings, evidence: removedEvidence };
+  },
+});
+
 export const publishFinding = mutation({
   args: { findingId: v.id("findings") },
   handler: async (ctx, args) => {
