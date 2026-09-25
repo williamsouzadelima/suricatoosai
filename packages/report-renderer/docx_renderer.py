@@ -9,6 +9,7 @@ from docx.oxml import OxmlElement
 import os
 
 import theme as T
+import logo
 
 
 def _rgb(h):
@@ -67,8 +68,16 @@ def _clip(s, n):
 def _cover(doc, sec, meta):
     for _ in range(3):
         doc.add_paragraph()
-    _para(doc, T.WORDMARK, size=22, bold=True, color=T.CORAL,
-          align=WD_ALIGN_PARAGRAPH.LEFT)
+    _lp = logo.write_logo(dark=False)
+    if _lp and os.path.exists(_lp):
+        try:
+            doc.add_picture(_lp, width=Inches(2.6))
+        except Exception:
+            _para(doc, T.WORDMARK, size=22, bold=True, color=T.CORAL,
+                  align=WD_ALIGN_PARAGRAPH.LEFT)
+    else:
+        _para(doc, T.WORDMARK, size=22, bold=True, color=T.CORAL,
+              align=WD_ALIGN_PARAGRAPH.LEFT)
     _para(doc, sec.get("title", ""), size=34, bold=True, color=T.INK, after=4)
     if sec.get("subtitle"):
         _para(doc, sec["subtitle"], size=16, color=T.MUTED)

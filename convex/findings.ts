@@ -395,6 +395,64 @@ export const approveFinding = mutation({
   },
 });
 
+/**
+ * Aprova EM MASSA os achados em rascunho/revisão do engajamento que têm ao menos
+ * uma evidência (para entrarem no relatório). Identity + posse. Pula os sem
+ * evidência. Aprovar é identity-only (analista decide).
+ */
+export const approveAllForEngagement = mutation({
+  args: { engagementId: v.id("engagements") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Não autenticado",
+      });
+    }
+    const engagement = await ctx.db.get(args.engagementId);
+    if (!engagement || engagement.user_id !== identity.subject) {
+      throw new ConvexError({ code: "ACCESS_DENIED", message: "Sem acesso" });
+    }
+    const findings = await ctx.db
+      .query("findings")
+      .withIndex("by_engagement_and_updated", (q) =>
+        q.eq("engagement_id", args.engagementId),
+      )
+      .collect();
+    let approved = 0;
+    let skipped = 0;
+    for (const f of findings) {
+      if (
+        f.user_id !== identity.subject ||
+        (f.status !== "draft" && f.status !== "in_review")
+      ) {
+        continue;
+      }
+      const hasEv = (
+        await ctx.db
+          .query("evidence")
+          .withIndex("by_finding_and_captured", (q) =>
+            q.eq("finding_id", f._id),
+          )
+          .take(1)
+      ).length;
+      if (hasEv === 0) {
+        skipped += 1;
+        continue;
+      }
+      await ctx.db.patch(f._id, {
+        status: "approved",
+        approved_by: identity.subject,
+        approved_at: Date.now(),
+        updated_at: Date.now(),
+      });
+      approved += 1;
+    }
+    return { approved, skipped };
+  },
+});
+
 export const publishFinding = mutation({
   args: { findingId: v.id("findings") },
   handler: async (ctx, args) => {

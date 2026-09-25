@@ -19,6 +19,7 @@ from reportlab.lib.utils import ImageReader
 import os
 
 import theme as T
+import logo
 
 
 def C(h):
@@ -93,8 +94,17 @@ def render_pdf(model, out_path):
     for sec in model.get("sections", []):
         t = sec.get("type")
         if t == "cover":
-            S.append(Spacer(1, 60 * mm))
-            S.append(Paragraph(esc(T.WORDMARK), ss["Wordmark"]))
+            S.append(Spacer(1, 55 * mm))
+            _lp = logo.write_logo(dark=False)
+            if _lp and os.path.exists(_lp):
+                try:
+                    im = Image(_lp, width=80 * mm, height=80 * mm * 155.0 / 900.0)
+                    im.hAlign = "CENTER"
+                    S.append(im)
+                except Exception:
+                    S.append(Paragraph(esc(T.WORDMARK), ss["Wordmark"]))
+            else:
+                S.append(Paragraph(esc(T.WORDMARK), ss["Wordmark"]))
             S.append(Spacer(1, 8 * mm))
             S.append(Paragraph(esc(sec.get("title", "")), ss["Cover"]))
             if sec.get("subtitle"):

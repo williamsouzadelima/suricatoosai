@@ -337,6 +337,25 @@ function EngagementDetail({
   const publish = useMutation(api.findings.publishFinding);
   const dismiss = useMutation(api.findings.dismissFinding);
   const reopen = useMutation(api.findings.reopenFinding);
+  const approveAll = useMutation(api.findings.approveAllForEngagement);
+  const [approvingAll, setApprovingAll] = useState(false);
+
+  const handleApproveAll = async () => {
+    setApprovingAll(true);
+    try {
+      const res = await approveAll({ engagementId });
+      toast.success(
+        `${res.approved} achado(s) aprovado(s)${
+          res.skipped ? `, ${res.skipped} pulado(s) (sem evidência)` : ""
+        }.`,
+      );
+    } catch (e) {
+      toast.error("Falha ao aprovar em massa.");
+      console.error(e);
+    } finally {
+      setApprovingAll(false);
+    }
+  };
 
   const counts = useMemo(() => {
     const c = { total: 0, published: 0, approved: 0, review: 0, draft: 0 };
@@ -391,8 +410,23 @@ function EngagementDetail({
 
       {/* Achados */}
       <Card className="gap-0 py-0">
-        <div className="border-b p-5">
+        <div className="flex items-center justify-between gap-2 border-b p-5">
           <SectionHeader title="Achados" count={findings?.length} />
+          {counts.draft + counts.review > 0 && (
+            <Button
+              size="sm"
+              onClick={() => void handleApproveAll()}
+              disabled={approvingAll}
+              title="Aprovar todos os achados com evidência (para entrarem no relatório)"
+            >
+              {approvingAll ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ShieldAlert className="h-4 w-4" />
+              )}
+              Aprovar todos
+            </Button>
+          )}
         </div>
         {findings === undefined ? (
           <div className="p-6 text-center text-sm text-muted-foreground">

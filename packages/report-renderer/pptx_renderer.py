@@ -9,6 +9,7 @@ from pptx.enum.shapes import MSO_SHAPE
 import os
 
 import theme as T
+import logo
 
 EMU_IN = 914400
 SW = Inches(13.333)
@@ -75,8 +76,16 @@ def _cover(prs, sec, meta):
     slide = _blank(prs)
     _rect(slide, 0, 0, SW, SH, T.INK)
     _rect(slide, 0, Inches(3.15), SW, Emu(int(0.06 * EMU_IN)), T.CORAL)
-    _text(slide, ML, Inches(0.5), CW, Inches(0.5), T.WORDMARK, size=20,
-          bold=True, color=T.CORAL, font=T.FONT_DISPLAY)
+    _lp = logo.write_logo(dark=True)
+    if _lp and os.path.exists(_lp):
+        try:
+            slide.shapes.add_picture(_lp, ML, Inches(0.5), height=Inches(0.55))
+        except Exception:
+            _text(slide, ML, Inches(0.5), CW, Inches(0.5), T.WORDMARK, size=20,
+                  bold=True, color=T.CORAL, font=T.FONT_DISPLAY)
+    else:
+        _text(slide, ML, Inches(0.5), CW, Inches(0.5), T.WORDMARK, size=20,
+              bold=True, color=T.CORAL, font=T.FONT_DISPLAY)
     _text(slide, ML, Inches(2.4), CW, Inches(1.0), sec.get("title", ""), size=40,
           bold=True, color="FFFFFF", font=T.FONT_DISPLAY)
     if sec.get("subtitle"):
