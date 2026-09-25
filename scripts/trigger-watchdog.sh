@@ -13,9 +13,11 @@
 #
 # Instalado via systemd timer (a cada 5 min). Ver ops/ ou o runbook.
 
-set -uo pipefail
+# Sem `set -u`: o nvm.sh referencia vars possivelmente não definidas (ex.: HOME
+# no ambiente mínimo do systemd) e abortaria. Os guardas abaixo são explícitos.
+export HOME="${HOME:-/root}"
+export NVM_DIR="${NVM_DIR:-/root/.nvm}"
 cd /root/suricatoos || exit 0
-export NVM_DIR="/root/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 nvm use 22 >/dev/null 2>&1 || true
 
