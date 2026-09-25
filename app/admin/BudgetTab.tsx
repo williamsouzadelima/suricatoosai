@@ -109,13 +109,16 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
           settings: {
             enabled,
             per_task_enabled: taskEnabled,
-            per_task_cap_dollars: taskCap.trim() === "" ? undefined : Number(taskCap),
+            per_task_cap_dollars:
+              taskCap.trim() === "" ? undefined : Number(taskCap),
             per_task_block: taskBlock,
             per_user_enabled: userEnabled,
-            per_user_cap_dollars: userCap.trim() === "" ? undefined : Number(userCap),
+            per_user_cap_dollars:
+              userCap.trim() === "" ? undefined : Number(userCap),
             per_user_period: userPeriod,
             per_user_block: userBlock,
-            warn_threshold_pct: warnPct.trim() === "" ? undefined : Number(warnPct),
+            warn_threshold_pct:
+              warnPct.trim() === "" ? undefined : Number(warnPct),
             alert_teams: alertTeams,
             alert_email: alertEmail,
           },
@@ -131,8 +134,18 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
       setSaving(false);
     }
   }, [
-    enabled, taskEnabled, taskCap, taskBlock, userEnabled, userCap, userPeriod,
-    userBlock, warnPct, alertTeams, alertEmail, load,
+    enabled,
+    taskEnabled,
+    taskCap,
+    taskBlock,
+    userEnabled,
+    userCap,
+    userPeriod,
+    userBlock,
+    warnPct,
+    alertTeams,
+    alertEmail,
+    load,
   ]);
 
   const addOverride = useCallback(async () => {
@@ -149,8 +162,10 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
           override: {
             userId: ovUserId.trim(),
             email: ovEmail.trim() || undefined,
-            perTaskCapDollars: ovTaskCap.trim() === "" ? undefined : Number(ovTaskCap),
-            perUserCapDollars: ovUserCap.trim() === "" ? undefined : Number(ovUserCap),
+            perTaskCapDollars:
+              ovTaskCap.trim() === "" ? undefined : Number(ovTaskCap),
+            perUserCapDollars:
+              ovUserCap.trim() === "" ? undefined : Number(ovUserCap),
             disabled: ovDisabled,
           },
         }),
@@ -158,7 +173,11 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       toast.success("Override salvo.");
-      setOvUserId(""); setOvEmail(""); setOvTaskCap(""); setOvUserCap(""); setOvDisabled(false);
+      setOvUserId("");
+      setOvEmail("");
+      setOvTaskCap("");
+      setOvUserCap("");
+      setOvDisabled(false);
       void load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha no override.");
@@ -202,7 +221,9 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
             title="Orçamentos por task e usuário"
             action={
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Ativar controle</span>
+                <span className="text-sm text-muted-foreground">
+                  Ativar controle
+                </span>
                 <Switch checked={enabled} onCheckedChange={setEnabled} />
               </div>
             }
@@ -211,24 +232,33 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
 
         <CardContent className="space-y-5 p-5">
           <Callout>
-            Threshold sobre o <strong>custo real</strong> (OpenRouter). Padrão de fábrica:
-            desligado. Com <strong>bloqueio</strong> ligado, um novo run é{" "}
-            <strong>recusado</strong> quando o custo real já acumulado (da task ou do usuário
-            no período) passou do teto — <strong>não corta</strong> um run em andamento (corte
-            mid-run por task é refinamento futuro). Alertas disparam a partir do % de aviso.
+            Threshold sobre o <strong>custo real</strong> (OpenRouter). Padrão
+            de fábrica: desligado. Com <strong>bloqueio</strong> ligado, um novo
+            run é <strong>recusado</strong> quando o custo real já acumulado (da
+            task ou do usuário no período) passou do teto —{" "}
+            <strong>não corta</strong> um run em andamento (corte mid-run por
+            task é refinamento futuro). Alertas disparam a partir do % de aviso.
           </Callout>
 
           {/* POR TASK */}
           <fieldset className="rounded-lg border p-4" disabled={!enabled}>
             <div className="flex items-center justify-between">
-              <legend className="px-1 text-sm font-semibold">Por task (chat)</legend>
+              <legend className="px-1 text-sm font-semibold">
+                Por task (chat)
+              </legend>
               <Switch checked={taskEnabled} onCheckedChange={setTaskEnabled} />
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <label className="text-sm text-muted-foreground">Teto (US$)</label>
+              <label className="text-sm text-muted-foreground">
+                Teto (US$)
+              </label>
               <Input
-                type="number" step="0.01" min="0" className="w-32"
-                placeholder="ex.: 5.00" value={taskCap}
+                type="number"
+                step="0.01"
+                min="0"
+                className="w-32"
+                placeholder="ex.: 5.00"
+                value={taskCap}
                 onChange={(e) => setTaskCap(e.target.value)}
               />
               <label className="ml-4 flex items-center gap-2 text-sm text-muted-foreground">
@@ -241,21 +271,31 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
           {/* POR USUÁRIO */}
           <fieldset className="rounded-lg border p-4" disabled={!enabled}>
             <div className="flex items-center justify-between">
-              <legend className="px-1 text-sm font-semibold">Por usuário</legend>
+              <legend className="px-1 text-sm font-semibold">
+                Por usuário
+              </legend>
               <Switch checked={userEnabled} onCheckedChange={setUserEnabled} />
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <label className="text-sm text-muted-foreground">Teto (US$)</label>
+              <label className="text-sm text-muted-foreground">
+                Teto (US$)
+              </label>
               <Input
-                type="number" step="0.01" min="0" className="w-32"
-                placeholder="ex.: 50.00" value={userCap}
+                type="number"
+                step="0.01"
+                min="0"
+                className="w-32"
+                placeholder="ex.: 50.00"
+                value={userCap}
                 onChange={(e) => setUserCap(e.target.value)}
               />
               <label className="text-sm text-muted-foreground">por</label>
               <select
                 className="h-9 rounded-md border bg-background px-2 text-sm"
                 value={userPeriod}
-                onChange={(e) => setUserPeriod(e.target.value === "day" ? "day" : "month")}
+                onChange={(e) =>
+                  setUserPeriod(e.target.value === "day" ? "day" : "month")
+                }
               >
                 <option value="month">mês</option>
                 <option value="day">dia</option>
@@ -270,24 +310,34 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
           {/* AVISO + CANAIS */}
           <div className="flex flex-wrap items-center gap-6">
             <div className="flex items-center gap-2">
-              <label className="text-sm text-muted-foreground">Alertar a partir de</label>
+              <label className="text-sm text-muted-foreground">
+                Alertar a partir de
+              </label>
               <Input
-                type="number" min="1" max="100" className="w-20"
-                value={warnPct} onChange={(e) => setWarnPct(e.target.value)}
+                type="number"
+                min="1"
+                max="100"
+                className="w-20"
+                value={warnPct}
+                onChange={(e) => setWarnPct(e.target.value)}
               />
               <span className="text-sm text-muted-foreground">% do teto</span>
             </div>
             <label className="flex items-center gap-2 text-sm">
-              <Switch checked={alertTeams} onCheckedChange={setAlertTeams} /> Teams
+              <Switch checked={alertTeams} onCheckedChange={setAlertTeams} />{" "}
+              Teams
             </label>
             <label className="flex items-center gap-2 text-sm">
-              <Switch checked={alertEmail} onCheckedChange={setAlertEmail} /> E-mail
+              <Switch checked={alertEmail} onCheckedChange={setAlertEmail} />{" "}
+              E-mail
             </label>
           </div>
-          {(alertTeams && !teamsConfigured) || (alertEmail && !emailConfigured) ? (
+          {(alertTeams && !teamsConfigured) ||
+          (alertEmail && !emailConfigured) ? (
             <Callout icon={AlertTriangle}>
-              Configure os destinos (webhook Teams / e-mail) na aba <strong>Alertas</strong> — os
-              alertas de orçamento reusam esses canais.
+              Configure os destinos (webhook Teams / e-mail) na aba{" "}
+              <strong>Alertas</strong> — os alertas de orçamento reusam esses
+              canais.
             </Callout>
           ) : null}
 
@@ -310,19 +360,48 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
         <div className="border-b p-5">
           <SectionHeader title="Exceções por usuário" />
           <p className="mt-1 text-xs text-muted-foreground">
-            Eleve o teto de um usuário com engajamento pesado, ou isente-o do controle.
-            O <code>user_id</code> aparece na aba Usuários.
+            Eleve o teto de um usuário com engajamento pesado, ou isente-o do
+            controle. O <code>user_id</code> aparece na aba Usuários.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2 border-b p-4">
-          <Input placeholder="user_id" className="w-56" value={ovUserId} onChange={(e) => setOvUserId(e.target.value)} />
-          <Input placeholder="e-mail (rótulo)" className="w-52" value={ovEmail} onChange={(e) => setOvEmail(e.target.value)} />
-          <Input type="number" step="0.01" placeholder="teto task $" className="w-28" value={ovTaskCap} onChange={(e) => setOvTaskCap(e.target.value)} />
-          <Input type="number" step="0.01" placeholder="teto usuário $" className="w-32" value={ovUserCap} onChange={(e) => setOvUserCap(e.target.value)} />
+          <Input
+            placeholder="user_id"
+            className="w-56"
+            value={ovUserId}
+            onChange={(e) => setOvUserId(e.target.value)}
+          />
+          <Input
+            placeholder="e-mail (rótulo)"
+            className="w-52"
+            value={ovEmail}
+            onChange={(e) => setOvEmail(e.target.value)}
+          />
+          <Input
+            type="number"
+            step="0.01"
+            placeholder="teto task $"
+            className="w-28"
+            value={ovTaskCap}
+            onChange={(e) => setOvTaskCap(e.target.value)}
+          />
+          <Input
+            type="number"
+            step="0.01"
+            placeholder="teto usuário $"
+            className="w-32"
+            value={ovUserCap}
+            onChange={(e) => setOvUserCap(e.target.value)}
+          />
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Switch checked={ovDisabled} onCheckedChange={setOvDisabled} /> isento
+            <Switch checked={ovDisabled} onCheckedChange={setOvDisabled} />{" "}
+            isento
           </label>
-          <Button variant="outline" size="sm" onClick={() => void addOverride()}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void addOverride()}
+          >
             <Plus className="h-4 w-4" /> Adicionar
           </Button>
         </div>
@@ -332,10 +411,14 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
           <div className="min-w-0 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
                   <th className="px-5 py-2 font-medium">Usuário</th>
-                  <th className="px-5 py-2 text-right font-medium">Teto task</th>
-                  <th className="px-5 py-2 text-right font-medium">Teto usuário</th>
+                  <th className="px-5 py-2 text-right font-medium">
+                    Teto task
+                  </th>
+                  <th className="px-5 py-2 text-right font-medium">
+                    Teto usuário
+                  </th>
                   <th className="px-5 py-2 font-medium">Isento</th>
                   <th className="px-5 py-2"></th>
                 </tr>
@@ -345,13 +428,29 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
                   <tr key={o.user_id} className="border-b last:border-0">
                     <td className="px-5 py-2">
                       <div className="font-medium">{o.email ?? o.user_id}</div>
-                      {o.email && <div className="text-xs text-muted-foreground">{o.user_id}</div>}
+                      {o.email && (
+                        <div className="text-xs text-muted-foreground">
+                          {o.user_id}
+                        </div>
+                      )}
                     </td>
-                    <td className="px-5 py-2 text-right tabular-nums">{capStr(o.per_task_cap_dollars) ? `$${o.per_task_cap_dollars}` : "—"}</td>
-                    <td className="px-5 py-2 text-right tabular-nums">{capStr(o.per_user_cap_dollars) ? `$${o.per_user_cap_dollars}` : "—"}</td>
+                    <td className="px-5 py-2 text-right tabular-nums">
+                      {capStr(o.per_task_cap_dollars)
+                        ? `$${o.per_task_cap_dollars}`
+                        : "—"}
+                    </td>
+                    <td className="px-5 py-2 text-right tabular-nums">
+                      {capStr(o.per_user_cap_dollars)
+                        ? `$${o.per_user_cap_dollars}`
+                        : "—"}
+                    </td>
                     <td className="px-5 py-2">{o.disabled ? "sim" : "—"}</td>
                     <td className="px-5 py-2 text-right">
-                      <Button variant="ghost" size="sm" onClick={() => void removeOverride(o.user_id)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void removeOverride(o.user_id)}
+                      >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </td>

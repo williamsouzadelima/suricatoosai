@@ -6,6 +6,7 @@ import { Search, Ban, RotateCcw, Download, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { toCsv, downloadCsv, csvName } from "@/lib/utils/csv";
 import { UserDetailModal } from "./UserDetailModal";
 import {
@@ -30,6 +31,31 @@ export interface UserRow {
   costDollars: number;
   lastActivityAt: number | null;
   capped: boolean;
+}
+
+const AV_GRADS = [
+  "from-[#2456e6] to-[#3f6ef0]",
+  "from-[#12996b] to-[#2bb783]",
+  "from-[#c9820b] to-[#e0a020]",
+  "from-[#7d5bf0] to-[#a78bfa]",
+  "from-[#5a6b84] to-[#8a9bb5]",
+  "from-[#e0555a] to-[#ff7678]",
+];
+function initials(email: string): string {
+  const n = email
+    .split("@")[0]
+    .replace(/[._-]+/g, " ")
+    .trim();
+  const p = n.split(/\s+/).filter(Boolean);
+  return (
+    ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? p[0]?.[1] ?? "")).toUpperCase() || "U"
+  );
+}
+function avGrad(email: string): string {
+  let h = 0;
+  for (let i = 0; i < email.length; i++)
+    h = (h * 31 + email.charCodeAt(i)) >>> 0;
+  return AV_GRADS[h % AV_GRADS.length];
 }
 
 export function UsersTable() {
@@ -174,13 +200,13 @@ export function UsersTable() {
         <div className="min-w-0 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-5 py-3 font-medium">Usuário</th>
-                <th className="px-5 py-3 font-medium">Últ. atividade</th>
-                <th className="px-5 py-3 text-right font-medium">Reqs</th>
-                <th className="px-5 py-3 text-right font-medium">Tokens</th>
-                <th className="px-5 py-3 text-right font-medium">Custo</th>
-                <th className="px-5 py-3 text-right font-medium">Ações</th>
+              <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                <th className="px-5 py-2.5 font-semibold">Usuário</th>
+                <th className="px-5 py-2.5 font-semibold">Últ. atividade</th>
+                <th className="px-5 py-2.5 text-right font-semibold">Reqs</th>
+                <th className="px-5 py-2.5 text-right font-semibold">Tokens</th>
+                <th className="px-5 py-2.5 text-right font-semibold">Custo</th>
+                <th className="px-5 py-2.5 text-right font-semibold">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -191,18 +217,30 @@ export function UsersTable() {
                   className="cursor-pointer border-b transition-colors last:border-0 hover:bg-muted/40"
                 >
                   <td className="px-5 py-3">
-                    <div className="flex items-center gap-2 font-medium">
-                      {u.email}
-                      {u.suspended && (
-                        <StatusBadge tone="destructive" label="suspenso" />
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {u.name ? `${u.name} · ` : ""}
-                      {u.allowlistStatus ?? "fora da lista"} · entrou{" "}
-                      {formatDateTime(
-                        u.lastSignInAt ? Date.parse(u.lastSignInAt) : null,
-                      )}
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={cn(
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-display text-xs font-bold text-white shadow-sm",
+                          avGrad(u.email),
+                        )}
+                      >
+                        {initials(u.email)}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 font-medium">
+                          <span className="truncate">{u.email}</span>
+                          {u.suspended && (
+                            <StatusBadge tone="destructive" label="suspenso" />
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {u.name ? `${u.name} · ` : ""}
+                          {u.allowlistStatus ?? "fora da lista"} · entrou{" "}
+                          {formatDateTime(
+                            u.lastSignInAt ? Date.parse(u.lastSignInAt) : null,
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </td>
                   <td className="px-5 py-3 text-muted-foreground">

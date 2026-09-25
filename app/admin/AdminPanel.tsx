@@ -512,7 +512,7 @@ export function AdminPanel({
                 <div className="min-w-0 overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <tr className="border-b border-border bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
                         <th className="px-5 py-3 font-medium">E-mail</th>
                         <th className="px-5 py-3 font-medium">Status</th>
                         <th className="px-5 py-3 font-medium">Convidado</th>
