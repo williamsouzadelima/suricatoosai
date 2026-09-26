@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { CostAnalyticsPanel } from "./CostAnalyticsPanel";
+import { RevenuePanel } from "./RevenuePanel";
 import {
   SectionHeader,
   StatusBadge,
@@ -256,6 +257,7 @@ export function TaskCostsTab() {
   return (
     <div className="space-y-4">
       <CostAnalyticsPanel />
+      <RevenuePanel />
       <Card className="gap-0 py-0">
         <div className="flex flex-col gap-3 border-b p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>

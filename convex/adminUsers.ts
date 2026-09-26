@@ -1,6 +1,7 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { validateServiceKey } from "./lib/utils";
+import { utcDay } from "./unitEconomicsLib";
 import type { Id } from "./_generated/dataModel";
 
 /**
@@ -786,6 +787,162 @@ export const getCostAnalyticsForBackend = query({
       clients,
       capped,
       scannedRows: rows.length,
+    };
+  },
+});
+
+/**
+ * Visão de negócio (receita/custo/lucro) por período, do rollup diário
+ * `unit_economics_daily`. **Regra anti-dupla-contagem:** todo evento de uso
+ * grava uma linha entity_type="user" (custo COMPLETO) e, se houver org, uma
+ * linha "organization" que DUPLICA o custo. Então: CUSTO = só linhas "user";
+ * RECEITA = "user" + "organization" (fluxos distintos: assinatura/extra
+ * individual vs. de time — sem sobreposição). Requests/tokens = só "user".
+ * MRR é snapshot → usa o do dia mais recente da janela. Fonte 100% indexada
+ * (índice by_day), sem varrer usage_logs.
+ */
+const REV_ROW_CAP = 6000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const REV_PERIOD_CFG: Record<string, { ms: number; bucketDays: number }> = {
+  "7d": { ms: 7 * DAY_MS, bucketDays: 1 },
+  "30d": { ms: 30 * DAY_MS, bucketDays: 2 },
+  "90d": { ms: 90 * DAY_MS, bucketDays: 7 },
+  "180d": { ms: 180 * DAY_MS, bucketDays: 14 },
+  "365d": { ms: 365 * DAY_MS, bucketDays: 30 },
+};
+
+export const getRevenueAnalyticsForBackend = query({
+  args: {
+    serviceKey: v.string(),
+    period: v.union(
+      v.literal("7d"),
+      v.literal("30d"),
+      v.literal("90d"),
+      v.literal("180d"),
+      v.literal("365d"),
+    ),
+    nowMs: v.number(),
+  },
+  returns: v.object({
+    period: v.string(),
+    fromDay: v.string(),
+    toDay: v.string(),
+    bucketDays: v.number(),
+    totals: v.object({
+      revenue: v.number(),
+      revenueUser: v.number(),
+      revenueOrg: v.number(),
+      cost: v.number(),
+      grossProfit: v.number(),
+      marginPct: v.number(),
+      mrr: v.number(),
+      requests: v.number(),
+      inputTokens: v.number(),
+      outputTokens: v.number(),
+    }),
+    series: v.array(
+      v.object({
+        t: v.number(),
+        revenue: v.number(),
+        cost: v.number(),
+        profit: v.number(),
+      }),
+    ),
+    capped: v.boolean(),
+    dayRows: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const cfg = REV_PERIOD_CFG[args.period];
+    const to = args.nowMs;
+    const from = to - cfg.ms;
+    const fromDay = utcDay(from);
+    const toDay = utcDay(to);
+    const bucketMs = cfg.bucketDays * DAY_MS;
+    const fromDayMs = Date.parse(`${fromDay}T00:00:00.000Z`);
+    const toDayMs = Date.parse(`${toDay}T00:00:00.000Z`);
+    const bucketCount = Math.max(
+      1,
+      Math.floor((toDayMs - fromDayMs) / bucketMs) + 1,
+    );
+
+    const rows = await ctx.db
+      .query("unit_economics_daily")
+      .withIndex("by_day", (q) => q.gte("day", fromDay).lte("day", toDay))
+      .take(REV_ROW_CAP);
+    const capped = rows.length === REV_ROW_CAP;
+
+    const series = Array.from({ length: bucketCount }, (_, i) => ({
+      t: fromDayMs + i * bucketMs,
+      revenue: 0,
+      cost: 0,
+      profit: 0,
+    }));
+    const dayMrr = new Map<string, number>();
+    let revenueUser = 0;
+    let revenueOrg = 0;
+    let cost = 0;
+    let requests = 0;
+    let inputTokens = 0;
+    let outputTokens = 0;
+
+    for (const r of rows) {
+      const dayMs = Date.parse(`${r.day}T00:00:00.000Z`);
+      if (Number.isNaN(dayMs)) continue;
+      let bi = Math.floor((dayMs - fromDayMs) / bucketMs);
+      if (bi < 0) bi = 0;
+      if (bi >= bucketCount) bi = bucketCount - 1;
+      const s = series[bi];
+
+      if (r.entity_type === "user") {
+        cost += r.total_cost_dollars;
+        revenueUser += r.net_revenue_dollars;
+        requests += r.usage_request_count;
+        inputTokens += r.input_tokens;
+        outputTokens += r.output_tokens;
+        s.cost += r.total_cost_dollars;
+        s.revenue += r.net_revenue_dollars;
+      } else {
+        revenueOrg += r.net_revenue_dollars;
+        s.revenue += r.net_revenue_dollars;
+      }
+      dayMrr.set(r.day, (dayMrr.get(r.day) ?? 0) + (r.mrr_dollars ?? 0));
+    }
+
+    for (const s of series) s.profit = s.revenue - s.cost;
+
+    const revenue = revenueUser + revenueOrg;
+    const grossProfit = revenue - cost;
+    const marginPct = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+    let mrr = 0;
+    let latestDay = "";
+    for (const [day, value] of dayMrr) {
+      if (day > latestDay) {
+        latestDay = day;
+        mrr = value;
+      }
+    }
+
+    return {
+      period: args.period,
+      fromDay,
+      toDay,
+      bucketDays: cfg.bucketDays,
+      totals: {
+        revenue,
+        revenueUser,
+        revenueOrg,
+        cost,
+        grossProfit,
+        marginPct,
+        mrr,
+        requests,
+        inputTokens,
+        outputTokens,
+      },
+      series,
+      capped,
+      dayRows: rows.length,
     };
   },
 });
