@@ -1140,12 +1140,16 @@ export default defineSchema({
     // upstream_inference_cost and can undercount the actual charge. Present only
     // on rows written after this field was added; historical rows leave it undefined.
     provider_billed_cost_dollars: v.optional(v.number()),
+    // Denormalizado no logUsage a partir de chats.engagement_id (best-effort) —
+    // habilita rollup/enforcement por engajamento indexados (só linhas novas).
+    engagement_id: v.optional(v.id("engagements")),
   })
     .index("by_usage_settlement_id", ["usage_settlement_id"])
     .index("by_user", ["user_id"])
     .index("by_user_and_model", ["user_id", "model"])
     .index("by_org", ["organization_id"])
-    .index("by_chat", ["chat_id"]),
+    .index("by_chat", ["chat_id"])
+    .index("by_engagement", ["engagement_id"]),
 
   // Presença de usuário-no-browser. Uma linha por usuário; o cliente
   // (GlobalState) bate um heartbeat a cada ~45s enquanto a aba está visível.

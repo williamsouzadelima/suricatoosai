@@ -141,11 +141,22 @@ export const logUsage = mutation({
         : args.cost_source;
     const now = Date.now();
 
+    // Denormaliza o engajamento a partir do chat (best-effort; um read indexado).
+    // Habilita custo/teto por engajamento sem varrer o join no read.
+    const chatDoc = args.chat_id
+      ? await ctx.db
+          .query("chats")
+          .withIndex("by_chat_id", (q) => q.eq("id", args.chat_id!))
+          .first()
+      : null;
+    const engagementId = chatDoc?.engagement_id;
+
     await ctx.db.insert("usage_logs", {
       usage_settlement_id: args.usage_settlement_id,
       user_id: args.user_id,
       organization_id: args.organization_id,
       chat_id: args.chat_id,
+      engagement_id: engagementId,
       assistant_message_id: args.assistant_message_id,
       endpoint: args.endpoint,
       mode: args.mode,
