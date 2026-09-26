@@ -1194,6 +1194,20 @@ export default defineSchema({
     .index("by_client_and_created", ["client_id", "created_at"])
     .index("by_user_and_created", ["user_id", "created_at"]),
 
+  // Teto de gasto de IA por engajamento (MONITOR — sem enforcement no hot-path).
+  // cap_dollars em USD (mesma unidade do custo real); warn_pct em 0-100.
+  engagement_budgets: defineTable({
+    user_id: v.string(),
+    organization_id: v.optional(v.string()),
+    client_id: v.id("clients"),
+    engagement_id: v.id("engagements"),
+    cap_dollars: v.number(),
+    warn_pct: v.number(),
+    note: v.optional(v.string()),
+    updated_by: v.optional(v.string()),
+    updated_at: v.number(),
+  }).index("by_engagement", ["engagement_id"]),
+
   // Durable revenue ledger for unit economics reporting. Revenue is stored as
   // gross/net dollars because usage costs are sub-cent dollar values already.
   revenue_events: defineTable({

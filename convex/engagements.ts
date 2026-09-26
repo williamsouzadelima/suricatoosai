@@ -491,11 +491,20 @@ export const getEngagementBilling = query({
           : r.cost_dollars;
     }
 
+    const budget = await ctx.db
+      .query("engagement_budgets")
+      .withIndex("by_engagement", (q) =>
+        q.eq("engagement_id", args.engagementId),
+      )
+      .first();
+
     const invoiced = paid + sent;
     return {
       clientId: eng.client_id,
       clientName: clientDoc?.name ?? "(cliente removido)",
       portalEnabled: clientDoc?.portal_enabled === true,
+      capDollars: budget?.cap_dollars ?? 0,
+      warnPct: budget?.warn_pct ?? 80,
       currency,
       paid,
       sent,
@@ -507,5 +516,66 @@ export const getEngagementBilling = query({
       costRows: costRows.length,
       invoiceCount: invoices.length,
     };
+  },
+});
+
+/**
+ * Define/atualiza o teto de gasto de IA do engajamento (MONITOR — sem bloqueio
+ * no hot-path). identity + posse. cap_dollars=0 remove o teto (sem monitor).
+ */
+export const setEngagementBudget = mutation({
+  args: {
+    engagementId: v.id("engagements"),
+    capDollars: v.number(),
+    warnPct: v.optional(v.number()),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({ code: "UNAUTHORIZED", message: "Unauthorized" });
+    }
+    const eng = await ctx.db.get(args.engagementId);
+    if (!eng || eng.user_id !== identity.subject) {
+      throw new ConvexError({
+        code: "ACCESS_DENIED",
+        message: "Engajamento inexistente ou sem acesso",
+      });
+    }
+    const cap = Number.isFinite(args.capDollars)
+      ? Math.max(0, args.capDollars)
+      : 0;
+    const warn = Number.isFinite(args.warnPct ?? 80)
+      ? Math.min(100, Math.max(0, args.warnPct ?? 80))
+      : 80;
+    const now = Date.now();
+    const existing = await ctx.db
+      .query("engagement_budgets")
+      .withIndex("by_engagement", (q) =>
+        q.eq("engagement_id", args.engagementId),
+      )
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        cap_dollars: cap,
+        warn_pct: warn,
+        note: args.note?.slice(0, 500),
+        updated_by: identity.subject,
+        updated_at: now,
+      });
+    } else {
+      await ctx.db.insert("engagement_budgets", {
+        user_id: identity.subject,
+        organization_id: eng.organization_id,
+        client_id: eng.client_id,
+        engagement_id: args.engagementId,
+        cap_dollars: cap,
+        warn_pct: warn,
+        note: args.note?.slice(0, 500),
+        updated_by: identity.subject,
+        updated_at: now,
+      });
+    }
+    return null;
   },
 });

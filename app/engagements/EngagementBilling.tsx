@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,11 +61,37 @@ export function EngagementBilling({
   const createInvoice = useMutation(api.engagements.createInvoice);
   const setStatus = useMutation(api.engagements.setInvoiceStatus);
   const removeInvoice = useMutation(api.engagements.deleteInvoice);
+  const setBudget = useMutation(api.engagements.setEngagementBudget);
 
   const [label, setLabel] = useState("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [busy, setBusy] = useState(false);
+  const [capInput, setCapInput] = useState("");
+  const [warnInput, setWarnInput] = useState("");
+  const [savingBudget, setSavingBudget] = useState(false);
+
+  const saveBudget = async () => {
+    const cap =
+      capInput.trim() === "" ? (billing?.capDollars ?? 0) : Number(capInput);
+    const warn =
+      warnInput.trim() === "" ? (billing?.warnPct ?? 80) : Number(warnInput);
+    if (!Number.isFinite(cap) || cap < 0) {
+      toast.error("Teto inválido.");
+      return;
+    }
+    setSavingBudget(true);
+    try {
+      await setBudget({ engagementId, capDollars: cap, warnPct: warn });
+      setCapInput("");
+      setWarnInput("");
+      toast.success(cap > 0 ? "Teto salvo." : "Teto removido.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao salvar o teto.");
+    } finally {
+      setSavingBudget(false);
+    }
+  };
 
   const cur = billing?.currency ?? currency;
 
@@ -143,6 +170,87 @@ export function EngagementBilling({
               loading={billing === undefined}
             />
           </div>
+
+          {/* Teto de custo de IA (monitor, sem enforcement) */}
+          {(() => {
+            const cap = billing?.capDollars ?? 0;
+            const cost = billing?.cost ?? 0;
+            const warnPct = billing?.warnPct ?? 80;
+            const pct = cap > 0 ? (cost / cap) * 100 : 0;
+            const over = cap > 0 && cost >= cap;
+            const warn = cap > 0 && !over && cost >= (cap * warnPct) / 100;
+            const barTone = over
+              ? "bg-destructive"
+              : warn
+                ? "bg-warning"
+                : "bg-success";
+            return (
+              <div className="rounded-lg border p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium">
+                    Teto de custo de IA
+                  </span>
+                  {cap > 0 ? (
+                    <StatusBadge
+                      tone={over ? "destructive" : warn ? "warning" : "success"}
+                      label={`${over ? "estourou" : warn ? "aviso" : "ok"} · ${pct.toFixed(0)}%`}
+                    />
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      sem teto
+                    </span>
+                  )}
+                </div>
+                {cap > 0 && (
+                  <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={cn("h-full rounded-full", barTone)}
+                      style={{ width: `${Math.min(100, pct)}%` }}
+                    />
+                  </div>
+                )}
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="w-32">
+                    <label className="mb-1 block text-xs text-muted-foreground">
+                      Teto (USD)
+                    </label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={capInput}
+                      onChange={(e) => setCapInput(e.target.value)}
+                      placeholder={cap > 0 ? cap.toFixed(2) : "0.00"}
+                    />
+                  </div>
+                  <div className="w-24">
+                    <label className="mb-1 block text-xs text-muted-foreground">
+                      Aviso (%)
+                    </label>
+                    <Input
+                      type="number"
+                      step="1"
+                      min="0"
+                      max="100"
+                      value={warnInput}
+                      onChange={(e) => setWarnInput(e.target.value)}
+                      placeholder={String(warnPct)}
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => void saveBudget()}
+                    disabled={savingBudget}
+                  >
+                    Salvar teto
+                  </Button>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Monitor apenas — não bloqueia runs. Teto 0 remove o monitor.
+                </p>
+              </div>
+            );
+          })()}
 
           {/* Nova fatura */}
           <div className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-end">
