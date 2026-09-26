@@ -1,6 +1,6 @@
 import { authkit } from "@workos-inc/authkit-nextjs";
 import { NextResponse, type NextRequest } from "next/server";
-import { checkIpBlock } from "@/lib/security/edge-guard";
+import { checkIpBlock, observe } from "@/lib/security/edge-guard";
 import { isRateLimitError } from "@/lib/api/response";
 import { isEndedSessionRefreshError } from "@/lib/auth/expected-auth-errors";
 import {
@@ -263,6 +263,11 @@ export default async function proxy(request: NextRequest) {
   const ipBlockResponse = checkIpBlock(request);
   if (ipBlockResponse) return ipBlockResponse;
 
+  // Detecção de anomalia/enumeração (contagem em memória, fail-open, sem bloqueio
+  // aqui). Dispara evento + notificação ao cruzar o limiar; auto-block só em modo
+  // enforce, aplicado pelo Convex no próximo refresh.
+  observe(request, "request");
+
   if (isUnsupportedRootPageRequest(request, pathname)) {
     return NextResponse.json(
       {
@@ -430,6 +435,10 @@ export default async function proxy(request: NextRequest) {
       }),
     );
   }
+
+  // Requisição não autenticada a um path protegido (não é sessão válida, nem
+  // path público, nem rate-limit de refresh) — sinal de enumeração/brute-force.
+  observe(request, "deny");
 
   if (!isBrowserRequest(request)) {
     return withAttributionCookies(

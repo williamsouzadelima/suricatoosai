@@ -1,5 +1,6 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalAction } from "./_generated/server";
 import { v } from "convex/values";
+import { internal, api } from "./_generated/api";
 import { validateServiceKey } from "./lib/utils";
 import type { Id } from "./_generated/dataModel";
 
@@ -39,6 +40,13 @@ export const getEdgeBlocklistForBackend = query({
     blocked: v.array(v.string()),
     safelist: v.array(v.string()),
     killSwitch: v.boolean(),
+    mode: v.string(),
+    autoBlock: v.boolean(),
+    reqWindowS: v.number(),
+    reqMax: v.number(),
+    denyMax: v.number(),
+    pathScanMax: v.number(),
+    ttlS: v.number(),
   }),
   handler: async (ctx, args) => {
     validateServiceKey(args.serviceKey);
@@ -53,14 +61,22 @@ export const getEdgeBlocklistForBackend = query({
       if (r.expires_at && r.expires_at < now) continue;
       blocked.push(r.value);
     }
-    const settings = await ctx.db
+    const s = await ctx.db
       .query("security_settings")
       .withIndex("by_key", (q) => q.eq("key", SETTINGS_KEY))
       .first();
     return {
       blocked,
-      safelist: settings?.safelist_ips ?? [],
-      killSwitch: settings?.kill_switch ?? false,
+      safelist: s?.safelist_ips ?? [],
+      killSwitch: s?.kill_switch ?? DEFAULT_SETTINGS.kill_switch,
+      mode: s?.enforcement_mode ?? DEFAULT_SETTINGS.enforcement_mode,
+      autoBlock: s?.auto_block_enabled ?? DEFAULT_SETTINGS.auto_block_enabled,
+      reqWindowS: s?.req_burst_window_s ?? DEFAULT_SETTINGS.req_burst_window_s,
+      reqMax: s?.req_burst_max ?? DEFAULT_SETTINGS.req_burst_max,
+      denyMax: s?.deny_burst_max ?? DEFAULT_SETTINGS.deny_burst_max,
+      pathScanMax:
+        s?.path_scan_distinct_max ?? DEFAULT_SETTINGS.path_scan_distinct_max,
+      ttlS: s?.auto_block_ttl_s ?? DEFAULT_SETTINGS.auto_block_ttl_s,
     };
   },
 });
@@ -246,3 +262,141 @@ export const setSecuritySettingsForBackend = mutation({
 
 // Reexport de tipo p/ uso futuro (Slice 2 detector).
 export type SecurityBlockId = Id<"security_blocklist">;
+
+/**
+ * Registra uma AMEAÇA detectada pela borda (fire-and-forget). Insere o evento no
+ * security_audit_log, opcionalmente auto-bloqueia o IP (TTL) e dispara a
+ * notificação imediata (Teams/e-mail). NUNCA é fail-closed — é chamada
+ * best-effort do proxy; se falhar, o request já seguiu.
+ */
+export const recordThreatForBackend = mutation({
+  args: {
+    serviceKey: v.string(),
+    eventType: v.union(
+      v.literal("threat.detected"),
+      v.literal("enumeration.detected"),
+      v.literal("anomaly.detected"),
+    ),
+    ip: v.optional(v.string()),
+    detail: v.string(),
+    autoBlock: v.boolean(),
+    ttlSeconds: v.number(),
+  },
+  returns: v.object({ blocked: v.boolean() }),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const now = Date.now();
+    const detail = args.detail.slice(0, 1000);
+    await ctx.db.insert("security_audit_log", {
+      event_type: args.eventType,
+      actor_kind: "system",
+      ip: args.ip,
+      target_type: args.ip ? "ip" : undefined,
+      target_id: args.ip,
+      outcome: "denied",
+      detail,
+      created_at: now,
+    });
+
+    let blocked = false;
+    if (args.autoBlock && args.ip) {
+      const existing = await ctx.db
+        .query("security_blocklist")
+        .withIndex("by_value", (q) =>
+          q.eq("type", "ip").eq("value", args.ip as string),
+        )
+        .filter((q) => q.eq(q.field("status"), "active"))
+        .first();
+      if (!existing) {
+        const ttl = args.ttlSeconds > 0 ? args.ttlSeconds : 3600;
+        await ctx.db.insert("security_blocklist", {
+          type: "ip",
+          value: args.ip,
+          reason: detail.slice(0, 200),
+          source: "auto",
+          category: "ioa",
+          created_at: now,
+          expires_at: now + ttl * 1000,
+          status: "active",
+          hits: 0,
+        });
+        await ctx.db.insert("security_audit_log", {
+          event_type: "ip.blocked",
+          actor_kind: "system",
+          ip: args.ip,
+          target_type: "ip",
+          target_id: args.ip,
+          outcome: "denied",
+          detail: `auto-block: ${detail.slice(0, 200)}`,
+          created_at: now,
+        });
+        blocked = true;
+      }
+    }
+
+    await ctx.scheduler.runAfter(0, internal.security.dispatchSecurityNotify, {
+      subject: `[Segurança] ${args.eventType}${args.ip ? ` · ${args.ip}` : ""}`,
+      body: `${detail}${blocked ? "\nAção: IP auto-bloqueado (TTL)." : "\n(modo sombra — sem bloqueio automático)"}`,
+    });
+    return { blocked };
+  },
+});
+
+/**
+ * Dispara a notificação de segurança (Teams/e-mail), inline e best-effort.
+ * Reusa os destinos configurados em monitorSettings (aba Alertas). NUNCA lança.
+ */
+export const dispatchSecurityNotify = internalAction({
+  args: { subject: v.string(), body: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    try {
+      const serviceKey = process.env.CONVEX_SERVICE_ROLE_KEY;
+      if (!serviceKey) return null;
+      const channels = await ctx.runQuery(api.monitorSettings.get, {
+        serviceKey,
+      });
+      if (channels.teams_webhook_url) {
+        try {
+          const res = await fetch(channels.teams_webhook_url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: `**${args.subject}**\n\n${args.body}`,
+            }),
+          });
+          if (!res.ok) console.warn(`[sec-notify] Teams HTTP ${res.status}`);
+        } catch (e) {
+          console.warn("[sec-notify] Teams falhou", e);
+        }
+      }
+      const apiKey = process.env.RESEND_API_KEY;
+      if (channels.email_to && apiKey) {
+        try {
+          const from =
+            process.env.ALERT_EMAIL_FROM ??
+            "Suricatoos Alertas <alertas@suricatoos.com>";
+          const res = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from,
+              to: [channels.email_to],
+              subject: args.subject,
+              text: args.body,
+            }),
+          });
+          if (!res.ok) console.warn(`[sec-notify] Resend HTTP ${res.status}`);
+        } catch (e) {
+          console.warn("[sec-notify] e-mail falhou", e);
+        }
+      }
+    } catch (e) {
+      console.warn("[sec-notify] dispatch falhou (não-fatal)", e);
+    }
+    return null;
+  },
+});
