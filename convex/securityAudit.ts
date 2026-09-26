@@ -1,6 +1,7 @@
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { validateServiceKey } from "./lib/utils";
+import type { Id } from "./_generated/dataModel";
 
 /**
  * security_audit_log — trilha de auditoria DURÁVEL (não best-effort) do plano de
@@ -73,5 +74,100 @@ export const recordSecurityEventForBackend = mutation({
       created_at: Date.now(),
     });
     return { id };
+  },
+});
+
+/**
+ * Leitura do security_audit_log para o /admin (serviceKey). Filtra por
+ * event_type (índice by_event_created) ou mostra os mais recentes de todos os
+ * tipos (índice de sistema by_creation_time). Resolve nome do cliente dos itens
+ * listados (bounded/memo). Só leitura — a tabela é imutável.
+ */
+const AUDIT_READ_CAP = 200;
+const AUDIT_EVENT_TYPES = [
+  "report.generated",
+  "report.viewed",
+  "report.downloaded",
+  "evidence.viewed",
+  "evidence.downloaded",
+  "artifact.url_issued",
+  "membership.granted",
+  "membership.revoked",
+  "engagement.created",
+  "access.denied",
+] as const;
+
+export const getSecurityAuditForBackend = query({
+  args: {
+    serviceKey: v.string(),
+    eventType: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  returns: v.object({
+    rows: v.array(
+      v.object({
+        id: v.string(),
+        eventType: v.string(),
+        actorEmail: v.union(v.string(), v.null()),
+        actorKind: v.string(),
+        clientName: v.union(v.string(), v.null()),
+        targetType: v.union(v.string(), v.null()),
+        targetId: v.union(v.string(), v.null()),
+        outcome: v.string(),
+        detail: v.union(v.string(), v.null()),
+        ip: v.union(v.string(), v.null()),
+        createdAt: v.number(),
+      }),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const limit = Math.min(Math.max(args.limit ?? AUDIT_READ_CAP, 1), 500);
+    const known = (AUDIT_EVENT_TYPES as readonly string[]).includes(
+      args.eventType ?? "",
+    );
+
+    const docs = known
+      ? await ctx.db
+          .query("security_audit_log")
+          .withIndex("by_event_created", (q) =>
+            q.eq(
+              "event_type",
+              args.eventType as (typeof AUDIT_EVENT_TYPES)[number],
+            ),
+          )
+          .order("desc")
+          .take(limit)
+      : await ctx.db.query("security_audit_log").order("desc").take(limit);
+
+    const cliCache = new Map<string, string>();
+    const rows = [];
+    for (const d of docs) {
+      let clientName: string | null = null;
+      if (d.client_id) {
+        const key = d.client_id as string;
+        let name = cliCache.get(key);
+        if (name === undefined) {
+          const c = await ctx.db.get(d.client_id as Id<"clients">);
+          name = c?.name ?? "(cliente removido)";
+          cliCache.set(key, name);
+        }
+        clientName = name;
+      }
+      rows.push({
+        id: d._id,
+        eventType: d.event_type,
+        actorEmail: d.actor_email ?? null,
+        actorKind: d.actor_kind,
+        clientName,
+        targetType: d.target_type ?? null,
+        targetId: d.target_id ?? null,
+        outcome: d.outcome,
+        detail: d.detail ?? null,
+        ip: d.ip ?? null,
+        createdAt: d.created_at,
+      });
+    }
+    return { rows };
   },
 });

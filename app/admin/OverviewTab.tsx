@@ -145,7 +145,7 @@ export function OverviewTab({
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard
             icon={UserCheck}
-            label="Ativos"
+            label="Com acesso"
             value={data?.users.active ?? 0}
             sub={activePct}
             tone="success"

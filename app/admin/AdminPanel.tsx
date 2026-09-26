@@ -32,6 +32,7 @@ import { AnnouncementsTab } from "./AnnouncementsTab";
 import { MarketingTab } from "./MarketingTab";
 import { OverviewTab } from "./OverviewTab";
 import { AuditTab } from "./AuditTab";
+import { SecurityAuditTab } from "./SecurityAuditTab";
 import { TaskCostsTab } from "./TaskCostsTab";
 import { BudgetTab } from "./BudgetTab";
 import {
@@ -55,6 +56,7 @@ type Tab =
   | "avisos"
   | "marketing"
   | "auditoria"
+  | "seguranca"
   | "custos"
   | "orcamentos";
 
@@ -106,7 +108,10 @@ const NAV_GROUPS: {
   },
   {
     title: "Sistema",
-    items: [{ id: "auditoria", label: "Auditoria", icon: ScrollText }],
+    items: [
+      { id: "auditoria", label: "Auditoria", icon: ScrollText },
+      { id: "seguranca", label: "Segurança", icon: ShieldCheck },
+    ],
   },
 ];
 
@@ -391,6 +396,8 @@ export function AdminPanel({
           <MarketingTab />
         ) : tab === "auditoria" ? (
           <AuditTab />
+        ) : tab === "seguranca" ? (
+          <SecurityAuditTab />
         ) : tab === "custos" ? (
           <TaskCostsTab />
         ) : tab === "orcamentos" ? (

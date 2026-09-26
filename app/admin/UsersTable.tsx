@@ -15,6 +15,7 @@ import {
   EmptyState,
   formatDateTime,
   fmtNum,
+  fmtDuration,
 } from "./_ui";
 
 export interface UserRow {
@@ -64,6 +65,10 @@ export function UsersTable() {
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selected, setSelected] = useState<UserRow | null>(null);
+  const [presence, setPresence] = useState<Record<string, "online" | "idle">>(
+    {},
+  );
+  const [now, setNow] = useState<number>(() => Date.now());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,10 +83,25 @@ export function UsersTable() {
     } finally {
       setLoading(false);
     }
+    // Presença ao vivo (best-effort): pinta o dot online/ausente.
+    try {
+      const pres = await fetch("/api/admin/presence", { cache: "no-store" });
+      if (pres.ok) {
+        const pd = await pres.json();
+        const m: Record<string, "online" | "idle"> = {};
+        for (const u of pd.users ?? []) m[u.userId] = u.status;
+        setPresence(m);
+      }
+    } catch {
+      // presença é secundária — ignora
+    }
+    setNow(Date.now());
   }, []);
 
   useEffect(() => {
     void load();
+    const id = setInterval(() => void load(), 60_000);
+    return () => clearInterval(id);
   }, [load]);
 
   const toggleSuspend = useCallback(
@@ -218,13 +238,30 @@ export function UsersTable() {
                 >
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
-                      <div
-                        className={cn(
-                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-display text-xs font-bold text-white shadow-sm",
-                          avGrad(u.email),
+                      <div className="relative shrink-0">
+                        <div
+                          className={cn(
+                            "flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br font-display text-xs font-bold text-white shadow-sm",
+                            avGrad(u.email),
+                          )}
+                        >
+                          {initials(u.email)}
+                        </div>
+                        {presence[u.id] && (
+                          <span
+                            className={cn(
+                              "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card",
+                              presence[u.id] === "online"
+                                ? "bg-success"
+                                : "bg-warning",
+                            )}
+                            title={
+                              presence[u.id] === "online"
+                                ? "online agora"
+                                : "ausente"
+                            }
+                          />
                         )}
-                      >
-                        {initials(u.email)}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 font-medium">
@@ -244,7 +281,12 @@ export function UsersTable() {
                     </div>
                   </td>
                   <td className="px-5 py-3 text-muted-foreground">
-                    {formatDateTime(u.lastActivityAt)}
+                    <div>{formatDateTime(u.lastActivityAt)}</div>
+                    {u.lastActivityAt && (
+                      <div className="text-xs tabular-nums">
+                        há {fmtDuration(now - u.lastActivityAt)}
+                      </div>
+                    )}
                   </td>
                   <td className="px-5 py-3 text-right tabular-nums">
                     {fmtNum(u.requests)}
