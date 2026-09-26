@@ -8,6 +8,7 @@ import {
   Zap,
   Cpu,
   Building2,
+  Briefcase,
   Route,
   UserRound,
   TrendingUp,
@@ -43,6 +44,14 @@ interface Series {
 interface ByClient {
   clientId: string | null;
   name: string;
+  realCost: number;
+  registeredCost: number;
+  requests: number;
+}
+interface ByEngagement {
+  engagementId: string | null;
+  name: string;
+  clientName: string;
   realCost: number;
   registeredCost: number;
   requests: number;
@@ -87,6 +96,7 @@ interface Analytics {
   };
   series: Series[];
   byClient: ByClient[];
+  byEngagement: ByEngagement[];
   byModel: ByModel[];
   byEndpoint: ByEndpoint[];
   byUser: ByUser[];
@@ -258,6 +268,10 @@ export function CostAnalyticsPanel() {
   const clients = data?.clients ?? [];
   const clientMax = useMemo(
     () => Math.max(0, ...(data?.byClient ?? []).map((c) => c.realCost)),
+    [data],
+  );
+  const engagementMax = useMemo(
+    () => Math.max(0, ...(data?.byEngagement ?? []).map((e) => e.realCost)),
     [data],
   );
   const modelMax = useMemo(
@@ -437,6 +451,37 @@ export function CostAnalyticsPanel() {
                     max={clientMax}
                     sub={`${c.requests} reqs`}
                     tone={c.clientId ? "primary" : "brand"}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Por engajamento */}
+          <div className="rounded-xl border p-4">
+            <div className="mb-3">
+              <SectionHeader
+                icon={Briefcase}
+                title="Por engajamento"
+                count={data?.byEngagement.length}
+              />
+            </div>
+            {loading ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                Carregando…
+              </div>
+            ) : (data?.byEngagement.length ?? 0) === 0 ? (
+              <EmptyState icon={Briefcase} title="Sem custo no período." />
+            ) : (
+              <div className="space-y-3">
+                {data!.byEngagement.map((e) => (
+                  <RankBar
+                    key={e.engagementId ?? "unassigned"}
+                    label={e.name}
+                    value={fmtUSD(e.realCost)}
+                    max={engagementMax}
+                    sub={`${e.clientName} · ${e.requests} reqs`}
+                    tone={e.engagementId ? "primary" : "brand"}
                   />
                 ))}
               </div>

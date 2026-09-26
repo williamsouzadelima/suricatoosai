@@ -542,6 +542,16 @@ export const getCostAnalyticsForBackend = query({
         requests: v.number(),
       }),
     ),
+    byEngagement: v.array(
+      v.object({
+        engagementId: v.union(v.id("engagements"), v.null()),
+        name: v.string(),
+        clientName: v.string(),
+        realCost: v.number(),
+        registeredCost: v.number(),
+        requests: v.number(),
+      }),
+    ),
     byModel: v.array(
       v.object({
         model: v.string(),
@@ -593,20 +603,25 @@ export const getCostAnalyticsForBackend = query({
       .take(ANALYTICS_ROW_CAP);
     const capped = rows.length === ANALYTICS_ROW_CAP;
 
-    // Resolve chat_id → cliente (memo; teto de lookups distintos).
-    const UNASSIGNED: { id: Id<"clients"> | null; name: string } = {
+    // Resolve chat_id → cliente + engajamento (memo; teto de lookups distintos).
+    type Owner = {
+      id: Id<"clients"> | null;
+      name: string;
+      engId: Id<"engagements"> | null;
+      engName: string;
+    };
+    const UNASSIGNED: Owner = {
       id: null,
       name: "Não atribuído",
+      engId: null,
+      engName: "Não atribuído",
     };
-    const chatCache = new Map<
-      string,
-      { id: Id<"clients"> | null; name: string }
-    >();
+    const chatCache = new Map<string, Owner>();
     const clientNameCache = new Map<string, string>();
     let lookups = 0;
     const resolveClientForChat = async (
       chatId: string | undefined,
-    ): Promise<{ id: Id<"clients"> | null; name: string }> => {
+    ): Promise<Owner> => {
       if (!chatId) return UNASSIGNED;
       const cached = chatCache.get(chatId);
       if (cached) return cached;
@@ -616,7 +631,7 @@ export const getCostAnalyticsForBackend = query({
         .query("chats")
         .withIndex("by_chat_id", (q) => q.eq("id", chatId))
         .first();
-      let out: { id: Id<"clients"> | null; name: string } = UNASSIGNED;
+      let out: Owner = UNASSIGNED;
       if (chat?.engagement_id) {
         const eng = await ctx.db.get(chat.engagement_id);
         if (eng) {
@@ -627,7 +642,12 @@ export const getCostAnalyticsForBackend = query({
             name = client?.name ?? "Cliente removido";
             clientNameCache.set(cid, name);
           }
-          out = { id: cid, name };
+          out = {
+            id: cid,
+            name,
+            engId: chat.engagement_id,
+            engName: eng.name,
+          };
         }
       }
       chatCache.set(chatId, out);
@@ -672,6 +692,17 @@ export const getCostAnalyticsForBackend = query({
     const byEndpoint = new Map<
       string,
       { endpoint: string; realCost: number; requests: number }
+    >();
+    const byEngagement = new Map<
+      string,
+      {
+        engagementId: Id<"engagements"> | null;
+        name: string;
+        clientName: string;
+        realCost: number;
+        registeredCost: number;
+        requests: number;
+      }
     >();
     const byUser = new Map<
       string,
@@ -723,6 +754,20 @@ export const getCostAnalyticsForBackend = query({
       cAgg.registeredCost += reg;
       cAgg.requests += 1;
       byClient.set(ckey, cAgg);
+
+      const engKey = client.engId ?? "__unassigned__";
+      const eAggEng = byEngagement.get(engKey) ?? {
+        engagementId: client.engId,
+        name: client.engName,
+        clientName: client.name,
+        realCost: 0,
+        registeredCost: 0,
+        requests: 0,
+      };
+      eAggEng.realCost += real;
+      eAggEng.registeredCost += reg;
+      eAggEng.requests += 1;
+      byEngagement.set(engKey, eAggEng);
 
       const mAgg = byModel.get(r.model) ?? {
         model: r.model,
@@ -779,6 +824,9 @@ export const getCostAnalyticsForBackend = query({
       totals,
       series,
       byClient: Array.from(byClient.values())
+        .sort(sortReal)
+        .slice(0, TOP_CLIENTS),
+      byEngagement: Array.from(byEngagement.values())
         .sort(sortReal)
         .slice(0, TOP_CLIENTS),
       byModel: Array.from(byModel.values()).sort(sortReal).slice(0, TOP_MODELS),
