@@ -1,5 +1,6 @@
 import { authkit } from "@workos-inc/authkit-nextjs";
 import { NextResponse, type NextRequest } from "next/server";
+import { checkIpBlock } from "@/lib/security/edge-guard";
 import { isRateLimitError } from "@/lib/api/response";
 import { isEndedSessionRefreshError } from "@/lib/auth/expected-auth-errors";
 import {
@@ -255,6 +256,12 @@ function buildEndedSessionResponse(
 
 export default async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  // Camada de segurança (fail-open, NÃO-bloqueante): recusa IPs na blocklist
+  // antes de tudo. Qualquer erro/indisponibilidade → deixa passar (nunca
+  // derruba tráfego legítimo). Cache em memória, refresh em segundo plano.
+  const ipBlockResponse = checkIpBlock(request);
+  if (ipBlockResponse) return ipBlockResponse;
 
   if (isUnsupportedRootPageRequest(request, pathname)) {
     return NextResponse.json(

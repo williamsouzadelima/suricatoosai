@@ -33,6 +33,7 @@ import { MarketingTab } from "./MarketingTab";
 import { OverviewTab } from "./OverviewTab";
 import { AuditTab } from "./AuditTab";
 import { SecurityAuditTab } from "./SecurityAuditTab";
+import { SecurityDefenseSection } from "./SecurityDefenseSection";
 import { TaskCostsTab } from "./TaskCostsTab";
 import { BudgetTab } from "./BudgetTab";
 import {
@@ -397,7 +398,10 @@ export function AdminPanel({
         ) : tab === "auditoria" ? (
           <AuditTab />
         ) : tab === "seguranca" ? (
-          <SecurityAuditTab />
+          <div className="space-y-4">
+            <SecurityDefenseSection />
+            <SecurityAuditTab />
+          </div>
         ) : tab === "custos" ? (
           <TaskCostsTab />
         ) : tab === "orcamentos" ? (

@@ -45,6 +45,22 @@ const EVENTS: { value: string; label: string; tone: Tone }[] = [
   { value: "access.denied", label: "Acesso negado", tone: "destructive" },
   { value: "portal.enabled", label: "Portal habilitado", tone: "success" },
   { value: "portal.disabled", label: "Portal desabilitado", tone: "warning" },
+  { value: "threat.detected", label: "Ameaça detectada", tone: "destructive" },
+  {
+    value: "enumeration.detected",
+    label: "Enumeração detectada",
+    tone: "destructive",
+  },
+  { value: "anomaly.detected", label: "Anomalia detectada", tone: "warning" },
+  { value: "ip.blocked", label: "IP bloqueado", tone: "destructive" },
+  { value: "ip.unblocked", label: "IP desbloqueado", tone: "success" },
+  { value: "ioc.added", label: "IoC adicionado", tone: "warning" },
+  { value: "ioc.removed", label: "IoC removido", tone: "neutral" },
+  {
+    value: "user.autoblocked",
+    label: "Usuário auto-bloqueado",
+    tone: "destructive",
+  },
 ];
 const EVENT_MAP = new Map(EVENTS.map((e) => [e.value, e]));
 

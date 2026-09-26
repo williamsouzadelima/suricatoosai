@@ -1208,6 +1208,51 @@ export default defineSchema({
     updated_at: v.number(),
   }).index("by_engagement", ["engagement_id"]),
 
+  // Camada de segurança: blocklist de IP/CIDR/IoC (fonte da verdade durável;
+  // a borda mantém um cache quente). "ip" é enforce na borda (match exato);
+  // "cidr"/"user_agent"/"path_pattern" ficam registrados p/ o firewall do host
+  // (Fase 2) e visibilidade. Bloqueio manual pode ser permanente; auto tem TTL.
+  security_blocklist: defineTable({
+    type: v.union(
+      v.literal("ip"),
+      v.literal("cidr"),
+      v.literal("user_agent"),
+      v.literal("path_pattern"),
+    ),
+    value: v.string(),
+    reason: v.optional(v.string()),
+    source: v.union(v.literal("manual"), v.literal("auto")),
+    category: v.optional(v.string()),
+    created_by: v.optional(v.string()),
+    created_at: v.number(),
+    expires_at: v.optional(v.number()),
+    status: v.union(v.literal("active"), v.literal("lifted")),
+    lifted_by: v.optional(v.string()),
+    lifted_at: v.optional(v.number()),
+    hits: v.optional(v.number()),
+  })
+    .index("by_value", ["type", "value"])
+    .index("by_status_and_created", ["status", "created_at"]),
+
+  // Config da camada de segurança (doc único key="global"). enforcement_mode
+  // "shadow" = detecta+audita+notifica SEM bloquear; "enforce" = bloqueia.
+  security_settings: defineTable({
+    key: v.string(),
+    enforcement_mode: v.union(v.literal("shadow"), v.literal("enforce")),
+    auto_block_enabled: v.boolean(),
+    auto_suspend_users: v.boolean(),
+    kill_switch: v.boolean(),
+    req_burst_window_s: v.number(),
+    req_burst_max: v.number(),
+    deny_burst_max: v.number(),
+    path_scan_distinct_max: v.number(),
+    auto_block_ttl_s: v.number(),
+    safelist_ips: v.array(v.string()),
+    safelist_user_ids: v.array(v.string()),
+    updated_by: v.optional(v.string()),
+    updated_at: v.number(),
+  }).index("by_key", ["key"]),
+
   // Durable revenue ledger for unit economics reporting. Revenue is stored as
   // gross/net dollars because usage costs are sub-cent dollar values already.
   revenue_events: defineTable({
@@ -1921,6 +1966,14 @@ export default defineSchema({
       v.literal("access.denied"),
       v.literal("portal.enabled"),
       v.literal("portal.disabled"),
+      v.literal("threat.detected"),
+      v.literal("enumeration.detected"),
+      v.literal("anomaly.detected"),
+      v.literal("ip.blocked"),
+      v.literal("ip.unblocked"),
+      v.literal("ioc.added"),
+      v.literal("ioc.removed"),
+      v.literal("user.autoblocked"),
     ),
     actor_user_id: v.optional(v.string()),
     actor_email: v.optional(v.string()),

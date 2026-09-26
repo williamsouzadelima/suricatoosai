@@ -26,6 +26,14 @@ const eventTypeArg = v.union(
   v.literal("access.denied"),
   v.literal("portal.enabled"),
   v.literal("portal.disabled"),
+  v.literal("threat.detected"),
+  v.literal("enumeration.detected"),
+  v.literal("anomaly.detected"),
+  v.literal("ip.blocked"),
+  v.literal("ip.unblocked"),
+  v.literal("ioc.added"),
+  v.literal("ioc.removed"),
+  v.literal("user.autoblocked"),
 );
 const actorKindArg = v.union(
   v.literal("internal"),
@@ -97,6 +105,16 @@ const AUDIT_EVENT_TYPES = [
   "membership.revoked",
   "engagement.created",
   "access.denied",
+  "portal.enabled",
+  "portal.disabled",
+  "threat.detected",
+  "enumeration.detected",
+  "anomaly.detected",
+  "ip.blocked",
+  "ip.unblocked",
+  "ioc.added",
+  "ioc.removed",
+  "user.autoblocked",
 ] as const;
 
 export const getSecurityAuditForBackend = query({

@@ -61,6 +61,7 @@ import type * as reports from "../reports.js";
 import type * as s3Actions from "../s3Actions.js";
 import type * as s3Cleanup from "../s3Cleanup.js";
 import type * as s3Utils from "../s3Utils.js";
+import type * as security from "../security.js";
 import type * as securityAudit from "../securityAudit.js";
 import type * as scheduledCampaigns from "../scheduledCampaigns.js";
 import type * as sharedChats from "../sharedChats.js";
@@ -137,6 +138,7 @@ declare const fullApi: ApiFromModules<{
   s3Actions: typeof s3Actions;
   s3Cleanup: typeof s3Cleanup;
   s3Utils: typeof s3Utils;
+  security: typeof security;
   securityAudit: typeof securityAudit;
   scheduledCampaigns: typeof scheduledCampaigns;
   sharedChats: typeof sharedChats;
