@@ -22,6 +22,7 @@ import {
   StatusBadge,
   type Tone,
 } from "@/app/admin/_ui";
+import { PortalAccessCard } from "./PortalAccessCard";
 
 const STATUS: Record<string, { tone: Tone; label: string }> = {
   draft: { tone: "neutral", label: "Rascunho" },
@@ -95,162 +96,172 @@ export function EngagementBilling({
     billing && billing.margin >= 0 ? "success" : "destructive";
 
   return (
-    <Card className="gap-0 py-0">
-      <div className="border-b p-5">
-        <SectionHeader
-          icon={Receipt}
-          title="Faturamento"
-          description="Receita faturada × custo de IA do engajamento → margem. Preço é placeholder (scaffold)."
-        />
-      </div>
-      <CardContent className="space-y-4 p-5">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-          <StatCard
-            icon={DollarSign}
-            tone="success"
-            label="Faturado"
-            value={billing ? fmtMoney(billing.invoiced, cur) : "—"}
-            sub={
-              billing
-                ? `${fmtMoney(billing.paid, cur)} pago · ${fmtMoney(
-                    billing.sent,
-                    cur,
-                  )} enviado`
-                : undefined
-            }
-            loading={billing === undefined}
-          />
-          <StatCard
-            icon={Coins}
-            tone="primary"
-            label="Custo IA"
-            value={billing ? fmtMoney(billing.cost, "USD") : "—"}
-            sub={
-              billing?.costCapped
-                ? "limite de leitura atingido"
-                : "linhas com engagement_id"
-            }
-            loading={billing === undefined}
-          />
-          <StatCard
-            icon={Percent}
-            tone={marginTone}
-            label="Margem"
-            value={billing ? fmtMoney(billing.margin, cur) : "—"}
-            sub="faturado − custo (ignora câmbio)"
-            loading={billing === undefined}
+    <div className="space-y-5">
+      <Card className="gap-0 py-0">
+        <div className="border-b p-5">
+          <SectionHeader
+            icon={Receipt}
+            title="Faturamento"
+            description="Receita faturada × custo de IA do engajamento → margem. Preço é placeholder (scaffold)."
           />
         </div>
+        <CardContent className="space-y-4 p-5">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            <StatCard
+              icon={DollarSign}
+              tone="success"
+              label="Faturado"
+              value={billing ? fmtMoney(billing.invoiced, cur) : "—"}
+              sub={
+                billing
+                  ? `${fmtMoney(billing.paid, cur)} pago · ${fmtMoney(
+                      billing.sent,
+                      cur,
+                    )} enviado`
+                  : undefined
+              }
+              loading={billing === undefined}
+            />
+            <StatCard
+              icon={Coins}
+              tone="primary"
+              label="Custo IA"
+              value={billing ? fmtMoney(billing.cost, "USD") : "—"}
+              sub={
+                billing?.costCapped
+                  ? "limite de leitura atingido"
+                  : "linhas com engagement_id"
+              }
+              loading={billing === undefined}
+            />
+            <StatCard
+              icon={Percent}
+              tone={marginTone}
+              label="Margem"
+              value={billing ? fmtMoney(billing.margin, cur) : "—"}
+              sub="faturado − custo (ignora câmbio)"
+              loading={billing === undefined}
+            />
+          </div>
 
-        {/* Nova fatura */}
-        <div className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <label className="mb-1 block text-xs text-muted-foreground">
-              Descrição
-            </label>
-            <Input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="ex.: Pentest Web — parcela 1"
-            />
+          {/* Nova fatura */}
+          <div className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-end">
+            <div className="flex-1">
+              <label className="mb-1 block text-xs text-muted-foreground">
+                Descrição
+              </label>
+              <Input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="ex.: Pentest Web — parcela 1"
+              />
+            </div>
+            <div className="w-28">
+              <label className="mb-1 block text-xs text-muted-foreground">
+                Valor
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+            <div className="w-20">
+              <label className="mb-1 block text-xs text-muted-foreground">
+                Moeda
+              </label>
+              <Input
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value.toUpperCase())}
+                maxLength={4}
+              />
+            </div>
+            <Button onClick={() => void add()} disabled={busy}>
+              <Plus className="h-4 w-4" />
+              Adicionar
+            </Button>
           </div>
-          <div className="w-28">
-            <label className="mb-1 block text-xs text-muted-foreground">
-              Valor
-            </label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.00"
-            />
-          </div>
-          <div className="w-20">
-            <label className="mb-1 block text-xs text-muted-foreground">
-              Moeda
-            </label>
-            <Input
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value.toUpperCase())}
-              maxLength={4}
-            />
-          </div>
-          <Button onClick={() => void add()} disabled={busy}>
-            <Plus className="h-4 w-4" />
-            Adicionar
-          </Button>
-        </div>
 
-        {/* Lista */}
-        {invoices && invoices.length > 0 ? (
-          <div className="overflow-hidden rounded-lg border">
-            {invoices.map((inv) => {
-              const st = STATUS[inv.status] ?? STATUS.draft;
-              return (
-                <div
-                  key={inv._id}
-                  className="flex flex-wrap items-center gap-2 border-b px-4 py-2.5 text-sm last:border-0"
-                >
-                  <span className="min-w-0 flex-1 truncate font-medium">
-                    {inv.label}
-                  </span>
-                  <span className="tabular-nums">
-                    {fmtMoney(inv.amount_dollars, inv.currency)}
-                  </span>
-                  <StatusBadge tone={st.tone} label={st.label} />
-                  <div className="flex gap-1">
-                    {inv.status !== "sent" && inv.status !== "paid" && (
+          {/* Lista */}
+          {invoices && invoices.length > 0 ? (
+            <div className="overflow-hidden rounded-lg border">
+              {invoices.map((inv) => {
+                const st = STATUS[inv.status] ?? STATUS.draft;
+                return (
+                  <div
+                    key={inv._id}
+                    className="flex flex-wrap items-center gap-2 border-b px-4 py-2.5 text-sm last:border-0"
+                  >
+                    <span className="min-w-0 flex-1 truncate font-medium">
+                      {inv.label}
+                    </span>
+                    <span className="tabular-nums">
+                      {fmtMoney(inv.amount_dollars, inv.currency)}
+                    </span>
+                    <StatusBadge tone={st.tone} label={st.label} />
+                    <div className="flex gap-1">
+                      {inv.status !== "sent" && inv.status !== "paid" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            void setStatus({
+                              invoiceId: inv._id,
+                              status: "sent",
+                            })
+                          }
+                        >
+                          Enviar
+                        </Button>
+                      )}
+                      {inv.status !== "paid" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            void setStatus({
+                              invoiceId: inv._id,
+                              status: "paid",
+                            })
+                          }
+                        >
+                          Pago
+                        </Button>
+                      )}
                       <Button
                         size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          void setStatus({
-                            invoiceId: inv._id,
-                            status: "sent",
-                          })
-                        }
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          if (
+                            window.confirm(`Excluir a fatura "${inv.label}"?`)
+                          )
+                            void removeInvoice({ invoiceId: inv._id });
+                        }}
                       >
-                        Enviar
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
-                    )}
-                    {inv.status !== "paid" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          void setStatus({
-                            invoiceId: inv._id,
-                            status: "paid",
-                          })
-                        }
-                      >
-                        Pago
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => {
-                        if (window.confirm(`Excluir a fatura "${inv.label}"?`))
-                          void removeInvoice({ invoiceId: inv._id });
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Nenhuma fatura ainda. Crie a primeira acima.
-          </p>
-        )}
-      </CardContent>
-    </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma fatura ainda. Crie a primeira acima.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+      {billing?.clientId && (
+        <PortalAccessCard
+          clientId={billing.clientId}
+          clientName={billing.clientName}
+        />
+      )}
+    </div>
   );
 }

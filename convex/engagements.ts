@@ -458,6 +458,7 @@ export const getEngagementBilling = query({
     if (!identity) return null;
     const eng = await ctx.db.get(args.engagementId);
     if (!eng || eng.user_id !== identity.subject) return null;
+    const clientDoc = await ctx.db.get(eng.client_id);
 
     const invoices = await ctx.db
       .query("engagement_invoices")
@@ -492,6 +493,9 @@ export const getEngagementBilling = query({
 
     const invoiced = paid + sent;
     return {
+      clientId: eng.client_id,
+      clientName: clientDoc?.name ?? "(cliente removido)",
+      portalEnabled: clientDoc?.portal_enabled === true,
       currency,
       paid,
       sent,

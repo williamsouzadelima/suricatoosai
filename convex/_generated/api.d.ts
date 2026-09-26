@@ -54,6 +54,7 @@ import type * as rateLimitStatus from "../rateLimitStatus.js";
 import type * as redisPubsub from "../redisPubsub.js";
 import type * as referrals from "../referrals.js";
 import type * as reportActions from "../reportActions.js";
+import type * as portal from "../portal.js";
 import type * as presence from "../presence.js";
 import type * as reports from "../reports.js";
 import type * as s3Actions from "../s3Actions.js";
@@ -128,6 +129,7 @@ declare const fullApi: ApiFromModules<{
   redisPubsub: typeof redisPubsub;
   referrals: typeof referrals;
   reportActions: typeof reportActions;
+  portal: typeof portal;
   presence: typeof presence;
   reports: typeof reports;
   s3Actions: typeof s3Actions;
