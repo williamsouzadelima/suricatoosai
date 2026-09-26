@@ -1,6 +1,7 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { validateServiceKey } from "./lib/utils";
+import type { Id } from "./_generated/dataModel";
 
 /**
  * Per-user activity aggregation for the /admin panel (service-key gated).
@@ -463,6 +464,328 @@ export const getTaskCostDetail = query({
       firstActivityAt,
       lastActivityAt: taskLastAt,
       capped,
+    };
+  },
+});
+
+/**
+ * Análise de custos por período (e opcionalmente por cliente) para o /admin.
+ * Fonte: usage_logs (uma linha por request). Custo REAL =
+ * provider_billed_cost_dollars (créditos do OpenRouter) com fallback para
+ * cost_dollars; REGISTRADO = cost_dollars. Atribuição a cliente:
+ * usage_logs.chat_id → chats.by_chat_id → engagement_id →
+ * engagements.client_id → clients.name. Chats sem engajamento caem em
+ * "Não atribuído". A janela é lida do índice de sistema by_creation_time (mais
+ * novas primeiro); `capped` sinaliza quando o teto foi atingido (os totais
+ * viram um limite inferior sobre as linhas mais recentes).
+ */
+const ANALYTICS_ROW_CAP = 8000;
+const MAX_CHAT_LOOKUPS = 1500;
+const TOP_MODELS = 30;
+const TOP_USERS = 50;
+const TOP_CLIENTS = 100;
+const CLIENTS_LIST_CAP = 500;
+
+const PERIOD_CFG: Record<string, { ms: number; bucketMs: number }> = {
+  "1h": { ms: 60 * 60 * 1000, bucketMs: 5 * 60 * 1000 },
+  "24h": { ms: 24 * 60 * 60 * 1000, bucketMs: 60 * 60 * 1000 },
+  "7d": { ms: 7 * 24 * 60 * 60 * 1000, bucketMs: 24 * 60 * 60 * 1000 },
+  "30d": { ms: 30 * 24 * 60 * 60 * 1000, bucketMs: 24 * 60 * 60 * 1000 },
+  "90d": { ms: 90 * 24 * 60 * 60 * 1000, bucketMs: 7 * 24 * 60 * 60 * 1000 },
+  "180d": { ms: 180 * 24 * 60 * 60 * 1000, bucketMs: 7 * 24 * 60 * 60 * 1000 },
+  "365d": { ms: 365 * 24 * 60 * 60 * 1000, bucketMs: 30 * 24 * 60 * 60 * 1000 },
+};
+
+export const getCostAnalyticsForBackend = query({
+  args: {
+    serviceKey: v.string(),
+    period: v.union(
+      v.literal("1h"),
+      v.literal("24h"),
+      v.literal("7d"),
+      v.literal("30d"),
+      v.literal("90d"),
+      v.literal("180d"),
+      v.literal("365d"),
+    ),
+    clientId: v.optional(v.id("clients")),
+    nowMs: v.number(),
+  },
+  returns: v.object({
+    period: v.string(),
+    from: v.number(),
+    to: v.number(),
+    bucketMs: v.number(),
+    totals: v.object({
+      realCost: v.number(),
+      registeredCost: v.number(),
+      requests: v.number(),
+      inputTokens: v.number(),
+      outputTokens: v.number(),
+      realRows: v.number(),
+    }),
+    series: v.array(
+      v.object({
+        t: v.number(),
+        realCost: v.number(),
+        registeredCost: v.number(),
+        requests: v.number(),
+      }),
+    ),
+    byClient: v.array(
+      v.object({
+        clientId: v.union(v.id("clients"), v.null()),
+        name: v.string(),
+        realCost: v.number(),
+        registeredCost: v.number(),
+        requests: v.number(),
+      }),
+    ),
+    byModel: v.array(
+      v.object({
+        model: v.string(),
+        realCost: v.number(),
+        registeredCost: v.number(),
+        requests: v.number(),
+        inputTokens: v.number(),
+        outputTokens: v.number(),
+      }),
+    ),
+    byEndpoint: v.array(
+      v.object({
+        endpoint: v.string(),
+        realCost: v.number(),
+        requests: v.number(),
+      }),
+    ),
+    byUser: v.array(
+      v.object({
+        userId: v.string(),
+        realCost: v.number(),
+        requests: v.number(),
+        lastActivityAt: v.union(v.number(), v.null()),
+      }),
+    ),
+    clients: v.array(
+      v.object({
+        id: v.id("clients"),
+        name: v.string(),
+        status: v.union(v.literal("active"), v.literal("archived")),
+      }),
+    ),
+    capped: v.boolean(),
+    scannedRows: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const cfg = PERIOD_CFG[args.period];
+    const to = args.nowMs;
+    const from = to - cfg.ms;
+    const bucketMs = cfg.bucketMs;
+    const bucketCount = Math.max(1, Math.ceil(cfg.ms / bucketMs));
+
+    // Janela de usage_logs (mais novas primeiro), limitada pelo teto.
+    const rows = await ctx.db
+      .query("usage_logs")
+      .withIndex("by_creation_time", (q) => q.gte("_creationTime", from))
+      .order("desc")
+      .take(ANALYTICS_ROW_CAP);
+    const capped = rows.length === ANALYTICS_ROW_CAP;
+
+    // Resolve chat_id → cliente (memo; teto de lookups distintos).
+    const UNASSIGNED: { id: Id<"clients"> | null; name: string } = {
+      id: null,
+      name: "Não atribuído",
+    };
+    const chatCache = new Map<
+      string,
+      { id: Id<"clients"> | null; name: string }
+    >();
+    const clientNameCache = new Map<string, string>();
+    let lookups = 0;
+    const resolveClientForChat = async (
+      chatId: string | undefined,
+    ): Promise<{ id: Id<"clients"> | null; name: string }> => {
+      if (!chatId) return UNASSIGNED;
+      const cached = chatCache.get(chatId);
+      if (cached) return cached;
+      if (lookups >= MAX_CHAT_LOOKUPS) return UNASSIGNED;
+      lookups++;
+      const chat = await ctx.db
+        .query("chats")
+        .withIndex("by_chat_id", (q) => q.eq("id", chatId))
+        .first();
+      let out: { id: Id<"clients"> | null; name: string } = UNASSIGNED;
+      if (chat?.engagement_id) {
+        const eng = await ctx.db.get(chat.engagement_id);
+        if (eng) {
+          const cid = eng.client_id;
+          let name = clientNameCache.get(cid);
+          if (name === undefined) {
+            const client = await ctx.db.get(cid);
+            name = client?.name ?? "Cliente removido";
+            clientNameCache.set(cid, name);
+          }
+          out = { id: cid, name };
+        }
+      }
+      chatCache.set(chatId, out);
+      return out;
+    };
+
+    const totals = {
+      realCost: 0,
+      registeredCost: 0,
+      requests: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      realRows: 0,
+    };
+    const series = Array.from({ length: bucketCount }, (_, i) => ({
+      t: from + i * bucketMs,
+      realCost: 0,
+      registeredCost: 0,
+      requests: 0,
+    }));
+    const byClient = new Map<
+      string,
+      {
+        clientId: Id<"clients"> | null;
+        name: string;
+        realCost: number;
+        registeredCost: number;
+        requests: number;
+      }
+    >();
+    const byModel = new Map<
+      string,
+      {
+        model: string;
+        realCost: number;
+        registeredCost: number;
+        requests: number;
+        inputTokens: number;
+        outputTokens: number;
+      }
+    >();
+    const byEndpoint = new Map<
+      string,
+      { endpoint: string; realCost: number; requests: number }
+    >();
+    const byUser = new Map<
+      string,
+      {
+        userId: string;
+        realCost: number;
+        requests: number;
+        lastActivityAt: number | null;
+      }
+    >();
+
+    for (const r of rows) {
+      if (r._creationTime > to) continue;
+      const client = await resolveClientForChat(r.chat_id);
+      if (args.clientId && client.id !== args.clientId) continue;
+
+      const hasReal = typeof r.provider_billed_cost_dollars === "number";
+      const real = hasReal
+        ? (r.provider_billed_cost_dollars as number)
+        : r.cost_dollars;
+      const reg = r.cost_dollars;
+      const inTok = r.input_tokens;
+      const outTok = r.output_tokens;
+
+      totals.realCost += real;
+      totals.registeredCost += reg;
+      totals.requests += 1;
+      totals.inputTokens += inTok;
+      totals.outputTokens += outTok;
+      if (hasReal) totals.realRows += 1;
+
+      let bi = Math.floor((r._creationTime - from) / bucketMs);
+      if (bi < 0) bi = 0;
+      if (bi >= bucketCount) bi = bucketCount - 1;
+      const s = series[bi];
+      s.realCost += real;
+      s.registeredCost += reg;
+      s.requests += 1;
+
+      const ckey = client.id ?? "__unassigned__";
+      const cAgg = byClient.get(ckey) ?? {
+        clientId: client.id,
+        name: client.name,
+        realCost: 0,
+        registeredCost: 0,
+        requests: 0,
+      };
+      cAgg.realCost += real;
+      cAgg.registeredCost += reg;
+      cAgg.requests += 1;
+      byClient.set(ckey, cAgg);
+
+      const mAgg = byModel.get(r.model) ?? {
+        model: r.model,
+        realCost: 0,
+        registeredCost: 0,
+        requests: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+      };
+      mAgg.realCost += real;
+      mAgg.registeredCost += reg;
+      mAgg.requests += 1;
+      mAgg.inputTokens += inTok;
+      mAgg.outputTokens += outTok;
+      byModel.set(r.model, mAgg);
+
+      const ekey = r.endpoint ?? "—";
+      const eAgg = byEndpoint.get(ekey) ?? {
+        endpoint: ekey,
+        realCost: 0,
+        requests: 0,
+      };
+      eAgg.realCost += real;
+      eAgg.requests += 1;
+      byEndpoint.set(ekey, eAgg);
+
+      const uAgg = byUser.get(r.user_id) ?? {
+        userId: r.user_id,
+        realCost: 0,
+        requests: 0,
+        lastActivityAt: null as number | null,
+      };
+      uAgg.realCost += real;
+      uAgg.requests += 1;
+      if (uAgg.lastActivityAt === null || r._creationTime > uAgg.lastActivityAt)
+        uAgg.lastActivityAt = r._creationTime;
+      byUser.set(r.user_id, uAgg);
+    }
+
+    // Lista de clientes para o seletor do painel.
+    const clientDocs = await ctx.db.query("clients").take(CLIENTS_LIST_CAP);
+    const clients = clientDocs
+      .map((c) => ({ id: c._id, name: c.name, status: c.status }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const sortReal = (a: { realCost: number }, b: { realCost: number }) =>
+      b.realCost - a.realCost;
+
+    return {
+      period: args.period,
+      from,
+      to,
+      bucketMs,
+      totals,
+      series,
+      byClient: Array.from(byClient.values())
+        .sort(sortReal)
+        .slice(0, TOP_CLIENTS),
+      byModel: Array.from(byModel.values()).sort(sortReal).slice(0, TOP_MODELS),
+      byEndpoint: Array.from(byEndpoint.values()).sort(sortReal),
+      byUser: Array.from(byUser.values()).sort(sortReal).slice(0, TOP_USERS),
+      clients,
+      capped,
+      scannedRows: rows.length,
     };
   },
 });

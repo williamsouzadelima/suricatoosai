@@ -275,15 +275,12 @@ export function MiniBarChart({
 
   return (
     <div>
-      <div className="flex h-32 items-end gap-1.5 border-b border-border pb-px">
+      <div className="flex h-32 items-stretch gap-1.5 border-b border-border pb-px">
         {data.map((d, i) => (
-          <div
-            key={i}
-            className="group flex flex-1 flex-col items-center justify-end"
-          >
-            <div className="relative flex h-full w-full max-w-[28px] items-end justify-center rounded-sm bg-muted/40">
+          <div key={i} className="group flex flex-1 justify-center">
+            <div className="relative h-full w-full max-w-[28px] rounded-sm bg-muted/40">
               <div
-                className="w-full rounded-sm bg-gradient-to-t from-primary to-chart-1 transition-opacity"
+                className="absolute bottom-0 left-0 w-full rounded-sm bg-gradient-to-t from-primary to-chart-1"
                 style={{
                   height:
                     d.count > 0
@@ -292,7 +289,7 @@ export function MiniBarChart({
                 }}
               />
               {d.count > 0 && (
-                <span className="pointer-events-none absolute -top-6 rounded-md bg-popover px-1.5 py-0.5 text-xs font-medium tabular-nums text-popover-foreground opacity-0 shadow transition-opacity group-hover:opacity-100">
+                <span className="pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 rounded-md bg-popover px-1.5 py-0.5 text-xs font-medium tabular-nums text-popover-foreground opacity-0 shadow transition-opacity group-hover:opacity-100">
                   {d.count}
                 </span>
               )}

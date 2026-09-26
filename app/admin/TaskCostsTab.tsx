@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { CostAnalyticsPanel } from "./CostAnalyticsPanel";
 import {
   SectionHeader,
   StatusBadge,
@@ -253,382 +254,393 @@ export function TaskCostsTab() {
   }, [filtered]);
 
   return (
-    <Card className="gap-0 py-0">
-      <div className="flex flex-col gap-3 border-b p-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <SectionHeader title="Custos por task" count={items.length} />
-          <p className="mt-1 text-xs text-muted-foreground">
-            Custo <strong>real</strong> = créditos deduzidos do OpenRouter
-            (linhas novas). <strong>Registrado</strong> = cost_dollars
-            histórico, pode subcontar. Infra = sandbox/estimativa. O traço{" "}
-            <strong>—</strong> = execução anterior a 09/09/2026 (sem custo real
-            capturado).
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="relative sm:w-72">
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar task/usuário/modelo…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="pl-8"
-            />
+    <div className="space-y-4">
+      <CostAnalyticsPanel />
+      <Card className="gap-0 py-0">
+        <div className="flex flex-col gap-3 border-b p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <SectionHeader title="Custos por task" count={items.length} />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Custo <strong>real</strong> = créditos deduzidos do OpenRouter
+              (linhas novas). <strong>Registrado</strong> = cost_dollars
+              histórico, pode subcontar. Infra = sandbox/estimativa. O traço{" "}
+              <strong>—</strong> = execução anterior a 09/09/2026 (sem custo
+              real capturado).
+            </p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => void load()}>
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={exportCsv}
-            disabled={filtered.length === 0}
-            title="Exportar CSV"
-          >
-            <Download className="h-4 w-4" />
-            CSV
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="relative sm:w-72">
+              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar task/usuário/modelo…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            <Button variant="outline" size="sm" onClick={() => void load()}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportCsv}
+              disabled={filtered.length === 0}
+              title="Exportar CSV"
+            >
+              <Download className="h-4 w-4" />
+              CSV
+            </Button>
+          </div>
         </div>
-      </div>
 
-      {/* Totais da seleção */}
-      <div className="flex flex-wrap gap-4 border-b px-4 py-3 text-sm">
-        <div>
-          <span className="text-muted-foreground">Custo real: </span>
-          <span className="font-semibold text-success">
-            {money(totals.real)}
-          </span>
-        </div>
-        <div>
-          <span className="text-muted-foreground">Registrado: </span>
-          <span className="font-semibold">{money(totals.registered)}</span>
-        </div>
-        <div>
-          <span className="text-muted-foreground">Infra: </span>
-          <span className="font-semibold">{money(totals.infra)}</span>
-        </div>
-        {anyCapped && (
-          <div className="flex items-center gap-1 text-warning">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            <span className="text-xs">
-              Alguns totais são parciais (limite de 3000 linhas/usuário).
+        {/* Totais da seleção */}
+        <div className="flex flex-wrap gap-4 border-b px-4 py-3 text-sm">
+          <div>
+            <span className="text-muted-foreground">Custo real: </span>
+            <span className="font-semibold text-success">
+              {money(totals.real)}
             </span>
           </div>
-        )}
-      </div>
-
-      {loading ? (
-        <div className="p-8 text-center text-sm text-muted-foreground">
-          Carregando…
+          <div>
+            <span className="text-muted-foreground">Registrado: </span>
+            <span className="font-semibold">{money(totals.registered)}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Infra: </span>
+            <span className="font-semibold">{money(totals.infra)}</span>
+          </div>
+          {anyCapped && (
+            <div className="flex items-center gap-1 text-warning">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              <span className="text-xs">
+                Alguns totais são parciais (limite de 3000 linhas/usuário).
+              </span>
+            </div>
+          )}
         </div>
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={Search}
-          title={
-            items.length === 0
-              ? "Nenhum uso registrado ainda."
-              : "Nenhum resultado para a busca."
-          }
-        />
-      ) : (
-        <div className="min-w-0 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                <th className="px-4 py-3 font-medium">Task</th>
-                <th className="px-4 py-3 font-medium">Usuário</th>
-                <th className="px-4 py-3 font-medium">Modelos</th>
-                <th className="px-4 py-3 text-right font-medium">
-                  Tokens (in/out)
-                </th>
-                <th className="px-4 py-3 text-right font-medium">Custo real</th>
-                <th className="px-4 py-3 text-right font-medium">Registrado</th>
-                <th className="px-4 py-3 text-right font-medium">Infra</th>
-                <th className="px-4 py-3 font-medium">Fonte</th>
-                <th className="px-4 py-3 text-right font-medium">Duração</th>
-                <th className="px-4 py-3 font-medium">Última ativ.</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((t) => (
-                <tr
-                  key={`${t.userId}:${t.chatId ?? "none"}`}
-                  onClick={() => void openDetail(t.chatId)}
-                  className={`border-b last:border-0 ${
-                    t.chatId ? "cursor-pointer hover:bg-muted/40" : "opacity-70"
-                  }`}
-                >
-                  <td className="max-w-[15rem] px-4 py-2.5">
-                    <div className="flex items-center gap-1.5">
-                      {t.capped && (
-                        <AlertTriangle
-                          className="h-3.5 w-3.5 shrink-0 text-warning"
-                          aria-label="Total parcial"
-                        />
-                      )}
-                      <span className="truncate font-medium">{t.title}</span>
-                    </div>
-                  </td>
-                  <td className="max-w-[14rem] truncate px-4 py-2.5 text-muted-foreground">
-                    {t.userEmail}
-                  </td>
-                  <td className="max-w-[9rem] truncate px-4 py-2.5 text-xs text-muted-foreground">
-                    {t.models.join(", ") || "—"}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-right text-muted-foreground">
-                    {fmtNum(t.inputTokens)} / {fmtNum(t.outputTokens)}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-right font-semibold text-success">
-                    <RealCost
-                      has={t.hasRealCost}
-                      value={t.providerBilledCostDollars}
-                    />
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-right">
-                    {money(t.costDollars)}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-right text-muted-foreground">
-                    {money(t.nonModelCostDollars)}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <StatusBadge
-                      tone={sourceTone(t.costSource)}
-                      label={t.costSource}
-                    />
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-muted-foreground">
-                    {t.requests > 1 &&
-                    t.firstActivityAt != null &&
-                    t.lastActivityAt != null ? (
-                      <span
-                        title={`Tempo entre o 1º e o último request cobrado${
-                          t.capped ? " (parcial: total limitado)" : ""
-                        }`}
-                      >
-                        {t.capped ? "≥ " : ""}
-                        {fmtDuration(t.lastActivityAt - t.firstActivityAt)}
-                      </span>
-                    ) : (
-                      <span
-                        className="cursor-help"
-                        title="Duração não medida: request único (a latência por request não é registrada)."
-                      >
-                        n/d
-                      </span>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">
-                    {formatDateTime(t.lastActivityAt)}
-                  </td>
+
+        {loading ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">
+            Carregando…
+          </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={Search}
+            title={
+              items.length === 0
+                ? "Nenhum uso registrado ainda."
+                : "Nenhum resultado para a busca."
+            }
+          />
+        ) : (
+          <div className="min-w-0 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <th className="px-4 py-3 font-medium">Task</th>
+                  <th className="px-4 py-3 font-medium">Usuário</th>
+                  <th className="px-4 py-3 font-medium">Modelos</th>
+                  <th className="px-4 py-3 text-right font-medium">
+                    Tokens (in/out)
+                  </th>
+                  <th className="px-4 py-3 text-right font-medium">
+                    Custo real
+                  </th>
+                  <th className="px-4 py-3 text-right font-medium">
+                    Registrado
+                  </th>
+                  <th className="px-4 py-3 text-right font-medium">Infra</th>
+                  <th className="px-4 py-3 font-medium">Fonte</th>
+                  <th className="px-4 py-3 text-right font-medium">Duração</th>
+                  <th className="px-4 py-3 font-medium">Última ativ.</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {filtered.map((t) => (
+                  <tr
+                    key={`${t.userId}:${t.chatId ?? "none"}`}
+                    onClick={() => void openDetail(t.chatId)}
+                    className={`border-b last:border-0 ${
+                      t.chatId
+                        ? "cursor-pointer hover:bg-muted/40"
+                        : "opacity-70"
+                    }`}
+                  >
+                    <td className="max-w-[15rem] px-4 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        {t.capped && (
+                          <AlertTriangle
+                            className="h-3.5 w-3.5 shrink-0 text-warning"
+                            aria-label="Total parcial"
+                          />
+                        )}
+                        <span className="truncate font-medium">{t.title}</span>
+                      </div>
+                    </td>
+                    <td className="max-w-[14rem] truncate px-4 py-2.5 text-muted-foreground">
+                      {t.userEmail}
+                    </td>
+                    <td className="max-w-[9rem] truncate px-4 py-2.5 text-xs text-muted-foreground">
+                      {t.models.join(", ") || "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right text-muted-foreground">
+                      {fmtNum(t.inputTokens)} / {fmtNum(t.outputTokens)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right font-semibold text-success">
+                      <RealCost
+                        has={t.hasRealCost}
+                        value={t.providerBilledCostDollars}
+                      />
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right">
+                      {money(t.costDollars)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right text-muted-foreground">
+                      {money(t.nonModelCostDollars)}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <StatusBadge
+                        tone={sourceTone(t.costSource)}
+                        label={t.costSource}
+                      />
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-muted-foreground">
+                      {t.requests > 1 &&
+                      t.firstActivityAt != null &&
+                      t.lastActivityAt != null ? (
+                        <span
+                          title={`Tempo entre o 1º e o último request cobrado${
+                            t.capped ? " (parcial: total limitado)" : ""
+                          }`}
+                        >
+                          {t.capped ? "≥ " : ""}
+                          {fmtDuration(t.lastActivityAt - t.firstActivityAt)}
+                        </span>
+                      ) : (
+                        <span
+                          className="cursor-help"
+                          title="Duração não medida: request único (a latência por request não é registrada)."
+                        >
+                          n/d
+                        </span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">
+                      {formatDateTime(t.lastActivityAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      {(detail || detailLoading) && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => {
-            setDetail(null);
-            setDetailLoading(false);
-          }}
-        >
+        {(detail || detailLoading) && (
           <div
-            className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-xl border bg-card p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={() => {
+              setDetail(null);
+              setDetailLoading(false);
+            }}
           >
-            {detailLoading || !detail ? (
-              <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Carregando detalhe…
-              </div>
-            ) : (
-              <>
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h3 className="text-lg font-semibold">{detail.title}</h3>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {detail.userEmail ?? detail.userId ?? "—"} ·{" "}
-                      {detail.chatId}
-                    </p>
-                    {detail.firstActivityAt != null &&
-                      detail.lastActivityAt != null && (
-                        <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                          <Clock className="h-3.5 w-3.5 shrink-0" />
-                          {detail.total.requests > 1 ? (
-                            <>
+            <div
+              className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-xl border bg-card p-6 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {detailLoading || !detail ? (
+                <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Carregando detalhe…
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-semibold">{detail.title}</h3>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {detail.userEmail ?? detail.userId ?? "—"} ·{" "}
+                        {detail.chatId}
+                      </p>
+                      {detail.firstActivityAt != null &&
+                        detail.lastActivityAt != null && (
+                          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                            <Clock className="h-3.5 w-3.5 shrink-0" />
+                            {detail.total.requests > 1 ? (
+                              <>
+                                <span
+                                  className="font-medium text-foreground"
+                                  title="Duração total da task: do 1º ao último request cobrado."
+                                >
+                                  {fmtDuration(
+                                    detail.lastActivityAt -
+                                      detail.firstActivityAt,
+                                  )}
+                                </span>
+                                <span>
+                                  · {formatDateTime(detail.firstActivityAt)} →{" "}
+                                  {formatDateTime(detail.lastActivityAt)}
+                                </span>
+                              </>
+                            ) : (
                               <span
-                                className="font-medium text-foreground"
-                                title="Duração total da task: do 1º ao último request cobrado."
+                                className="cursor-help"
+                                title="Duração não medida: request único (a latência por request não é registrada)."
                               >
-                                {fmtDuration(
-                                  detail.lastActivityAt -
-                                    detail.firstActivityAt,
-                                )}
-                              </span>
-                              <span>
-                                · {formatDateTime(detail.firstActivityAt)} →{" "}
+                                Duração n/d ·{" "}
                                 {formatDateTime(detail.lastActivityAt)}
                               </span>
-                            </>
-                          ) : (
-                            <span
-                              className="cursor-help"
-                              title="Duração não medida: request único (a latência por request não é registrada)."
-                            >
-                              Duração n/d ·{" "}
-                              {formatDateTime(detail.lastActivityAt)}
-                            </span>
-                          )}
-                        </p>
-                      )}
+                            )}
+                          </p>
+                        )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDetail(null)}
+                      className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+                      aria-label="Fechar"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setDetail(null)}
-                    className="rounded-md p-1 text-muted-foreground hover:bg-muted"
-                    aria-label="Fechar"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <StatCard
-                    label="Custo real"
-                    icon={DollarSign}
-                    tone="success"
-                    value={
-                      detail.total.hasRealCost ? (
-                        money(detail.total.providerBilledCostDollars)
-                      ) : (
-                        <span className="cursor-help" title={REAL_COST_HINT}>
-                          —
-                        </span>
-                      )
-                    }
-                  />
-                  <StatCard
-                    label="Registrado"
-                    icon={Receipt}
-                    value={money(detail.total.costDollars)}
-                  />
-                  <StatCard
-                    label="Infra"
-                    icon={Server}
-                    value={money(detail.total.nonModelCostDollars)}
-                  />
-                  <StatCard
-                    label="Requisições"
-                    icon={Hash}
-                    value={String(detail.total.requests)}
-                  />
-                </div>
-
-                {detail.capped && (
-                  <div className="mt-3">
-                    <Callout tone="warning" icon={AlertTriangle}>
-                      Detalhe parcial (limite de {2000} linhas).
-                    </Callout>
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <StatCard
+                      label="Custo real"
+                      icon={DollarSign}
+                      tone="success"
+                      value={
+                        detail.total.hasRealCost ? (
+                          money(detail.total.providerBilledCostDollars)
+                        ) : (
+                          <span className="cursor-help" title={REAL_COST_HINT}>
+                            —
+                          </span>
+                        )
+                      }
+                    />
+                    <StatCard
+                      label="Registrado"
+                      icon={Receipt}
+                      value={money(detail.total.costDollars)}
+                    />
+                    <StatCard
+                      label="Infra"
+                      icon={Server}
+                      value={money(detail.total.nonModelCostDollars)}
+                    />
+                    <StatCard
+                      label="Requisições"
+                      icon={Hash}
+                      value={String(detail.total.requests)}
+                    />
                   </div>
-                )}
 
-                <h4 className="mt-5 mb-2 text-sm font-semibold">Por modelo</h4>
-                <div className="min-w-0 overflow-x-auto rounded-lg border">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                        <th className="px-3 py-2 font-medium">Modelo</th>
-                        <th className="px-3 py-2 text-right font-medium">
-                          Req
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium">
-                          In/Out
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium">
-                          Real
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium">
-                          Registrado
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detail.byModel.map((m) => (
-                        <tr key={m.model} className="border-b last:border-0">
-                          <td className="px-3 py-2">{m.model}</td>
-                          <td className="px-3 py-2 text-right text-muted-foreground">
-                            {m.requests}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2 text-right text-muted-foreground">
-                            {fmtNum(m.inputTokens)} / {fmtNum(m.outputTokens)}
-                          </td>
-                          <td className="px-3 py-2 text-right font-medium text-success">
-                            <RealCost
-                              has={m.hasRealCost}
-                              value={m.providerBilledCostDollars}
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            {money(m.costDollars)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                  {detail.capped && (
+                    <div className="mt-3">
+                      <Callout tone="warning" icon={AlertTriangle}>
+                        Detalhe parcial (limite de {2000} linhas).
+                      </Callout>
+                    </div>
+                  )}
 
-                <h4 className="mt-5 mb-2 text-sm font-semibold">
-                  Por run ({detail.byRun.length})
-                </h4>
-                <div className="min-w-0 overflow-x-auto rounded-lg border">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                        <th className="px-3 py-2 font-medium">Quando</th>
-                        <th className="px-3 py-2 font-medium">Modelo</th>
-                        <th className="px-3 py-2 text-right font-medium">
-                          In/Out
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium">
-                          Real
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium">
-                          Registrado
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detail.byRun.map((r) => (
-                        <tr key={r.runId} className="border-b last:border-0">
-                          <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                            {formatDateTime(r.at)}
-                          </td>
-                          <td className="px-3 py-2 text-xs">{r.model}</td>
-                          <td className="whitespace-nowrap px-3 py-2 text-right text-muted-foreground">
-                            {fmtNum(r.inputTokens)} / {fmtNum(r.outputTokens)}
-                          </td>
-                          <td className="px-3 py-2 text-right font-medium text-success">
-                            <RealCost
-                              has={r.hasRealCost}
-                              value={r.providerBilledCostDollars}
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            {money(r.costDollars)}
-                          </td>
+                  <h4 className="mt-5 mb-2 text-sm font-semibold">
+                    Por modelo
+                  </h4>
+                  <div className="min-w-0 overflow-x-auto rounded-lg border">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                          <th className="px-3 py-2 font-medium">Modelo</th>
+                          <th className="px-3 py-2 text-right font-medium">
+                            Req
+                          </th>
+                          <th className="px-3 py-2 text-right font-medium">
+                            In/Out
+                          </th>
+                          <th className="px-3 py-2 text-right font-medium">
+                            Real
+                          </th>
+                          <th className="px-3 py-2 text-right font-medium">
+                            Registrado
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
+                      </thead>
+                      <tbody>
+                        {detail.byModel.map((m) => (
+                          <tr key={m.model} className="border-b last:border-0">
+                            <td className="px-3 py-2">{m.model}</td>
+                            <td className="px-3 py-2 text-right text-muted-foreground">
+                              {m.requests}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right text-muted-foreground">
+                              {fmtNum(m.inputTokens)} / {fmtNum(m.outputTokens)}
+                            </td>
+                            <td className="px-3 py-2 text-right font-medium text-success">
+                              <RealCost
+                                has={m.hasRealCost}
+                                value={m.providerBilledCostDollars}
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              {money(m.costDollars)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <h4 className="mt-5 mb-2 text-sm font-semibold">
+                    Por run ({detail.byRun.length})
+                  </h4>
+                  <div className="min-w-0 overflow-x-auto rounded-lg border">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                          <th className="px-3 py-2 font-medium">Quando</th>
+                          <th className="px-3 py-2 font-medium">Modelo</th>
+                          <th className="px-3 py-2 text-right font-medium">
+                            In/Out
+                          </th>
+                          <th className="px-3 py-2 text-right font-medium">
+                            Real
+                          </th>
+                          <th className="px-3 py-2 text-right font-medium">
+                            Registrado
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detail.byRun.map((r) => (
+                          <tr key={r.runId} className="border-b last:border-0">
+                            <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
+                              {formatDateTime(r.at)}
+                            </td>
+                            <td className="px-3 py-2 text-xs">{r.model}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right text-muted-foreground">
+                              {fmtNum(r.inputTokens)} / {fmtNum(r.outputTokens)}
+                            </td>
+                            <td className="px-3 py-2 text-right font-medium text-success">
+                              <RealCost
+                                has={r.hasRealCost}
+                                value={r.providerBilledCostDollars}
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              {money(r.costDollars)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-    </Card>
+        )}
+      </Card>
+    </div>
   );
 }
