@@ -349,9 +349,9 @@ export function AdminPanel({
       }
     >
       <div className="flex flex-col gap-5">
-        {/* Abas horizontais */}
-        <div className="-mx-1 overflow-x-auto px-1 pb-1">
-          <div className="flex w-fit gap-1 rounded-xl border bg-card p-1.5 shadow-[var(--shadow-soft)]">
+        {/* Abas horizontais (quebram em linha em vez de rolar) */}
+        <div className="-mx-1 px-1 pb-1">
+          <div className="flex flex-wrap gap-1 rounded-xl border bg-card p-1.5 shadow-[var(--shadow-soft)]">
             {ALL_NAV.map((item) => {
               const Icon = item.icon;
               const active = tab === item.id;
