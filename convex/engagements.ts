@@ -323,3 +323,185 @@ export const resolveEngagementForChatBackend = mutation({
     return { engagementId, clientId };
   },
 });
+
+// ── Scaffold de monetização: faturas por engajamento (identity + posse) ──────
+// Sem preço definido — amount_dollars é placeholder. Habilita margem por
+// engajamento (receita faturada − custo de IA do engajamento). Ver
+// [[suricatoosai-presenca-e-roadmap]].
+
+const INVOICE_COST_CAP = 20000;
+
+export const createInvoice = mutation({
+  args: {
+    engagementId: v.id("engagements"),
+    label: v.string(),
+    amountDollars: v.number(),
+    currency: v.optional(v.string()),
+    dueAt: v.optional(v.number()),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({ code: "UNAUTHORIZED", message: "Unauthorized" });
+    }
+    const eng = await ctx.db.get(args.engagementId);
+    if (!eng || eng.user_id !== identity.subject) {
+      throw new ConvexError({
+        code: "ACCESS_DENIED",
+        message: "Engajamento inexistente ou sem acesso",
+      });
+    }
+    if (!args.label.trim()) {
+      throw new ConvexError({ code: "INVALID", message: "Descrição vazia" });
+    }
+    const amount = Number.isFinite(args.amountDollars)
+      ? Math.max(0, args.amountDollars)
+      : 0;
+    const now = Date.now();
+    return await ctx.db.insert("engagement_invoices", {
+      user_id: identity.subject,
+      organization_id: eng.organization_id,
+      client_id: eng.client_id,
+      engagement_id: args.engagementId,
+      label: args.label.trim().slice(0, 200),
+      amount_dollars: amount,
+      currency: (args.currency ?? "USD").slice(0, 8),
+      status: "draft",
+      due_at: args.dueAt,
+      note: args.note?.slice(0, 1000),
+      created_at: now,
+      updated_at: now,
+    });
+  },
+});
+
+export const listInvoicesForEngagement = query({
+  args: { engagementId: v.id("engagements") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const eng = await ctx.db.get(args.engagementId);
+    if (!eng || eng.user_id !== identity.subject) return [];
+    return await ctx.db
+      .query("engagement_invoices")
+      .withIndex("by_engagement_and_created", (q) =>
+        q.eq("engagement_id", args.engagementId),
+      )
+      .order("desc")
+      .collect();
+  },
+});
+
+async function ownedInvoice(
+  ctx: QueryCtx,
+  invoiceId: Id<"engagement_invoices">,
+) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) {
+    throw new ConvexError({ code: "UNAUTHORIZED", message: "Unauthorized" });
+  }
+  const inv = await ctx.db.get(invoiceId);
+  if (!inv || inv.user_id !== identity.subject) {
+    throw new ConvexError({ code: "ACCESS_DENIED", message: "Sem acesso" });
+  }
+  return inv;
+}
+
+export const setInvoiceStatus = mutation({
+  args: {
+    invoiceId: v.id("engagement_invoices"),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("sent"),
+      v.literal("paid"),
+      v.literal("void"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const inv = await ownedInvoice(ctx, args.invoiceId);
+    const now = Date.now();
+    await ctx.db.patch(inv._id, {
+      status: args.status,
+      issued_at: args.status === "sent" && !inv.issued_at ? now : inv.issued_at,
+      paid_at:
+        args.status === "paid"
+          ? now
+          : args.status === "draft" || args.status === "void"
+            ? undefined
+            : inv.paid_at,
+      updated_at: now,
+    });
+    return null;
+  },
+});
+
+export const deleteInvoice = mutation({
+  args: { invoiceId: v.id("engagement_invoices") },
+  handler: async (ctx, args) => {
+    const inv = await ownedInvoice(ctx, args.invoiceId);
+    await ctx.db.delete(inv._id);
+    return null;
+  },
+});
+
+/**
+ * Resumo de faturamento do engajamento: receita faturada (por status) × custo
+ * de IA (usage_logs.by_engagement, só linhas com engagement_id denormalizado =
+ * forward-only) → margem. Margem ignora câmbio (assume mesma moeda) — é
+ * scaffold; precifica depois.
+ */
+export const getEngagementBilling = query({
+  args: { engagementId: v.id("engagements") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    const eng = await ctx.db.get(args.engagementId);
+    if (!eng || eng.user_id !== identity.subject) return null;
+
+    const invoices = await ctx.db
+      .query("engagement_invoices")
+      .withIndex("by_engagement_and_created", (q) =>
+        q.eq("engagement_id", args.engagementId),
+      )
+      .collect();
+    let paid = 0;
+    let sent = 0;
+    let draft = 0;
+    let currency = "USD";
+    for (const inv of invoices) {
+      currency = inv.currency || currency;
+      if (inv.status === "paid") paid += inv.amount_dollars;
+      else if (inv.status === "sent") sent += inv.amount_dollars;
+      else if (inv.status === "draft") draft += inv.amount_dollars;
+    }
+
+    const costRows = await ctx.db
+      .query("usage_logs")
+      .withIndex("by_engagement", (q) =>
+        q.eq("engagement_id", args.engagementId),
+      )
+      .take(INVOICE_COST_CAP);
+    let cost = 0;
+    for (const r of costRows) {
+      cost +=
+        typeof r.provider_billed_cost_dollars === "number"
+          ? r.provider_billed_cost_dollars
+          : r.cost_dollars;
+    }
+
+    const invoiced = paid + sent;
+    return {
+      currency,
+      paid,
+      sent,
+      draft,
+      invoiced,
+      cost,
+      margin: invoiced - cost,
+      costCapped: costRows.length === INVOICE_COST_CAP,
+      costRows: costRows.length,
+      invoiceCount: invoices.length,
+    };
+  },
+});

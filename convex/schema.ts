@@ -1165,6 +1165,35 @@ export default defineSchema({
     .index("by_user", ["user_id"])
     .index("by_last_seen", ["last_seen_at"]),
 
+  // Scaffold de monetização (sem preço): faturas por engajamento. amount_dollars
+  // é placeholder até o William definir preço/SKU. Habilita margem por
+  // engajamento (receita faturada − custo de IA do engajamento via
+  // usage_logs.by_engagement). Portal-ready (client_id/org).
+  engagement_invoices: defineTable({
+    user_id: v.string(),
+    organization_id: v.optional(v.string()),
+    client_id: v.id("clients"),
+    engagement_id: v.id("engagements"),
+    label: v.string(),
+    amount_dollars: v.number(),
+    currency: v.string(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("sent"),
+      v.literal("paid"),
+      v.literal("void"),
+    ),
+    issued_at: v.optional(v.number()),
+    due_at: v.optional(v.number()),
+    paid_at: v.optional(v.number()),
+    note: v.optional(v.string()),
+    created_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_engagement_and_created", ["engagement_id", "created_at"])
+    .index("by_client_and_created", ["client_id", "created_at"])
+    .index("by_user_and_created", ["user_id", "created_at"]),
+
   // Durable revenue ledger for unit economics reporting. Revenue is stored as
   // gross/net dollars because usage costs are sub-cent dollar values already.
   revenue_events: defineTable({

@@ -42,6 +42,7 @@ import {
   type Tone,
 } from "@/app/admin/_ui";
 import { ReportBrandCard } from "./ReportBrandCard";
+import { EngagementBilling } from "./EngagementBilling";
 import { AppShell } from "@/components/internal/app-shell";
 
 type Severity = "info" | "low" | "medium" | "high" | "critical";
@@ -880,6 +881,9 @@ function EngagementDetail({
 
       {/* Relatórios */}
       <ReportsSection engagementId={engagementId} />
+
+      {/* Faturamento (scaffold de monetização) */}
+      <EngagementBilling engagementId={engagementId} />
 
       {/* Evidência ao vivo + chats */}
       <div className="grid gap-5 lg:grid-cols-2">
