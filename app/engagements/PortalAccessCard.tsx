@@ -20,14 +20,45 @@ interface Member {
 export function PortalAccessCard({
   clientId,
   clientName,
+  portalEnabled,
 }: {
   clientId: string;
   clientName: string;
+  portalEnabled: boolean;
 }) {
   const [members, setMembers] = useState<Member[] | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
+  const [togglingPortal, setTogglingPortal] = useState(false);
+
+  const togglePortal = async () => {
+    const next = !portalEnabled;
+    if (
+      !next &&
+      !window.confirm(
+        `Desabilitar o portal de ${clientName}? TODOS os contatos deste cliente perdem o acesso imediatamente (kill-switch).`,
+      )
+    ) {
+      return;
+    }
+    setTogglingPortal(true);
+    try {
+      const res = await fetch("/api/admin/portal-access", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, enabled: next }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast.success(next ? "Portal habilitado." : "Portal desabilitado.");
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Falha ao alterar o portal.",
+      );
+    } finally {
+      setTogglingPortal(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -105,6 +136,22 @@ export function PortalAccessCard({
           icon={ShieldCheck}
           title="Acesso ao portal"
           description={`Quem do cliente (${clientName}) pode ver e baixar os relatórios pelo portal.`}
+          action={
+            <div className="flex items-center gap-2">
+              <StatusBadge
+                tone={portalEnabled ? "success" : "neutral"}
+                label={portalEnabled ? "portal ligado" : "portal desligado"}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void togglePortal()}
+                disabled={togglingPortal}
+              >
+                {portalEnabled ? "Desabilitar" : "Habilitar"}
+              </Button>
+            </div>
+          }
         />
       </div>
       <CardContent className="space-y-4 p-5">

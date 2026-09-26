@@ -1905,6 +1905,8 @@ export default defineSchema({
       v.literal("membership.revoked"),
       v.literal("engagement.created"),
       v.literal("access.denied"),
+      v.literal("portal.enabled"),
+      v.literal("portal.disabled"),
     ),
     actor_user_id: v.optional(v.string()),
     actor_email: v.optional(v.string()),

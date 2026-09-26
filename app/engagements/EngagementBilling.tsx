@@ -260,6 +260,7 @@ export function EngagementBilling({
         <PortalAccessCard
           clientId={billing.clientId}
           clientName={billing.clientName}
+          portalEnabled={billing.portalEnabled}
         />
       )}
     </div>

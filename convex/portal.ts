@@ -189,7 +189,12 @@ export const grantPortalAccessForBackend = mutation({
     clientId: v.id("clients"),
     grantedBy: v.optional(v.string()),
   },
-  returns: v.object({ ok: v.boolean(), clientName: v.string() }),
+  returns: v.object({
+    ok: v.boolean(),
+    clientName: v.string(),
+    portalEnabled: v.boolean(),
+    portalJustEnabled: v.boolean(),
+  }),
   handler: async (ctx, args) => {
     validateServiceKey(args.serviceKey);
     const client = await ctx.db.get(args.clientId);
@@ -197,12 +202,19 @@ export const grantPortalAccessForBackend = mutation({
       throw new Error("Cliente inexistente");
     }
     const now = Date.now();
-    // Conceder acesso implica habilitar o portal para o cliente.
-    if (client.portal_enabled !== true) {
-      await ctx.db.patch(client._id, {
-        portal_enabled: true,
-        updated_at: now,
-      });
+    // Só auto-liga o portal no PRIMEIRO onboarding (nenhuma membership prévia,
+    // de qualquer status). Se já houver membership e o portal estiver desligado,
+    // é um kill-switch DELIBERADO — um novo grant NÃO deve ressuscitar o acesso
+    // dos demais membros. Habilitar/desabilitar depois é ação explícita
+    // (setPortalEnabledForBackend), auditada. Corrige o achado do review.
+    const anyMembership = await ctx.db
+      .query("client_memberships")
+      .withIndex("by_client", (q) => q.eq("client_id", args.clientId))
+      .first();
+    let portalJustEnabled = false;
+    if (!anyMembership && client.portal_enabled !== true) {
+      await ctx.db.patch(client._id, { portal_enabled: true, updated_at: now });
+      portalJustEnabled = true;
     }
     const existing = await ctx.db
       .query("client_memberships")
@@ -226,6 +238,39 @@ export const grantPortalAccessForBackend = mutation({
         granted_by: args.grantedBy,
         created_at: now,
         updated_at: now,
+      });
+    }
+    return {
+      ok: true,
+      clientName: client.name,
+      portalEnabled: client.portal_enabled === true || portalJustEnabled,
+      portalJustEnabled,
+    };
+  },
+});
+
+/**
+ * Liga/desliga o portal do cliente EXPLICITAMENTE (kill-switch por cliente).
+ * serviceKey (rota gateia por getSuperadminUser + audita portal.enabled/disabled).
+ * Desligar nega TODOS os membros na hora (resolveMembership exige portal_enabled).
+ */
+export const setPortalEnabledForBackend = mutation({
+  args: {
+    serviceKey: v.string(),
+    clientId: v.id("clients"),
+    enabled: v.boolean(),
+  },
+  returns: v.object({ ok: v.boolean(), clientName: v.string() }),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const client = await ctx.db.get(args.clientId);
+    if (!client) {
+      throw new Error("Cliente inexistente");
+    }
+    if (client.portal_enabled !== args.enabled) {
+      await ctx.db.patch(client._id, {
+        portal_enabled: args.enabled,
+        updated_at: Date.now(),
       });
     }
     return { ok: true, clientName: client.name };

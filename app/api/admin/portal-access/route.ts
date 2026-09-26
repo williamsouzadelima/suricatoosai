@@ -103,10 +103,78 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     console.error("portal-access: falha ao auditar grant", e);
   }
+  if (grant.portalJustEnabled) {
+    try {
+      await convex.mutation(api.securityAudit.recordSecurityEventForBackend, {
+        serviceKey,
+        eventType: "portal.enabled",
+        actorUserId: admin.id,
+        actorEmail: admin.email ?? undefined,
+        actorKind: "internal",
+        clientId: clientId as Id<"clients">,
+        targetType: "client",
+        targetId: clientId,
+        outcome: "success",
+        detail: "portal auto-habilitado no 1º acesso",
+      });
+    } catch (e) {
+      console.error("portal-access: falha ao auditar portal.enabled", e);
+    }
+  }
   return NextResponse.json({
     status: "granted",
     clientName: grant.clientName,
     email,
+  });
+}
+
+// Liga/desliga o portal do cliente explicitamente (kill-switch por cliente).
+export async function PATCH(req: NextRequest) {
+  const admin = await getSuperadminUser();
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const serviceKey = process.env.CONVEX_SERVICE_ROLE_KEY;
+  if (!serviceKey) {
+    return NextResponse.json(
+      { error: "Server not configured" },
+      { status: 500 },
+    );
+  }
+  const body = await req.json().catch(() => ({}));
+  const clientId = body.clientId as string | undefined;
+  const enabled = body.enabled;
+  if (!clientId || typeof enabled !== "boolean") {
+    return NextResponse.json(
+      { error: "clientId e enabled (boolean) obrigatórios." },
+      { status: 400 },
+    );
+  }
+  const convex = getConvexClient();
+  const res = await convex.mutation(api.portal.setPortalEnabledForBackend, {
+    serviceKey,
+    clientId: clientId as Id<"clients">,
+    enabled,
+  });
+  try {
+    await convex.mutation(api.securityAudit.recordSecurityEventForBackend, {
+      serviceKey,
+      eventType: enabled ? "portal.enabled" : "portal.disabled",
+      actorUserId: admin.id,
+      actorEmail: admin.email ?? undefined,
+      actorKind: "internal",
+      clientId: clientId as Id<"clients">,
+      targetType: "client",
+      targetId: clientId,
+      outcome: "success",
+      detail: enabled
+        ? "portal habilitado"
+        : "portal desabilitado (kill-switch)",
+    });
+  } catch (e) {
+    console.error("portal-access: falha ao auditar toggle do portal", e);
+  }
+  return NextResponse.json({
+    status: enabled ? "enabled" : "disabled",
+    clientName: res.clientName,
   });
 }
 

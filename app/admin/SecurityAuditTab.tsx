@@ -43,6 +43,8 @@ const EVENTS: { value: string; label: string; tone: Tone }[] = [
   { value: "membership.revoked", label: "Acesso revogado", tone: "warning" },
   { value: "engagement.created", label: "Engajamento criado", tone: "neutral" },
   { value: "access.denied", label: "Acesso negado", tone: "destructive" },
+  { value: "portal.enabled", label: "Portal habilitado", tone: "success" },
+  { value: "portal.disabled", label: "Portal desabilitado", tone: "warning" },
 ];
 const EVENT_MAP = new Map(EVENTS.map((e) => [e.value, e]));
 

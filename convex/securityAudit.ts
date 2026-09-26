@@ -24,6 +24,8 @@ const eventTypeArg = v.union(
   v.literal("membership.revoked"),
   v.literal("engagement.created"),
   v.literal("access.denied"),
+  v.literal("portal.enabled"),
+  v.literal("portal.disabled"),
 );
 const actorKindArg = v.union(
   v.literal("internal"),
