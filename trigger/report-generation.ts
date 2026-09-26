@@ -62,6 +62,74 @@ function getS3() {
   return { s3, bucket };
 }
 
+const AUDIENCE_LABEL: Record<string, string> = {
+  technical: "Técnico",
+  executive: "Executivo",
+  commercial: "Comercial",
+};
+
+/**
+ * Notifica o solicitante por e-mail quando o grupo de relatórios termina.
+ * Best-effort: sem RESEND_API_KEY, sem e-mail válido, ou falha de rede → apenas
+ * loga e segue. generatedBy já vem como e-mail do analista (a rota usa
+ * staff.user.email); baixar sempre pela rota-proxy autenticada (nunca anexa o
+ * binário no e-mail).
+ */
+async function notifyReportDone(
+  payload: {
+    generatedBy: string;
+    audience: string;
+    version: number;
+  },
+  ready: string[],
+  failed: string[],
+): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const to = payload.generatedBy;
+  if (!apiKey || !to || !to.includes("@")) return;
+  if (ready.length === 0 && failed.length === 0) return;
+
+  const from =
+    process.env.MARKETING_EMAIL_FROM ?? "Suricatoos <noreply@suricatoos.com>";
+  const appUrl = (
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://ai.suricatoos.com"
+  ).replace(/\/$/, "");
+  const link = `${appUrl}/engagements`;
+  const aud = AUDIENCE_LABEL[payload.audience] ?? payload.audience;
+  const ok = ready.length > 0;
+  const subject = ok
+    ? `Relatório ${aud} v${payload.version} pronto`
+    : `Falha ao gerar relatório ${aud} v${payload.version}`;
+  const line = ok
+    ? `Seu relatório <strong>${aud} v${payload.version}</strong> está pronto (${ready
+        .map((f) => f.toUpperCase())
+        .join(", ")}).${
+        failed.length
+          ? ` Falharam: ${failed.map((f) => f.toUpperCase()).join(", ")}.`
+          : ""
+      }`
+    : `Não foi possível gerar o relatório <strong>${aud} v${payload.version}</strong> (${failed
+        .map((f) => f.toUpperCase())
+        .join(", ")}).`;
+  const html = `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#0e1b2e;line-height:1.6">
+  <p>${line}</p>
+  <p><a href="${link}" style="display:inline-block;background:#2456e6;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Abrir em Engajamentos</a></p>
+  <p style="color:#64748b;font-size:12px">O download é autenticado — abra a plataforma para baixar.</p>
+</div>`;
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from, to, subject, html }),
+  });
+  if (!res.ok) {
+    console.error(`notify: Resend HTTP ${res.status}`);
+  }
+}
+
 export const generateEngagementReport = schemaTask({
   id: REPORT_GENERATION_TASK_ID,
   schema: payloadSchema,
@@ -199,6 +267,8 @@ export const generateEngagementReport = schemaTask({
       }
       await sbx.files.write(`${base}/model.json`, JSON.stringify(model));
 
+      const readyFormats: string[] = [];
+      const failedFormats: string[] = [];
       for (const format of payload.formats) {
         await client.mutation(api.reports.markReportRenderingForBackend, {
           serviceKey,
@@ -239,6 +309,7 @@ export const generateEngagementReport = schemaTask({
             checksum: createHash("sha256").update(buf).digest("hex"),
           });
           metadata.set(`format.${format}`, "ready");
+          readyFormats.push(format);
         } catch (err) {
           await client.mutation(api.reports.markReportFailedForBackend, {
             serviceKey,
@@ -247,8 +318,16 @@ export const generateEngagementReport = schemaTask({
             error: err instanceof Error ? err.message : String(err),
           });
           metadata.set(`format.${format}`, "failed");
+          failedFormats.push(format);
         }
       }
+
+      // Notificação best-effort ao solicitante quando o grupo termina. Nunca
+      // falha a task. generatedBy já é o e-mail do analista (route usa
+      // staff.user.email); só envia se for um e-mail e houver Resend.
+      await notifyReportDone(payload, readyFormats, failedFormats).catch((e) =>
+        console.error("notify: falhou (ignorado)", e),
+      );
     } finally {
       await sbx.kill();
     }
