@@ -26,6 +26,7 @@ import {
 } from "./_ui";
 import { SystemHealthPanel } from "./SystemHealthPanel";
 import { OnlineUsersPanel } from "./OnlineUsersPanel";
+import { LiveRunsPanel } from "./LiveRunsPanel";
 
 type AdminTab = "acesso" | "usuarios" | "alertas" | "avisos" | "marketing";
 
@@ -138,6 +139,9 @@ export function OverviewTab({
 
       {/* Saúde do sistema */}
       <SystemHealthPanel />
+
+      {/* Runs ao vivo + kill switch */}
+      <LiveRunsPanel />
 
       {/* Usuários */}
       <section>
