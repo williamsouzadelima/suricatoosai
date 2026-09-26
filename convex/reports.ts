@@ -708,3 +708,151 @@ export const deleteReportGroup = mutation({
     return { deleted };
   },
 });
+
+/**
+ * Saúde da geração de relatórios para o /admin (serviceKey). Conta por status
+ * (índice by_status), detecta "presos" (queued/rendering há mais de stuckMs — o
+ * sinal do worker do trigger mudo, ver watchdog) e lista presos + falhas
+ * recentes com nome do cliente/engajamento resolvidos (bounded). nowMs vem da
+ * rota (Node) para não usar Date.now() na query.
+ */
+const HEALTH_READY_CAP = 3000;
+const HEALTH_STATUS_CAP = 1000;
+const STUCK_LIST_CAP = 50;
+const FAILED_LIST_CAP = 25;
+const HEALTH_ERR_MAX = 240;
+
+export const getSystemHealthForBackend = query({
+  args: { serviceKey: v.string(), nowMs: v.number(), stuckMs: v.number() },
+  returns: v.object({
+    reports: v.object({
+      ready: v.number(),
+      readyCapped: v.boolean(),
+      queued: v.number(),
+      rendering: v.number(),
+      failed: v.number(),
+      stuck: v.number(),
+    }),
+    stuckList: v.array(
+      v.object({
+        id: v.string(),
+        audience: v.string(),
+        format: v.string(),
+        version: v.number(),
+        engagementName: v.string(),
+        clientName: v.string(),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+        hasRun: v.boolean(),
+      }),
+    ),
+    recentFailed: v.array(
+      v.object({
+        id: v.string(),
+        audience: v.string(),
+        format: v.string(),
+        version: v.number(),
+        engagementName: v.string(),
+        clientName: v.string(),
+        updatedAt: v.number(),
+        error: v.string(),
+      }),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const cutoff = args.nowMs - args.stuckMs;
+
+    const byStatus = async (
+      status: "ready" | "queued" | "rendering" | "failed",
+      cap: number,
+    ) =>
+      await ctx.db
+        .query("reports")
+        .withIndex("by_status", (q) => q.eq("status", status))
+        .take(cap);
+
+    const readyRows = await byStatus("ready", HEALTH_READY_CAP);
+    const queuedRows = await byStatus("queued", HEALTH_STATUS_CAP);
+    const renderingRows = await byStatus("rendering", HEALTH_STATUS_CAP);
+    const failedRows = await byStatus("failed", HEALTH_STATUS_CAP);
+
+    const engCache = new Map<string, string>();
+    const cliCache = new Map<string, string>();
+    const resolveNames = async (
+      engId: Id<"engagements">,
+      cliId: Id<"clients">,
+    ): Promise<{ engagementName: string; clientName: string }> => {
+      let engagementName = engCache.get(engId);
+      if (engagementName === undefined) {
+        const e = await ctx.db.get(engId);
+        engagementName = e?.name ?? "(engajamento removido)";
+        engCache.set(engId, engagementName);
+      }
+      let clientName = cliCache.get(cliId);
+      if (clientName === undefined) {
+        const c = await ctx.db.get(cliId);
+        clientName = c?.name ?? "(cliente removido)";
+        cliCache.set(cliId, clientName);
+      }
+      return { engagementName, clientName };
+    };
+
+    const stuckSrc = [...queuedRows, ...renderingRows]
+      .filter((r) => r.updated_at < cutoff)
+      .sort((a, b) => a.updated_at - b.updated_at);
+
+    const stuckList = [];
+    for (const r of stuckSrc.slice(0, STUCK_LIST_CAP)) {
+      const { engagementName, clientName } = await resolveNames(
+        r.engagement_id,
+        r.client_id,
+      );
+      stuckList.push({
+        id: r._id,
+        audience: r.audience,
+        format: r.format,
+        version: r.version,
+        engagementName,
+        clientName,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+        hasRun: typeof r.trigger_run_id === "string",
+      });
+    }
+
+    const failedSorted = [...failedRows].sort(
+      (a, b) => b.updated_at - a.updated_at,
+    );
+    const recentFailed = [];
+    for (const r of failedSorted.slice(0, FAILED_LIST_CAP)) {
+      const { engagementName, clientName } = await resolveNames(
+        r.engagement_id,
+        r.client_id,
+      );
+      recentFailed.push({
+        id: r._id,
+        audience: r.audience,
+        format: r.format,
+        version: r.version,
+        engagementName,
+        clientName,
+        updatedAt: r.updated_at,
+        error: (r.error ?? "").slice(0, HEALTH_ERR_MAX),
+      });
+    }
+
+    return {
+      reports: {
+        ready: readyRows.length,
+        readyCapped: readyRows.length === HEALTH_READY_CAP,
+        queued: queuedRows.length,
+        rendering: renderingRows.length,
+        failed: failedRows.length,
+        stuck: stuckSrc.length,
+      },
+      stuckList,
+      recentFailed,
+    };
+  },
+});

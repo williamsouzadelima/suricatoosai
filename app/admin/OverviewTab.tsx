@@ -24,6 +24,7 @@ import {
   formatDateTime,
   fmtNum,
 } from "./_ui";
+import { SystemHealthPanel } from "./SystemHealthPanel";
 
 type AdminTab = "acesso" | "usuarios" | "alertas" | "avisos" | "marketing";
 
@@ -52,7 +53,10 @@ interface Overview {
 }
 
 const fmtWeek = (ms: number) =>
-  new Date(ms).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  new Date(ms).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+  });
 
 function GroupLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -128,6 +132,9 @@ export function OverviewTab({
 
   return (
     <div className="space-y-6">
+      {/* Saúde do sistema */}
+      <SystemHealthPanel />
+
       {/* Usuários */}
       <section>
         <GroupLabel>Usuários</GroupLabel>
@@ -152,9 +159,7 @@ export function OverviewTab({
             icon={TrendingUp}
             label="Novos (7d)"
             value={data?.users.new7d ?? 0}
-            sub={
-              loading ? undefined : `${data?.users.new30d ?? 0} em 30 dias`
-            }
+            sub={loading ? undefined : `${data?.users.new30d ?? 0} em 30 dias`}
             tone="primary"
             loading={loading}
           />
@@ -162,9 +167,7 @@ export function OverviewTab({
             icon={Users}
             label="Total"
             value={data?.users.total ?? 0}
-            sub={
-              loading ? undefined : `${data?.users.revoked ?? 0} revogados`
-            }
+            sub={loading ? undefined : `${data?.users.revoked ?? 0} revogados`}
             tone="neutral"
             loading={loading}
           />
