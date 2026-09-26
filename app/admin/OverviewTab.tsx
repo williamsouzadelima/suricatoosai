@@ -25,6 +25,7 @@ import {
   fmtNum,
 } from "./_ui";
 import { SystemHealthPanel } from "./SystemHealthPanel";
+import { OnlineUsersPanel } from "./OnlineUsersPanel";
 
 type AdminTab = "acesso" | "usuarios" | "alertas" | "avisos" | "marketing";
 
@@ -132,6 +133,9 @@ export function OverviewTab({
 
   return (
     <div className="space-y-6">
+      {/* Presença ao vivo */}
+      <OnlineUsersPanel />
+
       {/* Saúde do sistema */}
       <SystemHealthPanel />
 

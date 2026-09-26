@@ -1147,6 +1147,20 @@ export default defineSchema({
     .index("by_org", ["organization_id"])
     .index("by_chat", ["chat_id"]),
 
+  // Presença de usuário-no-browser. Uma linha por usuário; o cliente
+  // (GlobalState) bate um heartbeat a cada ~45s enquanto a aba está visível.
+  // "Online" é derivado no /admin comparando last_seen_at contra um nowMs vindo
+  // da rota Node (a query de admin não é reativa, então nenhum cron de sweep é
+  // necessário para expirar a presença).
+  user_presence: defineTable({
+    user_id: v.string(),
+    last_seen_at: v.number(),
+    path: v.optional(v.string()),
+    updated_at: v.number(),
+  })
+    .index("by_user", ["user_id"])
+    .index("by_last_seen", ["last_seen_at"]),
+
   // Durable revenue ledger for unit economics reporting. Revenue is stored as
   // gross/net dollars because usage costs are sub-cent dollar values already.
   revenue_events: defineTable({
