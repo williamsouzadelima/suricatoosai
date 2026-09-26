@@ -1740,6 +1740,18 @@ export default defineSchema({
     approved_by: v.optional(v.string()),
     approved_at: v.optional(v.number()),
     published_at: v.optional(v.number()),
+    // Retest: ciclo cliente-corrigiu → revalida. A evidência antes/depois vive
+    // na timeline normal de evidência; aqui fica só o desfecho da revalidação.
+    retest_status: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("fixed"),
+        v.literal("still_vulnerable"),
+      ),
+    ),
+    retested_at: v.optional(v.number()),
+    retested_by: v.optional(v.string()),
+    retest_note: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
     created_at: v.number(),
     updated_at: v.number(),

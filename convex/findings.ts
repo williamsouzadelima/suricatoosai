@@ -545,6 +545,42 @@ export const reopenFinding = mutation({
   },
 });
 
+/**
+ * Retest de achado (identity-only + posse). Revalida um achado
+ * aprovado/publicado: "fixed" (cliente corrigiu, confirmado), "still_vulnerable"
+ * (persiste) ou "pending" (reabre o retest). A evidência antes/depois é a
+ * timeline normal do achado; aqui grava só o desfecho + quem/quando.
+ */
+export const retestFinding = mutation({
+  args: {
+    findingId: v.id("findings"),
+    outcome: v.union(
+      v.literal("pending"),
+      v.literal("fixed"),
+      v.literal("still_vulnerable"),
+    ),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { subject, finding } = await requireOwnedFinding(ctx, args.findingId);
+    if (finding.status !== "approved" && finding.status !== "published") {
+      throw new ConvexError({
+        code: "INVALID",
+        message: "Só dá para retestar achado aprovado ou publicado.",
+      });
+    }
+    const now = Date.now();
+    await ctx.db.patch(finding._id, {
+      retest_status: args.outcome,
+      retested_at: now,
+      retested_by: subject,
+      retest_note: args.note ? args.note.slice(0, 1000) : undefined,
+      updated_at: now,
+    });
+    return null;
+  },
+});
+
 export const updateFinding = mutation({
   args: {
     findingId: v.id("findings"),

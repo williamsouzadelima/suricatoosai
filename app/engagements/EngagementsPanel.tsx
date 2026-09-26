@@ -69,6 +69,11 @@ const STATUS_LABEL: Record<FindingStatus, string> = {
   published: "Publicado",
   dismissed: "Descartado",
 };
+const RETEST_BADGE: Record<string, { tone: Tone; label: string }> = {
+  fixed: { tone: "success", label: "Corrigido" },
+  still_vulnerable: { tone: "destructive", label: "Ainda vulnerável" },
+  pending: { tone: "warning", label: "Retest pendente" },
+};
 const SEV_LABEL: Record<Severity, string> = {
   critical: "Crítico",
   high: "Alto",
@@ -418,6 +423,7 @@ function EngagementDetail({
   const publish = useMutation(api.findings.publishFinding);
   const dismiss = useMutation(api.findings.dismissFinding);
   const reopen = useMutation(api.findings.reopenFinding);
+  const retest = useMutation(api.findings.retestFinding);
   const approveAll = useMutation(api.findings.approveAllForEngagement);
   const clearFindings = useMutation(api.findings.clearFindingsForEngagement);
   const [approvingAll, setApprovingAll] = useState(false);
@@ -694,6 +700,15 @@ function EngagementDetail({
                       tone={STATUS_TONE[status]}
                       label={STATUS_LABEL[status]}
                     />
+                    {(() => {
+                      const rs = (f as { retest_status?: string })
+                        .retest_status;
+                      if (!rs) return null;
+                      const m = RETEST_BADGE[rs];
+                      return m ? (
+                        <StatusBadge tone={m.tone} label={m.label} />
+                      ) : null;
+                    })()}
                     <div className="flex gap-1.5">
                       {status === "draft" && (
                         <Button
@@ -764,6 +779,46 @@ function EngagementDetail({
                         >
                           Reabrir
                         </Button>
+                      )}
+                      {(status === "approved" || status === "published") && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-success hover:text-success"
+                            title="Revalidado: o cliente corrigiu"
+                            onClick={() =>
+                              void run(
+                                () =>
+                                  retest({
+                                    findingId: f._id,
+                                    outcome: "fixed",
+                                  }),
+                                "Marcado como corrigido.",
+                              )
+                            }
+                          >
+                            Corrigido
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            title="Revalidado: ainda vulnerável"
+                            onClick={() =>
+                              void run(
+                                () =>
+                                  retest({
+                                    findingId: f._id,
+                                    outcome: "still_vulnerable",
+                                  }),
+                                "Marcado como ainda vulnerável.",
+                              )
+                            }
+                          >
+                            Persiste
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>
