@@ -4,6 +4,7 @@ import {
   roleSatisfies,
   type InternalRole,
 } from "@/lib/auth/internal-roles";
+import { recordUserDenial } from "@/lib/security/user-detector";
 
 type AuthedUser = NonNullable<Awaited<ReturnType<typeof withAuth>>["user"]>;
 
@@ -24,7 +25,12 @@ export async function getInternalUser(
     const { user } = await withAuth();
     if (!user) return null;
     const role = getInternalRole(user.email);
-    if (!role || !roleSatisfies(role, minRole)) return null;
+    if (!role || !roleSatisfies(role, minRole)) {
+      // Usuário autenticado sem papel interno batendo em rota interna = sinal de
+      // ataque (fire-and-forget; staff é filtrado no detector).
+      recordUserDenial(user.id, user.email);
+      return null;
+    }
     return { user, role };
   } catch {
     return null;

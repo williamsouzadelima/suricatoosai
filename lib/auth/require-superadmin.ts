@@ -1,5 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { isSuperadmin } from "@/lib/auth/superadmin";
+import { recordUserDenial } from "@/lib/security/user-detector";
 
 type AuthedUser = NonNullable<Awaited<ReturnType<typeof withAuth>>["user"]>;
 
@@ -11,7 +12,13 @@ type AuthedUser = NonNullable<Awaited<ReturnType<typeof withAuth>>["user"]>;
 export async function getSuperadminUser(): Promise<AuthedUser | null> {
   try {
     const { user } = await withAuth();
-    if (!user || !isSuperadmin(user.email)) return null;
+    if (!user) return null;
+    if (!isSuperadmin(user.email)) {
+      // Usuário autenticado NÃO-superadmin batendo em rota de admin = sinal de
+      // ataque (fire-and-forget; staff é filtrado no detector).
+      recordUserDenial(user.id, user.email);
+      return null;
+    }
     return user;
   } catch {
     return null;

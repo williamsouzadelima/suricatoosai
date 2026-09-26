@@ -400,3 +400,80 @@ export const dispatchSecurityNotify = internalAction({
     return null;
   },
 });
+
+/**
+ * Ameaça de USUÁRIO autenticado (negações repetidas em rota privilegiada).
+ * Insere o evento, opcionalmente auto-suspende (reusa adminSuspend via action) e
+ * notifica. A decisão final de suspender respeita a safelist_user_ids; o detector
+ * Node já filtrou staff (superadmin/analista). Fire-and-forget.
+ */
+export const recordUserThreatForBackend = mutation({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    email: v.optional(v.string()),
+    detail: v.string(),
+    autoSuspend: v.boolean(),
+  },
+  returns: v.object({ suspended: v.boolean() }),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const now = Date.now();
+    const detail = args.detail.slice(0, 1000);
+    await ctx.db.insert("security_audit_log", {
+      event_type: "user.autoblocked",
+      actor_kind: "system",
+      actor_user_id: args.userId,
+      actor_email: args.email,
+      target_type: "user",
+      target_id: args.userId,
+      outcome: "denied",
+      detail,
+      created_at: now,
+    });
+    let willSuspend = false;
+    if (args.autoSuspend) {
+      const s = await ctx.db
+        .query("security_settings")
+        .withIndex("by_key", (q) => q.eq("key", SETTINGS_KEY))
+        .first();
+      const safe = s?.safelist_user_ids ?? [];
+      if (!safe.includes(args.userId)) {
+        willSuspend = true;
+        await ctx.scheduler.runAfter(0, internal.security.autoSuspendUser, {
+          userId: args.userId,
+          detail: detail.slice(0, 200),
+        });
+      }
+    }
+    await ctx.scheduler.runAfter(0, internal.security.dispatchSecurityNotify, {
+      subject: `[Segurança] usuário atacante${args.email ? ` · ${args.email}` : ""}`,
+      body: `${detail}${willSuspend ? "\nAção: usuário AUTO-SUSPENSO (reversível na aba Usuários)." : "\n(modo sombra — sem suspensão)"}`,
+    });
+    return { suspended: willSuspend };
+  },
+});
+
+/**
+ * Executa a auto-suspensão reusando adminSuspend (serviceKey do env). É reversível
+ * pelo mesmo unsuspend da aba Usuários. best-effort.
+ */
+export const autoSuspendUser = internalAction({
+  args: { userId: v.string(), detail: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    try {
+      const serviceKey = process.env.CONVEX_SERVICE_ROLE_KEY;
+      if (!serviceKey) return null;
+      await ctx.runMutation(api.userSuspensions.adminSuspend, {
+        serviceKey,
+        userId: args.userId,
+        reason: `auto-block de segurança: ${args.detail}`,
+        adminEmail: "security-auto",
+      });
+    } catch (e) {
+      console.warn("[sec] autoSuspendUser falhou", e);
+    }
+    return null;
+  },
+});
