@@ -410,10 +410,16 @@ const GlobalStateProviderInner: React.FC<GlobalStateProviderProps> = ({
     if (!user) return;
     const beat = () => {
       if (typeof document !== "undefined" && document.hidden) return;
-      void beatPresence({
-        path:
-          typeof window !== "undefined" ? window.location.pathname : undefined,
-      }).catch(() => {});
+      // Promise.resolve(...) torna robusto quando beatPresence não devolve
+      // promise (mock de teste) — em prod é o mesmo promise. Best-effort.
+      void Promise.resolve(
+        beatPresence({
+          path:
+            typeof window !== "undefined"
+              ? window.location.pathname
+              : undefined,
+        }),
+      ).catch(() => {});
     };
     beat();
     const id = setInterval(beat, 45_000);
