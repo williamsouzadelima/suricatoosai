@@ -390,15 +390,10 @@ async function ownedInvoice(
   ctx: QueryCtx,
   invoiceId: Id<"engagement_invoices">,
 ) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) {
-    throw new ConvexError({ code: "UNAUTHORIZED", message: "Unauthorized" });
-  }
-  const inv = await ctx.db.get(invoiceId);
-  if (!inv || inv.user_id !== identity.subject) {
-    throw new ConvexError({ code: "ACCESS_DENIED", message: "Sem acesso" });
-  }
-  return inv;
+  // Tenancy centralizada em lib/tenantGuards (mesmos erros). engagement_invoices
+  // carrega user_id diretamente.
+  const { doc } = await requireOwnedDoc(ctx, invoiceId);
+  return doc;
 }
 
 export const setInvoiceStatus = mutation({

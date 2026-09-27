@@ -32,7 +32,7 @@ const TENANCY_SIGNALS = [
   "getOwnedDoc",
   "requireOwnedFinding",
   "assertOwnedEngagement",
-  "assertOwnedInvoice",
+  "ownedInvoice",
   "resolveMembership",
   "identity.subject",
   "args.userId",
