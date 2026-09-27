@@ -53,10 +53,10 @@ export async function requireOwnedDoc<T extends OwnedTable>(
 ): Promise<Owned<T>> {
   const identity = await requireIdentity(ctx);
   const doc = await ctx.db.get(id);
-  if (!doc || (doc as { user_id: string }).user_id !== identity.subject) {
+  if (!doc || (doc as Record<string, unknown>).user_id !== identity.subject) {
     throw new ConvexError({ code: "ACCESS_DENIED", message: "Sem acesso" });
   }
-  return { identity, subject: identity.subject, doc: doc as Doc<T> };
+  return { identity, subject: identity.subject, doc };
 }
 
 /**
@@ -70,8 +70,8 @@ export async function getOwnedDoc<T extends OwnedTable>(
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return null;
   const doc = await ctx.db.get(id);
-  if (!doc || (doc as { user_id: string }).user_id !== identity.subject) {
+  if (!doc || (doc as Record<string, unknown>).user_id !== identity.subject) {
     return null;
   }
-  return { identity, subject: identity.subject, doc: doc as Doc<T> };
+  return { identity, subject: identity.subject, doc };
 }
