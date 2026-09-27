@@ -3,6 +3,7 @@ import { v, ConvexError } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { validateServiceKey } from "./lib/utils";
+import { requireOwnedDoc } from "./lib/tenantGuards";
 
 /**
  * Engajamentos (agrupam chats + evidências + achados de um cliente).
@@ -37,18 +38,10 @@ async function assertOwnedEngagement(
   ctx: QueryCtx,
   engagementId: Id<"engagements">,
 ) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) {
-    throw new ConvexError({
-      code: "UNAUTHORIZED",
-      message: "Unauthorized: User not authenticated",
-    });
-  }
-  const engagement = await ctx.db.get(engagementId);
-  if (!engagement || engagement.user_id !== identity.subject) {
-    throw new ConvexError({ code: "ACCESS_DENIED", message: "Sem acesso" });
-  }
-  return { identity, engagement };
+  // Tenancy centralizada em lib/tenantGuards (mesmos erros UNAUTHORIZED/
+  // ACCESS_DENIED). Mantém a interface { identity, engagement }.
+  const { identity, doc } = await requireOwnedDoc(ctx, engagementId);
+  return { identity, engagement: doc };
 }
 
 export const listEngagements = query({

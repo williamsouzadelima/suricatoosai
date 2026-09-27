@@ -15,9 +15,9 @@ type AuthedUser = NonNullable<Awaited<ReturnType<typeof withAuth>>["user"]>;
  * reports,evidence}. Espelha getSuperadminUser (lib/auth/require-superadmin).
  *
  * NOTA: este é o guard do Next (defesa em profundidade). A aplicação real de
- * tenancy nos dados é feita INLINE em cada função Convex (doc.user_id ===
- * identity.subject, ou validateServiceKey nas *ForBackend) — NÃO há wrapper
- * central; toda função nova precisa repetir a checagem de posse/tenant.
+ * tenancy nos dados usa os helpers de convex/lib/tenantGuards (requireOwnedDoc/
+ * getOwnedDoc: doc.user_id === identity.subject), ou validateServiceKey nas
+ * *ForBackend. Toda função nova tenant-scoped deve passar por eles.
  */
 export async function getInternalUser(
   minRole: InternalRole = "analyst",

@@ -1726,10 +1726,10 @@ export default defineSchema({
   // Portal-ready: toda linha carrega user_id (analista dono) + organization_id?
   // (WorkOS) + client_id/engagement_id, com índices by_user_* e by_org_*/
   // by_client_* desde a v1 — o portal do cliente (v2) não exige migração.
-  // Tenancy é verificada INLINE em cada função (doc.user_id === identity.subject,
-  // padrão de notes.ts/chats.ts) — NÃO há wrapper central; toda função NOVA
-  // precisa repetir a checagem de posse. Aprovação/publicação são identity-only
-  // (nunca serviceKey).
+  // Tenancy: use os helpers de convex/lib/tenantGuards (requireOwnedDoc = lança;
+  // getOwnedDoc = nullable) — é a checagem de posse (user_id === identity.subject)
+  // única e sancionada; toda função NOVA tenant-scoped deve passar por eles.
+  // Aprovação/publicação são identity-only (nunca serviceKey).
   // ───────────────────────────────────────────────────────────────────────
   clients: defineTable({
     user_id: v.string(),

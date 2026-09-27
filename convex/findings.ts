@@ -3,6 +3,7 @@ import { v, ConvexError } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { validateServiceKey } from "./lib/utils";
+import { requireOwnedDoc } from "./lib/tenantGuards";
 
 /**
  * Achados + evidências da feature de relatórios.
@@ -179,15 +180,10 @@ async function requireOwnedFinding(
   ctx: MutationCtx,
   findingId: Id<"findings">,
 ): Promise<{ subject: string; finding: Doc<"findings"> }> {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) {
-    throw new ConvexError({ code: "UNAUTHORIZED", message: "Unauthorized" });
-  }
-  const finding = await ctx.db.get(findingId);
-  if (!finding || finding.user_id !== identity.subject) {
-    throw new ConvexError({ code: "ACCESS_DENIED", message: "Sem acesso" });
-  }
-  return { subject: identity.subject, finding };
+  // Tenancy centralizada em lib/tenantGuards (mesmos erros UNAUTHORIZED/
+  // ACCESS_DENIED). Mantém a interface { subject, finding }.
+  const { subject, doc } = await requireOwnedDoc(ctx, findingId);
+  return { subject, finding: doc };
 }
 
 /**
