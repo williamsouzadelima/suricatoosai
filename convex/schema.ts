@@ -8,6 +8,74 @@ import {
   researchUserProfileValidator,
 } from "./userResearchValidators";
 
+// ── Evidências / Achados / Relatórios (Cliente → Engajamento → Achado) ──
+const severityValidator = v.union(
+  v.literal("info"),
+  v.literal("low"),
+  v.literal("medium"),
+  v.literal("high"),
+  v.literal("critical"),
+);
+const findingStatusValidator = v.union(
+  v.literal("draft"),
+  v.literal("in_review"),
+  v.literal("approved"),
+  v.literal("published"),
+  v.literal("dismissed"),
+);
+const findingOriginValidator = v.union(
+  v.literal("agent"),
+  v.literal("subagent"),
+  v.literal("analyst"),
+);
+const scopeItemValidator = v.object({
+  kind: v.union(
+    v.literal("domain"),
+    v.literal("ip"),
+    v.literal("cidr"),
+    v.literal("url"),
+    v.literal("app"),
+    v.literal("other"),
+  ),
+  value: v.string(),
+  in_scope: v.boolean(),
+  note: v.optional(v.string()),
+});
+const evidenceSourceTypeValidator = v.union(
+  v.literal("tool_output"),
+  v.literal("command"),
+  v.literal("file"),
+  v.literal("http"),
+  v.literal("note"),
+  v.literal("manual"),
+);
+const findingVerdictValidator = v.union(
+  v.literal("confirmed"),
+  v.literal("rejected"),
+  v.literal("inconclusive"),
+);
+const findingConfidenceValidator = v.union(
+  v.literal("low"),
+  v.literal("medium"),
+  v.literal("high"),
+);
+const reportAudienceValidator = v.union(
+  v.literal("technical"),
+  v.literal("executive"),
+  v.literal("commercial"),
+);
+const reportFormatValidator = v.union(
+  v.literal("docx"),
+  v.literal("pptx"),
+  v.literal("pdf"),
+);
+const reportStatusValidator = v.union(
+  v.literal("queued"),
+  v.literal("rendering"),
+  v.literal("ready"),
+  v.literal("failed"),
+);
+
 const usageDeductionFailureReasonValidator = v.union(
   v.literal("extra_usage_unavailable"),
   v.literal("insufficient_funds"),
@@ -170,6 +238,8 @@ export default defineSchema({
     sandbox_type: v.optional(v.string()),
     selected_model: v.optional(v.string()),
     project_id: v.optional(v.id("projects")),
+    // Feature de evidências/relatórios: um chat pertence a ≤1 engajamento.
+    engagement_id: v.optional(v.id("engagements")),
     // Legacy field retained on historical rows. The local-provider feature
     // was removed and nothing reads or writes this anymore — kept in the
     // schema so old rows still pass validation.
@@ -188,6 +258,7 @@ export default defineSchema({
     ])
     .index("by_user_and_pinned", ["user_id", "pinned_at"])
     .index("by_share_id", ["share_id"])
+    .index("by_engagement_and_updated", ["engagement_id", "update_time"])
     .searchIndex("search_title", {
       searchField: "title",
       filterFields: ["user_id"],
@@ -944,6 +1015,9 @@ export default defineSchema({
     connection_name: v.string(),
     container_id: v.optional(v.string()),
     client_version: v.string(),
+    // Desktop app's own version (Tauri), reported on connect via connectDesktop.
+    // client_version stays "desktop" (the marker for isDesktop / update-exclusion).
+    app_version: v.optional(v.string()),
     // Keep accepting legacy cloud rows until production data has been purged.
     // No current writer creates them, and connection queries exclude them.
     mode: v.union(
@@ -1066,12 +1140,118 @@ export default defineSchema({
     // upstream_inference_cost and can undercount the actual charge. Present only
     // on rows written after this field was added; historical rows leave it undefined.
     provider_billed_cost_dollars: v.optional(v.number()),
+    // Denormalizado no logUsage a partir de chats.engagement_id (best-effort) —
+    // habilita rollup/enforcement por engajamento indexados (só linhas novas).
+    engagement_id: v.optional(v.id("engagements")),
   })
     .index("by_usage_settlement_id", ["usage_settlement_id"])
     .index("by_user", ["user_id"])
     .index("by_user_and_model", ["user_id", "model"])
     .index("by_org", ["organization_id"])
-    .index("by_chat", ["chat_id"]),
+    .index("by_chat", ["chat_id"])
+    .index("by_engagement", ["engagement_id"]),
+
+  // Presença de usuário-no-browser. Uma linha por usuário; o cliente
+  // (GlobalState) bate um heartbeat a cada ~45s enquanto a aba está visível.
+  // "Online" é derivado no /admin comparando last_seen_at contra um nowMs vindo
+  // da rota Node (a query de admin não é reativa, então nenhum cron de sweep é
+  // necessário para expirar a presença).
+  user_presence: defineTable({
+    user_id: v.string(),
+    last_seen_at: v.number(),
+    path: v.optional(v.string()),
+    updated_at: v.number(),
+  })
+    .index("by_user", ["user_id"])
+    .index("by_last_seen", ["last_seen_at"]),
+
+  // Scaffold de monetização (sem preço): faturas por engajamento. amount_dollars
+  // é placeholder até o William definir preço/SKU. Habilita margem por
+  // engajamento (receita faturada − custo de IA do engajamento via
+  // usage_logs.by_engagement). Portal-ready (client_id/org).
+  engagement_invoices: defineTable({
+    user_id: v.string(),
+    organization_id: v.optional(v.string()),
+    client_id: v.id("clients"),
+    engagement_id: v.id("engagements"),
+    label: v.string(),
+    amount_dollars: v.number(),
+    currency: v.string(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("sent"),
+      v.literal("paid"),
+      v.literal("void"),
+    ),
+    issued_at: v.optional(v.number()),
+    due_at: v.optional(v.number()),
+    paid_at: v.optional(v.number()),
+    note: v.optional(v.string()),
+    created_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_engagement_and_created", ["engagement_id", "created_at"])
+    .index("by_client_and_created", ["client_id", "created_at"])
+    .index("by_user_and_created", ["user_id", "created_at"]),
+
+  // Teto de gasto de IA por engajamento (MONITOR — sem enforcement no hot-path).
+  // cap_dollars em USD (mesma unidade do custo real); warn_pct em 0-100.
+  engagement_budgets: defineTable({
+    user_id: v.string(),
+    organization_id: v.optional(v.string()),
+    client_id: v.id("clients"),
+    engagement_id: v.id("engagements"),
+    cap_dollars: v.number(),
+    warn_pct: v.number(),
+    note: v.optional(v.string()),
+    updated_by: v.optional(v.string()),
+    updated_at: v.number(),
+  }).index("by_engagement", ["engagement_id"]),
+
+  // Camada de segurança: blocklist de IP/CIDR/IoC (fonte da verdade durável;
+  // a borda mantém um cache quente). "ip" é enforce na borda (match exato);
+  // "cidr"/"user_agent"/"path_pattern" ficam registrados p/ o firewall do host
+  // (Fase 2) e visibilidade. Bloqueio manual pode ser permanente; auto tem TTL.
+  security_blocklist: defineTable({
+    type: v.union(
+      v.literal("ip"),
+      v.literal("cidr"),
+      v.literal("user_agent"),
+      v.literal("path_pattern"),
+    ),
+    value: v.string(),
+    reason: v.optional(v.string()),
+    source: v.union(v.literal("manual"), v.literal("auto")),
+    category: v.optional(v.string()),
+    created_by: v.optional(v.string()),
+    created_at: v.number(),
+    expires_at: v.optional(v.number()),
+    status: v.union(v.literal("active"), v.literal("lifted")),
+    lifted_by: v.optional(v.string()),
+    lifted_at: v.optional(v.number()),
+    hits: v.optional(v.number()),
+  })
+    .index("by_value", ["type", "value"])
+    .index("by_status_and_created", ["status", "created_at"]),
+
+  // Config da camada de segurança (doc único key="global"). enforcement_mode
+  // "shadow" = detecta+audita+notifica SEM bloquear; "enforce" = bloqueia.
+  security_settings: defineTable({
+    key: v.string(),
+    enforcement_mode: v.union(v.literal("shadow"), v.literal("enforce")),
+    auto_block_enabled: v.boolean(),
+    auto_suspend_users: v.boolean(),
+    kill_switch: v.boolean(),
+    req_burst_window_s: v.number(),
+    req_burst_max: v.number(),
+    deny_burst_max: v.number(),
+    path_scan_distinct_max: v.number(),
+    auto_block_ttl_s: v.number(),
+    safelist_ips: v.array(v.string()),
+    safelist_user_ids: v.array(v.string()),
+    updated_by: v.optional(v.string()),
+    updated_at: v.number(),
+  }).index("by_key", ["key"]),
 
   // Durable revenue ledger for unit economics reporting. Revenue is stored as
   // gross/net dollars because usage costs are sub-cent dollar values already.
@@ -1540,4 +1720,285 @@ export default defineSchema({
     session_key: v.string(),
     processed_at: v.number(),
   }).index("by_session_key", ["session_key"]),
+
+  // ───────────────────────────────────────────────────────────────────────
+  // Evidências + Achados + Relatórios (Cliente → Engajamento → Achado)
+  // Portal-ready: toda linha carrega user_id (analista dono) + organization_id?
+  // (WorkOS) + client_id/engagement_id, com índices by_user_* e by_org_*/
+  // by_client_* desde a v1 — o portal do cliente (v2) não exige migração.
+  // Acesso via wrapper withTenantScope (convex/lib/tenantGuards); aprovação/
+  // publicação são identity-only (nunca serviceKey).
+  // ───────────────────────────────────────────────────────────────────────
+  clients: defineTable({
+    user_id: v.string(),
+    organization_id: v.optional(v.string()),
+    name: v.string(),
+    slug: v.string(),
+    status: v.union(v.literal("active"), v.literal("archived")),
+    primary_contact_email: v.optional(v.string()),
+    portal_enabled: v.optional(v.boolean()),
+    created_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_user_and_updated", ["user_id", "updated_at"])
+    .index("by_user_and_slug", ["user_id", "slug"])
+    .index("by_org_and_updated", ["organization_id", "updated_at"])
+    .searchIndex("search_clients", {
+      searchField: "name",
+      filterFields: ["user_id", "organization_id"],
+    }),
+
+  // Marca do relatório por organização (MSSP). Campos opcionais → o que não for
+  // definido cai para DEFAULT_BRAND (Suricatoos) no builder. Portal-ready.
+  report_brands: defineTable({
+    user_id: v.optional(v.string()),
+    organization_id: v.optional(v.string()),
+    name: v.optional(v.string()),
+    wordmark: v.optional(v.string()),
+    tagline: v.optional(v.string()),
+    contact: v.optional(v.string()),
+    doc_code_prefix: v.optional(v.string()),
+    primary: v.optional(v.string()),
+    accent: v.optional(v.string()),
+    classification: v.optional(v.string()),
+    logo_s3_key: v.optional(v.string()),
+    logo_media_type: v.optional(v.string()),
+    updated_at: v.number(),
+  })
+    .index("by_org", ["organization_id"])
+    .index("by_user", ["user_id"]),
+
+  engagements: defineTable({
+    user_id: v.string(),
+    organization_id: v.optional(v.string()),
+    client_id: v.id("clients"),
+    code: v.optional(v.string()),
+    name: v.string(),
+    status: v.union(
+      v.literal("planned"),
+      v.literal("active"),
+      v.literal("review"),
+      v.literal("reporting"),
+      v.literal("closed"),
+    ),
+    scope: v.optional(v.array(scopeItemValidator)),
+    starts_at: v.optional(v.number()),
+    ends_at: v.optional(v.number()),
+    created_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_user_and_updated", ["user_id", "updated_at"])
+    .index("by_client_and_updated", ["client_id", "updated_at"])
+    .index("by_org_and_updated", ["organization_id", "updated_at"])
+    .index("by_user_and_status", ["user_id", "status"]),
+
+  findings: defineTable({
+    user_id: v.string(),
+    organization_id: v.optional(v.string()),
+    client_id: v.id("clients"),
+    engagement_id: v.id("engagements"),
+    finding_id: v.string(),
+    origin: findingOriginValidator,
+    source_chat_id: v.optional(v.string()),
+    source_message_id: v.optional(v.string()),
+    source_tool_call_id: v.optional(v.string()),
+    source_subagent_id: v.optional(v.string()),
+    title: v.string(),
+    affected_asset: v.string(),
+    weakness_class: v.string(),
+    cwe: v.optional(v.string()),
+    description: v.optional(v.string()),
+    impact: v.optional(v.string()),
+    remediation: v.optional(v.string()),
+    reproduction_steps: v.optional(v.array(v.string())),
+    // Narrativa (storytelling) do achado: como foi descoberto e explorado,
+    // encadeando os passos/evidências num contexto de negócio.
+    narrative: v.optional(v.string()),
+    severity: severityValidator,
+    cvss_version: v.optional(v.union(v.literal("3.1"), v.literal("4.0"))),
+    cvss_vector: v.optional(v.string()),
+    cvss_score: v.optional(v.number()),
+    verdict: v.optional(findingVerdictValidator),
+    confidence: v.optional(findingConfidenceValidator),
+    status: findingStatusValidator,
+    dedup_fingerprint: v.string(),
+    dismiss_reason: v.optional(v.string()),
+    created_by: v.string(),
+    reviewed_by: v.optional(v.string()),
+    approved_by: v.optional(v.string()),
+    approved_at: v.optional(v.number()),
+    published_at: v.optional(v.number()),
+    // Retest: ciclo cliente-corrigiu → revalida. A evidência antes/depois vive
+    // na timeline normal de evidência; aqui fica só o desfecho da revalidação.
+    retest_status: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("fixed"),
+        v.literal("still_vulnerable"),
+      ),
+    ),
+    retested_at: v.optional(v.number()),
+    retested_by: v.optional(v.string()),
+    retest_note: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+    created_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_finding_id", ["finding_id"])
+    .index("by_engagement_and_updated", ["engagement_id", "updated_at"])
+    .index("by_engagement_and_status", ["engagement_id", "status"])
+    .index("by_client_and_status", ["client_id", "status"])
+    .index("by_user_and_updated", ["user_id", "updated_at"])
+    .index("by_org_and_status", ["organization_id", "status"])
+    .index("by_engagement_and_fingerprint", [
+      "engagement_id",
+      "dedup_fingerprint",
+    ])
+    .searchIndex("search_findings", {
+      searchField: "title",
+      filterFields: ["engagement_id", "client_id", "organization_id", "status"],
+    }),
+
+  evidence: defineTable({
+    user_id: v.string(),
+    organization_id: v.optional(v.string()),
+    client_id: v.id("clients"),
+    engagement_id: v.id("engagements"),
+    finding_id: v.id("findings"),
+    source_type: evidenceSourceTypeValidator,
+    chat_id: v.optional(v.string()),
+    message_id: v.optional(v.string()),
+    tool_call_id: v.optional(v.string()),
+    subagent_id: v.optional(v.string()),
+    file_id: v.optional(v.id("files")),
+    s3_key: v.optional(v.string()),
+    sandbox_path: v.optional(v.string()),
+    label: v.optional(v.string()),
+    snippet: v.optional(v.string()),
+    media_type: v.optional(v.string()),
+    // Cadeia estruturada da evidência (ordem + contexto), para não virar um
+    // saco plano de trechos: passo, ferramenta, comando, resumo do resultado.
+    step_index: v.optional(v.number()),
+    tool_name: v.optional(v.string()),
+    command: v.optional(v.string()),
+    result_summary: v.optional(v.string()),
+    redacted: v.optional(v.boolean()),
+    captured_at: v.number(),
+    created_at: v.number(),
+  })
+    .index("by_finding_and_captured", ["finding_id", "captured_at"])
+    .index("by_engagement_and_captured", ["engagement_id", "captured_at"])
+    .index("by_user_and_captured", ["user_id", "captured_at"])
+    .index("by_file_id", ["file_id"]),
+
+  reports: defineTable({
+    report_group_id: v.string(),
+    user_id: v.string(),
+    organization_id: v.optional(v.string()),
+    client_id: v.id("clients"),
+    engagement_id: v.id("engagements"),
+    audience: reportAudienceValidator,
+    format: reportFormatValidator,
+    version: v.number(),
+    status: reportStatusValidator,
+    s3_key: v.optional(v.string()),
+    size_bytes: v.optional(v.number()),
+    checksum: v.optional(v.string()),
+    title: v.string(),
+    template_version: v.string(),
+    trigger_run_id: v.optional(v.string()),
+    generated_by: v.string(),
+    error: v.optional(v.string()),
+    created_at: v.number(),
+    generated_at: v.optional(v.number()),
+    updated_at: v.number(),
+  })
+    .index("by_engagement", ["engagement_id"])
+    .index("by_engagement_audience_version", [
+      "engagement_id",
+      "audience",
+      "version",
+    ])
+    .index("by_group", ["report_group_id"])
+    .index("by_trigger_run", ["trigger_run_id"])
+    .index("by_status", ["status"]),
+
+  // Fonte fail-closed de identidade interna DENTRO do Convex (ctx.auth não lê
+  // env do Next). Escrita só por rota "owner" via service-key.
+  internal_staff: defineTable({
+    user_id: v.optional(v.string()),
+    email: v.string(),
+    role: v.union(v.literal("owner"), v.literal("analyst")),
+    status: v.union(v.literal("active"), v.literal("revoked")),
+    created_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_email", ["email"])
+    .index("by_user_id", ["user_id"]),
+
+  // Predicate RLS do portal (v2): quem pode ler os dados de um cliente.
+  client_memberships: defineTable({
+    user_id: v.string(),
+    client_id: v.id("clients"),
+    organization_id: v.optional(v.string()),
+    role: v.literal("client_viewer"),
+    status: v.union(v.literal("active"), v.literal("revoked")),
+    granted_by: v.optional(v.string()),
+    created_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_user", ["user_id"])
+    .index("by_client", ["client_id"])
+    .index("by_user_and_client", ["user_id", "client_id"]),
+
+  // Auditoria de plano de dados, imutável (só insert+list). NÃO best-effort.
+  security_audit_log: defineTable({
+    event_type: v.union(
+      v.literal("report.generated"),
+      v.literal("report.viewed"),
+      v.literal("report.downloaded"),
+      v.literal("evidence.viewed"),
+      v.literal("evidence.downloaded"),
+      v.literal("artifact.url_issued"),
+      v.literal("membership.granted"),
+      v.literal("membership.revoked"),
+      v.literal("engagement.created"),
+      v.literal("access.denied"),
+      v.literal("portal.enabled"),
+      v.literal("portal.disabled"),
+      v.literal("threat.detected"),
+      v.literal("enumeration.detected"),
+      v.literal("anomaly.detected"),
+      v.literal("ip.blocked"),
+      v.literal("ip.unblocked"),
+      v.literal("ioc.added"),
+      v.literal("ioc.removed"),
+      v.literal("user.autoblocked"),
+    ),
+    actor_user_id: v.optional(v.string()),
+    actor_email: v.optional(v.string()),
+    actor_kind: v.union(
+      v.literal("internal"),
+      v.literal("client"),
+      v.literal("system"),
+    ),
+    organization_id: v.optional(v.string()),
+    client_id: v.optional(v.id("clients")),
+    engagement_id: v.optional(v.id("engagements")),
+    target_type: v.optional(v.string()),
+    target_id: v.optional(v.string()),
+    ip: v.optional(v.string()),
+    user_agent: v.optional(v.string()),
+    request_id: v.optional(v.string()),
+    outcome: v.union(
+      v.literal("success"),
+      v.literal("denied"),
+      v.literal("error"),
+    ),
+    detail: v.optional(v.string()),
+    created_at: v.number(),
+  })
+    .index("by_client_created", ["client_id", "created_at"])
+    .index("by_actor_created", ["actor_user_id", "created_at"])
+    .index("by_event_created", ["event_type", "created_at"]),
 });

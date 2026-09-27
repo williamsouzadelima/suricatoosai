@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import { runCommand, convexUrlFlag } from "@/lib/utils/sandbox-command";
 import { useGlobalState } from "@/app/contexts/GlobalState";
+import { isTauriEnvironment } from "@/app/hooks/useTauri";
 import type {
   ChatMode,
   SandboxPreference,
@@ -205,6 +206,26 @@ const RemoteControlTab = () => {
     },
     [],
   );
+
+  // Desktop rows report clientVersion "desktop" (a marker), not their real
+  // version — read the running app's version from Tauri to show it on the badge.
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isTauriEnvironment()) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { getVersion } = await import("@tauri-apps/api/app");
+        const version = await getVersion();
+        if (!cancelled) setAppVersion(version);
+      } catch {
+        // Tauri API unavailable — leave the desktop badge as a plain label.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const activeConnections = connections ?? [];
 
@@ -412,6 +433,32 @@ const RemoteControlTab = () => {
                       : t("remoteControl.remoteControlConnected")}
                   </div>
                 </div>
+                <span
+                  className={`shrink-0 rounded-md border px-1.5 py-0.5 font-mono text-[10px] leading-none ${
+                    conn.isDesktop || conn.clientVersion === "1.0.0"
+                      ? // Desktop (updates via Tauri) or legacy pre-auto-update
+                        // connectors ("1.0.0") — neutral.
+                        "border-border bg-muted text-muted-foreground"
+                      : conn.updateAvailable
+                        ? "border-warning/30 bg-warning/10 text-warning"
+                        : "border-success/30 bg-success/10 text-success"
+                  }`}
+                  title={
+                    conn.isDesktop
+                      ? "Desktop app"
+                      : conn.clientVersion === "1.0.0"
+                        ? "Versão legada (sem auto-update) — bootstrap manual p/ 0.1.x"
+                        : conn.updateAvailable
+                          ? "Update disponível"
+                          : "Atualizado"
+                  }
+                >
+                  {conn.isDesktop
+                    ? conn.appVersion || appVersion
+                      ? `v${conn.appVersion || appVersion}`
+                      : "Desktop"
+                    : `v${conn.clientVersion}`}
+                </span>
                 {!conn.isDesktop && conn.updateAvailable ? (
                   <Button
                     variant="default"

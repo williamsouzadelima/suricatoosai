@@ -143,7 +143,7 @@ export function AuditTab() {
         <div className="min-w-0 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr className="border-b border-border bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
                 <th className="px-5 py-3 font-medium">Quando</th>
                 <th className="px-5 py-3 font-medium">Quem</th>
                 <th className="px-5 py-3 font-medium">Ação</th>
@@ -165,7 +165,9 @@ export function AuditTab() {
                     />
                   </td>
                   <td className="px-5 py-2.5 text-muted-foreground">
-                    {e.target && <span className="font-medium">{e.target}</span>}
+                    {e.target && (
+                      <span className="font-medium">{e.target}</span>
+                    )}
                     {e.target && e.detail ? " — " : ""}
                     {e.detail}
                   </td>

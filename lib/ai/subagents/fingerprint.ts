@@ -7,8 +7,27 @@ import type {
   SubagentProfile,
 } from "./contracts";
 
-const normalize = (value: string): string =>
+export const normalize = (value: string): string =>
   value.trim().replace(/\s+/g, " ").toLowerCase();
+
+/**
+ * Fingerprint estável de um achado (dedup por engajamento). Usa só
+ * title|affected_asset|weakness_class normalizados — o MESMO recipe para achados
+ * capturados pelo agente e semeados de subagentes, de modo que colapsem.
+ * Calculado no bridge Node (server-only); NUNCA no runtime V8 do Convex.
+ */
+export const createFindingFingerprint = (input: {
+  title: string;
+  affectedAsset: string;
+  weaknessClass: string;
+}): string => {
+  const canonical = JSON.stringify({
+    title: normalize(input.title),
+    affectedAsset: normalize(input.affectedAsset),
+    weaknessClass: normalize(input.weaknessClass),
+  });
+  return createHash("sha256").update(canonical).digest("hex");
+};
 
 const normalizeContextRef = (ref: SubagentContextRef): string => {
   switch (ref.kind) {

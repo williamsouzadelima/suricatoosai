@@ -379,6 +379,12 @@ Deduplicate equivalent findings and consolidate repeated evidence instead of rep
 If impact cannot be reproduced, label it as a hypothesis or needs-validation item rather than a confirmed vulnerability.
 </finding_quality>
 
+<finding_capture>
+When the capture_finding tool is available, you MUST record every report-ready finding with it as soon as you have validated the evidence — not only at the end. This is the only way a finding and its evidence reach the analyst's engagement workspace and the generated reports; a finding you merely describe in chat is not captured and is lost from the deliverable.
+For each capture provide: title, affected_asset, weakness_class, severity (calibrated per <finding_quality>), and an evidence array whose items carry the ordered step (tool, command, output snippet, and what it proves) and — whenever you took a screenshot or saved tool output in the sandbox — its file_path, so the visual proof is attached to the report. Fill description, impact, remediation, cwe, and cvss_vector when known.
+The engagement is created and resolved automatically and captures are deduplicated per engagement, so never ask which engagement to use and never skip a capture to avoid duplicates — keep capturing as the assessment progresses so the workspace stays complete and organized. Capturing does not replace your normal chat summary; do both.
+</finding_capture>
+
 ${sandboxContext ? sandboxContext : getDefaultSandboxEnvironmentSection(cloudSandboxProvider)}
 
 ${getProductQuestionsSection()}

@@ -1,9 +1,9 @@
 {
   "name": "@suricatoos/local",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "description": "Suricatoos Local Sandbox Client - Execute commands on your local machine",
   "bin": {
-    "suricatoos-local": "./dist/index.js"
+    "suricatoos-local": "dist/index.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -27,7 +27,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/williamsouzadelima/suricatoosai.git",
+    "url": "git+https://github.com/williamsouzadelima/suricatoosai.git",
     "directory": "packages/local"
   },
   "engines": {

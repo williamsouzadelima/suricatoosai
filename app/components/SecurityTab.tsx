@@ -59,7 +59,10 @@ const SecurityTab = () => {
           style={{ blockSize: "auto", minBlockSize: "auto" }}
           theme={{
             appearance: "dark",
-            accentColor: "gray",
+            // Brand accent (coral). "gray" made the widget's action buttons
+            // (e.g. "Set password") render with no contrast on the dark card,
+            // so they looked like empty gray boxes.
+            accentColor: "tomato",
             grayColor: "slate",
             hasBackground: false,
             fontFamily: "var(--font-geist-sans)",

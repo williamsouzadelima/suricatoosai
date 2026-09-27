@@ -208,7 +208,9 @@ export function MarketingTab() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      toast.success(`Campanha agendada para ${new Date(when).toLocaleString("pt-BR")}.`);
+      toast.success(
+        `Campanha agendada para ${new Date(when).toLocaleString("pt-BR")}.`,
+      );
       setSubject("");
       setBody("");
       setScheduleAt("");
@@ -233,7 +235,9 @@ export function MarketingTab() {
         if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
         await load();
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Falha ao cancelar.");
+        toast.error(
+          error instanceof Error ? error.message : "Falha ao cancelar.",
+        );
       } finally {
         setBusyId(null);
       }
@@ -283,7 +287,7 @@ export function MarketingTab() {
                 ))}
               </div>
             </div>
-  
+
             <Input
               placeholder="Assunto"
               value={subject}
@@ -297,10 +301,10 @@ export function MarketingTab() {
               className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
             <p className="text-xs text-muted-foreground">
-              Todo e-mail inclui rodapé de descadastro automático. Descadastrados
-              são excluídos do envio.
+              Todo e-mail inclui rodapé de descadastro automático.
+              Descadastrados são excluídos do envio.
             </p>
-  
+
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 onClick={() => void sendCampaign()}
@@ -322,7 +326,7 @@ export function MarketingTab() {
                   : `Teste${adminEmail ? ` (p/ ${adminEmail})` : ""}`}
               </Button>
             </div>
-  
+
             <div className="flex flex-wrap items-center gap-2 border-t pt-3">
               <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <CalendarClock className="h-4 w-4" />
@@ -446,7 +450,7 @@ export function MarketingTab() {
           <div className="min-w-0 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
                   <th className="px-5 py-3 font-medium">Assunto</th>
                   <th className="px-5 py-3 font-medium">Segmento</th>
                   <th className="px-5 py-3 text-right font-medium">Enviados</th>

@@ -1,0 +1,74 @@
+name: Security Audit (deps)
+
+# Detecção de vulnerabilidades em dependências (pnpm audit) — REPORT-ONLY.
+# Nunca falha o job: segurança não pode derrubar o pipeline/entrega (mesma
+# filosofia do enforcement de borda fail-open). O resultado aparece no resumo
+# da execução (Summary) e, em PRs, ajuda a ver se a mudança introduz CVE novo.
+# A correção segue o fluxo detectar -> PR -> aprovar (Dependabot / pnpm.overrides).
+
+on:
+  schedule:
+    - cron: "17 6 * * 1" # toda segunda, 06:17 UTC
+  workflow_dispatch: {}
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  pnpm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20.x
+
+      - name: Auditar dependências (report-only)
+        shell: bash
+        run: |
+          set +e
+          {
+            echo "## Auditoria de dependências (pnpm audit)"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # pnpm audit lê o pnpm-lock.yaml e consulta a base de advisories —
+          # NÃO precisa instalar node_modules (nenhum código de dependência roda
+          # aqui: superfície de supply-chain no CI = zero).
+
+          echo "### Produção (nível high+)" >> "$GITHUB_STEP_SUMMARY"
+          pnpm audit --prod --audit-level=high 2>&1 | tee audit-prod.txt
+          prod_code=${PIPESTATUS[0]}
+          {
+            echo '```'
+            cat audit-prod.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "### Todas as dependências (nível moderate+, informativo)" >> "$GITHUB_STEP_SUMMARY"
+          pnpm audit --audit-level=moderate 2>&1 | tee audit-all.txt
+          {
+            echo '```'
+            tail -n 40 audit-all.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$prod_code" -ne 0 ]; then
+            echo "> ⚠️ pnpm audit encontrou vulnerabilidades high/critical em dependências de PRODUÇÃO. Report-only: NÃO bloqueia o merge. Trate via PR do Dependabot ou pin em pnpm.overrides." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "> ✅ Nenhuma vulnerabilidade high/critical em dependências de produção." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # Report-only: sempre sai 0 para nunca bloquear o pipeline.
+          exit 0

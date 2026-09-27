@@ -225,6 +225,7 @@ interface LocalSandboxConnection {
   lastSeen: number;
   isDesktop: boolean;
   clientVersion: string;
+  appVersion: string | null;
   updateAvailable: boolean;
   capabilities: {
     commands: boolean;
@@ -400,6 +401,41 @@ const GlobalStateProviderInner: React.FC<GlobalStateProviderProps> = ({
     unreadReferralRewardNotifications,
     user,
   ]);
+
+  // Presença: heartbeat leve enquanto a aba está visível (o /admin deriva
+  // "online agora" a partir disto). Pausa em background para não contar abas
+  // ociosas. Best-effort — falha de rede não afeta a app.
+  const beatPresence = useMutation(api.presence.beatPresence);
+  useEffect(() => {
+    if (!user) return;
+    const beat = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      // Promise.resolve(...) torna robusto quando beatPresence não devolve
+      // promise (mock de teste) — em prod é o mesmo promise. Best-effort.
+      void Promise.resolve(
+        beatPresence({
+          path:
+            typeof window !== "undefined"
+              ? window.location.pathname
+              : undefined,
+        }),
+      ).catch(() => {});
+    };
+    beat();
+    const id = setInterval(beat, 45_000);
+    const onVisible = () => {
+      if (typeof document !== "undefined" && !document.hidden) beat();
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisible);
+    }
+    return () => {
+      clearInterval(id);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisible);
+      }
+    };
+  }, [user, beatPresence]);
 
   // Initialize chat sidebar state
   const [chatSidebarOpen, setChatSidebarOpen] = useState(() =>

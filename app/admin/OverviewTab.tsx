@@ -24,6 +24,9 @@ import {
   formatDateTime,
   fmtNum,
 } from "./_ui";
+import { SystemHealthPanel } from "./SystemHealthPanel";
+import { OnlineUsersPanel } from "./OnlineUsersPanel";
+import { LiveRunsPanel } from "./LiveRunsPanel";
 
 type AdminTab = "acesso" | "usuarios" | "alertas" | "avisos" | "marketing";
 
@@ -52,7 +55,10 @@ interface Overview {
 }
 
 const fmtWeek = (ms: number) =>
-  new Date(ms).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  new Date(ms).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+  });
 
 function GroupLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -128,13 +134,22 @@ export function OverviewTab({
 
   return (
     <div className="space-y-6">
+      {/* Presença ao vivo */}
+      <OnlineUsersPanel />
+
+      {/* Saúde do sistema */}
+      <SystemHealthPanel />
+
+      {/* Runs ao vivo + kill switch */}
+      <LiveRunsPanel />
+
       {/* Usuários */}
       <section>
         <GroupLabel>Usuários</GroupLabel>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard
             icon={UserCheck}
-            label="Ativos"
+            label="Com acesso"
             value={data?.users.active ?? 0}
             sub={activePct}
             tone="success"
@@ -152,9 +167,7 @@ export function OverviewTab({
             icon={TrendingUp}
             label="Novos (7d)"
             value={data?.users.new7d ?? 0}
-            sub={
-              loading ? undefined : `${data?.users.new30d ?? 0} em 30 dias`
-            }
+            sub={loading ? undefined : `${data?.users.new30d ?? 0} em 30 dias`}
             tone="primary"
             loading={loading}
           />
@@ -162,9 +175,7 @@ export function OverviewTab({
             icon={Users}
             label="Total"
             value={data?.users.total ?? 0}
-            sub={
-              loading ? undefined : `${data?.users.revoked ?? 0} revogados`
-            }
+            sub={loading ? undefined : `${data?.users.revoked ?? 0} revogados`}
             tone="neutral"
             loading={loading}
           />

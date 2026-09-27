@@ -1,6 +1,47 @@
 version: 2
 updates:
+  # GitHub Actions — mantém as actions do CI atualizadas (já existia).
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    labels:
+      - "dependencies"
+      - "ci"
+
+  # Dependências JS (pnpm) — a MAIOR superfície de ataque de supply-chain.
+  # Atualizações agrupadas semanais (patch/minor) para evitar enxurrada de PRs,
+  # + PRs de SEGURANÇA (CVE) automáticos quando "Dependabot security updates"
+  # estiver ligado nas configurações do repositório. Você aprova cada PR
+  # (detectar -> PR -> aprovar; nunca patch cego).
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "security"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+    groups:
+      production-minor-patch:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      development-minor-patch:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Imagem base do sandbox de pentest (docker/Dockerfile) — patches do SO base.
+  - package-ecosystem: "docker"
+    directory: "/docker"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "docker"

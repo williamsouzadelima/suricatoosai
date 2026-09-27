@@ -13,13 +13,21 @@ jest.mock("convex/server", () => ({
 
 jest.mock("convex/values", () => ({
   v: {
-    string: jest.fn(() => "string"),
-    number: jest.fn(() => "number"),
-    optional: jest.fn(() => "optional"),
-    boolean: jest.fn(() => "boolean"),
-    union: jest.fn(() => "union"),
-    literal: jest.fn(() => "literal"),
+    id: jest.fn(() => "id"),
     null: jest.fn(() => "null"),
+    number: jest.fn(() => "number"),
+    float64: jest.fn(() => "float64"),
+    int64: jest.fn(() => "int64"),
+    boolean: jest.fn(() => "boolean"),
+    string: jest.fn(() => "string"),
+    bytes: jest.fn(() => "bytes"),
+    literal: jest.fn(() => "literal"),
+    array: jest.fn(() => "array"),
+    object: jest.fn(() => "object"),
+    record: jest.fn(() => "record"),
+    union: jest.fn(() => "union"),
+    any: jest.fn(() => "any"),
+    optional: jest.fn(() => "optional"),
   },
 }));
 

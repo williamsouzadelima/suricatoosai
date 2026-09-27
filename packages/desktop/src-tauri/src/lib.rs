@@ -1739,41 +1739,57 @@ async fn check_for_updates(app: tauri::AppHandle, silent: bool) {
             let version = update.version.clone();
             log::info!("Update available: {}", version);
 
-            let should_update = app
-                .dialog()
-                .message(format!(
-                    "A new version ({}) is available. Would you like to update now?",
-                    version
-                ))
-                .title("Update Available")
-                .kind(MessageDialogKind::Info)
-                .buttons(MessageDialogButtons::OkCancel)
-                .blocking_show();
+            // Chrome-style: the automatic (silent) path — the launch check and
+            // the periodic background check — downloads and installs the update
+            // with NO prompt and applies it on the next launch, so it never
+            // interrupts the user. Only the manual "Check for updates" action
+            // (silent == false) asks the user first and offers to restart now.
+            let should_update = if silent {
+                true
+            } else {
+                app.dialog()
+                    .message(format!(
+                        "A new version ({}) is available. Would you like to update now?",
+                        version
+                    ))
+                    .title("Update Available")
+                    .kind(MessageDialogKind::Info)
+                    .buttons(MessageDialogButtons::OkCancel)
+                    .blocking_show()
+            };
 
             if should_update {
-                log::info!("User accepted update to version {}", version);
+                if silent {
+                    log::info!("Auto-updating to version {} in the background", version);
+                } else {
+                    log::info!("User accepted update to version {}", version);
+                }
                 if let Err(e) = update.download_and_install(|_, _| {}, || {}).await {
                     log::error!("Failed to install update: {}", e);
-                    let _ = app
-                        .dialog()
-                        .message(format!("Failed to install update: {}", e))
-                        .kind(MessageDialogKind::Error)
-                        .title("Update Error")
-                        .blocking_show();
+                    if !silent {
+                        let _ = app
+                            .dialog()
+                            .message(format!("Failed to install update: {}", e))
+                            .kind(MessageDialogKind::Error)
+                            .title("Update Error")
+                            .blocking_show();
+                    }
                 } else {
-                    log::info!("Update installed successfully");
-                    let restart_now = app
-                        .dialog()
-                        .message("Update installed successfully. Restart now to apply changes?")
-                        .kind(MessageDialogKind::Info)
-                        .title("Update Complete")
-                        .buttons(MessageDialogButtons::OkCancelCustom(
-                            "Restart Now".into(),
-                            "Later".into(),
-                        ))
-                        .blocking_show();
-                    if restart_now {
-                        app.restart();
+                    log::info!("Update {} installed; will apply on next launch", version);
+                    if !silent {
+                        let restart_now = app
+                            .dialog()
+                            .message("Update installed successfully. Restart now to apply changes?")
+                            .kind(MessageDialogKind::Info)
+                            .title("Update Complete")
+                            .buttons(MessageDialogButtons::OkCancelCustom(
+                                "Restart Now".into(),
+                                "Later".into(),
+                            ))
+                            .blocking_show();
+                        if restart_now {
+                            app.restart();
+                        }
                     }
                 }
             }

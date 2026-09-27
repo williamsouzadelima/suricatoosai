@@ -17,6 +17,7 @@ import {
   createUpdateNote,
   createDeleteNote,
 } from "./notes";
+import { createCaptureFinding } from "./findings";
 // match tool removed — usage analytics showed it wasn't being used enough to justify
 // the added complexity. The agent should use run_terminal_cmd with rg instead.
 // import { createMatch } from "./match";
@@ -46,6 +47,8 @@ import { createE2BResourcePressureObserver } from "@/lib/analytics/sandbox-resou
 import { E2B_COST_PER_MS } from "./utils/e2b-cost";
 import { phLogger } from "@/lib/posthog/server";
 import type { TriggerRunRegion } from "@/lib/api/trigger-region";
+import { getConvexClient } from "@/lib/db/convex-client";
+import { api } from "@/convex/_generated/api";
 import type { CloudSandboxAcquisitionContext } from "./utils/cloud-sandbox";
 import type { CloudSandboxProvider } from "./utils/cloud-sandbox-provider";
 import {
@@ -102,6 +105,23 @@ export const createTools = (
   auxiliaryVision?: ToolContext["auxiliaryVision"],
   runtimePolicy: CreateToolsRuntimePolicy = {},
 ) => {
+  // Cria/garante o engajamento da task assim que ela inicia (eager) — aparece em
+  // /engagements mesmo antes do primeiro achado. Best-effort e não-bloqueante;
+  // idempotente (resolveEngagementForChatBackend reusa o engajamento do chat).
+  if (notesEnabled && serviceKey && chatId && mode === "agent") {
+    try {
+      void getConvexClient()
+        .mutation(api.engagements.resolveEngagementForChatBackend, {
+          serviceKey,
+          userId: userID,
+          chatId,
+        })
+        .catch((e) => console.error("eager engagement:", e));
+    } catch (e) {
+      console.error("eager engagement (client init):", e);
+    }
+  }
+
   let sandbox: AnySandbox | null = null;
   let sandboxCostSegmentStartedAt: number | null = null;
   let sandboxCostProvider: CloudSandboxProvider | null = null;
@@ -265,6 +285,7 @@ export const createTools = (
         list_notes: createListNotes(context),
         update_note: createUpdateNote(context),
         delete_note: createDeleteNote(context),
+        capture_finding: createCaptureFinding(context),
       }),
       ...(process.env.PERPLEXITY_API_KEY && {
         web_search: createWebSearch(context),
