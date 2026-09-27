@@ -199,6 +199,17 @@
     "*.{json,css,md}": "prettier --write"
   },
   "pnpm": {
+    "onlyBuiltDependencies": [
+      "@depot/cli",
+      "@parcel/watcher",
+      "@posthog/cli",
+      "@swc/core",
+      "core-js",
+      "esbuild",
+      "node-pty",
+      "protobufjs",
+      "unrs-resolver"
+    ],
     "overrides": {
       "axios": "1.18.0",
       "e2b>chalk": "^4.1.2",
