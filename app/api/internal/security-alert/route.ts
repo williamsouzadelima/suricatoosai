@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/**
+ * Comparação em tempo constante do segredo (evita canal lateral de timing).
+ * Hash SHA-256 de ambos os lados → buffers de tamanho fixo, sem vazar o
+ * comprimento. Espelha o gate endurecido de /api/internal/user-research.
+ */
+function safeEqualSecret(provided: string | null, expected: string): boolean {
+  if (!provided) return false;
+  const a = createHash("sha256").update(provided).digest();
+  const b = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(a, b);
+}
 
 /**
  * Endpoint INTERNO para o encaminhador do Suricata (roda no host, posta em
@@ -17,7 +30,7 @@ export async function POST(req: NextRequest) {
   if (!serviceKey) {
     return NextResponse.json({ error: "not configured" }, { status: 500 });
   }
-  if (req.headers.get("x-service-key") !== serviceKey) {
+  if (!safeEqualSecret(req.headers.get("x-service-key"), serviceKey)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
   const body = await req.json().catch(() => ({}));

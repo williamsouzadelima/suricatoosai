@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { tasks, auth, idempotencyKeys } from "@trigger.dev/sdk";
 import { getInternalUser } from "@/lib/auth/require-internal";
+import { S3_USER_FILES_PREFIX } from "@/lib/constants/s3";
 import type { ingestEvidenceBundle } from "@/trigger/ingest-bundle";
 
 export const runtime = "nodejs";
@@ -40,6 +41,19 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = staff.user.id;
+
+  // Segurança (IDOR): o s3Key precisa pertencer ao prefixo do PRÓPRIO usuário.
+  // Sem isto, um analista poderia ingerir um objeto de OUTRO tenant do bucket
+  // compartilhado para dentro do próprio engajamento — a posse do engajamento é
+  // validada na task, mas os BYTES vêm da chave, que tem de ser amarrada ao
+  // usuário ANTES do GetObject. (`..` rejeitado por defesa em profundidade.)
+  const ownedPrefix = `${S3_USER_FILES_PREFIX}/${userId}/`;
+  if (!s3Key.startsWith(ownedPrefix) || s3Key.includes("..")) {
+    return NextResponse.json(
+      { error: "s3Key não pertence ao usuário autenticado" },
+      { status: 403 },
+    );
+  }
 
   try {
     // A posse do engajamento é validada na task (captureFindingForBackend exige

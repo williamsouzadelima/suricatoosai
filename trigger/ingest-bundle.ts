@@ -13,6 +13,7 @@ import { myProvider, type ModelName } from "@/lib/ai/providers";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { createFindingFingerprint } from "@/lib/ai/subagents/fingerprint";
+import { S3_USER_FILES_PREFIX } from "@/lib/constants/s3";
 
 /**
  * Ingestão de um BUNDLE de evidências (tar.gz/zip) de uma task de pentest para
@@ -134,6 +135,16 @@ export const ingestEvidenceBundle = schemaTask({
     const { client, serviceKey } = getClient();
     const { s3, bucket } = getS3();
     const engagementId = payload.engagementId as Id<"engagements">;
+
+    // Defesa em profundidade (a rota /api/engagements/ingest-bundle já valida):
+    // o s3Key precisa pertencer ao prefixo do próprio usuário, senão baixaríamos
+    // bytes de um objeto de outro tenant do bucket compartilhado.
+    if (
+      !payload.s3Key.startsWith(`${S3_USER_FILES_PREFIX}/${payload.userId}/`) ||
+      payload.s3Key.includes("..")
+    ) {
+      throw new Error("s3Key fora do prefixo do usuário — ingestão recusada");
+    }
 
     metadata.set("phase", "downloading");
     const obj = await s3.send(
