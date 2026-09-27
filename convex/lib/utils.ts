@@ -4,7 +4,12 @@ import { Id } from "../_generated/dataModel";
 import type { RetainedTailDoc } from "./retainedTail";
 
 export function validateServiceKey(serviceKey: string): void {
-  if (serviceKey !== process.env.CONVEX_SERVICE_ROLE_KEY) {
+  const expected = process.env.CONVEX_SERVICE_ROLE_KEY;
+  // Fail-closed se a env não estiver setada (evita que uma implantação sem a
+  // chave configurada aceite qualquer chamada por acidente). Runtime V8 do
+  // Convex não tem node:crypto, então não dá p/ constant-time aqui — mas o
+  // segredo é de alta entropia e timing por rede é inviável (auditoria 27/09).
+  if (!expected || serviceKey !== expected) {
     throw new Error("Unauthorized: Invalid service key");
   }
 }

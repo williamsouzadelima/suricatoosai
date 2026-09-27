@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
 import { sendCampaign, normSegment } from "@/lib/marketing/dispatch";
@@ -7,13 +8,22 @@ export const runtime = "nodejs";
 
 const MAX_PER_RUN = 20;
 
+// Comparação em tempo constante (SHA-256 → buffers fixos, sem vazar tamanho),
+// coerente com o gate de /api/internal/security-alert e user-research.
+function safeEqual(provided: string, expected: string): boolean {
+  if (!provided) return false;
+  const a = createHash("sha256").update(provided).digest();
+  const b = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(a, b);
+}
+
 function authorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false; // sem segredo, o dispatcher fica fechado
   const auth = req.headers.get("authorization") ?? "";
   const bearer = auth.startsWith("Bearer ") ? auth.slice(7) : "";
   const headerSecret = req.headers.get("x-cron-secret") ?? "";
-  return bearer === secret || headerSecret === secret;
+  return safeEqual(bearer, secret) || safeEqual(headerSecret, secret);
 }
 
 async function run(req: NextRequest) {
