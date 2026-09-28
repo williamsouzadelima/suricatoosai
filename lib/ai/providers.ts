@@ -1,6 +1,7 @@
 import { customProvider } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { ChatMode, SelectedModel } from "@/types/chat";
+import { isOperatorModelSelection } from "@/types/chat";
 import { openrouterAttributionHeaders } from "@/lib/ai/openrouter-attribution";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -9,8 +10,14 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isXaiModelSlug = (value: unknown): boolean =>
   typeof value === "string" && value.toLowerCase().startsWith("x-ai/");
 
-const isGrok46ModelSlug = (value: unknown): boolean =>
-  typeof value === "string" && value.toLowerCase().startsWith("x-ai/grok-4.6");
+// Grok 4.6 E 4.7 EXIGEM reasoning (rejeitam reasoning.enabled=false) e o xAI
+// não aceita tool_choice forçado com reasoning → estes slugs são "reasoning-
+// locked": reroteiam a request p/ um fallback não-xAI em vez de desligar o
+// reasoning. Cobrir 4.7 aqui é a edição a-prova-de-regressão (senão xAI dá 400).
+const isReasoningLockedXaiGrokSlug = (value: unknown): boolean =>
+  typeof value === "string" &&
+  (value.toLowerCase().startsWith("x-ai/grok-4.6") ||
+    value.toLowerCase().startsWith("x-ai/grok-4.7"));
 
 const isKimiModelSlug = (value: unknown): boolean =>
   typeof value === "string" &&
@@ -279,7 +286,7 @@ export const makeOpenRouterToolChoiceCompatibleWithXaiReasoning = (
     return { body, changed: false };
   }
 
-  if (!isGrok46ModelSlug(body.model)) {
+  if (!isReasoningLockedXaiGrokSlug(body.model)) {
     return {
       body: {
         ...body,
@@ -296,7 +303,7 @@ export const makeOpenRouterToolChoiceCompatibleWithXaiReasoning = (
       )
     : [];
 
-  // Grok 4.6 requires reasoning, while xAI reasoning does not accept a forced
+  // Grok 4.6/4.7 require reasoning, while xAI reasoning does not accept a forced
   // tool choice. Preserve both behaviors by routing this single request to an
   // existing non-xAI fallback. When no compatible route exists, keep Grok's
   // mandatory reasoning and relax only the forced tool choice.
@@ -977,6 +984,7 @@ export const GLM_5_3_SLUG = "z-ai/glm-5.3";
 export const GLM_5_3_FLASH_SLUG = "z-ai/glm-5.3-flash";
 export const GROK_4_5_SLUG = "x-ai/grok-4.5";
 export const GROK_4_6_SLUG = "x-ai/grok-4.6";
+export const GROK_4_7_SLUG = "x-ai/grok-4.7";
 export const DEEPSEEK_V4_FLASH_VISION_SLUG =
   "deepseek/deepseek-v4-flash-vision-exp";
 export const MINIMAX_M3_SLUG = "minimax/minimax-m3";
@@ -986,6 +994,7 @@ export const MINIMAX_M3_SLUG = "minimax/minimax-m3";
 export const AUXILIARY_VISION_SLUG = MINIMAX_M3_SLUG;
 export const DEEPSEEK_V4_PRO_SLUG = "deepseek/deepseek-v4-pro";
 export const DEEPSEEK_V4_PRO_0813_SLUG = "deepseek/deepseek-v4-pro-0813";
+export const DEEPSEEK_V4_1_FLASH_SLUG = "deepseek/deepseek-v4.1-flash";
 export const DEEPSEEK_V4_FLASH_SLUG = "deepseek/deepseek-v4-flash-0731";
 export const DEEPSEEK_V4_FLASH_PREVIOUS_SLUG = "deepseek/deepseek-v4-flash";
 const TITLE_GENERATOR_DEEPSEEK_SLUG = "deepseek/deepseek-v4-flash";
@@ -1016,6 +1025,8 @@ const buildProviderMap = (
     "agent-model": or(GROK_4_6_SLUG),
     "agent-model-free": or(freeAgentDeepSeekSlug),
     "model-grok-4.6": or(GROK_4_6_SLUG),
+    "model-grok-4.7": or(GROK_4_7_SLUG),
+    "model-deepseek-v4.1-flash": or(DEEPSEEK_V4_1_FLASH_SLUG),
     // Separate internal keys use the same Grok 4.5 provider model while
     // provider reasoning options distinguish Standard from Pro vision.
     "model-grok-4.5": or(GROK_4_5_SLUG),
@@ -1055,6 +1066,9 @@ export const modelCutoffDates: Partial<Record<ModelName, string>> &
   "agent-model": "August 2026",
   "model-grok-4.6": "August 2026",
   "model-grok-4.6-pro": "August 2026",
+  // Aproximação por paridade de família (cutoff exato do 4.7 não publicado).
+  "model-grok-4.7": "August 2026",
+  "model-deepseek-v4.1-flash": "July 2026",
   "model-deepseek-v4-flash-0731": "July 2026",
   "model-deepseek-v4-pro": "May 2025",
   "model-deepseek-v4-pro-0813": "August 2026",
@@ -1077,6 +1091,8 @@ export const modelDisplayNames: Record<ModelName, string> &
   "agent-model": "Auto, an intelligent model router built by Suricatoos",
   "agent-model-free": "Auto, an intelligent model router built by Suricatoos",
   "model-grok-4.6": "xAI Grok 4.6",
+  "model-grok-4.7": "xAI Grok 4.7",
+  "model-deepseek-v4.1-flash": "DeepSeek V4.1 Flash",
   "model-grok-4.5": "xAI Grok 4.5",
   "model-grok-4.5-pro": "xAI Grok 4.5",
   "model-grok-4.6-pro": "xAI Grok 4.6",
@@ -1118,6 +1134,7 @@ export function isDeepSeekModel(modelName: string): boolean {
     modelName === "agent-model-free" ||
     modelName === "agent-auto-review-model" ||
     modelName === "model-deepseek-v4-flash-0731" ||
+    modelName === "model-deepseek-v4.1-flash" ||
     modelName === "model-deepseek-v4-pro" ||
     modelName === "model-deepseek-v4-pro-0813"
   );
@@ -1140,6 +1157,7 @@ function isGrokModel(modelName: string): boolean {
     normalized === "fallback-agent-model" ||
     normalized === "fallback-ask-model" ||
     normalized === "model-grok-4.6" ||
+    normalized === "model-grok-4.7" ||
     normalized === "model-grok-4.5" ||
     normalized === "model-grok-4.5-pro" ||
     normalized === "model-grok-4.6-pro" ||
@@ -1193,6 +1211,9 @@ export function resolveTierToProviderKey(
       return "model-deepseek-v4-pro-0813";
     case "hackerai-max":
       return "model-grok-4.6";
+    default:
+      // Escolha concreta do operador: o próprio id é a chave interna model-*.
+      return isOperatorModelSelection(tier) ? (tier as ModelName) : null;
   }
 }
 

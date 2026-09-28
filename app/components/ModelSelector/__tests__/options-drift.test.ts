@@ -63,41 +63,40 @@ describe("ModelSelector tier ↔ provider drift", () => {
     expect(resolveTierToProviderKey("auto", "agent")).toBeNull();
   });
 
-  it("hover-popup descriptions are present for every Suricatoos tier", () => {
-    const tiered = allOptions.filter((o) => o.label.startsWith("Suricatoos"));
-    expect(tiered.length).toBeGreaterThan(0);
-    for (const option of tiered) {
+  it("hover-popup descriptions and provider disclosure present for every option", () => {
+    expect(allOptions.length).toBeGreaterThan(0);
+    for (const option of allOptions) {
       expect(option.description).toBeTruthy();
       expect(option.poweredBy).toBeTruthy();
     }
   });
 
-  it("discloses DeepSeek V4 Flash 0731 for Agent Standard", () => {
-    expect(
-      AGENT_MODEL_OPTIONS.find((option) => option.id === "hackerai-standard")
-        ?.poweredBy,
-    ).toBe("DeepSeek V4 Flash 0731");
+  it("exposes the expected concrete operator models in both lineups", () => {
+    const expected = [
+      "model-grok-4.6",
+      "model-grok-4.7",
+      "model-glm-5.3",
+      "model-glm-5.3-flash",
+      "model-deepseek-v4-pro-0813",
+      "model-deepseek-v4.1-flash",
+      "model-deepseek-v4-flash-0731",
+      "model-kimi-k3",
+    ].sort();
+    expect(ASK_MODEL_OPTIONS.map((o) => o.id).sort()).toEqual(expected);
+    expect(AGENT_MODEL_OPTIONS.map((o) => o.id).sort()).toEqual(expected);
   });
 
-  it("discloses DeepSeek V4 Pro 0813 for Suricatoos Pro", () => {
-    expect(
-      ASK_MODEL_OPTIONS.find((option) => option.id === "hackerai-pro")
-        ?.poweredBy,
-    ).toBe("DeepSeek V4 Pro 0813");
-    expect(
-      AGENT_MODEL_OPTIONS.find((option) => option.id === "hackerai-pro")
-        ?.poweredBy,
-    ).toBe("DeepSeek V4 Pro 0813");
+  it("agent options carry the thinking flag; ask options do not", () => {
+    expect(AGENT_MODEL_OPTIONS.every((o) => o.thinking === true)).toBe(true);
+    expect(ASK_MODEL_OPTIONS.every((o) => !o.thinking)).toBe(true);
   });
 
-  it("discloses Grok 4.6 for Suricatoos Max", () => {
-    expect(
-      ASK_MODEL_OPTIONS.find((option) => option.id === "hackerai-max")
-        ?.poweredBy,
-    ).toBe("xAI Grok 4.6");
-    expect(
-      AGENT_MODEL_OPTIONS.find((option) => option.id === "hackerai-max")
-        ?.poweredBy,
-    ).toBe("xAI Grok 4.6");
+  it("resolves each concrete option to its own registered model key", () => {
+    expect(resolveTierToProviderKey("model-grok-4.7", "agent")).toBe(
+      "model-grok-4.7",
+    );
+    expect(resolveTierToProviderKey("model-deepseek-v4.1-flash", "ask")).toBe(
+      "model-deepseek-v4.1-flash",
+    );
   });
 });

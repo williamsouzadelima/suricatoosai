@@ -56,6 +56,13 @@ const { ModelSelector } = jest.requireActual<
   typeof import("../../ModelSelector")
 >("../../ModelSelector");
 
+/**
+ * O seletor expõe Auto + modelos CONCRETOS (seletor do operador). Os tiers
+ * (hackerai-standard/pro/max) não são mais oferecidos, então o fluxo de
+ * entitlement do Max é inalcançável pelo seletor — a cobertura aqui foca no
+ * comportamento novo: escolher um modelo concreto, Auto first-class, e o
+ * bloqueio de usuário free (que ainda vale para TODAS as opções).
+ */
 describe("ModelSelector", () => {
   beforeEach(() => {
     mockSubscription = "pro-plus";
@@ -76,7 +83,7 @@ describe("ModelSelector", () => {
     expect(mockUseQuery).toHaveBeenLastCalledWith(expect.anything(), {});
   });
 
-  it("shows model choices immediately while Auto is selected", () => {
+  it("shows Auto plus the concrete model choices while Auto is selected", () => {
     render(<ModelSelector value="auto" onChange={jest.fn()} mode="ask" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
@@ -86,44 +93,44 @@ describe("ModelSelector", () => {
         "Balanced quality and speed, recommended for most tasks",
       ),
     ).toBeVisible();
-    expect(screen.getByText("Suricatoos Standard")).toBeVisible();
-    expect(screen.getByText("Suricatoos Pro")).toBeVisible();
-    expect(screen.getByText("Suricatoos Max")).toBeVisible();
+    expect(screen.getByText("xAI Grok 4.6")).toBeVisible();
+    expect(screen.getByText("xAI Grok 4.7")).toBeVisible();
+    expect(screen.getByText("Z.ai GLM 5.3")).toBeVisible();
+    expect(screen.getByText("DeepSeek V4.1 Flash")).toBeVisible();
+    expect(screen.getByText("Moonshot Kimi K3")).toBeVisible();
 
     expect(
-      screen.getByRole("button", { name: /Suricatoos Standard/i }),
+      screen.getByRole("button", { name: /xAI Grok 4\.6/i }),
     ).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("discloses the Agent Standard and Pro providers", async () => {
+  it("discloses the underlying provider of a concrete model on hover", async () => {
     const user = userEvent.setup();
     render(<ModelSelector value="auto" onChange={jest.fn()} mode="agent" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
 
-    await user.hover(
-      screen.getByRole("button", { name: /Suricatoos Standard/i }),
-    );
+    await user.hover(screen.getByRole("button", { name: /Moonshot Kimi K3/i }));
     expect(
-      await screen.findAllByText("Powered by DeepSeek V4 Flash 0731"),
+      await screen.findAllByText("Powered by Moonshot"),
     ).not.toHaveLength(0);
 
     await user.unhover(
-      screen.getByRole("button", { name: /Suricatoos Standard/i }),
+      screen.getByRole("button", { name: /Moonshot Kimi K3/i }),
     );
-    await user.hover(screen.getByRole("button", { name: /Suricatoos Pro/i }));
+    await user.hover(screen.getByRole("button", { name: /xAI Grok 4\.7/i }));
     expect(
-      await screen.findAllByText("Powered by DeepSeek V4 Pro 0813"),
+      await screen.findAllByText("Powered by xAI · 500k contexto"),
     ).not.toHaveLength(0);
   });
 
   it("selects Auto as a first-class option", () => {
     const onChange = jest.fn();
     render(
-      <ModelSelector value="hackerai-pro" onChange={onChange} mode="ask" />,
+      <ModelSelector value="model-grok-4.6" onChange={onChange} mode="ask" />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Pro/i }));
+    fireEvent.click(screen.getByRole("button", { name: /xAI Grok 4\.6/i }));
     fireEvent.click(
       screen.getByRole("button", {
         name: /Auto Balanced quality and speed/i,
@@ -133,275 +140,81 @@ describe("ModelSelector", () => {
     expect(onChange).toHaveBeenCalledWith("auto");
   });
 
-  it("selects Suricatoos Pro in ask mode without a high-cost warning", () => {
+  it("selects a concrete model in ask mode without a high-cost warning", () => {
     const onChange = jest.fn();
     render(<ModelSelector value="auto" onChange={onChange} mode="ask" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Pro/i }));
+    fireEvent.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
 
     expect(
       screen.queryByTestId("high-cost-model-warning"),
     ).not.toBeInTheDocument();
-    expect(onChange).toHaveBeenCalledWith("hackerai-pro");
+    expect(onChange).toHaveBeenCalledWith("model-deepseek-v4-pro-0813");
   });
 
-  it("selects Suricatoos Pro in agent mode without a high-cost warning", () => {
+  it("selects the new Grok 4.7 in agent mode without a high-cost warning", () => {
     const onChange = jest.fn();
     render(<ModelSelector value="auto" onChange={onChange} mode="agent" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Pro/i }));
+    fireEvent.click(screen.getByRole("button", { name: /xAI Grok 4\.7/i }));
 
     expect(
       screen.queryByTestId("high-cost-model-warning"),
     ).not.toBeInTheDocument();
-    expect(onChange).toHaveBeenCalledWith("hackerai-pro");
+    expect(onChange).toHaveBeenCalledWith("model-grok-4.7");
   });
 
-  it("opens the Max access dialog when a Pro Plus user clicks the locked desktop row", () => {
-    mockMaxEntitlement = {
-      extraUsageAvailable: false,
-      reason: "disabled",
-      hasBalance: false,
-      autoReloadEnabled: false,
-    };
+  it("selects the new DeepSeek V4.1 Flash in agent mode", () => {
     const onChange = jest.fn();
     render(<ModelSelector value="auto" onChange={onChange} mode="agent" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    const maxButton = screen.getByRole("button", { name: /Suricatoos Max/i });
-
-    expect(maxButton).toHaveAccessibleName(
-      "Suricatoos Max. Use Extra Usage or upgrade to Ultra for Max mode.",
+    fireEvent.click(
+      screen.getByRole("button", { name: /DeepSeek V4\.1 Flash/i }),
     );
 
-    fireEvent.click(maxButton);
-
-    expect(onChange).not.toHaveBeenCalled();
-    expect(
-      screen.getByRole("dialog", { name: "Unlock Suricatoos Max" }),
-    ).toBeVisible();
-    expect(
-      screen.getByText(/pay for Max as you go, or upgrade to Ultra/i),
-    ).toBeVisible();
-    expect(mockOpenSettingsDialog).not.toHaveBeenCalled();
-    expect(mockRedirectToPricing).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: "Use Extra Usage" }));
-
-    expect(mockOpenSettingsDialog).toHaveBeenCalledWith("Extra Usage");
+    expect(onChange).toHaveBeenCalledWith("model-deepseek-v4.1-flash");
   });
 
-  it("does not reveal inline Max access actions on desktop hover", async () => {
-    mockMaxEntitlement = {
-      extraUsageAvailable: false,
-      reason: "disabled",
-      hasBalance: false,
-      autoReloadEnabled: false,
-    };
-    const user = userEvent.setup();
-    render(<ModelSelector value="auto" onChange={jest.fn()} mode="agent" />);
-
-    fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    await user.hover(screen.getByRole("button", { name: /Suricatoos Max/i }));
-
-    expect(
-      screen.queryByRole("group", {
-        name: "Choose how to access Suricatoos Max",
-      }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("can upgrade to Ultra from the locked Max desktop dialog", () => {
-    mockMaxEntitlement = {
-      extraUsageAvailable: false,
-      reason: "disabled",
-      hasBalance: false,
-      autoReloadEnabled: false,
-    };
-    render(<ModelSelector value="auto" onChange={jest.fn()} mode="agent" />);
-
-    fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Max/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Upgrade to Ultra" }));
-
-    expect(mockRedirectToPricing).toHaveBeenCalledWith({
-      surface: "model_selector",
-      source: "max_model_gate",
-      from_tier: "pro-plus",
-      cta_text: "Upgrade to Ultra",
-    });
-    expect(mockOpenSettingsDialog).not.toHaveBeenCalled();
-  });
-
-  it("shows both Max access choices after a locked mobile selection", () => {
-    mockIsMobile = true;
-    mockMaxEntitlement = {
-      extraUsageAvailable: false,
-      reason: "disabled",
-      hasBalance: false,
-      autoReloadEnabled: false,
-    };
-    const onChange = jest.fn();
-    render(<ModelSelector value="auto" onChange={onChange} mode="agent" />);
-
-    fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Max/i }));
-
-    expect(
-      screen.getByRole("dialog", { name: "Unlock Suricatoos Max" }),
-    ).toBeVisible();
-    expect(
-      screen.getByText(/pay for Max as you go, or upgrade to Ultra/i),
-    ).toBeVisible();
-    expect(onChange).not.toHaveBeenCalled();
-    expect(mockOpenSettingsDialog).not.toHaveBeenCalled();
-    expect(mockRedirectToPricing).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: "Use Extra Usage" }));
-
-    expect(mockOpenSettingsDialog).toHaveBeenCalledWith("Extra Usage");
-    expect(mockRedirectToPricing).not.toHaveBeenCalled();
-  });
-
-  it("can upgrade to Ultra from the locked Max mobile dialog", () => {
-    mockIsMobile = true;
-    mockMaxEntitlement = {
-      extraUsageAvailable: false,
-      reason: "empty",
-      hasBalance: false,
-      autoReloadEnabled: false,
-    };
-    render(<ModelSelector value="auto" onChange={jest.fn()} mode="agent" />);
-
-    fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Max/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Upgrade to Ultra" }));
-
-    expect(mockRedirectToPricing).toHaveBeenCalledWith({
-      surface: "model_selector_mobile",
-      source: "max_model_gate",
-      from_tier: "pro-plus",
-      cta_text: "Upgrade to Ultra",
-    });
-    expect(mockOpenSettingsDialog).not.toHaveBeenCalled();
-  });
-
-  it("shows a checking state while lazy Max entitlement is loading", () => {
-    const onChange = jest.fn();
-    render(<ModelSelector value="auto" onChange={onChange} mode="agent" />);
-
-    fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-
-    const maxButton = screen.getByRole("button", { name: /Suricatoos Max/i });
-    expect(maxButton).toHaveAccessibleName(
-      "Suricatoos Max. Checking Extra Usage for Max mode.",
-    );
-    expect(maxButton).toBeDisabled();
-
-    fireEvent.click(maxButton);
-
-    expect(onChange).not.toHaveBeenCalled();
-    expect(mockOpenSettingsDialog).not.toHaveBeenCalled();
-  });
-
-  it("selects Suricatoos Max on Pro Plus when extra usage is available", () => {
-    mockMaxEntitlement = {
-      extraUsageAvailable: true,
-      reason: "available",
-      hasBalance: true,
-      autoReloadEnabled: false,
-    };
-    const onChange = jest.fn();
-    render(<ModelSelector value="auto" onChange={onChange} mode="agent" />);
-
-    fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Max/i }));
-
-    expect(onChange).toHaveBeenCalledWith("hackerai-max");
-    expect(mockRedirectToPricing).not.toHaveBeenCalled();
-  });
-
-  it("selects Suricatoos Max for Ultra users", () => {
+  it("lets an Ultra user select any concrete model", () => {
     mockSubscription = "ultra";
     const onChange = jest.fn();
     render(<ModelSelector value="auto" onChange={onChange} mode="agent" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Max/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Z\.ai GLM 5\.3(?! Flash)/i }));
 
-    expect(onChange).toHaveBeenCalledWith("hackerai-max");
-  });
-
-  it("locks Suricatoos Max for team users", () => {
-    mockSubscription = "team";
-    const onChange = jest.fn();
-    render(<ModelSelector value="auto" onChange={onChange} mode="agent" />);
-
-    fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Max/i }));
-
-    expect(onChange).not.toHaveBeenCalled();
-    expect(mockOpenSettingsDialog).toHaveBeenCalledWith("Extra Usage");
+    expect(onChange).toHaveBeenCalledWith("model-glm-5.3");
     expect(mockRedirectToPricing).not.toHaveBeenCalled();
   });
 
-  it("does not display a stale paid model as selected for free users", () => {
+  it("does not display a stale concrete model as selected for free users", () => {
     mockSubscription = "free";
 
     render(
-      <ModelSelector value="hackerai-pro" onChange={jest.fn()} mode="agent" />,
+      <ModelSelector value="model-grok-4.6" onChange={jest.fn()} mode="agent" />,
     );
 
+    // Free agent collapses to the Auto trigger, never the stale paid model.
     expect(screen.getByRole("button", { name: /^Auto$/i })).toBeVisible();
   });
 
-  it("does not display stale Max as selected outside Ultra", () => {
-    mockSubscription = "pro";
-    mockMaxEntitlement = {
-      extraUsageAvailable: false,
-      reason: "empty",
-      hasBalance: false,
-      autoReloadEnabled: false,
-    };
+  it("locks every concrete model for free users and routes to the upgrade CTA", () => {
+    mockSubscription = "free";
+    const onChange = jest.fn();
+    render(<ModelSelector value="auto" onChange={onChange} mode="ask" />);
 
-    render(
-      <ModelSelector value="hackerai-max" onChange={jest.fn()} mode="agent" />,
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^Model$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /xAI Grok 4\.6/i }));
 
-    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Pro/i }));
-
-    const proButton = screen
-      .getAllByRole("button", { name: /Suricatoos Pro/i })
-      .find((button) => button.hasAttribute("aria-pressed"));
-    const maxButton = screen.getByRole("button", { name: /Suricatoos Max/i });
-
-    expect(proButton).toBeDefined();
-    expect(proButton).toHaveAttribute("aria-pressed", "true");
-    expect(maxButton).toHaveAttribute("aria-pressed", "false");
-  });
-
-  it("displays stale Max as selected for Pro users with extra usage available", () => {
-    mockSubscription = "pro";
-    mockMaxEntitlement = {
-      extraUsageAvailable: true,
-      reason: "available",
-      hasBalance: false,
-      autoReloadEnabled: true,
-    };
-
-    render(
-      <ModelSelector value="hackerai-max" onChange={jest.fn()} mode="agent" />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /Suricatoos Max/i }));
-
-    const maxButton = screen
-      .getAllByRole("button", { name: /Suricatoos Max/i })
-      .find((button) => button.hasAttribute("aria-pressed"));
-
-    expect(maxButton).toBeDefined();
-    expect(maxButton).toHaveAttribute("aria-pressed", "true");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(mockRedirectToPricing).toHaveBeenCalledWith({
+      surface: "model_selector",
+      source: "locked_model_option",
+      from_tier: "free",
+      cta_text: "Upgrade your plan",
+    });
   });
 });

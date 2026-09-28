@@ -36,13 +36,53 @@ export function coerceAgentPermissionMode(value: unknown): AgentPermissionMode {
 }
 
 export type SelectedModel =
-  "auto" | "hackerai-standard" | "hackerai-pro" | "hackerai-max";
+  | "auto"
+  | "hackerai-standard"
+  | "hackerai-pro"
+  | "hackerai-max"
+  // Escolhas concretas do "seletor do operador" (múltiplas opções). O valor É a
+  // chave interna model-* (ModelName); selectModel a retorna diretamente.
+  | "model-grok-4.6"
+  | "model-grok-4.7"
+  | "model-glm-5.3"
+  | "model-glm-5.3-flash"
+  | "model-deepseek-v4-pro-0813"
+  | "model-deepseek-v4.1-flash"
+  | "model-deepseek-v4-flash-0731"
+  | "model-kimi-k3";
+
+/**
+ * Modelos concretos expostos no seletor do operador (além dos tiers Auto/
+ * Standard/Pro/Max). A ordem define qual aparece destacado no modo Auto.
+ */
+export const OPERATOR_MODEL_SELECTIONS = [
+  "model-grok-4.6",
+  "model-grok-4.7",
+  "model-glm-5.3",
+  "model-glm-5.3-flash",
+  "model-deepseek-v4-pro-0813",
+  "model-deepseek-v4.1-flash",
+  "model-deepseek-v4-flash-0731",
+  "model-kimi-k3",
+] as const satisfies readonly SelectedModel[];
+
+const OPERATOR_MODEL_SELECTION_SET: ReadonlySet<string> = new Set(
+  OPERATOR_MODEL_SELECTIONS,
+);
+
+/** True quando a seleção é uma escolha de modelo concreta (não um tier/auto). */
+export function isOperatorModelSelection(
+  value: SelectedModel | null | undefined,
+): boolean {
+  return typeof value === "string" && OPERATOR_MODEL_SELECTION_SET.has(value);
+}
 
 export const SELECTABLE_MODELS: readonly SelectedModel[] = [
   "auto",
   "hackerai-standard",
   "hackerai-pro",
   "hackerai-max",
+  ...OPERATOR_MODEL_SELECTIONS,
 ];
 
 /**

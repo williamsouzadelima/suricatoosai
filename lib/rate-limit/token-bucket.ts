@@ -87,6 +87,13 @@ const DEEPSEEK_V4_PRO_PRICING: ModelPricing = {
   cacheRead: 0.003625,
   cacheWrite: 0.435,
 };
+// OpenRouter (28/09): $0.30 in / $1.20 out / $0.006 cached input por 1M tokens.
+const DEEPSEEK_V4_1_FLASH_PRICING: ModelPricing = {
+  input: 0.3,
+  output: 1.2,
+  cacheRead: 0.006,
+  cacheWrite: 0.3,
+};
 const OPUS_4_6_PRICING: ModelPricing = {
   input: 5.0,
   output: 25.0,
@@ -133,6 +140,9 @@ const MODEL_PRICING_MAP: Record<string, ModelPricing> = {
   // tokens handled by getModelPricing when the input size is available.
   "model-grok-4.6": GROK_4_6_BASE_PRICING,
   "model-grok-4.6-pro": GROK_4_6_BASE_PRICING,
+  // Grok 4.7 (28/09) tem o MESMO preço do 4.6: $2/$6 base, tier 2x em 200k.
+  "model-grok-4.7": GROK_4_6_BASE_PRICING,
+  "model-deepseek-v4.1-flash": DEEPSEEK_V4_1_FLASH_PRICING,
   "model-grok-4.5": GROK_4_6_BASE_PRICING,
   "model-grok-4.5-pro": GROK_4_6_BASE_PRICING,
   "ask-model": GROK_4_6_BASE_PRICING,
@@ -164,6 +174,8 @@ const MODEL_PRICING_MAP: Record<string, ModelPricing> = {
   "x-ai/grok-4.5": GROK_4_6_BASE_PRICING,
   "x-ai/grok-4.5-20260708": GROK_4_6_BASE_PRICING,
   "x-ai/grok-4.6": GROK_4_6_BASE_PRICING,
+  "x-ai/grok-4.7": GROK_4_6_BASE_PRICING,
+  "deepseek/deepseek-v4.1-flash": DEEPSEEK_V4_1_FLASH_PRICING,
   "deepseek/deepseek-v4-flash": DEEPSEEK_V4_FLASH_PRICING,
   "deepseek/deepseek-v4-flash-20260423": DEEPSEEK_V4_FLASH_PRICING,
   "deepseek/deepseek-v4-flash-0731": DEEPSEEK_V4_FLASH_0731_PRICING,
@@ -181,14 +193,18 @@ const MODEL_PRICING_MAP: Record<string, ModelPricing> = {
   "moonshotai/kimi-k3-20260715": KIMI_K3_PRICING,
 };
 
+// Modelos precificados como Grok 4.6 (base $2/$6 + tier 2x a partir de 200k
+// prompt tokens). Grok 4.7 compartilha exatamente essa tabela (28/09).
 const GROK_4_6_MODEL_IDS = new Set([
   "model-grok-4.6",
   "model-grok-4.6-pro",
+  "model-grok-4.7",
   "ask-model",
   "agent-model",
   "fallback-agent-model",
   "fallback-ask-model",
   "x-ai/grok-4.6",
+  "x-ai/grok-4.7",
 ]);
 
 const getModelPricing = (

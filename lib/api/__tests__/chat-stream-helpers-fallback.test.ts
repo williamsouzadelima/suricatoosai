@@ -880,6 +880,18 @@ describe("getRetryFallbackModel", () => {
       "model-glm-5.3",
     );
   });
+
+  it("retries Grok 4.7 with GLM 5.3 (mirrors Grok 4.6)", () => {
+    expect(getRetryFallbackModel("model-grok-4.7", "agent")).toBe(
+      "model-glm-5.3",
+    );
+  });
+
+  it("retries DeepSeek V4.1 Flash with DeepSeek V4 Pro 0813", () => {
+    expect(getRetryFallbackModel("model-deepseek-v4.1-flash", "agent")).toBe(
+      "model-deepseek-v4-pro-0813",
+    );
+  });
 });
 
 describe("getContentFilterRetryModel", () => {
@@ -1015,6 +1027,42 @@ describe("resolveServedModelForCostAccounting", () => {
         mode: "agent",
       }),
     ).toBe("model-kimi-k3");
+  });
+
+  it("maps base and dated DeepSeek V4.1 Flash slugs back to its cost key", () => {
+    // Base slug via the primary key match.
+    expect(
+      resolveServedModelForCostAccounting({
+        modelName: "model-deepseek-v4.1-flash",
+        responseModel: "deepseek/deepseek-v4.1-flash",
+        mode: "agent",
+      }),
+    ).toBe("model-deepseek-v4.1-flash");
+    // Any dated snapshot via the regex branch → priced key (not DEFAULT_PRICING).
+    expect(
+      resolveServedModelForCostAccounting({
+        modelName: "model-does-not-exist",
+        responseModel: "deepseek/deepseek-v4.1-flash-20260910",
+        mode: "agent",
+      }),
+    ).toBe("model-deepseek-v4.1-flash");
+  });
+
+  it("maps base and dated Grok 4.7 slugs back to its cost key", () => {
+    expect(
+      resolveServedModelForCostAccounting({
+        modelName: "model-does-not-exist",
+        responseModel: "x-ai/grok-4.7",
+        mode: "agent",
+      }),
+    ).toBe("model-grok-4.7");
+    expect(
+      resolveServedModelForCostAccounting({
+        modelName: "model-does-not-exist",
+        responseModel: "x-ai/grok-4.7-20260916",
+        mode: "agent",
+      }),
+    ).toBe("model-grok-4.7");
   });
 
   it("maps Suricatoos Pro primary and fallback usage to their exact cost keys", () => {

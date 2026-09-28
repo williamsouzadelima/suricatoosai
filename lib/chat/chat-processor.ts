@@ -1,6 +1,7 @@
 import { getModerationResult } from "@/lib/moderation";
 import {
   normalizeMaxModelForSubscription,
+  isOperatorModelSelection,
   type ChatMode,
   type SelectedModel,
   type SubscriptionTier,
@@ -60,6 +61,13 @@ export function selectModel(
     subscription,
     options,
   );
+  // Operator explicit model pick (non-free): route DIRECTLY to the chosen
+  // model, bypassing tier resolution and media auto-routing. The user selected
+  // it deliberately (multi-model operator selector); multimodal handling falls
+  // through to the provider machinery. Free users always use the auto router.
+  if (subscription !== "free" && isOperatorModelSelection(allowedSelectedModel)) {
+    return allowedSelectedModel as ModelName;
+  }
   // Paid Standard/Pro image prompts use GLM Flash directly, with DeepSeek
   // Vision configured as its provider fallback. The auxiliary treatment is
   // reserved for MiniMax summary recovery after both direct routes fail.

@@ -28,6 +28,7 @@ import {
   GLM_5_3_SLUG,
   GROK_4_5_SLUG,
   GROK_4_6_SLUG,
+  GROK_4_7_SLUG,
   getOpenRouterProviderRoutingForModel,
   isAnthropicModel,
   myProvider,
@@ -617,6 +618,9 @@ const MODEL_FALLBACK_CHAIN: Partial<Record<ModelName, readonly ModelName[]>> = {
   "ask-model": GROK_4_6_FALLBACK_CHAIN,
   "agent-model": GROK_4_6_FALLBACK_CHAIN,
   "model-grok-4.6": GROK_4_6_FALLBACK_CHAIN,
+  // Grok 4.7 e DeepSeek V4.1 Flash: mesma rede cross-provider dos irmãos.
+  "model-grok-4.7": GROK_4_6_FALLBACK_CHAIN,
+  "model-deepseek-v4.1-flash": PRO_TEXT_FALLBACK_CHAIN,
   "model-grok-4.5": ["model-kimi-k3"],
   "model-grok-4.5-pro": ["model-kimi-k3"],
   "model-grok-4.6-pro": HACKERAI_PRO_FALLBACK_CHAIN,
@@ -638,6 +642,7 @@ const AUTO_MODEL_KEYS = new Set<string>([
 ]);
 const EXPLICIT_RETRY_MODEL_KEYS = new Set<string>([
   "model-grok-4.6",
+  "model-grok-4.7",
   "model-grok-4.6-pro",
 ]);
 const EXPLICIT_DEEPSEEK_PRO_RETRY_MODEL_KEYS = new Set<string>([
@@ -676,8 +681,10 @@ export function isExplicitDeepSeekProSelectionForRetry({
 const HIGH_REASONING_MODELS = [
   "model-grok-4.5-pro",
   "model-grok-4.6",
+  "model-grok-4.7",
   "model-grok-4.6-pro",
   "model-deepseek-v4-flash-0731",
+  "model-deepseek-v4.1-flash",
   "model-deepseek-v4-pro-0813",
   "model-glm-5.2",
   "model-glm-5.3",
@@ -728,7 +735,8 @@ export function getRetryFallbackModel(
 ): ModelName {
   if (
     modelName === "agent-model-free" ||
-    modelName === "model-deepseek-v4-flash-0731"
+    modelName === "model-deepseek-v4-flash-0731" ||
+    modelName === "model-deepseek-v4.1-flash"
   ) {
     return "model-deepseek-v4-pro-0813";
   }
@@ -754,6 +762,7 @@ export function getRetryFallbackModel(
     modelName === "ask-model" ||
     modelName === "agent-model" ||
     modelName === "model-grok-4.6" ||
+    modelName === "model-grok-4.7" ||
     modelName === "model-grok-4.5" ||
     modelName === "fallback-agent-model" ||
     modelName === "fallback-ask-model"
@@ -869,6 +878,9 @@ const OPENROUTER_RESPONSE_MODEL_COST_KEYS: Record<string, string> = {
   "x-ai/grok-4.5": "model-grok-4.5",
   "x-ai/grok-4.5-20260708": "model-grok-4.5",
   "x-ai/grok-4.6": "model-grok-4.6",
+  "x-ai/grok-4.7": "model-grok-4.7",
+  "x-ai/grok-4.7-20260916": "model-grok-4.7",
+  "deepseek/deepseek-v4.1-flash": "model-deepseek-v4.1-flash",
   "z-ai/glm-5.2": "model-glm-5.2",
   "z-ai/glm-5.2-20260616": "model-glm-5.2",
   "z-ai/glm-5.3": "model-glm-5.3",
@@ -888,6 +900,13 @@ function resolveOpenRouterResponseModelCostKey(
   // every Claude family or version.
   if (/^anthropic\/claude-4\.6-opus-\d{8}$/.test(responseModel)) {
     return "model-opus-4.6";
+  }
+  // DeepSeek serves dated snapshot slugs (-YYYYMMDD) for every family; normalize
+  // any V4.1 Flash snapshot back to the priced registry key so its cost never
+  // falls through to DEFAULT_PRICING. The exact snapshot date is not known
+  // ahead of time, so match by pattern (mirrors the Opus alias above).
+  if (/^deepseek\/deepseek-v4\.1-flash-\d{8}$/.test(responseModel)) {
+    return "model-deepseek-v4.1-flash";
   }
   return undefined;
 }
@@ -944,6 +963,7 @@ export function buildProviderOptions(
   const isDeepSeekV4 = modelId?.startsWith("deepseek/deepseek-v4") ?? false;
   const isGrok45 = modelId === GROK_4_5_SLUG;
   const isGrok46 = modelId === GROK_4_6_SLUG;
+  const isGrok47 = modelId === GROK_4_7_SLUG;
   // Agent routes use high for both DeepSeek V4 Flash and Pro. Keep this
   // mode-scoped for any future route that does not also include Grok.
   const isAgentDeepSeekV4 = mode === "agent" && isDeepSeekV4;
@@ -962,8 +982,10 @@ export function buildProviderOptions(
   const routesThroughHighReasoningModel =
     isGrok45 ||
     isGrok46 ||
+    isGrok47 ||
     reasoningFallbackSlugs.includes(GROK_4_5_SLUG) ||
     reasoningFallbackSlugs.includes(GROK_4_6_SLUG) ||
+    reasoningFallbackSlugs.includes(GROK_4_7_SLUG) ||
     reasoningFallbackSlugs.includes(GLM_5_3_SLUG);
   const providerRouting = modelId
     ? getOpenRouterProviderRoutingForModel(modelId)
