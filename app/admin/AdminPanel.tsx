@@ -19,6 +19,7 @@ import {
   DollarSign,
   Wallet,
   AlertTriangle,
+  ArrowLeftRight,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,7 @@ import { SecurityAuditTab } from "./SecurityAuditTab";
 import { SecurityDefenseSection } from "./SecurityDefenseSection";
 import { TaskCostsTab } from "./TaskCostsTab";
 import { BudgetTab } from "./BudgetTab";
+import { ModelExchangePanel } from "./ModelExchangePanel";
 import {
   StatCard,
   StatusBadge,
@@ -59,7 +61,8 @@ type Tab =
   | "auditoria"
   | "seguranca"
   | "custos"
-  | "orcamentos";
+  | "orcamentos"
+  | "pregao";
 
 interface AllowlistEntry {
   email: string;
@@ -105,6 +108,7 @@ const NAV_GROUPS: {
     items: [
       { id: "custos", label: "Custos", icon: DollarSign },
       { id: "orcamentos", label: "Orçamentos", icon: Wallet },
+      { id: "pregao", label: "Pregão de LLMs", icon: ArrowLeftRight },
     ],
   },
   {
@@ -406,6 +410,8 @@ export function AdminPanel({
           <TaskCostsTab />
         ) : tab === "orcamentos" ? (
           <BudgetTab adminEmail={adminEmail} />
+        ) : tab === "pregao" ? (
+          <ModelExchangePanel />
         ) : (
           /* ---- Convites & acesso ---- */
           <div className="space-y-6">
