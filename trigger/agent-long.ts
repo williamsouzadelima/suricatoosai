@@ -205,6 +205,7 @@ import {
 import {
   createAgentStream,
   initAgentStreamState,
+  takeToolStatsDelta,
   resetServedModelTelemetryForRetry,
   retryUsesDifferentModel,
   type AgentStreamContext,
@@ -4338,6 +4339,7 @@ export const agentLongTask = task({
                   summarizationTracker.processMessageForSave(message),
                 );
                 await saveMessage({
+                  ...takeToolStatsDelta(state),
                   chatId,
                   userId,
                   message: processed,
@@ -4830,6 +4832,7 @@ export const agentLongTask = task({
                           for (const message of providerDisconnectContinuation.messages) {
                             if (message.role !== "assistant") continue;
                             await saveMessage({
+                              ...takeToolStatsDelta(state),
                               chatId,
                               userId,
                               message,
@@ -4942,6 +4945,7 @@ export const agentLongTask = task({
                                       if (message.role !== "assistant")
                                         continue;
                                       await saveMessage({
+                                        ...takeToolStatsDelta(state),
                                         chatId,
                                         userId,
                                         message,
@@ -5270,6 +5274,7 @@ export const agentLongTask = task({
                             continue;
                           }
                           await saveMessage({
+                            ...takeToolStatsDelta(state),
                             chatId,
                             userId,
                             message: processed,

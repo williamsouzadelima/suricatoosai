@@ -34,6 +34,8 @@ interface QualityRow {
   findingsValidated: number;
   findingsDismissed: number;
   findingsPending: number;
+  toolCalls: number;
+  toolErrors: number;
 }
 interface CostRow {
   model: string;
@@ -90,6 +92,8 @@ export async function GET(req: NextRequest) {
     findingsValidated: number;
     findingsDismissed: number;
     findingsPending: number;
+    toolCalls: number;
+    toolErrors: number;
   };
   const qualityBySlug = new Map<string, Q>();
   for (const r of (quality?.byModel ?? []) as QualityRow[]) {
@@ -100,6 +104,8 @@ export async function GET(req: NextRequest) {
       prev.findingsValidated += r.findingsValidated;
       prev.findingsDismissed += r.findingsDismissed;
       prev.findingsPending += r.findingsPending;
+      prev.toolCalls += r.toolCalls;
+      prev.toolErrors += r.toolErrors;
       for (const f of r.finishReasons) {
         prev.finishReasons.set(
           f.reason,
@@ -124,6 +130,8 @@ export async function GET(req: NextRequest) {
         findingsValidated: r.findingsValidated,
         findingsDismissed: r.findingsDismissed,
         findingsPending: r.findingsPending,
+        toolCalls: r.toolCalls,
+        toolErrors: r.toolErrors,
       });
     }
   }
@@ -168,6 +176,8 @@ export async function GET(req: NextRequest) {
       findingsValidated: q?.findingsValidated ?? 0,
       findingsDismissed: q?.findingsDismissed ?? 0,
       findingsPending: q?.findingsPending ?? 0,
+      toolCalls: q?.toolCalls ?? 0,
+      toolErrors: q?.toolErrors ?? 0,
       realCost: co?.realCost ?? 0,
       requests: co?.requests ?? 0,
       outputTokens: co?.outputTokens ?? 0,

@@ -539,6 +539,9 @@ export const saveMessage = mutation({
     usage: v.optional(v.any()),
     updateOnly: v.optional(v.boolean()),
     isHidden: v.optional(v.boolean()),
+    toolCalls: v.optional(v.number()),
+    toolErrorCount: v.optional(v.number()),
+    toolStatsApplyId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -681,6 +684,29 @@ export const saveMessage = mutation({
         if (args.isHidden !== undefined) {
           patch.is_hidden = args.isHidden;
         }
+        // Tool-stats (Fase B): ACUMULA o delta no existente (um run pode patchar
+        // a mesma mensagem mais de uma vez — cada save manda o SEU delta), mas
+        // com DEDUP por token: o loop de retry do saveMessage (lib/db/actions.ts)
+        // re-envia o MESMO toolStatsApplyId → só aplica quando o token difere do
+        // último aplicado, evitando contar 2× num commit-com-ack-perdido.
+        // Ver [[medicao-em-producao-mente-tres-modos]].
+        if (
+          args.toolStatsApplyId != null &&
+          args.toolStatsApplyId !== existingMessage.last_tool_stats_apply_id
+        ) {
+          if (typeof args.toolCalls === "number" && args.toolCalls > 0) {
+            patch.tool_calls =
+              (existingMessage.tool_calls ?? 0) + args.toolCalls;
+          }
+          if (
+            typeof args.toolErrorCount === "number" &&
+            args.toolErrorCount > 0
+          ) {
+            patch.tool_error_count =
+              (existingMessage.tool_error_count ?? 0) + args.toolErrorCount;
+          }
+          patch.last_tool_stats_apply_id = args.toolStatsApplyId;
+        }
 
         // Apply patch if there are changes
         if (Object.keys(patch).length > 0) {
@@ -732,6 +758,9 @@ export const saveMessage = mutation({
         trigger_run_id: args.triggerRunId,
         usage: args.usage,
         is_hidden: args.isHidden,
+        tool_calls: args.toolCalls,
+        tool_error_count: args.toolErrorCount,
+        last_tool_stats_apply_id: args.toolStatsApplyId,
       };
       failureStage = "prepare_insert_message";
       const baseDocumentSizeBytes = getMessageDocumentSize(messageDocumentBase);

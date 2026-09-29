@@ -341,6 +341,13 @@ export type AgentStreamState = {
   postSummarizationToolCallCount: number;
   postSummarizationText: string;
   budgetAbortDetails: BudgetAbortDetails | undefined;
+  /** Eval-gate Fase B — tool-success. Acumula em experimental_onToolCallFinish
+   *  (cumulativo no run); persistido por mensagem via takeToolStatsDelta (o
+   *  delta desde o último save evita dupla-contagem em runs multi-save). */
+  toolCallCount: number;
+  toolErrorCount: number;
+  toolStatsReportedCalls: number;
+  toolStatsReportedErrors: number;
 };
 
 export function initAgentStreamState(
@@ -373,7 +380,30 @@ export function initAgentStreamState(
     postSummarizationToolCallCount: 0,
     postSummarizationText: "",
     budgetAbortDetails: undefined,
+    toolCallCount: 0,
+    toolErrorCount: 0,
+    toolStatsReportedCalls: 0,
+    toolStatsReportedErrors: 0,
   };
+}
+
+/**
+ * Consome o incremento de tool-calls/erros desde o último save e marca como
+ * reportado — cada mensagem persiste só o SEU delta (evita dupla-contagem quando
+ * um run salva múltiplas mensagens: primária + fallback/retry). Ver Fase B.
+ */
+export function takeToolStatsDelta(state: AgentStreamState): {
+  toolCalls: number;
+  toolErrorCount: number;
+} {
+  const toolCalls = Math.max(0, state.toolCallCount - state.toolStatsReportedCalls);
+  const toolErrorCount = Math.max(
+    0,
+    state.toolErrorCount - state.toolStatsReportedErrors,
+  );
+  state.toolStatsReportedCalls = state.toolCallCount;
+  state.toolStatsReportedErrors = state.toolErrorCount;
+  return { toolCalls, toolErrorCount };
 }
 
 export const resetServedModelTelemetryForRetry = (
@@ -1673,6 +1703,15 @@ export async function createAgentStream(
           ctx.sandboxManager.getSandboxType(chunk.chunk.toolName),
         );
       }
+    },
+
+    experimental_onToolCallFinish: (event) => {
+      // Eval-gate Fase B — tool-success por modelo servido. `event.success` é a
+      // execução da tool (não lançou) — confiabilidade de tool-calling do modelo,
+      // NÃO sucesso semântico (ex.: shell exit≠0 ainda é success=true). Aditivo,
+      // não-bloqueante, sem efeito no fluxo.
+      state.toolCallCount += 1;
+      if (!event.success) state.toolErrorCount += 1;
     },
 
     onStepFinish: async ({ usage, response, providerMetadata }) => {

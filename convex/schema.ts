@@ -317,6 +317,12 @@ export default defineSchema({
     trigger_run_id: v.optional(v.string()),
     usage: v.optional(v.any()),
     is_hidden: v.optional(v.boolean()),
+    // Eval-gate Fase B — tool-success por modelo servido (só linhas novas).
+    tool_calls: v.optional(v.number()),
+    tool_error_count: v.optional(v.number()),
+    // Token de idempotência do último delta de tool-stats aplicado (dedup de
+    // retry do saveMessage — evita contar 2× em commit-com-ack-perdido).
+    last_tool_stats_apply_id: v.optional(v.string()),
   })
     .index("by_message_id", ["id"])
     .index("by_chat_id", ["chat_id"])

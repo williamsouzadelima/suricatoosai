@@ -977,6 +977,8 @@ export async function saveMessage({
   isHidden,
   wasAborted,
   wasPreemptiveTimeout,
+  toolCalls,
+  toolErrorCount,
 }: {
   chatId: string;
   userId: string;
@@ -997,6 +999,8 @@ export async function saveMessage({
   isHidden?: boolean;
   wasAborted?: boolean;
   wasPreemptiveTimeout?: boolean;
+  toolCalls?: number;
+  toolErrorCount?: number;
 }) {
   let fixedParts = message.parts;
   let partsForSave = message.parts;
@@ -1079,6 +1083,16 @@ export async function saveMessage({
     const usageForSave = sanitizeForConvexValue(usage) as
       Record<string, unknown> | undefined;
 
+    // Token de idempotência das tool-stats (Fase B): gerado UMA vez e re-enviado
+    // inalterado pelo loop de retry abaixo — a mutation só acumula quando o
+    // token difere do último aplicado, então um retry de um commit-com-ack-perdido
+    // não conta 2×. Saves distintos (delta guard) têm tokens distintos → acumulam.
+    const toolStatsApplyId =
+      (typeof toolCalls === "number" && toolCalls > 0) ||
+      (typeof toolErrorCount === "number" && toolErrorCount > 0)
+        ? uuidv4()
+        : undefined;
+
     const mutationArgs = {
       serviceKey,
       id: message.id,
@@ -1096,6 +1110,9 @@ export async function saveMessage({
       usage: usageForSave,
       updateOnly,
       isHidden,
+      toolCalls,
+      toolErrorCount,
+      toolStatsApplyId,
     };
 
     for (let attemptIndex = 0; ; attemptIndex++) {

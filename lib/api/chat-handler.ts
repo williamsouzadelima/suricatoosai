@@ -188,6 +188,7 @@ import { isAgentMode } from "@/lib/utils/mode-helpers";
 import {
   createAgentStream,
   initAgentStreamState,
+  takeToolStatsDelta,
   resetServedModelTelemetryForRetry,
   retryUsesDifferentModel,
   type AgentStreamContext,
@@ -2061,6 +2062,7 @@ export const createChatHandler = () => {
                                       );
 
                                     await saveMessage({
+                                      ...takeToolStatsDelta(state),
                                       chatId,
                                       userId,
                                       message: processed,
@@ -2512,6 +2514,7 @@ export const createChatHandler = () => {
                         // Budget/provider/system aborts must insert partial work if no row exists.
                         try {
                           await saveMessage({
+                            ...takeToolStatsDelta(state),
                             chatId,
                             userId,
                             message: processedMessage,

@@ -33,6 +33,8 @@ interface QualityRow {
   findingsValidated: number;
   findingsDismissed: number;
   findingsPending: number;
+  toolCalls: number;
+  toolErrors: number;
   realCost: number;
   requests: number;
   outputTokens: number;
@@ -62,6 +64,11 @@ function ms(n: number | null | undefined): string {
 function validationRate(v: number, d: number): number | null {
   const denom = v + d;
   return denom > 0 ? v / denom : null;
+}
+/** Tool-success = (calls - errors) / calls. Sucesso de EXECUÇÃO da tool (não
+ *  semântico — shell exit≠0 conta como sucesso de execução). */
+function toolSuccessRate(calls: number, errors: number): number | null {
+  return calls > 0 ? (calls - errors) / calls : null;
 }
 
 const JURIS_TONE: Record<string, string> = {
@@ -139,12 +146,14 @@ export function ModelQualityPanel() {
 
       <CardContent className="space-y-5 p-5">
         <Callout tone="neutral">
-          <strong>Fase A (3 de 4 métricas, read-only).</strong> Atribuição pelo
+          <strong>As 4 métricas por modelo servido.</strong> Atribuição pelo
           modelo <strong>servido</strong> (reflete fallback). Qualidade ={" "}
           <strong>achados validados</strong> (aprovados/publicados na curadoria),
-          nunca o veredito auto-declarado. <strong>Tool-success</strong> (a 4ª) é
-          a Fase B (precisa instrumentar o runner). Custo real só pós-09/09;
-          achado capturado em fallback sub-atribui ao modelo primário.
+          nunca o veredito auto-declarado. <strong>Tool-sucesso</strong> = a tool
+          executou sem lançar (confiabilidade de tool-calling, não sucesso
+          semântico); só conta em runs pós-instrumentação. Custo real só
+          pós-09/09; achado/tools capturados em fallback sub-atribuem ao modelo
+          primário.
         </Callout>
 
         {data?.qualityUnavailable && (
@@ -200,6 +209,9 @@ export function ModelQualityPanel() {
                     Taxa valid.
                   </th>
                   <th className="px-2 py-2 text-right font-medium">
+                    Tool-sucesso
+                  </th>
+                  <th className="px-2 py-2 text-right font-medium">
                     Latência p50/p95
                   </th>
                   <th className="px-2 py-2 pl-3 font-medium">Finish</th>
@@ -211,6 +223,7 @@ export function ModelQualityPanel() {
                     r.findingsValidated,
                     r.findingsDismissed,
                   );
+                  const toolRate = toolSuccessRate(r.toolCalls, r.toolErrors);
                   return (
                     <tr
                       key={r.slug}
@@ -278,6 +291,26 @@ export function ModelQualityPanel() {
                         )}
                       >
                         {rate != null ? `${Math.round(rate * 100)}%` : "—"}
+                      </td>
+                      <td
+                        className={cn(
+                          "px-2 py-2 text-right tabular-nums",
+                          toolRate != null &&
+                            (toolRate >= 0.95
+                              ? "text-emerald-500"
+                              : toolRate < 0.8
+                                ? "text-destructive"
+                                : "text-amber-500"),
+                        )}
+                        title={
+                          toolRate != null
+                            ? `${r.toolCalls} tool-calls · ${r.toolErrors} erros`
+                            : "sem tool-calls na janela (só linhas pós-Fase B)"
+                        }
+                      >
+                        {toolRate != null
+                          ? `${Math.round(toolRate * 100)}%`
+                          : "—"}
                       </td>
                       <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">
                         {ms(r.latencyP50Ms)}

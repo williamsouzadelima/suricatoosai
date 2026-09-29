@@ -884,6 +884,8 @@ export const getModelQualityForBackend = query({
         findingsValidated: v.number(),
         findingsDismissed: v.number(),
         findingsPending: v.number(),
+        toolCalls: v.number(),
+        toolErrors: v.number(),
       }),
     ),
   }),
@@ -901,6 +903,8 @@ export const getModelQualityForBackend = query({
       validated: number;
       dismissed: number;
       pending: number;
+      toolCalls: number;
+      toolErrors: number;
     };
     const byModel = new Map<string, Agg>();
     const ensure = (model: string): Agg => {
@@ -914,6 +918,8 @@ export const getModelQualityForBackend = query({
           validated: 0,
           dismissed: 0,
           pending: 0,
+          toolCalls: 0,
+          toolErrors: 0,
         };
         byModel.set(model, a);
       }
@@ -938,6 +944,11 @@ export const getModelQualityForBackend = query({
       }
       if (m.finish_reason) {
         a.finish.set(m.finish_reason, (a.finish.get(m.finish_reason) ?? 0) + 1);
+      }
+      // Fase B — tool-success (só linhas novas têm; histórico = 0).
+      if (typeof m.tool_calls === "number") a.toolCalls += m.tool_calls;
+      if (typeof m.tool_error_count === "number") {
+        a.toolErrors += m.tool_error_count;
       }
     }
 
@@ -1005,6 +1016,8 @@ export const getModelQualityForBackend = query({
           findingsValidated: a.validated,
           findingsDismissed: a.dismissed,
           findingsPending: a.pending,
+          toolCalls: a.toolCalls,
+          toolErrors: a.toolErrors,
         };
       })
       .sort((x, y) => y.assistantMessages - x.assistantMessages);
