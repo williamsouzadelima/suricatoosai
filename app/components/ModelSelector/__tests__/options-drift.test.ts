@@ -102,6 +102,22 @@ describe("ModelSelector tier ↔ provider drift", () => {
     expect(getCostTier("model-kimi-k3")).toBe("very-high"); // $$$+
   });
 
+  it("lista ordenada do mais barato ao mais caro (faixa não-decrescente)", () => {
+    const rank: Record<string, number> = {
+      low: 0,
+      medium: 1,
+      high: 2,
+      "very-high": 3,
+    };
+    for (const options of [ASK_MODEL_OPTIONS, AGENT_MODEL_OPTIONS]) {
+      const ranks = options.map((o) => rank[getCostTier(o.id)]);
+      const sorted = [...ranks].sort((a, b) => a - b);
+      expect(ranks).toEqual(sorted); // já em ordem crescente de custo
+    }
+    expect(AGENT_MODEL_OPTIONS[0].id).toBe("model-glm-5.3-flash"); // 1º = mais barato
+    expect(AGENT_MODEL_OPTIONS.at(-1)?.id).toBe("model-kimi-k3"); // último = mais caro
+  });
+
   it("resolves each concrete option to its own registered model key", () => {
     expect(resolveTierToProviderKey("model-grok-4.7", "agent")).toBe(
       "model-grok-4.7",

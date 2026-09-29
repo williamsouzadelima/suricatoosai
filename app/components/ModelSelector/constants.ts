@@ -13,40 +13,11 @@ export interface ModelOption {
 
 /**
  * Seletor do operador: modelos concretos (múltiplas opções) além do Auto.
- * A ordem define qual aparece destacado no modo Auto (o 1º). Cada `id` é uma
+ * ORDENADO do mais BARATO ao mais CARO (preço de saída $/M do OpenRouter) —
+ * casa com o indicador $ / $$ / $$$ / $$$+ do CostIndicator. Cada `id` é uma
  * chave interna model-* que `selectModel` roteia diretamente.
  */
 const OPERATOR_MODEL_OPTIONS: ModelOption[] = [
-  {
-    id: "model-grok-4.6",
-    label: "xAI Grok 4.6",
-    description: "Agente forte, tool-calling robusto",
-    poweredBy: "xAI · 500k contexto",
-  },
-  {
-    id: "model-grok-4.7",
-    label: "xAI Grok 4.7",
-    description: "Grok mais recente da xAI",
-    poweredBy: "xAI · 500k contexto",
-  },
-  {
-    id: "model-glm-5.3",
-    label: "Z.ai GLM 5.3",
-    description: "Forte e econômico, contexto longo",
-    poweredBy: "Z.ai · 1M contexto",
-  },
-  {
-    id: "model-deepseek-v4-pro-0813",
-    label: "DeepSeek V4 Pro",
-    description: "Raciocínio profundo, contexto longo",
-    poweredBy: "DeepSeek · 1M contexto",
-  },
-  {
-    id: "model-deepseek-v4.1-flash",
-    label: "DeepSeek V4.1 Flash",
-    description: "Flash mais recente, rápido e barato",
-    poweredBy: "DeepSeek · 1M contexto",
-  },
   {
     id: "model-glm-5.3-flash",
     label: "Z.ai GLM 5.3 Flash",
@@ -58,6 +29,36 @@ const OPERATOR_MODEL_OPTIONS: ModelOption[] = [
     label: "DeepSeek V4 Flash",
     description: "Econômico para tarefas simples",
     poweredBy: "DeepSeek",
+  },
+  {
+    id: "model-deepseek-v4.1-flash",
+    label: "DeepSeek V4.1 Flash",
+    description: "Flash mais recente, rápido e barato",
+    poweredBy: "DeepSeek · 1M contexto",
+  },
+  {
+    id: "model-deepseek-v4-pro-0813",
+    label: "DeepSeek V4 Pro",
+    description: "Raciocínio profundo, contexto longo",
+    poweredBy: "DeepSeek · 1M contexto",
+  },
+  {
+    id: "model-glm-5.3",
+    label: "Z.ai GLM 5.3",
+    description: "Forte e econômico, contexto longo",
+    poweredBy: "Z.ai · 1M contexto",
+  },
+  {
+    id: "model-grok-4.6",
+    label: "xAI Grok 4.6",
+    description: "Agente forte, tool-calling robusto",
+    poweredBy: "xAI · 500k contexto",
+  },
+  {
+    id: "model-grok-4.7",
+    label: "xAI Grok 4.7",
+    description: "Grok mais recente da xAI",
+    poweredBy: "xAI · 500k contexto",
   },
   {
     id: "model-kimi-k3",
