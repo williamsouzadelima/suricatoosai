@@ -1075,6 +1075,11 @@ export const getServedModelCostForBackend = query({
         realCost: v.number(),
         requests: v.number(),
         outputTokens: v.number(),
+        // Subconjunto FATURADO (provider_billed presente) — dólar real sobre
+        // requisições realmente faturadas. É o que a camada de decisão compara,
+        // p/ nunca cruzar dólar estimado com dólar real. Ver decision.ts.
+        billedCost: v.number(),
+        billedRequests: v.number(),
       }),
     ),
   }),
@@ -1113,17 +1118,21 @@ export const getServedModelCostForBackend = query({
       .take(SERVED_COST_ROW_CAP);
     const usageCapped = usageRows.length === SERVED_COST_ROW_CAP;
 
-    type CostAgg = { realCost: number; requests: number; outputTokens: number };
+    type CostAgg = {
+      realCost: number;
+      requests: number;
+      outputTokens: number;
+      billedCost: number;
+      billedRequests: number;
+    };
     const byModel = new Map<string, CostAgg>();
     let unattributedCostDollars = 0;
 
     for (const u of usageRows) {
       // Custo REAL (créditos do OpenRouter); fallback p/ cost_dollars nas linhas
       // antigas sem provider_billed. Ver [[suricatoosai-cost-per-task]].
-      const cost =
-        typeof u.provider_billed_cost_dollars === "number"
-          ? u.provider_billed_cost_dollars
-          : u.cost_dollars;
+      const billed = typeof u.provider_billed_cost_dollars === "number";
+      const cost = billed ? u.provider_billed_cost_dollars! : u.cost_dollars;
       const model = u.assistant_message_id
         ? await modelForMessage(u.assistant_message_id)
         : null;
@@ -1135,10 +1144,17 @@ export const getServedModelCostForBackend = query({
         realCost: 0,
         requests: 0,
         outputTokens: 0,
+        billedCost: 0,
+        billedRequests: 0,
       };
       a.realCost += cost;
       a.requests += 1;
       a.outputTokens += u.output_tokens;
+      // Só linhas efetivamente faturadas entram no custo/req da DECISÃO.
+      if (billed) {
+        a.billedCost += u.provider_billed_cost_dollars!;
+        a.billedRequests += 1;
+      }
       byModel.set(model, a);
     }
 
@@ -1154,6 +1170,8 @@ export const getServedModelCostForBackend = query({
         realCost: a.realCost,
         requests: a.requests,
         outputTokens: a.outputTokens,
+        billedCost: a.billedCost,
+        billedRequests: a.billedRequests,
       })),
     };
   },

@@ -2,11 +2,27 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Gauge, RefreshCw, CheckCircle2, XCircle, Clock } from "lucide-react";
+import {
+  Gauge,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  ArrowLeftRight,
+  ShieldCheck,
+  CircleDashed,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SectionHeader, Callout, EmptyState, formatDateTime } from "./_ui";
+import {
+  MIN_CURATED,
+  MIN_TOOLCALLS,
+  type TierDecision,
+  type MetricComparison,
+  type RateStat,
+} from "@/lib/models/decision";
 
 const PERIODS: { key: Period; label: string }[] = [
   { key: "7d", label: "7d" },
@@ -38,6 +54,8 @@ interface QualityRow {
   realCost: number;
   requests: number;
   outputTokens: number;
+  billedCost: number;
+  billedRequests: number;
   hasData: boolean;
 }
 interface QualityData {
@@ -49,6 +67,7 @@ interface QualityData {
   unattributedCostDollars: number;
   qualityUnavailable: boolean;
   costUnavailable: boolean;
+  decisions: TierDecision[];
   rows: QualityRow[];
 }
 
@@ -73,10 +92,185 @@ function toolSuccessRate(calls: number, errors: number): number | null {
 
 const JURIS_TONE: Record<string, string> = {
   US: "bg-chart-1/15 text-chart-1",
-  China: "bg-amber-500/15 text-amber-500",
+  China: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
   EU: "bg-chart-2/15 text-chart-2",
   Other: "bg-muted text-muted-foreground",
 };
+
+function fmtStat(s: RateStat | null): string {
+  return s ? `${Math.round(s.rate * 100)}%` : "—";
+}
+
+const VERDICT_META: Record<
+  TierDecision["verdict"],
+  { label: string; icon: typeof ArrowLeftRight; tone: string }
+> = {
+  switch: {
+    label: "Trocar",
+    icon: ArrowLeftRight,
+    tone: "border-amber-500/30 bg-amber-500/15 text-amber-600 dark:text-amber-400",
+  },
+  keep: {
+    label: "Manter",
+    icon: ShieldCheck,
+    tone: "border-emerald-500/30 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+  },
+  insufficient: {
+    label: "Sem amostra",
+    icon: CircleDashed,
+    tone: "border-border bg-muted text-muted-foreground",
+  },
+};
+
+type WinSide = "cur" | "cand" | "none";
+function cellTone(side: "cur" | "cand", winner: WinSide): string {
+  return side === winner
+    ? "font-semibold text-foreground"
+    : "text-muted-foreground";
+}
+
+/** Comparação lado-a-lado atual × desafiante, com destaque no vencedor por métrica. */
+function CompareGrid({
+  cmp,
+  currentLabel,
+  challengerLabel,
+}: {
+  cmp: MetricComparison;
+  currentLabel: string;
+  challengerLabel: string;
+}) {
+  const qWin: WinSide =
+    cmp.qualityCmp === "cand_better"
+      ? "cand"
+      : cmp.qualityCmp === "cur_better"
+        ? "cur"
+        : "none";
+  const tWin: WinSide =
+    cmp.toolCmp === "cand_better"
+      ? "cand"
+      : cmp.toolCmp === "cur_better"
+        ? "cur"
+        : "none";
+  const cWin: WinSide =
+    cmp.costCmp === "cand_cheaper"
+      ? "cand"
+      : cmp.costCmp === "cur_cheaper"
+        ? "cur"
+        : "none";
+  // Latência NÃO tem IC nem margem e o núcleo não a usa no veredito — é apenas
+  // informativa. Nunca destacar "vencedor" aqui (achado #11): destaque só para
+  // métricas com veredito estatístico (validação/tool/custo).
+  const gridRows: { k: string; cur: string; cand: string; win: WinSide }[] = [
+    {
+      k: "Validação",
+      cur: fmtStat(cmp.curValidation),
+      cand: fmtStat(cmp.candValidation),
+      win: qWin,
+    },
+    {
+      k: "Tool-sucesso",
+      cur: fmtStat(cmp.curTool),
+      cand: fmtStat(cmp.candTool),
+      win: tWin,
+    },
+    {
+      k: "Custo/req",
+      cur: usd(cmp.curCostPerReq),
+      cand: usd(cmp.candCostPerReq),
+      win: cWin,
+    },
+    {
+      k: "Latência p50",
+      cur: ms(cmp.curLatencyMs),
+      cand: ms(cmp.candLatencyMs),
+      win: "none", // informativa — sem destaque de vencedor (achado #11)
+    },
+  ];
+  // Trilhas de coluna FIXAS e compartilhadas entre cabeçalho e linhas, para que
+  // atual/desafiante alinhem verticalmente (achado #16).
+  const cols = "grid grid-cols-[1fr_64px_64px] gap-x-3";
+  return (
+    <div className="mt-3 overflow-hidden rounded-md border">
+      <div
+        className={cn(
+          cols,
+          "border-b bg-muted/40 px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground",
+        )}
+      >
+        <span>Métrica</span>
+        <span className="truncate text-right" title={currentLabel}>
+          {currentLabel}
+        </span>
+        <span className="truncate text-right" title={challengerLabel}>
+          {challengerLabel}
+        </span>
+      </div>
+      {gridRows.map((r) => (
+        <div key={r.k} className={cn(cols, "px-2.5 py-1 text-xs tabular-nums")}>
+          <span className="text-muted-foreground">{r.k}</span>
+          <span className={cn("text-right", cellTone("cur", r.win))}>
+            {r.cur}
+          </span>
+          <span className={cn("text-right", cellTone("cand", r.win))}>
+            {r.cand}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DecisionCards({ decisions }: { decisions: TierDecision[] }) {
+  return (
+    <div className="grid gap-3 md:grid-cols-3">
+      {decisions.map((d) => {
+        const meta = VERDICT_META[d.verdict];
+        const Icon = meta.icon;
+        return (
+          <div key={d.tier} className="rounded-lg border bg-card p-3.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {d.tierLabel}
+              </span>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                  meta.tone,
+                )}
+              >
+                <Icon className="h-3 w-3" />
+                {meta.label}
+              </span>
+            </div>
+            <div className="mt-1.5 text-sm font-medium">
+              {d.verdict === "switch" && d.challengerLabel ? (
+                <span className="inline-flex flex-wrap items-center gap-1.5">
+                  <span className="text-muted-foreground line-through decoration-muted-foreground/40">
+                    {d.currentLabel}
+                  </span>
+                  <ArrowLeftRight className="h-3.5 w-3.5 text-amber-500" />
+                  <span>{d.challengerLabel}</span>
+                </span>
+              ) : (
+                <span>{d.currentLabel}</span>
+              )}
+            </div>
+            <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
+              {d.reason}
+            </p>
+            {d.comparison && (
+              <CompareGrid
+                cmp={d.comparison}
+                currentLabel={d.currentLabel}
+                challengerLabel={d.challengerLabel ?? "—"}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export function ModelQualityPanel() {
   const [period, setPeriod] = useState<Period>("30d");
@@ -112,8 +306,8 @@ export function ModelQualityPanel() {
       <div className="flex flex-col gap-3 border-b p-5 lg:flex-row lg:items-center lg:justify-between">
         <SectionHeader
           icon={Gauge}
-          title="Comparar modelos — qualidade real (eval-gate)"
-          description="Medição por modelo SERVIDO: custo real, achados validados, latência. Read-only."
+          title="Comparar modelos — decisão + qualidade real (eval-gate)"
+          description="Recomendação por tier com significância + medição por modelo SERVIDO (custo, achados, tool-sucesso, latência). Read-only."
         />
         <div className="flex flex-wrap items-center gap-3">
           <div className="inline-flex rounded-lg border bg-muted/40 p-0.5">
@@ -182,6 +376,17 @@ export function ModelQualityPanel() {
           </Callout>
         )}
 
+        {!loading && data && data.decisions?.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              Recomendação por tier — só sugere trocar com significância (IC 95%,
+              sem regredir qualidade/tool-sucesso); abaixo da amostra diz “sem
+              amostra” em vez de chutar. A evidência está na tabela abaixo.
+            </p>
+            <DecisionCards decisions={data.decisions} />
+          </div>
+        )}
+
         {loading ? (
           <div className="py-10 text-center text-sm text-muted-foreground">
             Carregando…
@@ -223,7 +428,13 @@ export function ModelQualityPanel() {
                     r.findingsValidated,
                     r.findingsDismissed,
                   );
+                  const curated = r.findingsValidated + r.findingsDismissed;
+                  // Só colore a taxa quando há curadoria suficiente (mesmo piso da
+                  // decisão) — 1/1=100% não pode aparecer "verde forte" (achado #13).
+                  const rateColored = rate != null && curated >= MIN_CURATED;
                   const toolRate = toolSuccessRate(r.toolCalls, r.toolErrors);
+                  const toolColored =
+                    toolRate != null && r.toolCalls >= MIN_TOOLCALLS;
                   return (
                     <tr
                       key={r.slug}
@@ -251,13 +462,20 @@ export function ModelQualityPanel() {
                       <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">
                         {r.assistantMessages || "—"}
                       </td>
-                      <td className="px-2 py-2 text-right tabular-nums">
-                        {r.requests > 0 ? usd(r.realCost) : "—"}
+                      <td
+                        className="px-2 py-2 text-right tabular-nums"
+                        title={
+                          r.billedRequests > 0
+                            ? `${r.billedRequests} req. faturadas`
+                            : "sem custo faturado real na janela (pré-09/09 ou não atribuído)"
+                        }
+                      >
+                        {r.billedRequests > 0 ? usd(r.billedCost) : "—"}
                       </td>
                       <td className="px-2 py-2 text-center">
                         <span className="inline-flex items-center gap-1.5 tabular-nums">
                           <span
-                            className="inline-flex items-center gap-0.5 text-emerald-500"
+                            className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400"
                             title="Validados (aprovados/publicados)"
                           >
                             <CheckCircle2 className="h-3.5 w-3.5" />
@@ -282,29 +500,38 @@ export function ModelQualityPanel() {
                       <td
                         className={cn(
                           "px-2 py-2 text-right tabular-nums",
-                          rate != null &&
-                            (rate >= 0.7
-                              ? "text-emerald-500"
-                              : rate < 0.4
+                          rateColored &&
+                            (rate! >= 0.7
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : rate! < 0.4
                                 ? "text-destructive"
-                                : "text-amber-500"),
+                                : "text-amber-600 dark:text-amber-400"),
+                          rate != null && !rateColored && "text-muted-foreground",
                         )}
+                        title={
+                          rate != null
+                            ? `${r.findingsValidated}/${curated} curados${curated < MIN_CURATED ? ` · amostra baixa (mín ${MIN_CURATED})` : ""}`
+                            : "sem achados curados na janela"
+                        }
                       >
                         {rate != null ? `${Math.round(rate * 100)}%` : "—"}
                       </td>
                       <td
                         className={cn(
                           "px-2 py-2 text-right tabular-nums",
-                          toolRate != null &&
-                            (toolRate >= 0.95
-                              ? "text-emerald-500"
-                              : toolRate < 0.8
+                          toolColored &&
+                            (toolRate! >= 0.95
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : toolRate! < 0.8
                                 ? "text-destructive"
-                                : "text-amber-500"),
+                                : "text-amber-600 dark:text-amber-400"),
+                          toolRate != null &&
+                            !toolColored &&
+                            "text-muted-foreground",
                         )}
                         title={
                           toolRate != null
-                            ? `${r.toolCalls} tool-calls · ${r.toolErrors} erros`
+                            ? `${r.toolCalls} tool-calls · ${r.toolErrors} erros${r.toolCalls < MIN_TOOLCALLS ? ` · amostra baixa (mín ${MIN_TOOLCALLS})` : ""}`
                             : "sem tool-calls na janela (só linhas pós-Fase B)"
                         }
                       >

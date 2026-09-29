@@ -3,6 +3,7 @@ import { getSuperadminUser } from "@/lib/auth/require-superadmin";
 import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
 import { CANDIDATES, canonicalizeModelSlug } from "@/lib/models/exchange";
+import { decidePerTier } from "@/lib/models/decision";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +43,8 @@ interface CostRow {
   realCost: number;
   requests: number;
   outputTokens: number;
+  billedCost: number;
+  billedRequests: number;
 }
 
 export async function GET(req: NextRequest) {
@@ -139,7 +142,13 @@ export async function GET(req: NextRequest) {
   // Custo real por candidato — MESMA base (modelo servido).
   const costBySlug = new Map<
     string,
-    { realCost: number; requests: number; outputTokens: number }
+    {
+      realCost: number;
+      requests: number;
+      outputTokens: number;
+      billedCost: number;
+      billedRequests: number;
+    }
   >();
   for (const r of (cost?.byModel ?? []) as CostRow[]) {
     const slug = canonicalizeModelSlug(r.model);
@@ -148,13 +157,32 @@ export async function GET(req: NextRequest) {
       prev.realCost += r.realCost;
       prev.requests += r.requests;
       prev.outputTokens += r.outputTokens;
+      prev.billedCost += r.billedCost;
+      prev.billedRequests += r.billedRequests;
     } else {
       costBySlug.set(slug, {
         realCost: r.realCost,
         requests: r.requests,
         outputTokens: r.outputTokens,
+        billedCost: r.billedCost,
+        billedRequests: r.billedRequests,
       });
     }
+  }
+
+  // Observabilidade (achado #10): tráfego servido sob slug canônico que NÃO é
+  // candidato some da comparação. Não deve derrubar a decisão (é fail-safe: só
+  // subconta), mas logamos p/ caçar alias faltante em MODEL_SLUG_ALIASES.
+  const candidateSlugs = new Set(CANDIDATES.map((c) => c.slug));
+  const nonCandidate = new Set<string>();
+  for (const s of qualityBySlug.keys())
+    if (!candidateSlugs.has(s)) nonCandidate.add(s);
+  for (const s of costBySlug.keys())
+    if (!candidateSlugs.has(s)) nonCandidate.add(s);
+  if (nonCandidate.size > 0) {
+    console.warn(
+      `[model-quality] tráfego sob slug(s) não-candidato ignorado na comparação: ${[...nonCandidate].join(", ")} — adicione alias em MODEL_SLUG_ALIASES ou candidato em CANDIDATES.`,
+    );
   }
 
   const rows = CANDIDATES.map((c) => {
@@ -181,8 +209,19 @@ export async function GET(req: NextRequest) {
       realCost: co?.realCost ?? 0,
       requests: co?.requests ?? 0,
       outputTokens: co?.outputTokens ?? 0,
+      billedCost: co?.billedCost ?? 0,
+      billedRequests: co?.billedRequests ?? 0,
       hasData: !!q || !!co,
     };
+  });
+
+  // Camada de DECISÃO (fecha o A/B): verdito por tier a partir das MESMAS linhas
+  // medidas. Só recomenda com significância; abaixo da amostra diz "insuficiente".
+  // Passa as flags de INDISPONIBILIDADE p/ distinguir "falha de leitura" de "zero
+  // medido" (achado #9) — sem isso, uma query que falha viraria "0 msgs / rode mais".
+  const decisions = decidePerTier(rows, {
+    qualityUnavailable: quality == null,
+    costUnavailable: cost == null,
   });
 
   return NextResponse.json({
@@ -197,6 +236,7 @@ export async function GET(req: NextRequest) {
     unattributedCostDollars: cost?.unattributedCostDollars ?? 0,
     qualityUnavailable: quality == null,
     costUnavailable: cost == null,
+    decisions,
     rows,
   });
 }
