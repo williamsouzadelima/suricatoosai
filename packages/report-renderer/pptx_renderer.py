@@ -548,10 +548,12 @@ def _table(prs, findings, title, remediation=False):
     for j, hd in enumerate(headers):
         gt.columns[j].width = widths[j]
         cell = gt.cell(0, j)
-        cell.text = hd
         cell.fill.solid()
         cell.fill.fore_color.rgb = _rgb(T.PRIMARY)
-        pr = cell.text_frame.paragraphs[0].runs[0]
+        # add_run() sempre cria um run — ao contrário de `cell.text = ""`, que
+        # deixa o parágrafo SEM run e faz runs[0] estourar IndexError.
+        pr = cell.text_frame.paragraphs[0].add_run()
+        pr.text = str(hd)
         pr.font.size = Pt(11)
         pr.font.bold = True
         pr.font.color.rgb = _rgb("FFFFFF")
@@ -562,8 +564,10 @@ def _table(prs, findings, title, remediation=False):
                 [f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev), _clip(f.get("title", ""), 70), _clip(f.get("affectedAsset", ""), 40)])
         for j, v in enumerate(vals):
             cell = gt.cell(i, j)
-            cell.text = str(v)
-            r = cell.text_frame.paragraphs[0].runs[0]
+            # add_run() tolera valor vazio (achado sem remediation/ref/ativo) —
+            # o `cell.text` antigo estourava IndexError quando v == "".
+            r = cell.text_frame.paragraphs[0].add_run()
+            r.text = str(v)
             r.font.size = Pt(10)
             r.font.color.rgb = _rgb(T.SEVERITY_COLOR.get(sev, T.INK) if j == 1 else T.INK)
             if j == 1:

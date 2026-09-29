@@ -311,11 +311,23 @@ export const generateEngagementReport = schemaTask({
           metadata.set(`format.${format}`, "ready");
           readyFormats.push(format);
         } catch (err) {
+          // E2B lança CommandExitError (implements CommandResult) em exit≠0 —
+          // o `.stderr` carrega o traceback REAL do renderer Python. Sem isso o
+          // erro fica só "exit status 1" (a message do CommandExitError) e o
+          // diagnóstico se perde. Anexa o stderr quando presente.
+          const baseMsg = err instanceof Error ? err.message : String(err);
+          const stderr =
+            err && typeof err === "object" && "stderr" in err
+              ? String((err as { stderr?: unknown }).stderr ?? "").trim()
+              : "";
+          const error = stderr
+            ? `${baseMsg} — ${stderr.slice(0, 600)}`
+            : baseMsg;
           await client.mutation(api.reports.markReportFailedForBackend, {
             serviceKey,
             reportGroupId: payload.reportGroupId,
             format,
-            error: err instanceof Error ? err.message : String(err),
+            error,
           });
           metadata.set(`format.${format}`, "failed");
           failedFormats.push(format);
