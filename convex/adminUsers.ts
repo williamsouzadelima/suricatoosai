@@ -840,6 +840,313 @@ export const getCostAnalyticsForBackend = query({
 });
 
 /**
+ * Medição de QUALIDADE por modelo SERVIDO (eval-gate, Fase A — read-only).
+ * Atribui por modelo REALMENTE servido (messages.model, reflete fallback;
+ * usage_logs.model vira "auto" no braço auto, por isso NÃO é usado aqui):
+ *  - latência p50/p95 (messages.generation_time_ms) e finish_reason;
+ *  - achados VALIDADOS (approved+published, curadoria humana) vs DESCARTADOS
+ *    (dismissed) vs PENDENTES (draft/in_review). NUNCA usa verdict/confidence
+ *    (auto-declarados pelo agente). Join finding.source_message_id → messages.
+ * Custo por modelo vem à parte (getCostAnalyticsForBackend.byModel) no route.
+ * Ressalva conhecida: achado capturado na perna de FALLBACK aponta p/ a msg
+ * primária → sub-atribui ao modelo primário (viés pequeno, documentado).
+ */
+export const getModelQualityForBackend = query({
+  args: {
+    serviceKey: v.string(),
+    period: v.union(
+      v.literal("1h"),
+      v.literal("24h"),
+      v.literal("7d"),
+      v.literal("30d"),
+      v.literal("90d"),
+      v.literal("180d"),
+      v.literal("365d"),
+    ),
+    nowMs: v.number(),
+  },
+  returns: v.object({
+    period: v.string(),
+    from: v.number(),
+    to: v.number(),
+    messagesCapped: v.boolean(),
+    findingsCapped: v.boolean(),
+    findingsLookupCapped: v.boolean(),
+    byModel: v.array(
+      v.object({
+        model: v.string(),
+        assistantMessages: v.number(),
+        latencyP50Ms: v.union(v.number(), v.null()),
+        latencyP95Ms: v.union(v.number(), v.null()),
+        finishReasons: v.array(
+          v.object({ reason: v.string(), count: v.number() }),
+        ),
+        findingsValidated: v.number(),
+        findingsDismissed: v.number(),
+        findingsPending: v.number(),
+      }),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const cfg = PERIOD_CFG[args.period];
+    const to = args.nowMs;
+    const from = to - cfg.ms;
+
+    type Agg = {
+      model: string;
+      assistantMessages: number;
+      latencies: number[];
+      finish: Map<string, number>;
+      validated: number;
+      dismissed: number;
+      pending: number;
+    };
+    const byModel = new Map<string, Agg>();
+    const ensure = (model: string): Agg => {
+      let a = byModel.get(model);
+      if (!a) {
+        a = {
+          model,
+          assistantMessages: 0,
+          latencies: [],
+          finish: new Map(),
+          validated: 0,
+          dismissed: 0,
+          pending: 0,
+        };
+        byModel.set(model, a);
+      }
+      return a;
+    };
+
+    // 1) Mensagens do assistente na janela → latência + finish_reason por modelo.
+    const msgRows = await ctx.db
+      .query("messages")
+      .withIndex("by_creation_time", (q) => q.gte("_creationTime", from))
+      .order("desc")
+      .take(ANALYTICS_ROW_CAP);
+    const messagesCapped = msgRows.length === ANALYTICS_ROW_CAP;
+    for (const m of msgRows) {
+      if (m.role !== "assistant") continue;
+      const model = m.model;
+      if (!model) continue;
+      const a = ensure(model);
+      a.assistantMessages++;
+      if (typeof m.generation_time_ms === "number" && m.generation_time_ms > 0) {
+        a.latencies.push(m.generation_time_ms);
+      }
+      if (m.finish_reason) {
+        a.finish.set(m.finish_reason, (a.finish.get(m.finish_reason) ?? 0) + 1);
+      }
+    }
+
+    // 2) Achados do agente na janela → qualidade por modelo servido (join msg).
+    // Teto de lookups = DETAIL_ROW_CAP (findings já é capado nele → nunca dropa
+    // em operação normal; flag sinaliza se algum dia bater).
+    const msgModelCache = new Map<string, string | null>();
+    let msgLookups = 0;
+    let findingsLookupCapped = false;
+    const modelForMessage = async (
+      msgId: string,
+    ): Promise<string | null> => {
+      const cached = msgModelCache.get(msgId);
+      if (cached !== undefined) return cached;
+      if (msgLookups >= DETAIL_ROW_CAP) {
+        findingsLookupCapped = true;
+        return null;
+      }
+      msgLookups++;
+      const m = await ctx.db
+        .query("messages")
+        .withIndex("by_message_id", (q) => q.eq("id", msgId))
+        .first();
+      const model = m?.model ?? null;
+      msgModelCache.set(msgId, model);
+      return model;
+    };
+
+    const findingRows = await ctx.db
+      .query("findings")
+      .withIndex("by_creation_time", (q) => q.gte("_creationTime", from))
+      .order("desc")
+      .take(DETAIL_ROW_CAP);
+    const findingsCapped = findingRows.length === DETAIL_ROW_CAP;
+    for (const f of findingRows) {
+      if (f.origin !== "agent" || !f.source_message_id) continue;
+      const model = await modelForMessage(f.source_message_id);
+      if (!model) continue;
+      const a = ensure(model);
+      if (f.status === "approved" || f.status === "published") a.validated++;
+      else if (f.status === "dismissed") a.dismissed++;
+      else a.pending++; // draft | in_review
+    }
+
+    const percentile = (sorted: number[], p: number): number | null => {
+      if (sorted.length === 0) return null;
+      const idx = Math.min(
+        sorted.length - 1,
+        Math.max(0, Math.floor(p * (sorted.length - 1))),
+      );
+      return sorted[idx];
+    };
+
+    const byModelOut = Array.from(byModel.values())
+      .map((a) => {
+        const sorted = a.latencies.slice().sort((x, y) => x - y);
+        return {
+          model: a.model,
+          assistantMessages: a.assistantMessages,
+          latencyP50Ms: percentile(sorted, 0.5),
+          latencyP95Ms: percentile(sorted, 0.95),
+          finishReasons: Array.from(a.finish.entries())
+            .map(([reason, count]) => ({ reason, count }))
+            .sort((x, y) => y.count - x.count),
+          findingsValidated: a.validated,
+          findingsDismissed: a.dismissed,
+          findingsPending: a.pending,
+        };
+      })
+      .sort((x, y) => y.assistantMessages - x.assistantMessages);
+
+    return {
+      period: args.period,
+      from,
+      to,
+      messagesCapped,
+      findingsCapped,
+      findingsLookupCapped,
+      byModel: byModelOut,
+    };
+  },
+});
+
+/**
+ * Eval-gate Fase A — CUSTO real por modelo SERVIDO. Corrige o desalinhamento de
+ * universo: getCostAnalyticsForBackend.byModel usa usage_logs.model, que vira
+ * "auto" no braço auto-router (o custo do modelo servido cairia no balde "auto"
+ * e sumiria). Aqui o custo é atribuído ao MESMO modelo servido da qualidade,
+ * juntando usage_logs.assistant_message_id → messages.model (by_message_id).
+ * Custo sem mensagem resolvível vai p/ `unattributedCostDollars` (visível, não
+ * descartado em silêncio). Fica na MESMA base que getModelQualityForBackend.
+ */
+// Teto menor que o de custo/qualidade: esta query lê usage_logs E faz um lookup
+// de mensagem por linha (2× leituras) → 2×6000=12000 fica folgado sob o limite
+// de ~16384 docs/execução do Convex. Volume real da instância solo << isso.
+const SERVED_COST_ROW_CAP = 6000;
+
+export const getServedModelCostForBackend = query({
+  args: {
+    serviceKey: v.string(),
+    period: v.union(
+      v.literal("1h"),
+      v.literal("24h"),
+      v.literal("7d"),
+      v.literal("30d"),
+      v.literal("90d"),
+      v.literal("180d"),
+      v.literal("365d"),
+    ),
+    nowMs: v.number(),
+  },
+  returns: v.object({
+    period: v.string(),
+    from: v.number(),
+    to: v.number(),
+    usageCapped: v.boolean(),
+    lookupCapped: v.boolean(),
+    unattributedCostDollars: v.number(),
+    byModel: v.array(
+      v.object({
+        model: v.string(),
+        realCost: v.number(),
+        requests: v.number(),
+        outputTokens: v.number(),
+      }),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const cfg = PERIOD_CFG[args.period];
+    const to = args.nowMs;
+    const from = to - cfg.ms;
+
+    const msgModelCache = new Map<string, string | null>();
+    let lookups = 0;
+    let lookupCapped = false;
+    const modelForMessage = async (
+      msgId: string,
+    ): Promise<string | null> => {
+      const cached = msgModelCache.get(msgId);
+      if (cached !== undefined) return cached;
+      if (lookups >= SERVED_COST_ROW_CAP) {
+        lookupCapped = true;
+        return null;
+      }
+      lookups++;
+      const m = await ctx.db
+        .query("messages")
+        .withIndex("by_message_id", (q) => q.eq("id", msgId))
+        .first();
+      const model = m?.model ?? null;
+      msgModelCache.set(msgId, model);
+      return model;
+    };
+
+    const usageRows = await ctx.db
+      .query("usage_logs")
+      .withIndex("by_creation_time", (q) => q.gte("_creationTime", from))
+      .order("desc")
+      .take(SERVED_COST_ROW_CAP);
+    const usageCapped = usageRows.length === SERVED_COST_ROW_CAP;
+
+    type CostAgg = { realCost: number; requests: number; outputTokens: number };
+    const byModel = new Map<string, CostAgg>();
+    let unattributedCostDollars = 0;
+
+    for (const u of usageRows) {
+      // Custo REAL (créditos do OpenRouter); fallback p/ cost_dollars nas linhas
+      // antigas sem provider_billed. Ver [[suricatoosai-cost-per-task]].
+      const cost =
+        typeof u.provider_billed_cost_dollars === "number"
+          ? u.provider_billed_cost_dollars
+          : u.cost_dollars;
+      const model = u.assistant_message_id
+        ? await modelForMessage(u.assistant_message_id)
+        : null;
+      if (!model) {
+        unattributedCostDollars += cost;
+        continue;
+      }
+      const a = byModel.get(model) ?? {
+        realCost: 0,
+        requests: 0,
+        outputTokens: 0,
+      };
+      a.realCost += cost;
+      a.requests += 1;
+      a.outputTokens += u.output_tokens;
+      byModel.set(model, a);
+    }
+
+    return {
+      period: args.period,
+      from,
+      to,
+      usageCapped,
+      lookupCapped,
+      unattributedCostDollars,
+      byModel: Array.from(byModel.entries()).map(([model, a]) => ({
+        model,
+        realCost: a.realCost,
+        requests: a.requests,
+        outputTokens: a.outputTokens,
+      })),
+    };
+  },
+});
+
+/**
  * Visão de negócio (receita/custo/lucro) por período, do rollup diário
  * `unit_economics_daily`. **Regra anti-dupla-contagem:** todo evento de uso
  * grava uma linha entity_type="user" (custo COMPLETO) e, se houver org, uma

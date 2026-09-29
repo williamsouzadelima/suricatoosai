@@ -2,6 +2,7 @@ import {
   isEligible,
   blendedIndex,
   recommendPerTier,
+  canonicalizeModelSlug,
   CURRENT_ASSIGNMENT,
   type MarketData,
   type OurUsage,
@@ -58,6 +59,41 @@ describe("blendedIndex", () => {
   it("peso 1 = só qualidade (neutra 0.5 -> 50)", () => {
     expect(blendedIndex(mkt({ slug: "x" }), 0.5, 1)).toBe(50);
     expect(blendedIndex(mkt({ slug: "x" }), 1, 1)).toBe(100);
+  });
+});
+
+describe("canonicalizeModelSlug", () => {
+  it("mantém slug de candidato exato", () => {
+    expect(canonicalizeModelSlug("z-ai/glm-5.3")).toBe("z-ai/glm-5.3");
+    expect(canonicalizeModelSlug("x-ai/grok-4.7")).toBe("x-ai/grok-4.7");
+  });
+  it("normaliza variante datada de candidato pelo strip -YYYYMMDD", () => {
+    expect(canonicalizeModelSlug("x-ai/grok-4.7-20260916")).toBe(
+      "x-ai/grok-4.7",
+    );
+    expect(canonicalizeModelSlug("deepseek/deepseek-v4.1-flash-20260910")).toBe(
+      "deepseek/deepseek-v4.1-flash",
+    );
+  });
+  it("evita a colisão -0813 (candidato) vs -20260813 (datado) via alias", () => {
+    // O strip -YYYYMMDD daria "deepseek/deepseek-v4-pro" (OUTRO candidato);
+    // o alias explícito garante o candidato certo (-0813).
+    expect(canonicalizeModelSlug("deepseek/deepseek-v4-pro-20260813")).toBe(
+      "deepseek/deepseek-v4-pro-0813",
+    );
+  });
+  it("mapeia nomes internos model-* para o slug", () => {
+    expect(canonicalizeModelSlug("model-grok-4.6")).toBe("x-ai/grok-4.6");
+    expect(canonicalizeModelSlug("model-deepseek-v4.1-flash")).toBe(
+      "deepseek/deepseek-v4.1-flash",
+    );
+    expect(canonicalizeModelSlug("agent-model-free")).toBe(
+      "deepseek/deepseek-v4-flash-0731",
+    );
+  });
+  it("devolve slug desconhecido inalterado", () => {
+    expect(canonicalizeModelSlug("openai/gpt-5")).toBe("openai/gpt-5");
+    expect(canonicalizeModelSlug("auto")).toBe("auto");
   });
 });
 

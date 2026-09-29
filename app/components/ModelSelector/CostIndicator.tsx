@@ -6,15 +6,34 @@ import {
 
 type CostTier = "low" | "medium" | "high" | "very-high";
 
-// Cost tier per Suricatoos tier id. Standard stays low cost in both modes;
-// Pro reflects the GLM/vision routes, while Max surfaces the highest-cost choice.
+// Faixa de custo por id. Tiers legados (hackerai-*) mantidos p/ compat; os
+// modelos concretos do seletor do operador usam o preço REAL de saída ($/M do
+// OpenRouter, 28/09) p/ dar o espectro $ / $$ / $$$ / $$$+ e permitir escolher
+// por custo. Re-sondar o catálogo se os preços mudarem materialmente.
 export function getCostTier(modelId: string): CostTier {
   switch (modelId) {
+    // Tiers legados.
     case "hackerai-standard":
       return "low";
     case "hackerai-pro":
       return "medium";
     case "hackerai-max":
+      return "very-high";
+    // Baratos ($): GLM Flash ~$0.5, DeepSeek Flash ~$0.28, V4.1 Flash ~$1.20.
+    case "model-glm-5.3-flash":
+    case "model-deepseek-v4-flash-0731":
+    case "model-deepseek-v4.1-flash":
+      return "low";
+    // Intermediários ($$): DeepSeek V4 Pro ~$3.5, GLM 5.3 ~$4.40.
+    case "model-deepseek-v4-pro-0813":
+    case "model-glm-5.3":
+      return "medium";
+    // Caros ($$$): Grok 4.6/4.7 ~$6.00.
+    case "model-grok-4.6":
+    case "model-grok-4.7":
+      return "high";
+    // Mais caro ($$$+): Kimi K3 ~$15.00.
+    case "model-kimi-k3":
       return "very-high";
     default:
       return "medium";

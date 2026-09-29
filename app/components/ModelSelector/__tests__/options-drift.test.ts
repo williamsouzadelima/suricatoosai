@@ -1,5 +1,6 @@
 import { describe, it, expect } from "@jest/globals";
 import { ASK_MODEL_OPTIONS, AGENT_MODEL_OPTIONS } from "../constants";
+import { getCostTier } from "../CostIndicator";
 import { myProvider, resolveTierToProviderKey } from "@/lib/ai/providers";
 import type { ChatMode } from "@/types/chat";
 
@@ -89,6 +90,16 @@ describe("ModelSelector tier ↔ provider drift", () => {
   it("agent options carry the thinking flag; ask options do not", () => {
     expect(AGENT_MODEL_OPTIONS.every((o) => o.thinking === true)).toBe(true);
     expect(ASK_MODEL_OPTIONS.every((o) => !o.thinking)).toBe(true);
+  });
+
+  it("os modelos concretos cobrem múltiplas faixas de custo ($/$$/$$$)", () => {
+    // Sem diferenciação (tudo "medium") era o bug: precisa haver espectro real.
+    const tiers = new Set(AGENT_MODEL_OPTIONS.map((o) => getCostTier(o.id)));
+    expect(tiers.size).toBeGreaterThanOrEqual(3);
+    expect(getCostTier("model-glm-5.3-flash")).toBe("low"); // $
+    expect(getCostTier("model-glm-5.3")).toBe("medium"); // $$
+    expect(getCostTier("model-grok-4.7")).toBe("high"); // $$$
+    expect(getCostTier("model-kimi-k3")).toBe("very-high"); // $$$+
   });
 
   it("resolves each concrete option to its own registered model key", () => {

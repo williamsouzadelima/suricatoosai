@@ -43,6 +43,52 @@ export const CANDIDATES: Candidate[] = [
   { slug: "moonshotai/kimi-k3", label: "Kimi K3", family: "kimi", jurisdiction: "China", tiers: ["max"] },
 ];
 
+const CANDIDATE_SLUG_SET: ReadonlySet<string> = new Set(
+  CANDIDATES.map((c) => c.slug),
+);
+
+/**
+ * Aliases: variante datada `-YYYYMMDD` conhecida OU nome interno `model-*` →
+ * slug canônico do candidato. Evita a colisão `-0813` (candidato) vs
+ * `-20260813` (datado). O que não estiver aqui cai no strip de `-\d{8}` abaixo.
+ */
+export const MODEL_SLUG_ALIASES: Record<string, string> = {
+  "deepseek/deepseek-v4-flash-20260731": "deepseek/deepseek-v4-flash-0731",
+  "deepseek/deepseek-v4-pro-20260813": "deepseek/deepseek-v4-pro-0813",
+  "x-ai/grok-4.6-20260810": "x-ai/grok-4.6",
+  "z-ai/glm-5.3-20260816": "z-ai/glm-5.3",
+  "moonshotai/kimi-k3-20260715": "moonshotai/kimi-k3",
+  // Nomes internos (defensivo; usage_logs guarda slug, messages.model idem).
+  "model-grok-4.6": "x-ai/grok-4.6",
+  "model-grok-4.7": "x-ai/grok-4.7",
+  "agent-model": "x-ai/grok-4.6",
+  "ask-model": "x-ai/grok-4.6",
+  "fallback-agent-model": "x-ai/grok-4.6",
+  "fallback-ask-model": "x-ai/grok-4.6",
+  "model-deepseek-v4-flash-0731": "deepseek/deepseek-v4-flash-0731",
+  "agent-model-free": "deepseek/deepseek-v4-flash-0731",
+  "model-deepseek-v4-pro-0813": "deepseek/deepseek-v4-pro-0813",
+  "model-deepseek-v4-pro": "deepseek/deepseek-v4-pro",
+  "model-deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash",
+  "model-glm-5.3": "z-ai/glm-5.3",
+  "model-glm-5.3-flash": "z-ai/glm-5.3-flash",
+  "ask-model-free": "z-ai/glm-5.3-flash",
+  "model-kimi-k3": "moonshotai/kimi-k3",
+  "model-opus-4.6": "moonshotai/kimi-k3",
+};
+
+/**
+ * Normaliza um `model` bruto (slug servido do OpenRouter, com/sem sufixo de
+ * data, ou nome interno) para o slug canônico de um candidato. Slugs
+ * desconhecidos voltam como estão (não casam com nenhum candidato → ignorados).
+ */
+export function canonicalizeModelSlug(raw: string): string {
+  if (MODEL_SLUG_ALIASES[raw]) return MODEL_SLUG_ALIASES[raw];
+  const m = raw.match(/^(.+)-\d{8}$/); // variante datada -YYYYMMDD
+  if (m && CANDIDATE_SLUG_SET.has(m[1])) return m[1];
+  return raw;
+}
+
 export interface MarketData {
   slug: string;
   priceIn: number | null; // $ por token

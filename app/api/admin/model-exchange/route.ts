@@ -7,6 +7,7 @@ import {
   CURRENT_ASSIGNMENT,
   UPSTREAM_ASSIGNMENT,
   TIER_LABELS,
+  canonicalizeModelSlug,
   type MarketData,
   type OurUsage,
 } from "@/lib/models/exchange";
@@ -30,45 +31,8 @@ const OR_BASE = "https://openrouter.ai/api/v1";
 const MARKET_TTL_MS = 5 * 60 * 1000; // cache do mercado (dados mudam devagar)
 const FETCH_TIMEOUT_MS = 8000;
 
-const CANDIDATE_SLUGS = new Set(CANDIDATES.map((c) => c.slug));
-
-/**
- * usage_logs.model guarda o SLUG do OpenRouter (resolveModelName =
- * responseModel || configuredModelId), às vezes com sufixo de data
- * (ex.: "x-ai/grok-4.6-20260810"). Aliases explícitos evitam a colisão
- * "-0813" (candidato) vs "-20260813" (variante datada). Nomes internos
- * ("model-grok-4.6") entram como defesa caso alguma linha antiga os tenha.
- */
-const SLUG_ALIASES: Record<string, string> = {
-  "deepseek/deepseek-v4-flash-20260731": "deepseek/deepseek-v4-flash-0731",
-  "deepseek/deepseek-v4-pro-20260813": "deepseek/deepseek-v4-pro-0813",
-  "x-ai/grok-4.6-20260810": "x-ai/grok-4.6",
-  "z-ai/glm-5.3-20260816": "z-ai/glm-5.3",
-  "moonshotai/kimi-k3-20260715": "moonshotai/kimi-k3",
-  // Nomes internos (defensivo; hoje o campo guarda slug).
-  "model-grok-4.6": "x-ai/grok-4.6",
-  "model-grok-4.7": "x-ai/grok-4.7",
-  "agent-model": "x-ai/grok-4.6",
-  "ask-model": "x-ai/grok-4.6",
-  "fallback-agent-model": "x-ai/grok-4.6",
-  "fallback-ask-model": "x-ai/grok-4.6",
-  "model-deepseek-v4-flash-0731": "deepseek/deepseek-v4-flash-0731",
-  "agent-model-free": "deepseek/deepseek-v4-flash-0731",
-  "model-deepseek-v4-pro-0813": "deepseek/deepseek-v4-pro-0813",
-  "model-deepseek-v4-pro": "deepseek/deepseek-v4-pro",
-  "model-glm-5.3": "z-ai/glm-5.3",
-  "model-glm-5.3-flash": "z-ai/glm-5.3-flash",
-  "ask-model-free": "z-ai/glm-5.3-flash",
-  "model-kimi-k3": "moonshotai/kimi-k3",
-  "model-opus-4.6": "moonshotai/kimi-k3",
-};
-
-function canonicalizeSlug(raw: string): string {
-  if (SLUG_ALIASES[raw]) return SLUG_ALIASES[raw];
-  const m = raw.match(/^(.+)-\d{8}$/); // variante datada -YYYYMMDD desconhecida
-  if (m && CANDIDATE_SLUGS.has(m[1])) return m[1];
-  return raw;
-}
+// Normalização de slug (variantes datadas + nomes internos → candidato):
+// helper compartilhado em lib/models/exchange.ts (canonicalizeModelSlug).
 
 interface ModelsRow {
   id: string;
@@ -208,7 +172,7 @@ export async function GET(req: NextRequest) {
       { serviceKey, period, nowMs: Date.now() },
     );
     for (const r of data.byModel) {
-      const slug = canonicalizeSlug(r.model);
+      const slug = canonicalizeModelSlug(r.model);
       const prev = usageBySlug[slug];
       if (prev) {
         prev.requests += r.requests;

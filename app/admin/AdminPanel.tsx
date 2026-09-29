@@ -38,6 +38,7 @@ import { SecurityDefenseSection } from "./SecurityDefenseSection";
 import { TaskCostsTab } from "./TaskCostsTab";
 import { BudgetTab } from "./BudgetTab";
 import { ModelExchangePanel } from "./ModelExchangePanel";
+import { ModelQualityPanel } from "./ModelQualityPanel";
 import {
   StatCard,
   StatusBadge,
@@ -411,7 +412,10 @@ export function AdminPanel({
         ) : tab === "orcamentos" ? (
           <BudgetTab adminEmail={adminEmail} />
         ) : tab === "pregao" ? (
-          <ModelExchangePanel />
+          <div className="space-y-4">
+            <ModelExchangePanel />
+            <ModelQualityPanel />
+          </div>
         ) : (
           /* ---- Convites & acesso ---- */
           <div className="space-y-6">
