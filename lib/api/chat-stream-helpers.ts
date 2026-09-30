@@ -609,6 +609,24 @@ const HACKERAI_PRO_FALLBACK_CHAIN = [
   "model-kimi-k3",
 ] as const satisfies readonly ModelName[];
 
+// Modelos GRATUITOS ($0; podem treinar com o prompt). Quando falham/rate-limitam,
+// caem no padrão PAGO mais barato — direção SEGURA (pago é mais privado).
+// INVARIANTE (testado): nenhuma cadeia de modelo PAGO contém um free — pago →
+// free vazaria dado de cliente pra provedor que treina. Conjunto local espelha
+// FREE_MODEL_SELECTIONS (types/chat) — teste garante paridade.
+const FREE_MODEL_NAMES = [
+  "model-nemotron-3-ultra-free",
+  "model-nemotron-3-super-free",
+  "model-qwen3.8-27b-free",
+  "model-gemma-4-31b-free",
+] as const satisfies readonly ModelName[];
+export const FREE_MODEL_NAME_SET: ReadonlySet<string> = new Set(
+  FREE_MODEL_NAMES,
+);
+const FREE_MODEL_FALLBACK_CHAIN = [
+  "model-deepseek-v4-flash-0731",
+] as const satisfies readonly ModelName[];
+
 const MODEL_FALLBACK_CHAIN: Partial<Record<ModelName, readonly ModelName[]>> = {
   "ask-model-free": FREE_ASK_GLM_FLASH_FALLBACK_CHAIN,
   "agent-model-free": DEEPSEEK_V4_FLASH_0731_FALLBACK_CHAIN,
@@ -632,6 +650,11 @@ const MODEL_FALLBACK_CHAIN: Partial<Record<ModelName, readonly ModelName[]>> = {
   "fallback-agent-model": GROK_4_6_FALLBACK_CHAIN,
   "fallback-ask-model": GROK_4_6_FALLBACK_CHAIN,
   "model-kimi-k3": ["model-grok-4.6"],
+  // Gratuitos → padrão pago (nunca o inverso; ver invariante acima).
+  "model-nemotron-3-ultra-free": FREE_MODEL_FALLBACK_CHAIN,
+  "model-nemotron-3-super-free": FREE_MODEL_FALLBACK_CHAIN,
+  "model-qwen3.8-27b-free": FREE_MODEL_FALLBACK_CHAIN,
+  "model-gemma-4-31b-free": FREE_MODEL_FALLBACK_CHAIN,
 };
 
 const AUTO_MODEL_KEYS = new Set<string>([
@@ -733,6 +756,10 @@ export function getRetryFallbackModel(
   modelName: ModelName,
   _mode: ChatMode,
 ): ModelName {
+  // Free → padrão pago mais barato (direção segura: pago é MAIS privado).
+  if (FREE_MODEL_NAME_SET.has(modelName)) {
+    return "model-deepseek-v4-flash-0731";
+  }
   if (
     modelName === "agent-model-free" ||
     modelName === "model-deepseek-v4-flash-0731" ||
@@ -881,6 +908,17 @@ const OPENROUTER_RESPONSE_MODEL_COST_KEYS: Record<string, string> = {
   "x-ai/grok-4.7": "model-grok-4.7",
   "x-ai/grok-4.7-20260916": "model-grok-4.7",
   "deepseek/deepseek-v4.1-flash": "model-deepseek-v4.1-flash",
+  // Gratuitos ($0). O OpenRouter pode reportar o slug servido COM ou SEM o
+  // sufixo `:free`; ambos mapeiam p/ a chave free ($0). Só usamos a variante
+  // free destes modelos — se um dia entrar a paga, separar as chaves.
+  "nvidia/nemotron-3-ultra-550b-a55b:free": "model-nemotron-3-ultra-free",
+  "nvidia/nemotron-3-ultra-550b-a55b": "model-nemotron-3-ultra-free",
+  "nvidia/nemotron-3-super-120b-a12b:free": "model-nemotron-3-super-free",
+  "nvidia/nemotron-3-super-120b-a12b": "model-nemotron-3-super-free",
+  "qwen/qwen3.8-27b:free": "model-qwen3.8-27b-free",
+  "qwen/qwen3.8-27b": "model-qwen3.8-27b-free",
+  "google/gemma-4-31b-it:free": "model-gemma-4-31b-free",
+  "google/gemma-4-31b-it": "model-gemma-4-31b-free",
   "z-ai/glm-5.2": "model-glm-5.2",
   "z-ai/glm-5.2-20260616": "model-glm-5.2",
   "z-ai/glm-5.3": "model-glm-5.3",

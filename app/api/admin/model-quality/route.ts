@@ -193,6 +193,7 @@ export async function GET(req: NextRequest) {
       label: c.label,
       family: c.family,
       jurisdiction: c.jurisdiction,
+      free: c.free ?? false,
       assistantMessages: q?.assistantMessages ?? 0,
       latencyP50Ms: q?.latencyP50Ms ?? null,
       latencyP95Ms: q?.latencyP95Ms ?? null,

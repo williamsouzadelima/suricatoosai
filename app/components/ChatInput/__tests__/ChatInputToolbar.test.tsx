@@ -26,7 +26,13 @@ jest.mock("../FreeAskComputerActivation", () => ({
 }));
 
 jest.mock("@/app/components/ModelSelector", () => ({
-  ModelSelector: () => <div data-testid="model-selector" />,
+  // Captura a prop de vínculo p/ o teste da cadeia chat → ChatInput → Toolbar.
+  ModelSelector: ({ engagementBound }: { engagementBound?: boolean }) => (
+    <div
+      data-testid="model-selector"
+      data-engagement-bound={String(!!engagementBound)}
+    />
+  ),
 }));
 
 jest.mock("@/app/components/AgentPermissionSelector", () => ({
@@ -138,6 +144,22 @@ describe("ChatInputToolbar", () => {
     render(<ChatInputToolbar {...defaultProps} />);
 
     expect(screen.getByTestId("model-selector")).toBeInTheDocument();
+  });
+
+  it("repassa chatEngagementBound ao ModelSelector (bloqueio de modelos gratuitos)", () => {
+    mockAuthUser({ id: "user_123" });
+
+    const { rerender } = render(<ChatInputToolbar {...defaultProps} />);
+    expect(screen.getByTestId("model-selector")).toHaveAttribute(
+      "data-engagement-bound",
+      "false",
+    );
+
+    rerender(<ChatInputToolbar {...defaultProps} chatEngagementBound />);
+    expect(screen.getByTestId("model-selector")).toHaveAttribute(
+      "data-engagement-bound",
+      "true",
+    );
   });
 
   it("shows computer activation only for logged-in free Ask users without a local sandbox", () => {

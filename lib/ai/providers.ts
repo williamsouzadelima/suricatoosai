@@ -995,6 +995,17 @@ export const AUXILIARY_VISION_SLUG = MINIMAX_M3_SLUG;
 export const DEEPSEEK_V4_PRO_SLUG = "deepseek/deepseek-v4-pro";
 export const DEEPSEEK_V4_PRO_0813_SLUG = "deepseek/deepseek-v4-pro-0813";
 export const DEEPSEEK_V4_1_FLASH_SLUG = "deepseek/deepseek-v4.1-flash";
+// Modelos GRATUITOS do OpenRouter (custo $0, sufixo `:free`). Todos com tools +
+// reasoning (verificado na API /models em 30/09). POLÍTICA DE DADOS: o provedor
+// pode TREINAR com o prompt → só podem servir tarefas SEM engajamento/cliente
+// (portão duro em lib/chat/free-model-gate.ts). Nunca entram em cadeia de
+// fallback de modelo pago (pago → free vazaria dado de cliente).
+export const NEMOTRON_3_ULTRA_FREE_SLUG =
+  "nvidia/nemotron-3-ultra-550b-a55b:free";
+export const NEMOTRON_3_SUPER_FREE_SLUG =
+  "nvidia/nemotron-3-super-120b-a12b:free";
+export const QWEN_3_8_27B_FREE_SLUG = "qwen/qwen3.8-27b:free";
+export const GEMMA_4_31B_FREE_SLUG = "google/gemma-4-31b-it:free";
 export const DEEPSEEK_V4_FLASH_SLUG = "deepseek/deepseek-v4-flash-0731";
 export const DEEPSEEK_V4_FLASH_PREVIOUS_SLUG = "deepseek/deepseek-v4-flash";
 const TITLE_GENERATOR_DEEPSEEK_SLUG = "deepseek/deepseek-v4-flash";
@@ -1027,6 +1038,11 @@ const buildProviderMap = (
     "model-grok-4.6": or(GROK_4_6_SLUG),
     "model-grok-4.7": or(GROK_4_7_SLUG),
     "model-deepseek-v4.1-flash": or(DEEPSEEK_V4_1_FLASH_SLUG),
+    // Gratuitos ($0; treinam com o prompt → só chats sem engajamento).
+    "model-nemotron-3-ultra-free": or(NEMOTRON_3_ULTRA_FREE_SLUG),
+    "model-nemotron-3-super-free": or(NEMOTRON_3_SUPER_FREE_SLUG),
+    "model-qwen3.8-27b-free": or(QWEN_3_8_27B_FREE_SLUG),
+    "model-gemma-4-31b-free": or(GEMMA_4_31B_FREE_SLUG),
     // Separate internal keys use the same Grok 4.5 provider model while
     // provider reasoning options distinguish Standard from Pro vision.
     "model-grok-4.5": or(GROK_4_5_SLUG),
@@ -1093,6 +1109,10 @@ export const modelDisplayNames: Record<ModelName, string> &
   "model-grok-4.6": "xAI Grok 4.6",
   "model-grok-4.7": "xAI Grok 4.7",
   "model-deepseek-v4.1-flash": "DeepSeek V4.1 Flash",
+  "model-nemotron-3-ultra-free": "NVIDIA Nemotron 3 Ultra (free)",
+  "model-nemotron-3-super-free": "NVIDIA Nemotron 3 Super (free)",
+  "model-qwen3.8-27b-free": "Qwen 3.8 27B (free)",
+  "model-gemma-4-31b-free": "Google Gemma 4 31B (free)",
   "model-grok-4.5": "xAI Grok 4.5",
   "model-grok-4.5-pro": "xAI Grok 4.5",
   "model-grok-4.6-pro": "xAI Grok 4.6",

@@ -67,6 +67,15 @@ export type CreateToolsRuntimePolicy = {
   cloudSandboxProvider?: CloudSandboxProvider;
   triggerRegion?: TriggerRunRegion;
   keepE2BLeaseAliveForRun?: boolean;
+  /**
+   * false = o run está num modelo GRATUITO (o provedor pode treinar com o
+   * prompt). Por definição, run free é RASCUNHO sem engajamento: NÃO provisiona
+   * engajamento eager nem expõe `capture_finding` — senão o próprio run
+   * transformaria o chat em chat-de-cliente logo após passar no portão
+   * (lib/chat/free-model-gate.ts) e gravaria achados vindos de um provedor
+   * que treina. Padrão (undefined/true) = comportamento normal.
+   */
+  engagementBindingAllowed?: boolean;
 };
 
 export type SandboxSessionUsage = {
@@ -108,7 +117,14 @@ export const createTools = (
   // Cria/garante o engajamento da task assim que ela inicia (eager) — aparece em
   // /engagements mesmo antes do primeiro achado. Best-effort e não-bloqueante;
   // idempotente (resolveEngagementForChatBackend reusa o engajamento do chat).
-  if (notesEnabled && serviceKey && chatId && mode === "agent") {
+  // NUNCA em run de modelo gratuito (engagementBindingAllowed === false).
+  if (
+    notesEnabled &&
+    serviceKey &&
+    chatId &&
+    mode === "agent" &&
+    runtimePolicy.engagementBindingAllowed !== false
+  ) {
     try {
       void getConvexClient()
         .mutation(api.engagements.resolveEngagementForChatBackend, {
@@ -285,8 +301,13 @@ export const createTools = (
         list_notes: createListNotes(context),
         update_note: createUpdateNote(context),
         delete_note: createDeleteNote(context),
-        capture_finding: createCaptureFinding(context),
       }),
+      // capture_finding anexa o chat a um engajamento (lazy) e grava achados —
+      // proibido em run de modelo gratuito (ver engagementBindingAllowed).
+      ...(notesEnabled &&
+        runtimePolicy.engagementBindingAllowed !== false && {
+          capture_finding: createCaptureFinding(context),
+        }),
       ...(process.env.PERPLEXITY_API_KEY && {
         web_search: createWebSearch(context),
       }),

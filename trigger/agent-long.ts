@@ -29,6 +29,12 @@ import { ptySessionManager } from "@/lib/ai/tools/utils/pty-session-manager";
 import { generateTitleFromUserMessageWithWriter } from "@/lib/actions";
 import { createTrackedProvider } from "@/lib/ai/providers";
 import { processChatMessages, selectModel } from "@/lib/chat/chat-processor";
+import {
+  assertFreeModelStillAllowed,
+  createFreeModelStepGuard,
+  enforceFreeModelEngagementGate,
+} from "@/lib/chat/free-model-gate";
+import { isFreeModelSelection } from "@/types/chat";
 import { cacheAuxiliaryVisionDescription } from "@/lib/utils/file-transform-utils";
 import {
   createVisionSummaryRecoveryController,
@@ -2529,6 +2535,16 @@ export const agentLongTask = task({
         normalizeMaxModelForSubscription(selectedModelOverride, subscription, {
           extraUsageAvailable,
         }) ?? undefined;
+      // Portão duro (defesa em profundidade): a task re-deriva do payload BRUTO
+      // do cliente, então o mesmo portão do handler roda aqui. Free só em chat
+      // sem engajamento/cliente; senão rebaixa p/ "auto" (pago).
+      selectedModelOverride = (
+        await enforceFreeModelEngagementGate({
+          selectedModelOverride,
+          chatId,
+          chat, // já carregado acima → sem releitura nem caminho de falha
+        })
+      ).override;
       const extraUsageConfig = withExtraUsageBillingForModel(
         baseExtraUsageConfig,
         selectedModelOverride,
@@ -2976,6 +2992,17 @@ export const agentLongTask = task({
                   "The chat is no longer waiting for this approval.",
                 );
               }
+              // Modelo GRATUITO: se o chat foi vinculado a engajamento/cliente
+              // durante a pausa, não retoma no provedor que treina.
+              if (
+                isFreeModelSelection(selectedModelOverride) &&
+                currentChat.engagement_id
+              ) {
+                throw new AgentApprovalAuthorizationError(
+                  "authorization_mismatch",
+                  "Chat vinculado a engajamento/cliente; modelo gratuito não é mais autorizado.",
+                );
+              }
 
               const currentUserCustomization = await getUserCustomization({
                 userId,
@@ -3062,6 +3089,16 @@ export const agentLongTask = task({
                 throw new AgentApprovalAuthorizationError(
                   "authorization_mismatch",
                   "The chat is no longer associated with this Agent run.",
+                );
+              }
+              // Modelo GRATUITO: idem — vínculo novo com engajamento veta a retomada.
+              if (
+                isFreeModelSelection(selectedModelOverride) &&
+                currentChat.engagement_id
+              ) {
+                throw new AgentApprovalAuthorizationError(
+                  "authorization_mismatch",
+                  "Chat vinculado a engajamento/cliente; modelo gratuito não é mais autorizado.",
                 );
               }
 
@@ -3212,6 +3249,10 @@ export const agentLongTask = task({
                 cloudSandboxProvider,
                 triggerRegion,
                 keepE2BLeaseAliveForRun: true,
+                // Run em modelo GRATUITO = rascunho: sem engajamento eager nem
+                // capture_finding (senão o run vira chat-de-cliente após o portão).
+                engagementBindingAllowed:
+                  !isFreeModelSelection(selectedModelOverride),
                 ...(subagentsEnabled
                   ? {
                       additionalTools: (toolContext) => ({
@@ -4110,12 +4151,21 @@ export const agentLongTask = task({
                 agentLongDurationExceeded
                   ? PREEMPTIVE_TIMEOUT_FINISH_REASON
                   : null,
+              // Run free: re-checa vínculo com engajamento a cada passo (throttled).
+              beforeStep: createFreeModelStepGuard({
+                selectedModelOverride,
+                chatId,
+              }),
             };
 
-            const createStream = (
+            const createStream = async (
               modelName: string,
               excludedProviderModelSlugs?: readonly string[],
             ) => {
+              // Run free: o chat pode ter sido vinculado a engajamento desde o
+              // portão de entrada (UI ou captura) — não abre stream no provedor
+              // que treina. Aborta em vez de rebaixar em silêncio.
+              await assertFreeModelStillAllowed({ selectedModelOverride, chatId });
               activeModelName = modelName;
               terminalRequestedModelSlug =
                 trackedProvider.languageModel(modelName).modelId;

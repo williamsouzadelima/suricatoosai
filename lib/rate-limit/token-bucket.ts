@@ -94,6 +94,14 @@ const DEEPSEEK_V4_1_FLASH_PRICING: ModelPricing = {
   cacheRead: 0.006,
   cacheWrite: 0.3,
 };
+// Modelos GRATUITOS do OpenRouter: $0 em tudo (o faturado real é 0). Mantido
+// como tabela própria p/ a contabilidade mostrar $0 honesto, não DEFAULT_PRICING.
+const FREE_PRICING: ModelPricing = {
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+};
 const OPUS_4_6_PRICING: ModelPricing = {
   input: 5.0,
   output: 25.0,
@@ -143,6 +151,11 @@ const MODEL_PRICING_MAP: Record<string, ModelPricing> = {
   // Grok 4.7 (28/09) tem o MESMO preço do 4.6: $2/$6 base, tier 2x em 200k.
   "model-grok-4.7": GROK_4_6_BASE_PRICING,
   "model-deepseek-v4.1-flash": DEEPSEEK_V4_1_FLASH_PRICING,
+  // Gratuitos ($0).
+  "model-nemotron-3-ultra-free": FREE_PRICING,
+  "model-nemotron-3-super-free": FREE_PRICING,
+  "model-qwen3.8-27b-free": FREE_PRICING,
+  "model-gemma-4-31b-free": FREE_PRICING,
   "model-grok-4.5": GROK_4_6_BASE_PRICING,
   "model-grok-4.5-pro": GROK_4_6_BASE_PRICING,
   "ask-model": GROK_4_6_BASE_PRICING,
@@ -176,6 +189,15 @@ const MODEL_PRICING_MAP: Record<string, ModelPricing> = {
   "x-ai/grok-4.6": GROK_4_6_BASE_PRICING,
   "x-ai/grok-4.7": GROK_4_6_BASE_PRICING,
   "deepseek/deepseek-v4.1-flash": DEEPSEEK_V4_1_FLASH_PRICING,
+  // Gratuitos ($0) — slug servido com ou sem `:free`.
+  "nvidia/nemotron-3-ultra-550b-a55b:free": FREE_PRICING,
+  "nvidia/nemotron-3-ultra-550b-a55b": FREE_PRICING,
+  "nvidia/nemotron-3-super-120b-a12b:free": FREE_PRICING,
+  "nvidia/nemotron-3-super-120b-a12b": FREE_PRICING,
+  "qwen/qwen3.8-27b:free": FREE_PRICING,
+  "qwen/qwen3.8-27b": FREE_PRICING,
+  "google/gemma-4-31b-it:free": FREE_PRICING,
+  "google/gemma-4-31b-it": FREE_PRICING,
   "deepseek/deepseek-v4-flash": DEEPSEEK_V4_FLASH_PRICING,
   "deepseek/deepseek-v4-flash-20260423": DEEPSEEK_V4_FLASH_PRICING,
   "deepseek/deepseek-v4-flash-0731": DEEPSEEK_V4_FLASH_0731_PRICING,

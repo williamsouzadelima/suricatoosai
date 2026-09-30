@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Loader2,
   Lock,
+  ShieldAlert,
 } from "lucide-react";
 import {
   Popover,
@@ -33,13 +34,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
   canUseMaxModel,
   normalizeMaxModelForSubscription,
   normalizeSelectedModelForSubscription,
+  isFreeModelSelection,
   type ChatMode,
   type SelectedModel,
   type SubscriptionTier,
@@ -55,6 +57,7 @@ import {
   ASK_MODEL_OPTIONS,
   AGENT_MODEL_OPTIONS,
   getDefaultModelForMode,
+  getFreeModelOptions,
   type ModelOption,
 } from "./ModelSelector/constants";
 
@@ -64,6 +67,9 @@ interface ModelSelectorProps {
   value: SelectedModel;
   onChange: (model: SelectedModel) => void;
   mode: ChatMode;
+  /** O chat atual pertence a um engajamento/cliente → modelos GRATUITOS ficam
+   *  bloqueados na UI (o servidor impõe o mesmo portão independentemente). */
+  engagementBound?: boolean;
 }
 
 const AUTO_MODEL_DESCRIPTION =
@@ -293,8 +299,12 @@ const ModelOptionList = ({
   onSelect,
   onClose,
   mobile = false,
+  freeOptions = [],
+  engagementBound = false,
 }: {
   options: ModelOption[];
+  freeOptions?: ModelOption[];
+  engagementBound?: boolean;
   value: SelectedModel;
   isAuto: boolean;
   isFreeUser: boolean;
@@ -433,12 +443,103 @@ const ModelOptionList = ({
         </Tooltip>
       );
     })}
+
+    {/* Gratuitos: grupo SEPARADO (nunca default), com selo de política de dados.
+        Em chat de engajamento/cliente ficam bloqueados — e o servidor impõe o
+        mesmo portão, então isto é aviso honesto, não a proteção em si. */}
+    {!isFreeUser && freeOptions.length > 0 && (
+      <>
+        <div className="my-1.5 border-b border-border/50" />
+        <div className="flex items-center gap-1.5 px-2.5 pb-1 pt-0.5">
+          <ShieldAlert className="h-3 w-3 shrink-0 text-sky-500" />
+          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Gratuitos · podem treinar com o prompt
+          </span>
+        </div>
+        {engagementBound && (
+          <p
+            className="px-2.5 pb-1 text-[11px] leading-snug text-amber-600 dark:text-amber-400"
+            data-testid="free-models-blocked-notice"
+          >
+            Bloqueados nesta tarefa: ela pertence a um engajamento/cliente.
+          </p>
+        )}
+        {freeOptions.map((option) => {
+          if (!engagementBound) {
+            return (
+              <div key={option.id}>
+                <ModelOptionButton
+                  option={option}
+                  isSelected={value === option.id}
+                  isLocked={false}
+                  isPending={false}
+                  subscription={subscription}
+                  onSelect={onSelect}
+                  mobile={mobile}
+                />
+              </div>
+            );
+          }
+          // Bloqueado: botão próprio (não reutiliza isLocked, cujo aria/CTA é
+          // "upgrade de plano" — semântica errada aqui) e sem tooltip aninhado.
+          const blocked = (
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              aria-label={`${option.label}. Bloqueado: esta tarefa pertence a um engajamento/cliente.`}
+              className={`group w-full flex items-center gap-2.5 px-2.5 rounded-lg text-left select-none cursor-not-allowed opacity-50 ${
+                mobile ? "py-2.5" : "py-1.5"
+              }`}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm text-muted-foreground">
+                    {option.label}
+                  </span>
+                  <CostIndicator modelId={option.id} />
+                </div>
+              </div>
+              <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            </button>
+          );
+          if (mobile) return <div key={option.id}>{blocked}</div>;
+          return (
+            <Tooltip key={option.id}>
+              <TooltipTrigger asChild>
+                <div>{blocked}</div>
+              </TooltipTrigger>
+              <TooltipContent
+                side="right"
+                sideOffset={12}
+                align="start"
+                className="bg-popover text-popover-foreground border border-border shadow-lg rounded-xl px-4 py-3 max-w-[240px] space-y-1.5 [&_svg]:!hidden"
+              >
+                <p className="text-sm font-semibold text-foreground leading-snug">
+                  Bloqueado em tarefa de cliente
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Modelos gratuitos podem treinar com o prompt; esta tarefa está
+                  ligada a um engajamento. O servidor usaria o modelo pago mesmo
+                  assim.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </>
+    )}
   </div>
 );
 
 // ── Main component ─────────────────────────────────────────────────
 
-export function ModelSelector({ value, onChange, mode }: ModelSelectorProps) {
+export function ModelSelector({
+  value,
+  onChange,
+  mode,
+  engagementBound = false,
+}: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const [maxAccessDialogOpen, setMaxAccessDialogOpen] = useState(false);
   const { subscription } = useGlobalState();
@@ -466,13 +567,31 @@ export function ModelSelector({ value, onChange, mode }: ModelSelectorProps) {
       : (normalizeMaxModelForSubscription(subscriptionValue, subscription, {
           extraUsageAvailable: maxModelExtraUsageAvailable,
         }) ?? "auto");
-  const isAuto = displayValue === "auto";
+  // Chat de engajamento: um free escolhido antes não pode aparecer como ativo
+  // (o servidor rebaixa p/ auto). Espelha aqui p/ o rótulo do gatilho não mentir.
+  const boundSafeValue: SelectedModel =
+    engagementBound && isFreeModelSelection(displayValue)
+      ? "auto"
+      : displayValue;
+  const isAuto = boundSafeValue === "auto";
+
+  // Exibir "Auto" não basta: o estado REAL (GlobalState/localStorage) seguiria
+  // no free e re-armaria a preferência na próxima tarefa nova (opt-in violado
+  // em silêncio). Em chat de engajamento, normaliza a preferência de verdade.
+  useEffect(() => {
+    if (engagementBound && isFreeModelSelection(value)) onChange("auto");
+  }, [engagementBound, value, onChange]);
 
   const options = isAgentMode(mode) ? AGENT_MODEL_OPTIONS : ASK_MODEL_OPTIONS;
+  const freeOptions = getFreeModelOptions(mode);
 
-  const effectiveValue = isAuto ? getDefaultModelForMode(mode) : displayValue;
+  const effectiveValue = isAuto
+    ? getDefaultModelForMode(mode)
+    : boundSafeValue;
   const selected =
-    options.find((opt) => opt.id === effectiveValue) ?? options[0];
+    options.find((opt) => opt.id === effectiveValue) ??
+    freeOptions.find((opt) => opt.id === effectiveValue) ??
+    options[0];
 
   const isFreeAgent = isFreeUser && isAgentMode(mode);
   const triggerLabel = isFreeAgent
@@ -594,7 +713,7 @@ export function ModelSelector({ value, onChange, mode }: ModelSelectorProps) {
             </SheetHeader>
             <ModelOptionList
               options={options}
-              value={displayValue}
+              value={boundSafeValue}
               isAuto={isAuto}
               isFreeUser={isFreeUser}
               subscription={subscription}
@@ -603,6 +722,8 @@ export function ModelSelector({ value, onChange, mode }: ModelSelectorProps) {
               onAutoSelect={handleAutoSelect}
               onSelect={handleModelSelect}
               onClose={() => setOpen(false)}
+              freeOptions={freeOptions}
+              engagementBound={engagementBound}
               mobile
             />
           </SheetContent>
@@ -619,7 +740,7 @@ export function ModelSelector({ value, onChange, mode }: ModelSelectorProps) {
         <PopoverContent className="w-[270px] p-1.5 rounded-xl" align="start">
           <ModelOptionList
             options={options}
-            value={displayValue}
+            value={boundSafeValue}
             isAuto={isAuto}
             isFreeUser={isFreeUser}
             subscription={subscription}
@@ -628,6 +749,8 @@ export function ModelSelector({ value, onChange, mode }: ModelSelectorProps) {
             onAutoSelect={handleAutoSelect}
             onSelect={handleModelSelect}
             onClose={() => setOpen(false)}
+            freeOptions={freeOptions}
+            engagementBound={engagementBound}
           />
         </PopoverContent>
       </Popover>

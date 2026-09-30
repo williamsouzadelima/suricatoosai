@@ -8,6 +8,7 @@
 
 import {
   buildProviderOptions,
+  FREE_MODEL_NAME_SET,
   getContentFilterRetryModel,
   getRetryFallbackModel,
   isAutoModelSelectionForRetry,
@@ -23,6 +24,73 @@ jest.mock("@/lib/db/actions", () => ({
 jest.mock("@/lib/logger", () => ({
   logger: { warn: jest.fn(), info: jest.fn(), error: jest.fn() },
 }));
+
+import { FREE_MODEL_SELECTIONS, OPERATOR_MODEL_SELECTIONS } from "@/types/chat";
+
+/**
+ * Modelos GRATUITOS (podem treinar com o prompt) — INVARIANTES de fallback:
+ *  (a) free → padrão PAGO mais barato (direção segura: pago é mais privado);
+ *  (b) NENHUM modelo pago/auto cai num free (pago → free vazaria dado de cliente);
+ *  (c) o conjunto local espelha FREE_MODEL_SELECTIONS (sem drift entre módulos).
+ */
+describe("free models — fallback invariants", () => {
+  const FREE_SLUG_FRAGMENTS = [
+    "nemotron-3-ultra-550b-a55b",
+    "nemotron-3-super-120b-a12b",
+    "qwen3.8-27b",
+    "gemma-4-31b-it",
+  ];
+  const looksFree = (slug: string) =>
+    slug.endsWith(":free") || FREE_SLUG_FRAGMENTS.some((f) => slug.includes(f));
+
+  it("(c) FREE_MODEL_NAME_SET espelha FREE_MODEL_SELECTIONS", () => {
+    expect([...FREE_MODEL_NAME_SET].sort()).toEqual(
+      [...FREE_MODEL_SELECTIONS].sort(),
+    );
+  });
+
+  it("(a) todo free cai no padrão pago mais barato", () => {
+    for (const id of FREE_MODEL_SELECTIONS) {
+      for (const mode of ["ask", "agent"] as const) {
+        expect(getRetryFallbackModel(id, mode)).toBe(
+          "model-deepseek-v4-flash-0731",
+        );
+      }
+      // Cadeia OpenRouter do free também aponta só pra slug PAGO.
+      const models: string[] =
+        (buildProviderOptions(true, "u", id, "agent") as any).openrouter
+          .models ?? [];
+      expect(models.length).toBeGreaterThan(0);
+      for (const s of models) expect(looksFree(s)).toBe(false);
+    }
+  });
+
+  it("(b) nenhum modelo PAGO ou auto cai num free — nem no retry, nem na cadeia", () => {
+    const paid = [
+      ...OPERATOR_MODEL_SELECTIONS.filter(
+        (id) => !FREE_MODEL_NAME_SET.has(id),
+      ),
+      "ask-model",
+      "agent-model",
+      "ask-model-free",
+      "agent-model-free",
+      "fallback-agent-model",
+      "fallback-ask-model",
+    ] as const;
+    expect(paid.length).toBeGreaterThanOrEqual(8);
+    for (const id of paid) {
+      for (const mode of ["ask", "agent"] as const) {
+        expect(FREE_MODEL_NAME_SET.has(getRetryFallbackModel(id, mode))).toBe(
+          false,
+        );
+        const models: string[] =
+          (buildProviderOptions(true, "u", id, mode) as any).openrouter
+            .models ?? [];
+        for (const s of models) expect(looksFree(s)).toBe(false);
+      }
+    }
+  });
+});
 
 // Slugs the test asserts against. These match the registry in lib/ai/providers.ts.
 // If the registry slug for a model changes, update both places intentionally.

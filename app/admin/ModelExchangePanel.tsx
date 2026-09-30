@@ -43,6 +43,8 @@ interface CandidateRow {
   family: string;
   jurisdiction: "US" | "China" | "EU" | "Other";
   tiers: TierId[];
+  /** Gratuito ($0): o provedor pode treinar com o prompt. Nunca candidato a padrão. */
+  free?: boolean;
   market: MarketData | null;
   ourUsage: OurUsage | null;
 }
@@ -333,6 +335,14 @@ export function ModelExchangePanel() {
                             >
                               {c.jurisdiction}
                             </span>
+                            {c.free && (
+                              <span
+                                className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-medium text-sky-600 dark:text-sky-400"
+                                title="Gratuito ($0). O provedor pode treinar com o prompt — listado para medição; nunca recomendado como padrão de tier e bloqueado em tarefas de cliente. Índice '—' porque custo zero não entra no índice."
+                              >
+                                Grátis · treina
+                              </span>
+                            )}
                           </div>
                           <div className="font-mono text-[10px] text-muted-foreground">
                             {c.slug}

@@ -49,11 +49,46 @@ export type SelectedModel =
   | "model-deepseek-v4-pro-0813"
   | "model-deepseek-v4.1-flash"
   | "model-deepseek-v4-flash-0731"
-  | "model-kimi-k3";
+  | "model-kimi-k3"
+  // Modelos GRATUITOS (custo $0 no OpenRouter). Podem TREINAR com o prompt →
+  // só servem chats SEM engajamento/cliente (portão em lib/chat/free-model-gate).
+  // Nomes com sufixo "-free" de CUSTO — não confundir com "agent-model-free"
+  // (que é o roteador do PLANO free). Por isso a checagem é por conjunto.
+  | "model-nemotron-3-ultra-free"
+  | "model-nemotron-3-super-free"
+  | "model-qwen3.8-27b-free"
+  | "model-gemma-4-31b-free";
+
+/**
+ * Modelos GRATUITOS ($0 no OpenRouter). Podem TREINAR com o prompt → só servem
+ * chats SEM engajamento/cliente (portão duro em lib/chat/free-model-gate.ts).
+ * Checagem por CONJUNTO explícito — o sufixo "-free" colide semanticamente com
+ * "agent-model-free"/"ask-model-free" (roteadores do PLANO free, pagos por nós).
+ */
+export const FREE_MODEL_SELECTIONS = [
+  "model-nemotron-3-ultra-free",
+  "model-nemotron-3-super-free",
+  "model-qwen3.8-27b-free",
+  "model-gemma-4-31b-free",
+] as const satisfies readonly SelectedModel[];
+
+const FREE_MODEL_SELECTION_SET: ReadonlySet<string> = new Set(
+  FREE_MODEL_SELECTIONS,
+);
+
+/** True quando a seleção é um modelo GRATUITO (custo $0, pode treinar com o prompt). */
+export function isFreeModelSelection(
+  value: SelectedModel | null | undefined,
+): boolean {
+  return typeof value === "string" && FREE_MODEL_SELECTION_SET.has(value);
+}
 
 /**
  * Modelos concretos expostos no seletor do operador (além dos tiers Auto/
- * Standard/Pro/Max). A ordem define qual aparece destacado no modo Auto.
+ * Standard/Pro/Max). Os PAGOS vêm primeiro (a UI usa o 1º como default do
+ * seletor — um free NUNCA pode ser default: é opt-in). Os free ficam num grupo
+ * separado na UI (FREE_MODEL_OPTIONS), mas entram aqui p/ o selectModel roteá-los
+ * diretamente e p/ o coerceSelectedModel aceitá-los.
  */
 export const OPERATOR_MODEL_SELECTIONS = [
   "model-grok-4.6",
@@ -64,6 +99,7 @@ export const OPERATOR_MODEL_SELECTIONS = [
   "model-deepseek-v4.1-flash",
   "model-deepseek-v4-flash-0731",
   "model-kimi-k3",
+  ...FREE_MODEL_SELECTIONS,
 ] as const satisfies readonly SelectedModel[];
 
 const OPERATOR_MODEL_SELECTION_SET: ReadonlySet<string> = new Set(

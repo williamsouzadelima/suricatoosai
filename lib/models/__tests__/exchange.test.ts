@@ -3,6 +3,7 @@ import {
   blendedIndex,
   recommendPerTier,
   canonicalizeModelSlug,
+  CANDIDATES,
   CURRENT_ASSIGNMENT,
   type MarketData,
   type OurUsage,
@@ -94,6 +95,34 @@ describe("canonicalizeModelSlug", () => {
   it("devolve slug desconhecido inalterado", () => {
     expect(canonicalizeModelSlug("openai/gpt-5")).toBe("openai/gpt-5");
     expect(canonicalizeModelSlug("auto")).toBe("auto");
+  });
+  it("gratuitos: nome interno, slug COM e SEM `:free` → slug canônico `:free`", () => {
+    const canon = "qwen/qwen3.8-27b:free";
+    expect(canonicalizeModelSlug("model-qwen3.8-27b-free")).toBe(canon);
+    expect(canonicalizeModelSlug("qwen/qwen3.8-27b:free")).toBe(canon);
+    expect(canonicalizeModelSlug("qwen/qwen3.8-27b")).toBe(canon);
+    expect(canonicalizeModelSlug("model-nemotron-3-ultra-free")).toBe(
+      "nvidia/nemotron-3-ultra-550b-a55b:free",
+    );
+  });
+});
+
+describe("candidatos GRATUITOS (free) — medidos, nunca padrão", () => {
+  const free = CANDIDATES.filter((c) => c.free);
+
+  it("existem, têm slug `:free` e tiers VAZIOS (jamais candidatos a padrão)", () => {
+    expect(free.length).toBeGreaterThanOrEqual(4);
+    for (const c of free) {
+      expect(c.slug.endsWith(":free")).toBe(true);
+      expect(c.tiers).toEqual([]);
+    }
+  });
+
+  it("nenhum padrão ATUAL de tier é um modelo free", () => {
+    const freeSlugs = new Set(free.map((c) => c.slug));
+    for (const slug of Object.values(CURRENT_ASSIGNMENT)) {
+      expect(freeSlugs.has(slug)).toBe(false);
+    }
   });
 });
 

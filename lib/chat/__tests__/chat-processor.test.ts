@@ -220,6 +220,28 @@ describe("selectModel", () => {
     );
   });
 
+  // Modelos GRATUITOS ($0): escolha explícita do operador roteia DIRETO (pago),
+  // e o plano free NUNCA os alcança (o portão de engajamento é em outra camada).
+  it.each([
+    "model-nemotron-3-ultra-free",
+    "model-nemotron-3-super-free",
+    "model-qwen3.8-27b-free",
+    "model-gemma-4-31b-free",
+  ] as const)("routes paid operator pick %s directly in both modes", (id) => {
+    for (const mode of ["ask", "agent"] as const) {
+      expect(selectModel(mode, "ultra", id)).toBe(id);
+      expect(selectModel(mode, "pro", id)).toBe(id);
+    }
+  });
+
+  it("free-PLAN users never reach a free-cost model (operator pick ignored)", () => {
+    for (const mode of ["ask", "agent"] as const) {
+      expect(selectModel(mode, "free", "model-qwen3.8-27b-free")).not.toBe(
+        "model-qwen3.8-27b-free",
+      );
+    }
+  });
+
   it.each([
     ["ask", "hackerai-standard", "model-deepseek-v4-flash-0731"],
     ["agent", "hackerai-standard", "model-deepseek-v4-flash-0731"],

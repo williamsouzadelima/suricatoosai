@@ -91,7 +91,7 @@ import {
   getAgentToolApprovalPromptTitle,
   isAgentToolApprovalOperation,
 } from "@/types/agent";
-import { coerceSelectedModel } from "@/types/chat";
+import { coerceSelectedModel, isFreeModelSelection } from "@/types/chat";
 import { v4 as uuidv4 } from "uuid";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useComputerSidebarOverlay } from "@/hooks/use-workspace-layout";
@@ -1732,7 +1732,11 @@ export const Chat = ({ autoResume }: { autoResume: boolean }) => {
     const savedModel = (chatData as any).selected_model as string | undefined;
     hasInitializedModelRef.current = true;
     const coerced = coerceSelectedModel(savedModel ?? null);
-    if (coerced) {
+    // Não re-arma um modelo GRATUITO a partir de um chat vinculado a engajamento:
+    // o servidor rebaixaria de qualquer forma, e reinjetar o free no GlobalState
+    // (persistido) faria a PRÓXIMA tarefa nova nascer no free sem escolha explícita.
+    const boundToEngagement = !!(chatData as any).engagement_id;
+    if (coerced && !(boundToEngagement && isFreeModelSelection(coerced))) {
       setSelectedModel(coerced);
     }
   }, [chatData, isExistingChat, chatId]);
@@ -2232,6 +2236,11 @@ export const Chat = ({ autoResume }: { autoResume: boolean }) => {
                             onScrollToBottom={handleScrollToBottom}
                             isNewChat={!isExistingChat}
                             chatId={chatId}
+                            chatEngagementBound={
+                              isExistingChat &&
+                              (chatDataForCurrentChat === undefined ||
+                                !!chatDataForCurrentChat.engagement_id)
+                            }
                             rateLimitWarning={
                               rateLimitWarning ? rateLimitWarning : undefined
                             }
@@ -2269,6 +2278,15 @@ export const Chat = ({ autoResume }: { autoResume: boolean }) => {
                     onScrollToBottom={handleScrollToBottom}
                     isNewChat={!isExistingChat}
                     chatId={chatId}
+                    chatEngagementBound={
+                      // Fail-closed na UI: enquanto o chat existente ainda não
+                      // carregou (undefined), trata como vinculado — evita exibir
+                      // um free como ativo/selecionável em chat de cliente por um
+                      // round-trip. Chat novo continua livre (coerente c/ servidor).
+                      isExistingChat &&
+                      (chatDataForCurrentChat === undefined ||
+                        !!chatDataForCurrentChat.engagement_id)
+                    }
                     isResolvingInitialState={isApprovalPresentationLoading}
                     rateLimitWarning={
                       rateLimitWarning ? rateLimitWarning : undefined

@@ -42,6 +42,8 @@ interface QualityRow {
   label: string;
   family: string;
   jurisdiction: "US" | "China" | "EU" | "Other";
+  /** Gratuito ($0): medido, mas nunca candidato a padrão (treina com o prompt). */
+  free?: boolean;
   assistantMessages: number;
   latencyP50Ms: number | null;
   latencyP95Ms: number | null;
@@ -454,6 +456,14 @@ export function ModelQualityPanel() {
                           >
                             {r.jurisdiction}
                           </span>
+                          {r.free && (
+                            <span
+                              className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-medium text-sky-600 dark:text-sky-400"
+                              title="Gratuito ($0). O provedor pode treinar com o prompt — medido aqui, mas nunca recomendado como padrão de tier e bloqueado em tarefas de cliente."
+                            >
+                              Grátis · treina
+                            </span>
+                          )}
                         </div>
                         <div className="font-mono text-[10px] text-muted-foreground">
                           {r.slug}

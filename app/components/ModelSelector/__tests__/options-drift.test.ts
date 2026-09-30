@@ -1,8 +1,17 @@
 import { describe, it, expect } from "@jest/globals";
-import { ASK_MODEL_OPTIONS, AGENT_MODEL_OPTIONS } from "../constants";
+import {
+  ASK_MODEL_OPTIONS,
+  AGENT_MODEL_OPTIONS,
+  getDefaultModelForMode,
+  getFreeModelOptions,
+} from "../constants";
 import { getCostTier } from "../CostIndicator";
 import { myProvider, resolveTierToProviderKey } from "@/lib/ai/providers";
-import type { ChatMode } from "@/types/chat";
+import {
+  FREE_MODEL_SELECTIONS,
+  isFreeModelSelection,
+  type ChatMode,
+} from "@/types/chat";
 
 /**
  * Drift guard: every selectable Suricatoos tier must resolve to a provider key
@@ -125,5 +134,57 @@ describe("ModelSelector tier ↔ provider drift", () => {
     expect(resolveTierToProviderKey("model-deepseek-v4.1-flash", "ask")).toBe(
       "model-deepseek-v4.1-flash",
     );
+  });
+});
+
+/**
+ * Modelos GRATUITOS: grupo SEPARADO (nunca na lista paga, nunca default),
+ * faixa "free", todos registrados no provider, e paridade com FREE_MODEL_SELECTIONS.
+ */
+describe("ModelSelector — grupo GRATUITO (free)", () => {
+  const freeAgent = getFreeModelOptions("agent");
+  const freeAsk = getFreeModelOptions("ask");
+
+  it("expõe exatamente os ids de FREE_MODEL_SELECTIONS (paridade, sem drift)", () => {
+    const ids = freeAgent.map((o) => o.id).sort();
+    expect(ids).toEqual([...FREE_MODEL_SELECTIONS].sort());
+    expect(freeAsk.map((o) => o.id).sort()).toEqual(ids);
+    for (const o of freeAgent) expect(isFreeModelSelection(o.id)).toBe(true);
+  });
+
+  it("NENHUM free aparece na lista paga (ask/agent) e o default segue PAGO", () => {
+    const paid = new Set(
+      [...ASK_MODEL_OPTIONS, ...AGENT_MODEL_OPTIONS].map((o) => o.id),
+    );
+    for (const id of FREE_MODEL_SELECTIONS) expect(paid.has(id)).toBe(false);
+    for (const mode of ["ask", "agent"] as ChatMode[]) {
+      expect(isFreeModelSelection(getDefaultModelForMode(mode))).toBe(false);
+    }
+  });
+
+  it("todo free resolve a um provider registrado e tem faixa 'free'", () => {
+    for (const mode of ["ask", "agent"] as ChatMode[]) {
+      for (const o of getFreeModelOptions(mode)) {
+        const key = resolveTierToProviderKey(o.id, mode);
+        expect(key).toBe(o.id);
+        expect(() => myProvider.languageModel(key as string)).not.toThrow();
+        expect(getCostTier(o.id)).toBe("free");
+        expect(o.free).toBe(true);
+        expect(o.description).toBeTruthy();
+        // A política de dados TEM que estar visível no hover (poweredBy).
+        expect(o.poweredBy).toMatch(/treinar com o prompt/i);
+      }
+    }
+  });
+
+  it("agent carrega thinking; ask não", () => {
+    expect(freeAgent.every((o) => o.thinking === true)).toBe(true);
+    expect(freeAsk.every((o) => !o.thinking)).toBe(true);
+  });
+
+  it("nenhum PAGO é classificado como 'free' (a faixa free é só dos gratuitos)", () => {
+    for (const o of [...ASK_MODEL_OPTIONS, ...AGENT_MODEL_OPTIONS]) {
+      expect(getCostTier(o.id)).not.toBe("free");
+    }
   });
 });

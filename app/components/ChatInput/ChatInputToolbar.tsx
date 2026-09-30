@@ -17,11 +17,14 @@ import { FreeAskComputerActivation } from "./FreeAskComputerActivation";
 export interface ChatInputToolbarProps extends SubmitStopButtonProps {
   compactAgentControls?: boolean;
   onAttachClick: () => void;
+  /** Chat ligado a engajamento/cliente → bloqueia modelos gratuitos no seletor. */
+  chatEngagementBound?: boolean;
 }
 
 export function ChatInputToolbar({
   compactAgentControls = false,
   onAttachClick,
+  chatEngagementBound = false,
   chatMode,
   isOnline = true,
   ...submitStopProps
@@ -99,6 +102,7 @@ export function ChatInputToolbar({
             value={selectedModel}
             onChange={setSelectedModel}
             mode={chatMode}
+            engagementBound={chatEngagementBound}
           />
         ) : null}
         <SubmitStopButton

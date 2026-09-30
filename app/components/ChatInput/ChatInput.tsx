@@ -63,6 +63,8 @@ interface ChatInputProps {
   isNewChat?: boolean;
   clearDraftOnSubmit?: boolean;
   chatId?: string;
+  /** Chat ligado a engajamento/cliente → bloqueia modelos gratuitos no seletor. */
+  chatEngagementBound?: boolean;
   rateLimitWarning?: RateLimitWarningData;
   onDismissRateLimitWarning?: () => void;
   placeholder?: string;
@@ -243,6 +245,7 @@ export const ChatInput = ({
   offlineProtection = true,
   sendDisabledReason,
   isResolvingInitialState = false,
+  chatEngagementBound = false,
 }: ChatInputProps) => {
   const {
     chatMode,
@@ -900,6 +903,7 @@ export const ChatInput = ({
               chatMode={chatMode}
               isOnline={!isOffline}
               sendDisabledReason={effectiveSendDisabledReason}
+              chatEngagementBound={chatEngagementBound}
             />
           </div>
         )}

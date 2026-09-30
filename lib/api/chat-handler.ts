@@ -116,6 +116,12 @@ import {
 } from "@/lib/utils/stream-cancellation";
 import { v4 as uuidv4 } from "uuid";
 import { processChatMessages, selectModel } from "@/lib/chat/chat-processor";
+import {
+  assertFreeModelStillAllowed,
+  createFreeModelStepGuard,
+  enforceFreeModelEngagementGate,
+} from "@/lib/chat/free-model-gate";
+import { isFreeModelSelection } from "@/types/chat";
 import { cacheAuxiliaryVisionDescription } from "@/lib/utils/file-transform-utils";
 import {
   createVisionSummaryRecoveryController,
@@ -390,6 +396,16 @@ export const createChatHandler = () => {
         normalizeMaxModelForSubscription(selectedModelOverride, subscription, {
           extraUsageAvailable,
         }) ?? undefined;
+      // Portão duro: modelo GRATUITO (pode treinar com o prompt) só em chat SEM
+      // engajamento/cliente. Busca o chat só quando a escolha é free; rebaixa
+      // p/ "auto" (pago) se bloqueado. Servidor decide — nunca o cliente.
+      selectedModelOverride = (
+        await enforceFreeModelEngagementGate({
+          selectedModelOverride,
+          chatId,
+          chat, // já carregado acima → sem releitura nem caminho de falha
+        })
+      ).override;
       const extraUsageConfig = withExtraUsageBillingForModel(
         baseExtraUsageConfig,
         selectedModelOverride,
@@ -757,6 +773,12 @@ export const createChatHandler = () => {
               projectContext.workingDirectory,
               undefined,
               auxiliaryVision,
+              {
+                // Run em modelo GRATUITO = rascunho: sem engajamento eager nem
+                // capture_finding (senão o run vira chat-de-cliente após o portão).
+                engagementBindingAllowed:
+                  !isFreeModelSelection(selectedModelOverride),
+              },
             );
 
             // Helper to send file metadata via stream for resumable stream clients
@@ -1443,12 +1465,20 @@ export const createChatHandler = () => {
                 }),
               getHardTimeoutReason: () =>
                 preemptiveTimeout?.isPreemptive() ? "timeout" : null,
+              // Run free: re-checa vínculo com engajamento a cada passo (throttled).
+              beforeStep: createFreeModelStepGuard({
+                selectedModelOverride,
+                chatId,
+              }),
             };
 
-            const createStream = (
+            const createStream = async (
               modelName: string,
               excludedProviderModelSlugs?: readonly string[],
             ) => {
+              // Run free: o chat pode ter sido vinculado a engajamento desde o
+              // portão de entrada — não abre stream no provedor que treina.
+              await assertFreeModelStillAllowed({ selectedModelOverride, chatId });
               activeModelName = modelName;
               streamCtx.tools = getToolsForModel(modelName);
               streamCtx.excludedProviderModelSlugs = excludedProviderModelSlugs;

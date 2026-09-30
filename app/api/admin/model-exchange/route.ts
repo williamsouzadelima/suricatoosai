@@ -208,6 +208,7 @@ export async function GET(req: NextRequest) {
       family: c.family,
       jurisdiction: c.jurisdiction,
       tiers: c.tiers,
+      free: c.free ?? false,
       market: market[c.slug] ?? null,
       ourUsage: usageBySlug[c.slug] ?? null,
     })),

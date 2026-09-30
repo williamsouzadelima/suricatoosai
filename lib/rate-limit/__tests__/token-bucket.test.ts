@@ -28,6 +28,21 @@ describe("token-bucket", () => {
   // calculateTokenCost - Core pricing logic
   // ==========================================================================
   describe("calculateTokenCost", () => {
+    it("modelos GRATUITOS custam $0 (chave interna e slug com/sem `:free`), pagos não", () => {
+      for (const id of [
+        "model-nemotron-3-ultra-free",
+        "model-qwen3.8-27b-free",
+        "qwen/qwen3.8-27b:free",
+        "qwen/qwen3.8-27b",
+        "google/gemma-4-31b-it:free",
+      ]) {
+        expect(calculateTokenCost(1_000_000, "input", id)).toBe(0);
+        expect(calculateTokenCost(1_000_000, "output", id)).toBe(0);
+      }
+      // Sanidade: um pago segue cobrando.
+      expect(calculateTokenCost(1_000_000, "output", "model-grok-4.7")).toBeGreaterThan(0);
+    });
+
     it("should return 0 for zero or negative tokens", () => {
       expect(calculateTokenCost(0, "input")).toBe(0);
       expect(calculateTokenCost(0, "output")).toBe(0);

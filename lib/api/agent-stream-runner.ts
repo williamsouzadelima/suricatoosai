@@ -647,6 +647,9 @@ export type AgentStreamContext = {
   subscription: SubscriptionTier;
   selectedModelOverride?: SelectedModel;
   chatId: string;
+  /** Portão por passo (ex.: modelo GRATUITO × chat vinculado a engajamento
+   *  durante o run). Chamado no início de cada prepareStep; lança p/ abortar. */
+  beforeStep?: () => Promise<void>;
   fileTokens: Record<string, number>;
   noteInjectionOpts: {
     userId: string;
@@ -1160,6 +1163,10 @@ export async function createAgentStream(
     experimental_onToolCallStart: () => ctx.onModelStreamFinish?.(),
 
     prepareStep: async ({ steps, messages }) => {
+      // Portão por passo do chamador (ex.: run em modelo GRATUITO cujo chat
+      // foi vinculado a engajamento no meio do run). Lança p/ abortar o run —
+      // nunca rebaixa em silêncio (o contexto acumulado já foi pro modelo).
+      await ctx.beforeStep?.();
       const rawModelMessages = messages as ModelMessage[];
       let rollingModelMessages = buildRollingModelMessages(
         rawModelMessages,

@@ -190,6 +190,125 @@ describe("ModelSelector", () => {
     expect(mockRedirectToPricing).not.toHaveBeenCalled();
   });
 
+  // ── Modelos GRATUITOS (grupo separado; bloqueados em chat de engajamento) ──
+
+  it("mostra o grupo GRATUITO com o selo de política de dados para usuário pago", () => {
+    mockSubscription = "ultra";
+    render(<ModelSelector value="auto" onChange={jest.fn()} mode="agent" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
+
+    expect(
+      screen.getByText(/Gratuitos · podem treinar com o prompt/i),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: /NVIDIA Nemotron 3 Ultra/i }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByTestId("free-models-blocked-notice"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("seleciona um modelo GRATUITO em chat sem engajamento", () => {
+    mockSubscription = "ultra";
+    const onChange = jest.fn();
+    render(<ModelSelector value="auto" onChange={onChange} mode="agent" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Qwen 3\.8 27B/i }));
+
+    expect(onChange).toHaveBeenCalledWith("model-qwen3.8-27b-free");
+  });
+
+  it("em chat de ENGAJAMENTO: free fica bloqueado, aviso aparece e não seleciona", () => {
+    mockSubscription = "ultra";
+    const onChange = jest.fn();
+    render(
+      <ModelSelector
+        value="auto"
+        onChange={onChange}
+        mode="agent"
+        engagementBound
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
+
+    expect(screen.getByTestId("free-models-blocked-notice")).toBeVisible();
+    const blocked = screen.getByRole("button", {
+      name: /Qwen 3\.8 27B\. Bloqueado/i,
+    });
+    expect(blocked).toBeDisabled();
+    fireEvent.click(blocked);
+    expect(onChange).not.toHaveBeenCalled();
+    // Os pagos continuam selecionáveis normalmente.
+    fireEvent.click(screen.getByRole("button", { name: /xAI Grok 4\.7/i }));
+    expect(onChange).toHaveBeenCalledWith("model-grok-4.7");
+  });
+
+  it("em chat de ENGAJAMENTO um free previamente escolhido é exibido como Auto (não mente)", () => {
+    mockSubscription = "ultra";
+    render(
+      <ModelSelector
+        value="model-qwen3.8-27b-free"
+        onChange={jest.fn()}
+        mode="agent"
+        engagementBound
+      />,
+    );
+    // O gatilho não pode exibir o free como ativo — o servidor rebaixa p/ auto.
+    expect(screen.getByRole("button", { name: /^Auto$/i })).toBeVisible();
+  });
+
+  it("em chat de ENGAJAMENTO normaliza o estado REAL para Auto (onChange), não só a exibição", () => {
+    mockSubscription = "ultra";
+    const onChange = jest.fn();
+    render(
+      <ModelSelector
+        value="model-qwen3.8-27b-free"
+        onChange={onChange}
+        mode="agent"
+        engagementBound
+      />,
+    );
+    expect(onChange).toHaveBeenCalledWith("auto");
+  });
+
+  it("o grupo GRATUITO exibe o selo 'Grátis' em cada opção", () => {
+    mockSubscription = "ultra";
+    render(<ModelSelector value="auto" onChange={jest.fn()} mode="agent" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
+    expect(screen.getAllByText("Grátis").length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("usuário de PLANO free não vê o grupo gratuito", () => {
+    mockSubscription = "free";
+    render(<ModelSelector value="auto" onChange={jest.fn()} mode="ask" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Model$/i }));
+    expect(
+      screen.queryByText(/Gratuitos · podem treinar com o prompt/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("MOBILE em chat de engajamento: free bloqueado e aviso no Sheet", () => {
+    mockSubscription = "ultra";
+    mockIsMobile = true;
+    const onChange = jest.fn();
+    render(
+      <ModelSelector
+        value="auto"
+        onChange={onChange}
+        mode="agent"
+        engagementBound
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
+    expect(screen.getByTestId("free-models-blocked-notice")).toBeVisible();
+    const blocked = screen.getByRole("button", {
+      name: /Qwen 3\.8 27B\. Bloqueado/i,
+    });
+    expect(blocked).toBeDisabled();
+    fireEvent.click(blocked);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("does not display a stale concrete model as selected for free users", () => {
     mockSubscription = "free";
 
