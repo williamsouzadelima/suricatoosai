@@ -170,6 +170,7 @@ export interface ChatWideEvent {
       | "create_fresh"
       | "create_after_version_mismatch"
       | "create_after_expired"
+      | "create_after_stale_paused"
       | "create_after_broken";
     duration_ms: number;
     create_attempts: number;

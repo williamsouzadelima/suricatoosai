@@ -711,45 +711,51 @@ describe("E2B sandbox lease lifecycle", () => {
     }
   });
 
-  it("preserves a paused sandbox after a placement failure", async () => {
+  it("recovers from a placement failure on a paused sandbox by creating a fresh one without killing it", async () => {
     const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
     try {
+      const createdSandbox = { sandboxId: "sandbox-2" } as unknown as Sandbox;
       listSandbox({ state: "paused" });
       sandboxApi.connect.mockRejectedValue(
         new Error("500: Failed to place sandbox"),
       );
+      sandboxApi.create.mockResolvedValue(createdSandbox);
 
-      await expect(
-        ensureSandboxConnection({
-          userID: "user-1",
-          setSandbox: jest.fn(),
-        }),
-      ).rejects.toThrow("Failed to place sandbox");
+      const result = await ensureSandboxConnection({
+        userID: "user-1",
+        setSandbox: jest.fn(),
+      });
 
+      // A paused sandbox cannot be in use by a running command, so a resume
+      // that cannot be placed falls through to a fresh sandbox instead of
+      // failing the run — but the old sandbox is never killed (a concurrent
+      // run may have resumed it; E2B reaps a genuinely stale one).
+      expect(result.sandbox).toBe(createdSandbox);
       expect(sandboxApi.kill).not.toHaveBeenCalled();
-      expect(sandboxApi.create).not.toHaveBeenCalled();
+      expect(sandboxApi.create).toHaveBeenCalled();
     } finally {
       errorSpy.mockRestore();
     }
   });
 
-  it("preserves a paused sandbox after an operation timeout", async () => {
+  it("recovers from a resume timeout on a paused sandbox by creating a fresh one without killing it", async () => {
     const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
     try {
+      const createdSandbox = { sandboxId: "sandbox-2" } as unknown as Sandbox;
       listSandbox({ state: "paused" });
       sandboxApi.connect.mockRejectedValue(
         new Error("sandbox operation timed out"),
       );
+      sandboxApi.create.mockResolvedValue(createdSandbox);
 
-      await expect(
-        ensureSandboxConnection({
-          userID: "user-1",
-          setSandbox: jest.fn(),
-        }),
-      ).rejects.toThrow("sandbox operation timed out");
+      const result = await ensureSandboxConnection({
+        userID: "user-1",
+        setSandbox: jest.fn(),
+      });
 
+      expect(result.sandbox).toBe(createdSandbox);
       expect(sandboxApi.kill).not.toHaveBeenCalled();
-      expect(sandboxApi.create).not.toHaveBeenCalled();
+      expect(sandboxApi.create).toHaveBeenCalled();
     } finally {
       errorSpy.mockRestore();
     }

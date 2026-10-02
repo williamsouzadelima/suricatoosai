@@ -1,6 +1,10 @@
 import { Sandbox } from "@e2b/code-interpreter";
 import type { SandboxBootInfo, SandboxContext } from "@/types";
-import { NotFoundError, getUserFacingE2BErrorMessage } from "./e2b-errors";
+import {
+  NotFoundError,
+  getUserFacingE2BErrorMessage,
+  isE2BPermanentError,
+} from "./e2b-errors";
 import { isExpectedAlreadyGoneCleanupError } from "@/lib/utils/cleanup-errors";
 import { retryWithBackoff } from "./retry-with-backoff";
 import { getE2BClusterRouting, type E2BClusterConfig } from "./e2b-cluster";
@@ -25,6 +29,23 @@ const RATE_LIMIT_COOLDOWN_MS = 1_000;
 const MAX_CREATE_RETRIES = 3;
 const MAX_DISCOVERY_RETRIES = 3;
 const MAX_CONNECT_RETRIES = 3;
+
+/**
+ * True when resuming/connecting to a sandbox failed because the attempt timed
+ * out or its placement could not be scheduled. The E2B SDK's HTTP layer throws
+ * a raw DOMException with name "TimeoutError" (via AbortSignal.timeout) that is
+ * NOT an instance of the SDK's own error classes, so classifyE2BError() cannot
+ * see it; placement failures surface only as a message. We detect both so a
+ * doomed resume of a paused sandbox is not retried before we recreate.
+ */
+const isSandboxResumeUnrecoverableError = (error: unknown): boolean =>
+  error instanceof Error &&
+  (error.name === "TimeoutError" ||
+    error.message?.includes("aborted due to timeout") ||
+    error.message?.includes("operation was aborted") ||
+    error.message?.includes("timed out") ||
+    error.message?.includes("Failed to place sandbox") ||
+    error.message?.includes("placement timed out"));
 
 const logSandboxKillFailure = (
   userID: string,
@@ -207,6 +228,12 @@ export const ensureSandboxConnection = async (
             maxRetries: MAX_CONNECT_RETRIES,
             baseDelayMs: 400,
             jitterMs: 40,
+            // A resume that times out or cannot be placed will not recover by
+            // being retried; fail fast so we can fall through to a fresh
+            // sandbox instead of multiplying the wait.
+            isPermanentError: (error) =>
+              isE2BPermanentError(error) ||
+              isSandboxResumeUnrecoverableError(error),
           },
         );
         setSandbox(sandbox);
@@ -214,14 +241,30 @@ export const ensureSandboxConnection = async (
         return { sandbox };
       } catch (e) {
         // Handle specific error cases
-        if (
+        const isMissing =
           e instanceof NotFoundError ||
-          (e instanceof Error && e.message?.includes("not found"))
-        ) {
+          (e instanceof Error && e.message?.includes("not found"));
+
+        if (isMissing) {
           console.error(
             `[${userID}] Sandbox ${existingSandboxInfo.sandboxId} expired/deleted, creating new one`,
           );
           createPath = "create_after_expired";
+        } else if (existingSandboxInfo.state === "paused") {
+          // A *paused* sandbox that fails to resume (most commonly a stale
+          // snapshot whose paused lease has expired on E2B's side: the resume
+          // hangs and aborts with a TimeoutError instead of a clean NotFound)
+          // is not owned by any running command. Rather than failing the whole
+          // run, fall through and create a fresh sandbox. We deliberately do
+          // NOT kill it: a concurrent run for the same user may have resumed it
+          // between discovery and this failure, and the create loop below is a
+          // no-op against it. A genuinely stale sandbox is reaped by E2B's own
+          // retention. Running sandboxes keep the conservative throw (else).
+          console.error(
+            `[${userID}] Failed to resume paused sandbox ${existingSandboxInfo.sandboxId} (${e instanceof Error ? e.name : "unknown error"}); creating a fresh sandbox instead:`,
+            e,
+          );
+          createPath = "create_after_stale_paused";
         } else {
           console.error(
             `[${userID}] Unexpected error resuming sandbox ${existingSandboxInfo.sandboxId}:`,
