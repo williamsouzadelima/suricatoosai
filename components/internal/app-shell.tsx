@@ -5,6 +5,7 @@ import {
   Search,
   FileText,
   LayoutDashboard,
+  ShieldCheck,
   ArrowLeft,
   type LucideIcon,
 } from "lucide-react";
@@ -16,7 +17,8 @@ import { HackerAISVG } from "@/components/icons/hackerai-svg";
  * premium + top bar + cabeçalho de página. Fonte única do visual "nível agência".
  */
 
-type ActiveKey = "engagements" | "achados" | "relatorios" | "admin";
+type ActiveKey =
+  "engagements" | "achados" | "relatorios" | "admin" | "seguranca";
 
 type NavEntry = {
   key: ActiveKey;
@@ -57,6 +59,12 @@ const NAV: { group: string; items: NavEntry[] }[] = [
         href: "/admin",
         label: "Painel admin",
         icon: LayoutDashboard,
+      },
+      {
+        key: "seguranca",
+        href: "/seguranca",
+        label: "Segurança",
+        icon: ShieldCheck,
       },
     ],
   },
