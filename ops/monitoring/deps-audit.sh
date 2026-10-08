@@ -20,6 +20,7 @@ KEY=$(printf '%s' "${CONVEX_SERVICE_KEY:-}" | tr -d "\"' \t\r\n")
 
 REPO="${REPO_DIR:-/root/suricatoos}"
 cd "$REPO" || { echo "repo não encontrado: $REPO"; exit 0; }
+export HOME="${HOME:-/root}"
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 # shellcheck disable=SC1090
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use 22.23.2 >/dev/null 2>&1
