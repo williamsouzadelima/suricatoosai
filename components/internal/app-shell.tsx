@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   ShieldAlert,
   Search,
+  FileText,
   LayoutDashboard,
   ArrowLeft,
   type LucideIcon,
@@ -15,7 +16,7 @@ import { HackerAISVG } from "@/components/icons/hackerai-svg";
  * premium + top bar + cabeçalho de página. Fonte única do visual "nível agência".
  */
 
-type ActiveKey = "engagements" | "achados" | "admin";
+type ActiveKey = "engagements" | "achados" | "relatorios" | "admin";
 
 type NavEntry = {
   key: ActiveKey;
@@ -39,6 +40,12 @@ const NAV: { group: string; items: NavEntry[] }[] = [
         href: "/achados",
         label: "Achados",
         icon: Search,
+      },
+      {
+        key: "relatorios",
+        href: "/relatorios",
+        label: "Relatórios",
+        icon: FileText,
       },
     ],
   },
