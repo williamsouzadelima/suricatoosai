@@ -38,6 +38,7 @@ export const getEdgeBlocklistForBackend = query({
   args: { serviceKey: v.string() },
   returns: v.object({
     blocked: v.array(v.string()),
+    blockedCidrs: v.array(v.string()),
     safelist: v.array(v.string()),
     killSwitch: v.boolean(),
     mode: v.string(),
@@ -56,10 +57,11 @@ export const getEdgeBlocklistForBackend = query({
       .withIndex("by_status_and_created", (q) => q.eq("status", "active"))
       .take(BLOCKLIST_CAP);
     const blocked: string[] = [];
+    const blockedCidrs: string[] = [];
     for (const r of rows) {
-      if (r.type !== "ip") continue;
       if (r.expires_at && r.expires_at < now) continue;
-      blocked.push(r.value);
+      if (r.type === "ip") blocked.push(r.value);
+      else if (r.type === "cidr") blockedCidrs.push(r.value);
     }
     const s = await ctx.db
       .query("security_settings")
@@ -67,6 +69,7 @@ export const getEdgeBlocklistForBackend = query({
       .first();
     return {
       blocked,
+      blockedCidrs,
       safelist: s?.safelist_ips ?? [],
       killSwitch: s?.kill_switch ?? DEFAULT_SETTINGS.kill_switch,
       mode: s?.enforcement_mode ?? DEFAULT_SETTINGS.enforcement_mode,

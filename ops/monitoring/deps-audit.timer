@@ -1,0 +1,11 @@
+[Unit]
+Description=Roda a auditoria de dependencias semanalmente
+
+[Timer]
+# Semanal (segunda 06:30 UTC) + persistente (roda se o host estava desligado).
+OnCalendar=Mon *-*-* 06:30:00
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -26,13 +26,31 @@ export async function GET(req: NextRequest) {
       { status: 400 },
     );
   }
-  const findings = await getConvexClient().query(
-    api.portal.listPortalFindingsForBackend,
-    {
+  const convex = getConvexClient();
+  const eid = engagementId as Id<"engagements">;
+  const findings = await convex.query(api.portal.listPortalFindingsForBackend, {
+    serviceKey,
+    userId: u.id,
+    engagementId: eid,
+  });
+  // Auditoria durável (fail-closed): registra a listagem antes de servir.
+  try {
+    await convex.mutation(api.portal.recordPortalFindingsViewForBackend, {
       serviceKey,
       userId: u.id,
-      engagementId: engagementId as Id<"engagements">,
-    },
-  );
+      engagementId: eid,
+      count: findings.length,
+      actorEmail: u.email ?? undefined,
+      ip:
+        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined,
+      userAgent: req.headers.get("user-agent") ?? undefined,
+    });
+  } catch (e) {
+    console.error("portal findings: auditoria indisponível, recusando", e);
+    return NextResponse.json(
+      { error: "Auditoria indisponível" },
+      { status: 503 },
+    );
+  }
   return NextResponse.json({ findings });
 }

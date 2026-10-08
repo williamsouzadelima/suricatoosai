@@ -69,6 +69,8 @@ export function EngagementBilling({
   const [busy, setBusy] = useState(false);
   const [capInput, setCapInput] = useState("");
   const [warnInput, setWarnInput] = useState("");
+  // null = segue o valor salvo (billing.enforce); boolean = override local.
+  const [enforceInput, setEnforceInput] = useState<boolean | null>(null);
   const [savingBudget, setSavingBudget] = useState(false);
 
   const saveBudget = async () => {
@@ -80,11 +82,18 @@ export function EngagementBilling({
       toast.error("Teto inválido.");
       return;
     }
+    const enforce = enforceInput ?? billing?.enforce ?? false;
     setSavingBudget(true);
     try {
-      await setBudget({ engagementId, capDollars: cap, warnPct: warn });
+      await setBudget({
+        engagementId,
+        capDollars: cap,
+        warnPct: warn,
+        enforce,
+      });
       setCapInput("");
       setWarnInput("");
+      setEnforceInput(null);
       toast.success(cap > 0 ? "Teto salvo." : "Teto removido.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao salvar o teto.");
@@ -171,11 +180,12 @@ export function EngagementBilling({
             />
           </div>
 
-          {/* Teto de custo de IA (monitor, sem enforcement) */}
+          {/* Teto de custo de IA (monitor + enforcement opcional por engajamento) */}
           {(() => {
             const cap = billing?.capDollars ?? 0;
             const cost = billing?.cost ?? 0;
             const warnPct = billing?.warnPct ?? 80;
+            const enforce = enforceInput ?? billing?.enforce ?? false;
             const pct = cap > 0 ? (cost / cap) * 100 : 0;
             const over = cap > 0 && cost >= cap;
             const warn = cap > 0 && !over && cost >= (cap * warnPct) / 100;
@@ -245,8 +255,22 @@ export function EngagementBilling({
                     Salvar teto
                   </Button>
                 </div>
+                <label className="mt-2 flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 accent-primary"
+                    checked={enforce}
+                    onChange={(e) => setEnforceInput(e.target.checked)}
+                  />
+                  <span className="font-medium">
+                    Bloquear novos runs ao exceder
+                  </span>
+                </label>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Monitor apenas — não bloqueia runs. Teto 0 remove o monitor.
+                  {enforce
+                    ? "Bloqueia INICIAR novos runs quando o gasto passa do teto (runs em andamento terminam). Salve para aplicar."
+                    : "Monitor apenas — não bloqueia runs."}{" "}
+                  Teto 0 remove o monitor.
                 </p>
               </div>
             );

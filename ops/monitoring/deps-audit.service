@@ -1,0 +1,11 @@
+[Unit]
+Description=Suricatoos auditoria de dependencias (deps->alerta de seguranca)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=HOME=/root
+EnvironmentFile=-/etc/suricatoos-monitor.env
+ExecStart=/root/suricatoos/ops/monitoring/deps-audit.sh
+# Sem Restart: one-shot disparado pelo .timer
