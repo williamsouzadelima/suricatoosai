@@ -25,10 +25,11 @@ export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 # shellcheck disable=SC1090
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use 22.23.2 >/dev/null 2>&1
 
-# Baseline de "high" aceitas (ex.: ReDoS do brace-expansion patchado p/ compat,
-# que o time já aceita). Alerta em QUALQUER crítica, ou high ACIMA do baseline
-# (vuln nova) — evita e-mail semanal repetido das vulns conhecidas.
-BASELINE_HIGH="${DEPS_BASELINE_HIGH:-2}"
+# Baseline de "high" aceitas em PROD. Desde 08/10 o `pnpm audit --prod` está
+# 0/0 (brace-expansion foi p/ 5.0.12, sprintf-js eliminado) — então baseline 0:
+# alerta em QUALQUER crítica OU qualquer high de prod (= vuln nova). Se um dia
+# o time aceitar uma high conhecida, suba via env DEPS_BASELINE_HIGH.
+BASELINE_HIGH="${DEPS_BASELINE_HIGH:-0}"
 
 AUDIT=$(pnpm audit --prod --json 2>/dev/null)
 SUMMARY=$(printf '%s' "$AUDIT" | node -e '
