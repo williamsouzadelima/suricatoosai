@@ -125,7 +125,7 @@
     "mammoth": "^1.12.1",
     "marked": "^18.0.11",
     "motion": "13.1.1",
-    "next": "16.3.3",
+    "next": "16.3.8",
     "next-intl": "^4.14.1",
     "next-themes": "^0.4.6",
     "openai": "6.49.0",
@@ -148,7 +148,7 @@
     "stripe": "22.5.0",
     "swr": "2.5.1",
     "tailwind-merge": "^3.6.0",
-    "undici": "7.29.0",
+    "undici": "7.29.1",
     "use-stick-to-bottom": "^1.1.6",
     "uuid": "^14.0.2",
     "word-extractor": "^1.0.4",
@@ -211,7 +211,7 @@
       "unrs-resolver"
     ],
     "overrides": {
-      "axios": "1.18.0",
+      "axios": "^1.20.0",
       "e2b>chalk": "^4.1.2",
       "glob@>=10.0.0 <10.5.0": "10.5.0",
       "glob@>=11.0.0 <11.1.0": "11.1.0",
@@ -223,7 +223,7 @@
       "vite": "7.3.2",
       "tar": "7.5.21",
       "@isaacs/brace-expansion": "5.0.1",
-      "brace-expansion@<5.0.9": "5.0.9",
+      "brace-expansion@<5.0.11": "5.0.11",
       "picomatch@<2.3.2": "2.3.2",
       "picomatch@>=3.0.0 <4.0.4": "4.0.4",
       "diff@>=4.0.0 <4.0.4": "4.0.4",
@@ -237,7 +237,7 @@
       "underscore@<=1.13.7": "1.13.8",
       "rollup@>=4.0.0 <4.59.0": "4.59.0",
       "fast-xml-parser@<5.7.1": "5.7.1",
-      "dompurify@<=3.4.12": "3.4.13",
+      "dompurify@<=3.4.15": "3.4.16",
       "@xmldom/xmldom": "^0.8.15",
       "protobufjs@<=7.6.4": "7.6.5",
       "flatted@<3.4.2": "3.4.2",
@@ -262,7 +262,7 @@
       "fast-uri@>=3.0.0 <3.1.5": "3.1.5",
       "ip-address@>=10.1.1 <10.3.1": "10.3.1",
       "valibot@<=1.4.1": "1.4.2",
-      "sharp": "^0.35.4",
+      "sharp": "^0.35.5",
       "body-parser@>=2.0.0 <2.3.0": "2.3.0",
       "engine.io@>=4.1.0 <6.6.7": "6.6.7",
       "shell-quote@<=1.8.4": "1.9.0",
@@ -272,13 +272,13 @@
       "@langchain/core@<1.2.8": "1.2.8",
       "socket.io-parser@>=4.0.0 <4.2.7": "4.2.7",
       "undici@>=7.0.0 <7.28.0": "7.28.0",
-      "undici@>=8.0.0 <8.9.0": "8.9.0",
-      "e2b>undici8": "npm:undici@8.9.0"
+      "undici@>=8.0.0 <8.10.2": "8.10.2",
+      "source-map-js@<1.2.2": "1.2.2",
+      "e2b>undici8": "npm:undici@8.10.2"
     },
     "patchedDependencies": {
       "ai@6.0.200": "patches/ai@6.0.200.patch",
-      "@workos-inc/authkit-nextjs@4.2.0": "patches/@workos-inc__authkit-nextjs@4.2.0.patch",
-      "brace-expansion@5.0.9": "patches/brace-expansion@5.0.9.patch"
+      "@workos-inc/authkit-nextjs@4.2.0": "patches/@workos-inc__authkit-nextjs@4.2.0.patch"
     }
   }
 }
