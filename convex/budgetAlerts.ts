@@ -12,7 +12,11 @@ import { validateServiceKey } from "./lib/utils";
 export const claimAlert = mutation({
   args: {
     serviceKey: v.string(),
-    scope: v.union(v.literal("task"), v.literal("user")),
+    scope: v.union(
+      v.literal("task"),
+      v.literal("user"),
+      v.literal("engagement"),
+    ),
     scopeId: v.string(),
     periodKey: v.string(),
     threshold: v.string(),

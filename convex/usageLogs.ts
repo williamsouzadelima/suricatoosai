@@ -392,3 +392,65 @@ export const getRealCostForBudgetCheck = query({
     return { taskReal, userReal, taskCapped, userCapped };
   },
 });
+
+/**
+ * Teto POR ENGAJAMENTO para o gate de run-start (lib/budget-guard.ts). Resolve o
+ * engajamento do chat (by_chat_id → engagement_id), lê o engagement_budget e só
+ * devolve algo quando o teto está com ENFORCE ligado e cap>0 — caso contrário
+ * null (monitor-only / sem engajamento / sem teto → o guard não faz nada). Soma o
+ * custo REAL do engajamento (provider_billed_cost_dollars, índice by_engagement).
+ * engCapped=true = a soma bateu no rowCap (lower-bound); o guard não bloqueia na
+ * incerteza (anti-subcontagem).
+ */
+export const getEngagementBudgetCheck = query({
+  args: {
+    serviceKey: v.string(),
+    chatId: v.string(),
+    rowCap: v.optional(v.number()),
+  },
+  returns: v.union(
+    v.null(),
+    v.object({
+      engagementId: v.id("engagements"),
+      capDollars: v.number(),
+      warnPct: v.number(),
+      engReal: v.number(),
+      engCapped: v.boolean(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const chatDoc = await ctx.db
+      .query("chats")
+      .withIndex("by_chat_id", (q) => q.eq("id", args.chatId))
+      .first();
+    const engagementId = chatDoc?.engagement_id;
+    if (!engagementId) return null;
+    const budget = await ctx.db
+      .query("engagement_budgets")
+      .withIndex("by_engagement", (q) => q.eq("engagement_id", engagementId))
+      .first();
+    if (!budget || budget.cap_dollars <= 0 || budget.enforce !== true) {
+      return null;
+    }
+    const cap = args.rowCap ?? 10000;
+    const rows = await ctx.db
+      .query("usage_logs")
+      .withIndex("by_engagement", (q) => q.eq("engagement_id", engagementId))
+      .order("desc")
+      .take(cap);
+    let engReal = 0;
+    for (const r of rows) {
+      if (typeof r.provider_billed_cost_dollars === "number") {
+        engReal += r.provider_billed_cost_dollars;
+      }
+    }
+    return {
+      engagementId,
+      capDollars: budget.cap_dollars,
+      warnPct: budget.warn_pct,
+      engReal,
+      engCapped: rows.length === cap,
+    };
+  },
+});

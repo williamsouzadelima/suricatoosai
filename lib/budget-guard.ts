@@ -91,8 +91,54 @@ export async function enforceBudget(input: {
       serviceKey,
       userId: input.userId,
     });
-    if (!cfg.enabled) return NO_PLAN;
-    if (!cfg.perTaskEnabled && !cfg.perUserEnabled) return NO_PLAN;
+
+    // Escopo POR ENGAJAMENTO — INDEPENDENTE do budgetSettings do usuário (é o
+    // controle do analista sobre o engajamento). Só Camada A: recusa INICIAR
+    // novos runs quando o gasto do engajamento já cruzou o teto; NUNCA corta run
+    // em andamento (assimetria do per-user). getEngagementBudgetCheck só devolve
+    // algo quando enforce está LIGADO e cap>0 (senão null → no-op).
+    if (input.chatId) {
+      const eng = await convex.query(api.usageLogs.getEngagementBudgetCheck, {
+        serviceKey,
+        chatId: input.chatId,
+      });
+      if (eng) {
+        const engWarnFrac = Math.max(0, Math.min(1, eng.warnPct / 100));
+        const engLevel = levelFor(eng.engReal, eng.capDollars, engWarnFrac);
+        if (engLevel) {
+          void fireBudgetAlert({
+            scope: "engagement",
+            scopeId: eng.engagementId,
+            periodKey: "engagement",
+            threshold: engLevel,
+            alertTeams: cfg.alertTeams,
+            alertEmail: cfg.alertEmail,
+            userEmail: input.userEmail,
+            costDollars: eng.engReal,
+            capDollars: eng.capDollars,
+          });
+        }
+        // Anti-subcontagem: só bloqueia quando a soma (lower-bound) já atinge o
+        // teto. Se engCapped e a soma ficou abaixo, a incerteza deixa passar.
+        // Lança direto (Camada A) — o catch de fail-open RE-LANÇA ChatSDKError.
+        if (blockOnExceed && eng.engReal >= eng.capDollars) {
+          throw new ChatSDKError(
+            "forbidden:chat",
+            `Este engajamento atingiu o teto de gasto de IA (US$ ${eng.engReal.toFixed(
+              4,
+            )} de US$ ${eng.capDollars.toFixed(
+              4,
+            )}). Ajuste o teto no engajamento para continuar.`,
+          );
+        }
+      }
+    }
+
+    // budgetSettings (task/user) desligado → só o escopo de engajamento valia
+    // (já lançou acima se bloqueou). Sem task/user, nada a cortar.
+    if (!cfg.enabled || (!cfg.perTaskEnabled && !cfg.perUserEnabled)) {
+      return NO_PLAN;
+    }
 
     const range = periodRange(cfg.perUserPeriod);
     const cost = await convex.query(api.usageLogs.getRealCostForBudgetCheck, {
@@ -185,6 +231,9 @@ export async function enforceBudget(input: {
       }
     }
   } catch (e) {
+    // Bloqueio INTENCIONAL (ChatSDKError, ex.: teto de engajamento lançado
+    // dentro do try) NÃO é falha de infra → re-lança.
+    if (e instanceof ChatSDKError) throw e;
     // FAIL-OPEN: falha de infra nunca interrompe engajamento legítimo.
     console.warn("[budget-guard] enforceBudget falhou (fail-open):", e);
     return NO_PLAN;

@@ -974,7 +974,11 @@ export default defineSchema({
   // Dedup durável de alertas de orçamento (sobrevive a retries do Trigger e a
   // cruzamentos multi-run do teto por usuário). 1 alerta por scope+período+threshold.
   budget_alerts: defineTable({
-    scope: v.union(v.literal("task"), v.literal("user")),
+    scope: v.union(
+      v.literal("task"),
+      v.literal("user"),
+      v.literal("engagement"),
+    ),
     scope_id: v.string(),
     period_key: v.string(),
     threshold: v.string(),
@@ -1203,6 +1207,9 @@ export default defineSchema({
 
   // Teto de gasto de IA por engajamento (MONITOR — sem enforcement no hot-path).
   // cap_dollars em USD (mesma unidade do custo real); warn_pct em 0-100.
+  // enforce: ausente/false = só MONITOR (default, comportamento histórico);
+  // true = bloqueia INICIAR novos runs quando o gasto do engajamento >= cap
+  // (runs em andamento terminam — nunca corta mid-run). Ver lib/budget-guard.ts.
   engagement_budgets: defineTable({
     user_id: v.string(),
     organization_id: v.optional(v.string()),
@@ -1210,6 +1217,7 @@ export default defineSchema({
     engagement_id: v.id("engagements"),
     cap_dollars: v.number(),
     warn_pct: v.number(),
+    enforce: v.optional(v.boolean()),
     note: v.optional(v.string()),
     updated_by: v.optional(v.string()),
     updated_at: v.number(),

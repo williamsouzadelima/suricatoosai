@@ -13,7 +13,7 @@ function budgetEmailFrom(): string {
 }
 
 export interface BudgetAlertInput {
-  scope: "task" | "user";
+  scope: "task" | "user" | "engagement";
   scopeId: string;
   periodKey: string;
   threshold: "warn" | "block";
@@ -48,9 +48,16 @@ export async function fireBudgetAlert(input: BudgetAlertInput): Promise<void> {
     });
     if (!claimed) return;
 
-    const channels = await convex.query(api.monitorSettings.get, { serviceKey });
+    const channels = await convex.query(api.monitorSettings.get, {
+      serviceKey,
+    });
 
-    const scopeLabel = input.scope === "task" ? "task" : "usuário";
+    const scopeLabel =
+      input.scope === "task"
+        ? "task"
+        : input.scope === "engagement"
+          ? "engajamento"
+          : "usuário";
     const verb =
       input.threshold === "block"
         ? "ATINGIU o teto"

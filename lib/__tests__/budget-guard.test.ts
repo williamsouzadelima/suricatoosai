@@ -24,13 +24,45 @@ const CFG = {
   alertTeams: false,
   alertEmail: false,
 };
+const DISABLED = { ...CFG, enabled: false };
 
-const cost = (o: Partial<{ taskReal: number; userReal: number; taskCapped: boolean; userCapped: boolean }>) => ({
-  taskReal: 0,
-  userReal: 0,
-  taskCapped: false,
-  userCapped: false,
-  ...o,
+const cost = (
+  o: Partial<{
+    taskReal: number;
+    userReal: number;
+    taskCapped: boolean;
+    userCapped: boolean;
+  }>,
+) => ({ taskReal: 0, userReal: 0, taskCapped: false, userCapped: false, ...o });
+
+type Eng = {
+  engagementId: string;
+  capDollars: number;
+  warnPct: number;
+  engReal: number;
+  engCapped: boolean;
+} | null;
+
+// As queries em enforceBudget rodam NESTA ordem (com chatId): getEffectiveForUser
+// (cfg) → getEngagementBudgetCheck (eng) → [getRealCostForBudgetCheck (cost), só
+// quando o budgetSettings de task/user está ligado]. O helper encadeia nessa ordem.
+function mockRun(opts: {
+  cfg: typeof CFG;
+  eng?: Eng;
+  cost?: ReturnType<typeof cost>;
+}) {
+  mockQuery.mockResolvedValueOnce(opts.cfg); // 1: cfg
+  mockQuery.mockResolvedValueOnce(opts.eng ?? null); // 2: eng
+  if (opts.cost !== undefined) mockQuery.mockResolvedValueOnce(opts.cost); // 3: cost
+}
+
+const ENG = (engReal: number, over: Partial<Eng> = {}): Eng => ({
+  engagementId: "e1",
+  capDollars: 10,
+  warnPct: 80,
+  engReal,
+  engCapped: false,
+  ...(over as object),
 });
 
 describe("enforceBudget (Fase 4b — gate + plano Camada B)", () => {
@@ -45,44 +77,53 @@ describe("enforceBudget (Fase 4b — gate + plano Camada B)", () => {
     else process.env.CONVEX_SERVICE_ROLE_KEY = OLD;
   });
 
-  it("no-op (NO_PLAN) quando o controle está desligado (não lê custo)", async () => {
-    mockQuery.mockResolvedValueOnce({ ...CFG, enabled: false });
+  it("no-op (NO_PLAN) quando o controle está desligado e sem teto de engajamento (não lê custo)", async () => {
+    mockRun({ cfg: DISABLED, eng: null });
     const plan = await enforceBudget({ userId: "u1", chatId: "c1" });
     expect(plan.taskCapRemainingDollars).toBeNull();
-    expect(mockQuery).toHaveBeenCalledTimes(1);
+    // lê cfg + eng, mas NÃO o custo de task/user.
+    expect(mockQuery).toHaveBeenCalledTimes(2);
   });
 
   it("BLOQUEIA (throw) quando block por-task ligado e custo real >= teto", async () => {
-    mockQuery.mockResolvedValueOnce(CFG).mockResolvedValueOnce(cost({ taskReal: 6 }));
-    await expect(enforceBudget({ userId: "u1", chatId: "c1" })).rejects.toBeInstanceOf(ChatSDKError);
+    mockRun({ cfg: CFG, eng: null, cost: cost({ taskReal: 6 }) });
+    await expect(
+      enforceBudget({ userId: "u1", chatId: "c1" }),
+    ).rejects.toBeInstanceOf(ChatSDKError);
   });
 
   it("NÃO bloqueia abaixo do teto e devolve o teto restante da task (Camada B)", async () => {
-    mockQuery.mockResolvedValueOnce(CFG).mockResolvedValueOnce(cost({ taskReal: 2 }));
+    mockRun({ cfg: CFG, eng: null, cost: cost({ taskReal: 2 }) });
     const plan = await enforceBudget({ userId: "u1", chatId: "c1" });
     expect(plan.taskCapRemainingDollars).toBe(3); // 5 - 2
   });
 
   it("alerta-only (block off): não bloqueia e SEM plano de corte mid-run", async () => {
-    mockQuery
-      .mockResolvedValueOnce({ ...CFG, perTaskBlock: false })
-      .mockResolvedValueOnce(cost({ taskReal: 99 }));
+    mockRun({
+      cfg: { ...CFG, perTaskBlock: false },
+      eng: null,
+      cost: cost({ taskReal: 99 }),
+    });
     const plan = await enforceBudget({ userId: "u1", chatId: "c1" });
     expect(plan.taskCapRemainingDollars).toBeNull();
   });
 
   it("NÃO bloqueia sobre soma capada abaixo do teto (anti-subcontagem); plano usa o parcial", async () => {
-    mockQuery
-      .mockResolvedValueOnce(CFG)
-      .mockResolvedValueOnce(cost({ taskReal: 3, taskCapped: true }));
+    mockRun({
+      cfg: CFG,
+      eng: null,
+      cost: cost({ taskReal: 3, taskCapped: true }),
+    });
     const plan = await enforceBudget({ userId: "u1", chatId: "c1" });
     expect(plan.taskCapRemainingDollars).toBe(2); // 5 - 3
   });
 
   it("NÃO bloqueia com cap negativo/inválido (guarda contra wrong-block)", async () => {
-    mockQuery
-      .mockResolvedValueOnce({ ...CFG, perTaskCapDollars: -1 })
-      .mockResolvedValueOnce(cost({ taskReal: 0 }));
+    mockRun({
+      cfg: { ...CFG, perTaskCapDollars: -1 },
+      eng: null,
+      cost: cost({ taskReal: 0 }),
+    });
     const plan = await enforceBudget({ userId: "u1", chatId: "c1" });
     expect(plan.taskCapRemainingDollars).toBeNull();
   });
@@ -101,8 +142,8 @@ describe("enforceBudget (Fase 4b — gate + plano Camada B)", () => {
   });
 
   it("BLOQUEIA por teto de usuário quando acima (usuário nunca gera plano mid-run)", async () => {
-    mockQuery
-      .mockResolvedValueOnce({
+    mockRun({
+      cfg: {
         ...CFG,
         perTaskEnabled: false,
         perTaskCapDollars: null,
@@ -110,8 +151,44 @@ describe("enforceBudget (Fase 4b — gate + plano Camada B)", () => {
         perUserEnabled: true,
         perUserCapDollars: 50,
         perUserBlock: true,
-      })
-      .mockResolvedValueOnce(cost({ userReal: 60 }));
-    await expect(enforceBudget({ userId: "u1", chatId: "c1" })).rejects.toBeInstanceOf(ChatSDKError);
+      },
+      eng: null,
+      cost: cost({ userReal: 60 }),
+    });
+    await expect(
+      enforceBudget({ userId: "u1", chatId: "c1" }),
+    ).rejects.toBeInstanceOf(ChatSDKError);
+  });
+
+  // ── Escopo POR ENGAJAMENTO ────────────────────────────────────────────────
+  it("BLOQUEIA por teto de ENGAJAMENTO mesmo com budgetSettings desligado (independência)", async () => {
+    mockRun({ cfg: DISABLED, eng: ENG(12) }); // 12 >= 10
+    await expect(
+      enforceBudget({ userId: "u1", chatId: "c1" }),
+    ).rejects.toBeInstanceOf(ChatSDKError);
+    // nunca chega a ler o custo de task/user (early-return após o bloqueio).
+    expect(mockQuery).toHaveBeenCalledTimes(2);
+  });
+
+  it("engajamento NÃO bloqueia abaixo do teto (task Camada B segue valendo)", async () => {
+    mockRun({ cfg: CFG, eng: ENG(3), cost: cost({ taskReal: 2 }) });
+    const plan = await enforceBudget({ userId: "u1", chatId: "c1" });
+    expect(plan.taskCapRemainingDollars).toBe(3);
+  });
+
+  it("engajamento: soma capada abaixo do teto NÃO bloqueia (anti-subcontagem)", async () => {
+    mockRun({ cfg: DISABLED, eng: ENG(8, { engCapped: true }) }); // 8 < 10
+    const plan = await enforceBudget({ userId: "u1", chatId: "c1" });
+    expect(plan.taskCapRemainingDollars).toBeNull();
+  });
+
+  it("engajamento: blockOnExceed=false NÃO bloqueia mesmo acima (task do agent-long)", async () => {
+    mockRun({ cfg: DISABLED, eng: ENG(50) });
+    const plan = await enforceBudget({
+      userId: "u1",
+      chatId: "c1",
+      blockOnExceed: false,
+    });
+    expect(plan.taskCapRemainingDollars).toBeNull();
   });
 });

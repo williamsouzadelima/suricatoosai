@@ -493,6 +493,7 @@ export const getEngagementBilling = query({
       portalEnabled: clientDoc?.portal_enabled === true,
       capDollars: budget?.cap_dollars ?? 0,
       warnPct: budget?.warn_pct ?? 80,
+      enforce: budget?.enforce === true,
       currency,
       paid,
       sent,
@@ -508,14 +509,17 @@ export const getEngagementBilling = query({
 });
 
 /**
- * Define/atualiza o teto de gasto de IA do engajamento (MONITOR — sem bloqueio
- * no hot-path). identity + posse. cap_dollars=0 remove o teto (sem monitor).
+ * Define/atualiza o teto de gasto de IA do engajamento. identity + posse.
+ * cap_dollars=0 remove o teto (sem monitor). enforce=false (default) = só
+ * MONITOR; enforce=true = bloqueia INICIAR novos runs quando o gasto >= teto
+ * (Camada A no lib/budget-guard.ts; nunca corta run em andamento).
  */
 export const setEngagementBudget = mutation({
   args: {
     engagementId: v.id("engagements"),
     capDollars: v.number(),
     warnPct: v.optional(v.number()),
+    enforce: v.optional(v.boolean()),
     note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -547,6 +551,7 @@ export const setEngagementBudget = mutation({
       await ctx.db.patch(existing._id, {
         cap_dollars: cap,
         warn_pct: warn,
+        enforce: args.enforce === true,
         note: args.note?.slice(0, 500),
         updated_by: identity.subject,
         updated_at: now,
@@ -559,6 +564,7 @@ export const setEngagementBudget = mutation({
         engagement_id: args.engagementId,
         cap_dollars: cap,
         warn_pct: warn,
+        enforce: args.enforce === true,
         note: args.note?.slice(0, 500),
         updated_by: identity.subject,
         updated_at: now,
