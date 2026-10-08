@@ -6,20 +6,22 @@
 // Regra do design system (ver app/admin/_ui): ZERO hex hardcoded fora dos
 // terminais de evidência (que são intencionalmente navy #0e1b2e).
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import {
   ListOrdered,
   Paperclip,
+  Server,
   Image as ImageIcon,
   type LucideIcon,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Callout, type Tone } from "@/app/admin/_ui";
+import { Callout, StatusBadge, type Tone } from "@/app/admin/_ui";
 
 // ── Tipos + constantes de apresentação ─────────────────────────────────────
 
@@ -421,6 +423,217 @@ function SubHead({
       <span className="rounded-full bg-primary px-1.5 text-[11px] font-bold text-primary-foreground">
         {n}
       </span>
+    </div>
+  );
+}
+
+// ── Quadro Kanban de achados (/engagements) ─────────────────────────────────
+
+const BOARD_COLUMNS: { status: FindingStatus; label: string; dot: string }[] = [
+  { status: "draft", label: "Rascunho", dot: "bg-muted-foreground" },
+  { status: "in_review", label: "Em revisão", dot: "bg-warning" },
+  { status: "approved", label: "Aprovado", dot: "bg-success" },
+  { status: "published", label: "Publicado", dot: "bg-primary" },
+];
+
+/**
+ * Quadro Kanban dos achados de um engajamento. Arrastar um card para outra
+ * coluna dispara a transição VÁLIDA da máquina de estados (draft→in_review→
+ * approved→published, + reabrir); transição inválida mostra aviso, nunca força
+ * (as regras reais vivem em convex/findings.ts). Clicar no card abre o detalhe
+ * em /achados; os botões de curadoria continuam no próprio card.
+ */
+export function FindingsBoard({
+  findings,
+  engagementId,
+}: {
+  findings: Doc<"findings">[];
+  engagementId: Id<"engagements">;
+}) {
+  const router = useRouter();
+  const submit = useMutation(api.findings.submitForReview);
+  const approve = useMutation(api.findings.approveFinding);
+  const publish = useMutation(api.findings.publishFinding);
+  const reopen = useMutation(api.findings.reopenFinding);
+  const [dragOver, setDragOver] = useState<FindingStatus | null>(null);
+
+  const byStatus = useMemo(() => {
+    const cols: Record<FindingStatus, Doc<"findings">[]> = {
+      draft: [],
+      in_review: [],
+      approved: [],
+      published: [],
+      dismissed: [],
+    };
+    for (const f of findings) {
+      const s = f.status as FindingStatus;
+      if (cols[s]) cols[s].push(f);
+    }
+    return cols;
+  }, [findings]);
+
+  const moveTo = async (f: Doc<"findings">, target: FindingStatus) => {
+    const s = f.status as FindingStatus;
+    if (s === target) return;
+    const run = async (fn: () => Promise<unknown>, ok: string) => {
+      try {
+        await fn();
+        toast.success(ok);
+      } catch (e) {
+        const msg =
+          e instanceof Error && e.message ? e.message : "Ação falhou.";
+        toast.error(msg);
+        console.error(e);
+      }
+    };
+    if (target === "in_review") {
+      if (s === "draft")
+        return run(() => submit({ findingId: f._id }), "Enviado para revisão.");
+      if (s === "approved" || s === "published")
+        return run(() => reopen({ findingId: f._id }), "Reaberto em revisão.");
+    } else if (target === "approved") {
+      if (s === "in_review")
+        return run(() => approve({ findingId: f._id }), "Aprovado.");
+    } else if (target === "published") {
+      if (s === "approved")
+        return run(() => publish({ findingId: f._id }), "Publicado.");
+    }
+    toast.error(
+      `Mover de "${STATUS_LABEL[s]}" para "${STATUS_LABEL[target]}" não é permitido — siga o fluxo de curadoria.`,
+    );
+  };
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {BOARD_COLUMNS.map((col) => {
+        const items = byStatus[col.status];
+        const over = dragOver === col.status;
+        return (
+          <div
+            key={col.status}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (dragOver !== col.status) setDragOver(col.status);
+            }}
+            onDragLeave={() =>
+              setDragOver((c) => (c === col.status ? null : c))
+            }
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(null);
+              const id = e.dataTransfer.getData("text/plain");
+              const f = findings.find((x) => x._id === id);
+              if (f) void moveTo(f, col.status);
+            }}
+            className={cn(
+              "flex flex-col rounded-xl border bg-muted/30 p-2.5 transition-colors",
+              over && "border-primary bg-primary/5",
+            )}
+          >
+            <div className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold">
+              <span className={cn("h-2 w-2 rounded-full", col.dot)} />
+              {col.label}
+              <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                {items.length}
+              </span>
+            </div>
+            <div className="flex flex-col gap-2">
+              {items.map((f) => (
+                <FindingCard
+                  key={f._id}
+                  finding={f}
+                  onOpen={() =>
+                    router.push(`/achados?e=${engagementId}&f=${f._id}`)
+                  }
+                />
+              ))}
+              {items.length === 0 && (
+                <div className="rounded-lg border border-dashed py-6 text-center text-[11px] text-muted-foreground">
+                  Vazio
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+      {byStatus.dismissed.length > 0 && (
+        <button
+          onClick={() => router.push(`/achados?e=${engagementId}`)}
+          className="text-left text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline sm:col-span-2 xl:col-span-4"
+        >
+          {byStatus.dismissed.length} achado(s) descartado(s) — ver em Achados
+        </button>
+      )}
+    </div>
+  );
+}
+
+function FindingCard({
+  finding: f,
+  onOpen,
+}: {
+  finding: Doc<"findings">;
+  onOpen: () => void;
+}) {
+  const severity = f.severity as Severity;
+  const status = f.status as FindingStatus;
+  const cvss = typeof f.cvss_score === "number" ? f.cvss_score : undefined;
+  const rs = f.retest_status;
+  return (
+    <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", f._id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      className="relative cursor-grab overflow-hidden rounded-lg border bg-card p-2.5 pl-3 shadow-[var(--shadow-soft)] transition-shadow hover:shadow-[var(--shadow-card)] active:cursor-grabbing"
+    >
+      <span
+        className={cn(
+          "absolute inset-y-2 left-0 w-1 rounded-r-full",
+          SEV_STRIPE[severity],
+        )}
+      />
+      <button onClick={onOpen} className="block w-full text-left">
+        <div className="flex items-center gap-1.5">
+          {f.finding_id && (
+            <span className="font-mono text-[10.5px] text-muted-foreground">
+              {f.finding_id}
+            </span>
+          )}
+          {cvss !== undefined && (
+            <span className="ml-auto rounded bg-muted px-1 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground">
+              CVSS {cvss.toFixed(1)}
+            </span>
+          )}
+        </div>
+        <div className="mt-1 line-clamp-2 text-[13px] font-medium leading-snug">
+          {f.title}
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <span
+            className={cn(
+              "inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold",
+              SEV_PILL[severity],
+            )}
+          >
+            {SEV_LABEL[severity]}
+          </span>
+          {rs && RETEST_BADGE[rs] && (
+            <StatusBadge
+              tone={RETEST_BADGE[rs].tone}
+              label={RETEST_BADGE[rs].label}
+            />
+          )}
+        </div>
+        <div className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+          <Server className="h-3 w-3 shrink-0" />
+          <span className="truncate">{f.affected_asset}</span>
+        </div>
+      </button>
+      <div className="mt-2 border-t pt-2">
+        <FindingActions findingId={f._id} status={status} />
+      </div>
     </div>
   );
 }

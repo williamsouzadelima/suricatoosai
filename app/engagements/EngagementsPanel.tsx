@@ -40,59 +40,17 @@ import {
 import { ReportBrandCard } from "./ReportBrandCard";
 import { EngagementBilling } from "./EngagementBilling";
 import { AppShell } from "@/components/internal/app-shell";
-import { FindingEvidence } from "@/components/internal/findings";
+import {
+  FindingsBoard,
+  SEV_LABEL,
+  SEV_PILL,
+  SEV_STRIPE,
+  type Severity,
+} from "@/components/internal/findings";
 
-type Severity = "info" | "low" | "medium" | "high" | "critical";
-type FindingStatus =
-  "draft" | "in_review" | "approved" | "published" | "dismissed";
-
-const SEVERITY_TONE: Record<Severity, Tone> = {
-  critical: "destructive",
-  high: "destructive",
-  medium: "warning",
-  low: "primary",
-  info: "neutral",
-};
-const STATUS_TONE: Record<FindingStatus, Tone> = {
-  draft: "neutral",
-  in_review: "warning",
-  approved: "success",
-  published: "brand",
-  dismissed: "destructive",
-};
-const STATUS_LABEL: Record<FindingStatus, string> = {
-  draft: "Rascunho",
-  in_review: "Em revisão",
-  approved: "Aprovado",
-  published: "Publicado",
-  dismissed: "Descartado",
-};
-const RETEST_BADGE: Record<string, { tone: Tone; label: string }> = {
-  fixed: { tone: "success", label: "Corrigido" },
-  still_vulnerable: { tone: "destructive", label: "Ainda vulnerável" },
-  pending: { tone: "warning", label: "Retest pendente" },
-};
-const SEV_LABEL: Record<Severity, string> = {
-  critical: "Crítico",
-  high: "Alto",
-  medium: "Médio",
-  low: "Baixo",
-  info: "Info",
-};
-const SEV_STRIPE: Record<Severity, string> = {
-  critical: "bg-destructive",
-  high: "bg-[#e8590c]",
-  medium: "bg-warning",
-  low: "bg-primary",
-  info: "bg-muted-foreground",
-};
-const SEV_PILL: Record<Severity, string> = {
-  critical: "text-destructive bg-destructive/10 border-destructive/25",
-  high: "text-[#e8590c] bg-[#e8590c]/10 border-[#e8590c]/25",
-  medium: "text-warning bg-warning/10 border-warning/25",
-  low: "text-primary bg-primary/10 border-primary/25",
-  info: "text-muted-foreground bg-muted border-border",
-};
+// Severity/FindingStatus + SEV_*/STATUS_*/RETEST_BADGE + FindingActions/
+// FindingEvidence/FindingsBoard vivem em components/internal/findings.tsx
+// (fonte única). SEV_LABEL/SEV_PILL/SEV_STRIPE + Severity importados acima.
 const ENG_STATUS_TONE: Record<string, Tone> = {
   planned: "neutral",
   active: "success",
@@ -120,8 +78,6 @@ export function EngagementsPanel({
 
   const [selectedEngagementId, setSelectedEngagementId] =
     useState<Id<"engagements"> | null>(null);
-  const [expandedFindingId, setExpandedFindingId] =
-    useState<Id<"findings"> | null>(null);
   const [newClientName, setNewClientName] = useState("");
   const [newEngName, setNewEngName] = useState("");
   const [newEngClientId, setNewEngClientId] = useState<Id<"clients"> | "">("");
@@ -302,11 +258,7 @@ export function EngagementsPanel({
         </Card>
 
         {selectedEngagementId && (
-          <EngagementDetail
-            engagementId={selectedEngagementId}
-            expandedFindingId={expandedFindingId}
-            setExpandedFindingId={setExpandedFindingId}
-          />
+          <EngagementDetail engagementId={selectedEngagementId} />
         )}
       </div>
     </AppShell>
@@ -315,12 +267,8 @@ export function EngagementsPanel({
 
 function EngagementDetail({
   engagementId,
-  expandedFindingId,
-  setExpandedFindingId,
 }: {
   engagementId: Id<"engagements">;
-  expandedFindingId: Id<"findings"> | null;
-  setExpandedFindingId: (id: Id<"findings"> | null) => void;
 }) {
   const findings = useQuery(api.findings.listFindingsForEngagement, {
     engagementId,
@@ -416,12 +364,6 @@ function EngagementDetail({
     }
   };
 
-  const submit = useMutation(api.findings.submitForReview);
-  const approve = useMutation(api.findings.approveFinding);
-  const publish = useMutation(api.findings.publishFinding);
-  const dismiss = useMutation(api.findings.dismissFinding);
-  const reopen = useMutation(api.findings.reopenFinding);
-  const retest = useMutation(api.findings.retestFinding);
   const approveAll = useMutation(api.findings.approveAllForEngagement);
   const clearFindings = useMutation(api.findings.clearFindingsForEngagement);
   const [approvingAll, setApprovingAll] = useState(false);
@@ -496,17 +438,6 @@ function EngagementDetail({
     }
     return c;
   }, [findings]);
-
-  const run = async (fn: () => Promise<unknown>, ok: string) => {
-    try {
-      await fn();
-      toast.success(ok);
-    } catch (e) {
-      const msg = e instanceof Error && e.message ? e.message : "Ação falhou.";
-      toast.error(msg);
-      console.error(e);
-    }
-  };
 
   return (
     <>
@@ -586,7 +517,7 @@ function EngagementDetail({
       {/* Achados */}
       <Card className="gap-0 py-0">
         <div className="flex items-center justify-between gap-2 border-b p-5">
-          <SectionHeader title="Achados" count={findings?.length} />
+          <SectionHeader title="Quadro de achados" count={findings?.length} />
           <div className="flex items-center gap-2">
             {counts.draft + counts.review > 0 && (
               <Button
@@ -633,201 +564,8 @@ function EngagementDetail({
             description="Achados capturados pelo agente (capture_finding) aparecem aqui em rascunho."
           />
         ) : (
-          <div className="space-y-2.5 p-4">
-            {findings.map((f) => {
-              const status = f.status as FindingStatus;
-              const severity = f.severity as Severity;
-              const expanded = expandedFindingId === f._id;
-              const cvss =
-                typeof (f as { cvss_score?: number }).cvss_score === "number"
-                  ? (f as { cvss_score?: number }).cvss_score
-                  : undefined;
-              const ref = (f as { finding_id?: string }).finding_id;
-              return (
-                <div
-                  key={f._id}
-                  className={cn(
-                    "relative overflow-hidden rounded-xl border bg-card shadow-[var(--shadow-soft)] transition-shadow hover:shadow-[var(--shadow-card)]",
-                    expanded && "ring-1 ring-primary/20",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "absolute inset-y-3 left-0 w-1 rounded-r-full",
-                      SEV_STRIPE[severity],
-                    )}
-                  />
-                  <div className="flex flex-wrap items-center gap-2.5 py-3.5 pl-5 pr-4">
-                    <button
-                      onClick={() =>
-                        setExpandedFindingId(expanded ? null : f._id)
-                      }
-                      className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-                    >
-                      <ChevronRight
-                        className={cn(
-                          "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                          expanded && "rotate-90",
-                        )}
-                      />
-                      <span
-                        className={cn(
-                          "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
-                          SEV_PILL[severity],
-                        )}
-                      >
-                        {SEV_LABEL[severity]}
-                      </span>
-                      {ref && (
-                        <span className="shrink-0 font-mono text-[11.5px] text-muted-foreground">
-                          {ref}
-                        </span>
-                      )}
-                      <span className="truncate font-medium">{f.title}</span>
-                      <span className="hidden shrink-0 items-center gap-1.5 text-xs text-muted-foreground sm:inline-flex">
-                        <Server className="h-3.5 w-3.5" />
-                        {f.affected_asset}
-                      </span>
-                      {cvss !== undefined && (
-                        <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold text-muted-foreground">
-                          CVSS {cvss.toFixed(1)}
-                        </span>
-                      )}
-                    </button>
-                    <StatusBadge
-                      tone={STATUS_TONE[status]}
-                      label={STATUS_LABEL[status]}
-                    />
-                    {(() => {
-                      const rs = (f as { retest_status?: string })
-                        .retest_status;
-                      if (!rs) return null;
-                      const m = RETEST_BADGE[rs];
-                      return m ? (
-                        <StatusBadge tone={m.tone} label={m.label} />
-                      ) : null;
-                    })()}
-                    <div className="flex gap-1.5">
-                      {status === "draft" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            void run(
-                              () => submit({ findingId: f._id }),
-                              "Enviado para revisão.",
-                            )
-                          }
-                        >
-                          Enviar p/ revisão
-                        </Button>
-                      )}
-                      {status === "in_review" && (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={() =>
-                              void run(
-                                () => approve({ findingId: f._id }),
-                                "Aprovado.",
-                              )
-                            }
-                          >
-                            Aprovar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              void run(
-                                () => dismiss({ findingId: f._id }),
-                                "Descartado.",
-                              )
-                            }
-                          >
-                            Descartar
-                          </Button>
-                        </>
-                      )}
-                      {status === "approved" && (
-                        <Button
-                          size="sm"
-                          onClick={() =>
-                            void run(
-                              () => publish({ findingId: f._id }),
-                              "Publicado.",
-                            )
-                          }
-                        >
-                          Publicar
-                        </Button>
-                      )}
-                      {(status === "approved" ||
-                        status === "published" ||
-                        status === "dismissed") && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            void run(
-                              () => reopen({ findingId: f._id }),
-                              "Reaberto em revisão.",
-                            )
-                          }
-                        >
-                          Reabrir
-                        </Button>
-                      )}
-                      {(status === "approved" || status === "published") && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-success hover:text-success"
-                            title="Revalidado: o cliente corrigiu"
-                            onClick={() =>
-                              void run(
-                                () =>
-                                  retest({
-                                    findingId: f._id,
-                                    outcome: "fixed",
-                                  }),
-                                "Marcado como corrigido.",
-                              )
-                            }
-                          >
-                            Corrigido
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive hover:text-destructive"
-                            title="Revalidado: ainda vulnerável"
-                            onClick={() =>
-                              void run(
-                                () =>
-                                  retest({
-                                    findingId: f._id,
-                                    outcome: "still_vulnerable",
-                                  }),
-                                "Marcado como ainda vulnerável.",
-                              )
-                            }
-                          >
-                            Persiste
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {expanded && (
-                    <div className="px-4 pb-4">
-                      <FindingEvidence findingId={f._id} finding={f} />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div className="p-4">
+            <FindingsBoard findings={findings} engagementId={engagementId} />
           </div>
         )}
       </Card>
