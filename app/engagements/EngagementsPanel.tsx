@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
+import Link from "next/link";
+import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import {
   Plus,
@@ -12,7 +13,6 @@ import {
   Radio,
   MessagesSquare,
   FileText,
-  Download,
   Loader2,
   Sparkles,
   ExternalLink,
@@ -20,7 +20,6 @@ import {
   Trash2,
   Server,
   BarChart3,
-  Eye,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -615,7 +614,7 @@ function EngagementDetail({
       </Card>
 
       {/* Relatórios */}
-      <ReportsSection engagementId={engagementId} />
+      <ReportsSummary engagementId={engagementId} />
 
       {/* Faturamento (scaffold de monetização) */}
       <EngagementBilling engagementId={engagementId} />
@@ -794,412 +793,51 @@ function EngagementDetail({
   );
 }
 
-type ReportAudience = "technical" | "executive" | "commercial";
-type ReportFormat = "docx" | "pptx" | "pdf";
-type ReportStatus = "queued" | "rendering" | "ready" | "failed";
-
-const AUDIENCE_LABEL: Record<ReportAudience, string> = {
-  technical: "Técnico",
-  executive: "Executivo",
-  commercial: "Ações comerciais",
-};
-const REPORT_STATUS_TONE: Record<ReportStatus, Tone> = {
-  queued: "neutral",
-  rendering: "warning",
-  ready: "success",
-  failed: "destructive",
-};
-const REPORT_STATUS_LABEL: Record<ReportStatus, string> = {
-  queued: "Na fila",
-  rendering: "Gerando…",
-  ready: "Pronto",
-  failed: "Falhou",
-};
-const ALL_FORMATS: ReportFormat[] = ["docx", "pptx", "pdf"];
-
-type ReportRow = {
-  _id: Id<"reports">;
-  report_group_id: string;
-  audience: string;
-  format: string;
-  version: number;
-  status: string;
-  error?: string;
-  size_bytes?: number;
-  created_at: number;
-};
-
-function ReportsSection({ engagementId }: { engagementId: Id<"engagements"> }) {
+function ReportsSummary({ engagementId }: { engagementId: Id<"engagements"> }) {
   const reports = useQuery(api.reports.listReportsForEngagement, {
     engagementId,
   });
-
-  const deleteReportGroup = useAction(
-    api.reportActions.deleteReportGroupWithFiles,
-  );
-
-  const [audience, setAudience] = useState<ReportAudience>("technical");
-  const [formats, setFormats] = useState<Set<ReportFormat>>(
-    () => new Set<ReportFormat>(["pdf"]),
-  );
-  const [generating, setGenerating] = useState(false);
-  const [deletingGroup, setDeletingGroup] = useState<string | null>(null);
-
-  const removeGroup = async (
-    groupId: string,
-    audienceLabel: string,
-    version: number,
-  ) => {
-    if (
-      !window.confirm(
-        `Remover o relatório ${audienceLabel} v${version} (todos os formatos)? Esta ação não pode ser desfeita.`,
-      )
-    ) {
-      return;
+  const stats = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    for (const r of reports ?? []) {
+      const arr = groups.get(r.report_group_id);
+      if (arr) arr.push(r.status);
+      else groups.set(r.report_group_id, [r.status]);
     }
-    setDeletingGroup(groupId);
-    try {
-      await deleteReportGroup({ reportGroupId: groupId });
-      toast.success("Relatório removido.");
-    } catch (e) {
-      toast.error("Falha ao remover o relatório.");
-      console.error(e);
-    } finally {
-      setDeletingGroup(null);
+    let ready = 0;
+    let pending = 0;
+    for (const statuses of groups.values()) {
+      if (statuses.every((s) => s === "ready")) ready += 1;
+      if (statuses.some((s) => s === "queued" || s === "rendering"))
+        pending += 1;
     }
-  };
-
-  const toggleFormat = (f: ReportFormat) => {
-    setFormats((prev) => {
-      const next = new Set(prev);
-      if (next.has(f)) next.delete(f);
-      else next.add(f);
-      return next;
-    });
-  };
-
-  const generate = async () => {
-    if (formats.size === 0) {
-      toast.error("Selecione ao menos um formato.");
-      return;
-    }
-    setGenerating(true);
-    try {
-      const res = await fetch("/api/reports/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          engagementId,
-          audience,
-          formats: [...formats],
-        }),
-      });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error || "Falha ao iniciar geração.");
-      }
-      const j = (await res.json()) as { version?: number };
-      toast.success(
-        `Geração iniciada (${AUDIENCE_LABEL[audience]}${
-          j.version ? ` v${j.version}` : ""
-        }). O status atualiza abaixo.`,
-      );
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao iniciar geração.");
-      console.error(e);
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  // Download por rota-proxy autenticada (sessão WorkOS via cookie); a rota
-  // grava auditoria antes de servir e faz stream do S3 (sem bearer no browser).
-  const download = (reportId: Id<"reports">) => {
-    window.open(
-      `/api/reports/${reportId}/download`,
-      "_blank",
-      "noopener,noreferrer",
-    );
-  };
-
-  // Prévia pixel-a-pixel inline: PDF serve direto; docx/pptx são convertidos
-  // para PDF no host (LibreOffice, cacheado no S3) pela rota /view.
-  const openPreview = (reportId: Id<"reports">) => {
-    window.open(
-      `/api/reports/${reportId}/view`,
-      "_blank",
-      "noopener,noreferrer",
-    );
-  };
-
-  const [reprocessing, setReprocessing] = useState<string | null>(null);
-  const reprocess = async (reportGroupId: string) => {
-    setReprocessing(reportGroupId);
-    try {
-      const res = await fetch("/api/reports/reprocess", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reportGroupId }),
-      });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error || "Falha ao reprocessar.");
-      }
-      toast.success("Reprocessando… o status atualiza abaixo.");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao reprocessar.");
-      console.error(e);
-    } finally {
-      setReprocessing(null);
-    }
-  };
-
-  // Relógio para o "há X min" (re-render a cada 20s).
-  const [nowTs, setNowTs] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNowTs(Date.now()), 20_000);
-    return () => clearInterval(id);
-  }, []);
-  const minsAgo = (ms: number) => Math.max(0, Math.floor((nowTs - ms) / 60000));
-
-  // Agrupa as linhas (uma por formato) por report_group_id, mais recentes no topo.
-  const groups = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        id: string;
-        audience: string;
-        version: number;
-        created_at: number;
-        rows: ReportRow[];
-      }
-    >();
-    for (const r of (reports ?? []) as ReportRow[]) {
-      const g = map.get(r.report_group_id);
-      if (g) {
-        g.rows.push(r);
-        g.created_at = Math.min(g.created_at, r.created_at);
-      } else {
-        map.set(r.report_group_id, {
-          id: r.report_group_id,
-          audience: r.audience,
-          version: r.version,
-          created_at: r.created_at,
-          rows: [r],
-        });
-      }
-    }
-    return [...map.values()].sort((a, b) => b.created_at - a.created_at);
+    return { total: groups.size, ready, pending };
   }, [reports]);
 
   return (
     <Card className="gap-0 py-0">
-      <div className="border-b p-5">
-        <SectionHeader
-          icon={FileText}
-          title="Relatórios"
-          description="Gere relatórios a partir dos achados aprovados/publicados. Público × formato, versionado a cada geração."
-          count={groups.length}
-        />
-      </div>
-
-      {/* Controles de geração */}
-      <div className="flex flex-col gap-3 border-b p-5 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex flex-wrap items-end gap-4">
+      <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <FileText className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
           <div>
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">
-              Público
-            </label>
-            <select
-              className="h-9 rounded-md border bg-background px-2 text-sm"
-              value={audience}
-              onChange={(e) => setAudience(e.target.value as ReportAudience)}
-            >
-              <option value="technical">Técnico</option>
-              <option value="executive">Executivo</option>
-              <option value="commercial">Ações comerciais</option>
-            </select>
-          </div>
-          <div>
-            <span className="mb-1 block text-xs font-medium text-muted-foreground">
-              Formatos
-            </span>
-            <div className="flex gap-1.5">
-              {ALL_FORMATS.map((f) => {
-                const on = formats.has(f);
-                return (
-                  <button
-                    key={f}
-                    type="button"
-                    onClick={() => toggleFormat(f)}
-                    className={`rounded-md border px-3 py-1.5 text-xs font-medium uppercase transition-colors ${
-                      on
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-muted/40"
-                    }`}
-                  >
-                    {f}
-                  </button>
-                );
-              })}
+            <div className="text-sm font-medium">Relatórios</div>
+            <div className="text-xs text-muted-foreground">
+              {reports === undefined
+                ? "Carregando…"
+                : `${stats.total} dossiê(s) · ${stats.ready} pronto(s)${
+                    stats.pending ? ` · ${stats.pending} gerando` : ""
+                  }`}
             </div>
           </div>
         </div>
-        <Button
-          onClick={() => void generate()}
-          disabled={generating || formats.size === 0}
+        <Link
+          href={`/relatorios?e=${engagementId}`}
+          className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border px-3 text-sm font-medium hover:bg-muted/40"
         >
-          {generating ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <FileText className="h-4 w-4" />
-          )}
-          Gerar relatório
-        </Button>
+          <FileText className="h-4 w-4" /> Abrir Relatórios
+          <ExternalLink className="h-3.5 w-3.5" />
+        </Link>
       </div>
-
-      {/* Lista de gerações */}
-      {reports === undefined ? (
-        <div className="p-6 text-center text-sm text-muted-foreground">
-          Carregando…
-        </div>
-      ) : groups.length === 0 ? (
-        <EmptyState
-          icon={FileText}
-          title="Nenhum relatório gerado."
-          description="Escolha o público e os formatos acima e clique em Gerar. Só entram achados aprovados ou publicados."
-        />
-      ) : (
-        <div className="divide-y">
-          {groups.map((g) => {
-            const allReady = g.rows.every((r) => r.status === "ready");
-            const anyPending = g.rows.some(
-              (r) => r.status === "queued" || r.status === "rendering",
-            );
-            const anyFailed = g.rows.some((r) => r.status === "failed");
-            const mins = minsAgo(g.created_at);
-            const stuck = anyPending && mins >= 3;
-            return (
-              <div key={g.id} className="p-4">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="font-medium">
-                    {AUDIENCE_LABEL[g.audience as ReportAudience] ?? g.audience}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    v{g.version} · {formatDateTime(g.created_at)}
-                  </span>
-                  {anyPending && (
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${
-                        stuck
-                          ? "bg-warning/15 text-warning"
-                          : "bg-primary/10 text-primary"
-                      }`}
-                    >
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      {stuck ? "Sem progresso" : "Gerando"} · há {mins} min
-                    </span>
-                  )}
-                  {anyFailed && !anyPending && (
-                    <span className="inline-flex items-center rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] text-destructive">
-                      Falhou
-                    </span>
-                  )}
-                  <div className="ml-auto flex items-center gap-2">
-                    {!allReady && (
-                      <button
-                        onClick={() => void reprocess(g.id)}
-                        disabled={reprocessing === g.id}
-                        title="Redisparar a geração (útil se travou na fila)"
-                        className="inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs text-primary hover:bg-primary/10 disabled:opacity-50"
-                      >
-                        {reprocessing === g.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-3.5 w-3.5" />
-                        )}
-                        Reprocessar
-                      </button>
-                    )}
-                    <button
-                      onClick={() =>
-                        void removeGroup(
-                          g.id,
-                          AUDIENCE_LABEL[g.audience as ReportAudience] ??
-                            g.audience,
-                          g.version,
-                        )
-                      }
-                      disabled={deletingGroup === g.id}
-                      title="Remover este relatório (todos os formatos)"
-                      className="inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                    >
-                      {deletingGroup === g.id ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5" />
-                      )}
-                      Remover
-                    </button>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {g.rows
-                    .slice()
-                    .sort((a, b) => a.format.localeCompare(b.format))
-                    .map((r) => {
-                      const status = r.status as ReportStatus;
-                      const ready = status === "ready";
-                      return (
-                        <div
-                          key={r._id}
-                          className="flex items-center gap-2 rounded-lg border px-3 py-2"
-                        >
-                          <span className="text-xs font-semibold uppercase">
-                            {r.format}
-                          </span>
-                          <StatusBadge
-                            tone={REPORT_STATUS_TONE[status] ?? "neutral"}
-                            label={REPORT_STATUS_LABEL[status] ?? status}
-                          />
-                          {ready && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => openPreview(r._id)}
-                                title="Pré-visualizar páginas e evidências"
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                                Prévia
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => download(r._id)}
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                                Baixar
-                              </Button>
-                            </>
-                          )}
-                          {status === "failed" && r.error && (
-                            <span
-                              className="max-w-[16rem] truncate text-xs text-destructive"
-                              title={r.error}
-                            >
-                              {r.error}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </Card>
   );
 }
