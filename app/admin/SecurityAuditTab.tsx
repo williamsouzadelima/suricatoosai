@@ -32,6 +32,7 @@ const EVENTS: { value: string; label: string; tone: Tone }[] = [
   { value: "report.generated", label: "Relatório gerado", tone: "info" },
   { value: "report.viewed", label: "Relatório visto", tone: "neutral" },
   { value: "report.downloaded", label: "Relatório baixado", tone: "primary" },
+  { value: "finding.viewed", label: "Achados vistos", tone: "neutral" },
   { value: "evidence.viewed", label: "Evidência vista", tone: "neutral" },
   {
     value: "evidence.downloaded",

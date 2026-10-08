@@ -1970,6 +1970,7 @@ export default defineSchema({
       v.literal("report.generated"),
       v.literal("report.viewed"),
       v.literal("report.downloaded"),
+      v.literal("finding.viewed"),
       v.literal("evidence.viewed"),
       v.literal("evidence.downloaded"),
       v.literal("artifact.url_issued"),

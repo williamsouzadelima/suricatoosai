@@ -292,6 +292,90 @@ export const listPortalEvidenceForFindingForBackend = query({
   },
 });
 
+// ── Auditoria de VIEW do portal (trilha durável; rotas são fail-closed) ──────
+// Hoje só o download era auditado. Estas gravam que o cliente LISTOU achados /
+// VIU evidência (o conteúdo exposto na Fatia 2a). Re-resolvem o cliente do
+// próprio doc (IDOR-proof) e gravam finding.viewed/evidence.viewed quando o
+// acesso bate, ou access.denied caso contrário — sempre deixam rastro.
+
+/** Audita a listagem de achados publicados de um engajamento pelo cliente. */
+export const recordPortalFindingsViewForBackend = mutation({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    engagementId: v.id("engagements"),
+    count: v.number(),
+    actorEmail: v.optional(v.string()),
+    ip: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+  },
+  returns: v.object({ ok: v.boolean() }),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const eng = await ctx.db.get(args.engagementId);
+    const access = eng
+      ? await resolveMembership(ctx, args.userId, eng.client_id)
+      : null;
+    await ctx.db.insert("security_audit_log", {
+      event_type: access ? "finding.viewed" : "access.denied",
+      actor_user_id: args.userId,
+      actor_email: args.actorEmail,
+      actor_kind: "client",
+      organization_id: eng?.organization_id,
+      client_id: eng?.client_id,
+      engagement_id: args.engagementId,
+      target_type: "engagement_findings",
+      target_id: args.engagementId,
+      ip: args.ip,
+      user_agent: args.userAgent?.slice(0, 500),
+      outcome: access ? "success" : "denied",
+      detail: `${args.count} achado(s) publicado(s) (portal)`,
+      created_at: Date.now(),
+    });
+    return { ok: access !== null };
+  },
+});
+
+/** Audita a visualização da cadeia de evidência de um achado pelo cliente. */
+export const recordPortalEvidenceViewForBackend = mutation({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    findingId: v.id("findings"),
+    count: v.number(),
+    actorEmail: v.optional(v.string()),
+    ip: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+  },
+  returns: v.object({ ok: v.boolean() }),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const f = await ctx.db.get(args.findingId);
+    const published = !!f && f.status === "published";
+    const access =
+      f && published
+        ? await resolveMembership(ctx, args.userId, f.client_id)
+        : null;
+    await ctx.db.insert("security_audit_log", {
+      event_type: access ? "evidence.viewed" : "access.denied",
+      actor_user_id: args.userId,
+      actor_email: args.actorEmail,
+      actor_kind: "client",
+      organization_id: f?.organization_id,
+      client_id: f?.client_id,
+      engagement_id: f?.engagement_id,
+      target_type: "finding_evidence",
+      target_id: args.findingId,
+      ip: args.ip,
+      user_agent: args.userAgent?.slice(0, 500),
+      outcome: access ? "success" : "denied",
+      detail: `${args.count} evidência(s) (portal)`,
+      created_at: Date.now(),
+    });
+    return { ok: access !== null };
+  },
+});
+
 // ── Grant / revoke (chamado pelas rotas admin com getSuperadminUser) ─────────
 
 /** Concede acesso de portal (upsert membership ativa). serviceKey. */

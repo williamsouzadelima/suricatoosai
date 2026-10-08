@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 // Evidência (TEXTO) de um achado PUBLICADO. O Convex re-resolve o cliente do
 // próprio achado e nega por padrão (membership); só status "published".
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ findingId: string }> },
 ) {
   const u = await getPortalSessionUser();
@@ -23,13 +23,30 @@ export async function GET(
     );
   }
   const { findingId } = await params;
-  const evidence = await getConvexClient().query(
+  const convex = getConvexClient();
+  const fid = findingId as Id<"findings">;
+  const evidence = await convex.query(
     api.portal.listPortalEvidenceForFindingForBackend,
-    {
+    { serviceKey, userId: u.id, findingId: fid },
+  );
+  // Auditoria durável (fail-closed): registra a visualização antes de servir.
+  try {
+    await convex.mutation(api.portal.recordPortalEvidenceViewForBackend, {
       serviceKey,
       userId: u.id,
-      findingId: findingId as Id<"findings">,
-    },
-  );
+      findingId: fid,
+      count: evidence.length,
+      actorEmail: u.email ?? undefined,
+      ip:
+        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined,
+      userAgent: req.headers.get("user-agent") ?? undefined,
+    });
+  } catch (e) {
+    console.error("portal evidence: auditoria indisponível, recusando", e);
+    return NextResponse.json(
+      { error: "Auditoria indisponível" },
+      { status: 503 },
+    );
+  }
   return NextResponse.json({ evidence });
 }
