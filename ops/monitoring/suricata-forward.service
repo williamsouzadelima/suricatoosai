@@ -1,0 +1,15 @@
+[Unit]
+Description=Suricatoos encaminhador de alertas do Suricata (eve.json -> app)
+After=network-online.target suricata.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=HOME=/root
+# O wrapper faz source+strip da chave e carrega o node (nvm) + tail -F | node.
+ExecStart=/root/suricatoos/ops/monitoring/suricata-forward-run.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
