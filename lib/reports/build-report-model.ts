@@ -551,6 +551,120 @@ function buildCommercial(input: ReportInput): ReportModel {
   return { meta: baseMeta(input, "commercial"), kpis, charts, sections };
 }
 
+// ── Plano de Ação (remediação priorizada com prazo-alvo) ────────────────────
+
+/** Prazo-alvo sugerido por severidade (não contratual). */
+const PRAZO_ALVO: Record<Severity, string> = {
+  critical: "7 dias",
+  high: "15 dias",
+  medium: "30 dias",
+  low: "90 dias",
+  info: "planejamento",
+};
+
+/** Fases do plano: 3 faixas de prioridade com prazo-alvo por severidade. */
+function actionPlanPhases(findings: ReportFindingView[]): RoadmapPhase[] {
+  const actionsFor = (sev: Severity[]): string[] => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const f of sortBySeverity(findings)) {
+      if (!sev.includes(f.severity)) continue;
+      const r = (f.remediation || "").trim();
+      const action = r && !/^(n\/?a\b|—|-|informativo)/i.test(r) ? r : f.title;
+      const key = `${f.ref}|${action.toLowerCase().slice(0, 32)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(
+        `${f.ref} · ${SEVERITY_LABEL_PT[f.severity]} (${PRAZO_ALVO[f.severity]}) — ${clip(action, 80)}`,
+      );
+      if (out.length >= 8) break;
+    }
+    return out;
+  };
+  const p1 = actionsFor(["critical", "high"]);
+  const p2 = actionsFor(["medium"]);
+  const p3 = actionsFor(["low", "info"]);
+  p3.push("Reteste de validação pós-correção");
+  return [
+    {
+      window: "Crítico ≤ 7 dias · Alto ≤ 15 dias",
+      label: "P1 · Imediato",
+      actions: p1.length ? p1 : ["Sem achados críticos/altos."],
+    },
+    {
+      window: "≤ 30 dias",
+      label: "P2 · Curto prazo",
+      actions: p2.length ? p2 : ["Sem achados de severidade média."],
+    },
+    { window: "≤ 90 dias", label: "P3 · Planejado", actions: p3 },
+  ];
+}
+
+const ACTION_PLAN_NEXT_STEPS = [
+  "Aprovar o plano priorizado e os responsáveis por ação",
+  "Executar as ações P1 (imediato) dentro do prazo-alvo",
+  "Acompanhar P2/P3 no ciclo de correção",
+  "Reteste de validação após a remediação",
+];
+
+/** Embute o prazo-alvo na remediação de cada achado (sem coluna nova no renderer). */
+function findingsWithPrazo(findings: ReportFindingView[]): ReportFindingView[] {
+  return findings.map((f) => {
+    const base = (f.remediation || "").trim();
+    const rem = base || "Ver descrição do achado.";
+    return {
+      ...f,
+      remediation: `[Prazo-alvo: ${PRAZO_ALVO[f.severity]}] ${rem}`,
+    };
+  });
+}
+
+function buildActionPlan(input: ReportInput): ReportModel {
+  const kpis = computeKpis(input.findings);
+  const charts = computeChartData(input.findings);
+  const sorted = sortBySeverity(input.findings);
+  const criticalHigh = input.findings.filter(
+    (f) => f.severity === "critical" || f.severity === "high",
+  ).length;
+  const sections: Section[] = [
+    {
+      type: "cover",
+      title: "Plano de Ação de Remediação",
+      subtitle: `${input.client.name} — ${input.engagement.name}`,
+      stats: coverStats(kpis, input),
+    },
+    { type: "partDivider", part: "PANORAMA", title: "Situação atual" },
+    {
+      type: "statBand",
+      headline: riskPostureText(kpis),
+      body: engagementStory(input, kpis),
+      stats: coverStats(kpis, input),
+    },
+    { type: "kpis", kpis },
+    { type: "severityChart", data: charts },
+    {
+      type: "callout",
+      tone: criticalHigh > 0 ? "critical" : "info",
+      text:
+        criticalHigh > 0
+          ? `${criticalHigh} achado(s) de severidade alta/crítica com prazo-alvo imediato (P1).`
+          : "Sem achados críticos/altos; foco em hardening planejado.",
+    },
+    {
+      type: "partDivider",
+      part: "PRIORIZAÇÃO",
+      title: "Plano por prioridade e prazo-alvo",
+      subtitle: "Prazos-alvo sugeridos por severidade (não contratuais).",
+    },
+    { type: "roadmap", phases: actionPlanPhases(input.findings) },
+    { type: "heading", text: "Matriz de remediação detalhada", level: 1 },
+    { type: "remediationMatrix", findings: findingsWithPrazo(sorted) },
+    { type: "nextSteps", steps: ACTION_PLAN_NEXT_STEPS },
+    { type: "divider" },
+  ];
+  return { meta: baseMeta(input, "action_plan"), kpis, charts, sections };
+}
+
 export function buildReportModel(
   audience: ReportAudience,
   input: ReportInput,
@@ -562,5 +676,7 @@ export function buildReportModel(
       return buildExecutive(input);
     case "commercial":
       return buildCommercial(input);
+    case "action_plan":
+      return buildActionPlan(input);
   }
 }

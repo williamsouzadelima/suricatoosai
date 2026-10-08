@@ -7,7 +7,6 @@ import {
   FileText,
   FileCheck,
   Clock,
-  Layers,
   Download,
   Eye,
   Loader2,
@@ -172,6 +171,12 @@ function RelatoriosForEngagement({
 }) {
   const reports = useQuery(api.reports.listReportsForEngagement, {
     engagementId,
+  });
+  // Janela de 30 dias ancorada no mount (estável → não re-subscreve a cada render).
+  const [sinceMs] = useState(() => Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const downloads30d = useQuery(api.reports.countReportDownloadsForEngagement, {
+    engagementId,
+    sinceMs,
   });
   const deleteReportGroup = useAction(
     api.reportActions.deleteReportGroupWithFiles,
@@ -358,11 +363,11 @@ function RelatoriosForEngagement({
           tone="warning"
         />
         <StatCard
-          label="Arquivos"
-          value={String(kpis.files)}
-          icon={Layers}
+          label="Downloads"
+          value={downloads30d === undefined ? "…" : String(downloads30d)}
+          icon={Download}
           tone="neutral"
-          sub="por formato"
+          sub="últimos 30 dias"
         />
       </div>
 

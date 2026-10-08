@@ -9,7 +9,8 @@
  * METODOLOGIA/estrutura; o conteúdo vem de ReportInput em runtime.
  */
 
-export type ReportAudience = "technical" | "executive" | "commercial";
+export type ReportAudience =
+  "technical" | "executive" | "commercial" | "action_plan";
 export type ReportFormat = "docx" | "pptx" | "pdf";
 export type Severity = "info" | "low" | "medium" | "high" | "critical";
 

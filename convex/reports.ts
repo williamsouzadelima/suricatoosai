@@ -15,6 +15,7 @@ const audienceArg = v.union(
   v.literal("technical"),
   v.literal("executive"),
   v.literal("commercial"),
+  v.literal("action_plan"),
 );
 const formatArg = v.union(
   v.literal("docx"),
@@ -664,6 +665,32 @@ export const listReportsForEngagement = query({
       )
       .order("desc")
       .take(120);
+  },
+});
+
+/**
+ * Conta downloads REAIS de relatório do engajamento desde `sinceMs` (identity +
+ * posse). Exclui prévias inline (detail "(prévia)"); inclui downloads internos e
+ * do portal. Usa o índice by_engagement_event_created (seletivo por engajamento).
+ */
+export const countReportDownloadsForEngagement = query({
+  args: { engagementId: v.id("engagements"), sinceMs: v.number() },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return 0;
+    const engagement = await ctx.db.get(args.engagementId);
+    if (!engagement || engagement.user_id !== identity.subject) return 0;
+    const rows = await ctx.db
+      .query("security_audit_log")
+      .withIndex("by_engagement_event_created", (q) =>
+        q
+          .eq("engagement_id", args.engagementId)
+          .eq("event_type", "report.downloaded")
+          .gte("created_at", args.sinceMs),
+      )
+      .collect();
+    return rows.filter((r) => !(r.detail ?? "").includes("(prévia)")).length;
   },
 });
 

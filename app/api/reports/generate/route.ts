@@ -9,9 +9,14 @@ import type { generateEngagementReport } from "@/trigger/report-generation";
 export const runtime = "nodejs";
 
 const TASK_ID = "generate-engagement-report";
-type Audience = "technical" | "executive" | "commercial";
+type Audience = "technical" | "executive" | "commercial" | "action_plan";
 type Format = "docx" | "pptx" | "pdf";
-const AUDIENCES: readonly Audience[] = ["technical", "executive", "commercial"];
+const AUDIENCES: readonly Audience[] = [
+  "technical",
+  "executive",
+  "commercial",
+  "action_plan",
+];
 const FORMATS: readonly Format[] = ["docx", "pptx", "pdf"];
 
 function isAudience(v: unknown): v is Audience {

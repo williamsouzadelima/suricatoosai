@@ -27,7 +27,7 @@ const MIME: Record<string, string> = {
 const payloadSchema = z.object({
   engagementId: z.string().min(1),
   userId: z.string().min(1),
-  audience: z.enum(["technical", "executive", "commercial"]),
+  audience: z.enum(["technical", "executive", "commercial", "action_plan"]),
   formats: z.array(z.enum(["docx", "pptx", "pdf"])).min(1),
   reportGroupId: z.string().min(1),
   version: z.number().int().positive(),
@@ -66,6 +66,7 @@ const AUDIENCE_LABEL: Record<string, string> = {
   technical: "Técnico",
   executive: "Executivo",
   commercial: "Comercial",
+  action_plan: "Plano de Ação",
 };
 
 /**

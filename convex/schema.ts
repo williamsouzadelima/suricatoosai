@@ -63,6 +63,7 @@ const reportAudienceValidator = v.union(
   v.literal("technical"),
   v.literal("executive"),
   v.literal("commercial"),
+  v.literal("action_plan"),
 );
 const reportFormatValidator = v.union(
   v.literal("docx"),
@@ -2008,5 +2009,10 @@ export default defineSchema({
   })
     .index("by_client_created", ["client_id", "created_at"])
     .index("by_actor_created", ["actor_user_id", "created_at"])
-    .index("by_event_created", ["event_type", "created_at"]),
+    .index("by_event_created", ["event_type", "created_at"])
+    .index("by_engagement_event_created", [
+      "engagement_id",
+      "event_type",
+      "created_at",
+    ]),
 });
