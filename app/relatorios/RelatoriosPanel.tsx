@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import {
   FileText,
@@ -9,6 +9,7 @@ import {
   Clock,
   Download,
   Eye,
+  EyeOff,
   Loader2,
   RefreshCw,
   Trash2,
@@ -181,6 +182,9 @@ function RelatoriosForEngagement({
   const deleteReportGroup = useAction(
     api.reportActions.deleteReportGroupWithFiles,
   );
+  const setGroupVisibility = useMutation(
+    api.reports.setReportGroupClientVisibility,
+  );
 
   const [formats, setFormats] = useState<Set<ReportFormat>>(
     () => new Set<ReportFormat>(["pdf"]),
@@ -189,6 +193,9 @@ function RelatoriosForEngagement({
     useState<ReportAudience | null>(null);
   const [reprocessing, setReprocessing] = useState<string | null>(null);
   const [deletingGroup, setDeletingGroup] = useState<string | null>(null);
+  const [togglingVisibility, setTogglingVisibility] = useState<string | null>(
+    null,
+  );
 
   // Relógio para o "há X min" (re-render a cada 20s).
   const [nowTs, setNowTs] = useState(() => Date.now());
@@ -301,6 +308,27 @@ function RelatoriosForEngagement({
     }
   };
 
+  // Liga/desliga a visibilidade do relatório no portal do cliente. A lista
+  // (useQuery reativa) se atualiza sozinha após a mutation.
+  const toggleVisibility = async (groupId: string, visible: boolean) => {
+    setTogglingVisibility(groupId);
+    try {
+      await setGroupVisibility({ reportGroupId: groupId, visible });
+      toast.success(
+        visible
+          ? "Relatório visível ao cliente no portal."
+          : "Relatório oculto do cliente.",
+      );
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Falha ao alterar a visibilidade.",
+      );
+      console.error(e);
+    } finally {
+      setTogglingVisibility(null);
+    }
+  };
+
   // Agrupa as linhas (uma por formato) por report_group_id, recentes no topo.
   const groups = useMemo<ReportGroup[]>(() => {
     const map = new Map<string, ReportGroup>();
@@ -401,6 +429,10 @@ function RelatoriosForEngagement({
                   minsAgo={minsAgo}
                   reprocessing={reprocessing === g.id}
                   deleting={deletingGroup === g.id}
+                  toggling={togglingVisibility === g.id}
+                  onToggleVisibility={(visible) =>
+                    void toggleVisibility(g.id, visible)
+                  }
                   onReprocess={() => void reprocess(g.id)}
                   onRemove={() =>
                     void removeGroup(
@@ -499,6 +531,8 @@ function ReportGroupRow({
   minsAgo,
   reprocessing,
   deleting,
+  toggling,
+  onToggleVisibility,
   onReprocess,
   onRemove,
   onDownload,
@@ -508,6 +542,8 @@ function ReportGroupRow({
   minsAgo: (ms: number) => number;
   reprocessing: boolean;
   deleting: boolean;
+  toggling: boolean;
+  onToggleVisibility: (visible: boolean) => void;
   onReprocess: () => void;
   onRemove: () => void;
   onDownload: (id: Id<"reports">) => void;
@@ -520,6 +556,9 @@ function ReportGroupRow({
   const anyFailed = g.rows.some((r) => r.status === "failed");
   const mins = minsAgo(g.created_at);
   const stuck = anyPending && mins >= 3;
+  // Visível ao cliente a menos que algum formato esteja explicitamente oculto
+  // (o toggle sempre grava todos os formatos do grupo juntos → consistente).
+  const clientVisible = g.rows.every((r) => r.client_visible !== false);
 
   return (
     <div className="p-4">
@@ -553,6 +592,30 @@ function ReportGroupRow({
           <StatusBadge tone="success" label="Pronto" />
         ) : null}
         <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => onToggleVisibility(!clientVisible)}
+            disabled={toggling}
+            title={
+              clientVisible
+                ? "Visível ao cliente no portal — clique para ocultar"
+                : "Oculto do cliente — clique para tornar visível"
+            }
+            className={cn(
+              "inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs disabled:opacity-50",
+              clientVisible
+                ? "border-success/30 text-success hover:bg-success/10"
+                : "border-border text-muted-foreground hover:bg-muted/40",
+            )}
+          >
+            {toggling ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : clientVisible ? (
+              <Eye className="h-3.5 w-3.5" />
+            ) : (
+              <EyeOff className="h-3.5 w-3.5" />
+            )}
+            {clientVisible ? "Visível ao cliente" : "Oculto"}
+          </button>
           {!allReady && (
             <button
               onClick={onReprocess}

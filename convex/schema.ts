@@ -1918,6 +1918,10 @@ export default defineSchema({
     trigger_run_id: v.optional(v.string()),
     generated_by: v.string(),
     error: v.optional(v.string()),
+    // Gate de visibilidade no portal do cliente. Ausente/true = visível (default
+    // visível, decisão do William); false = oculto. Aplicado na lista E no
+    // download do portal (convex/portal.ts). Não afeta o acesso interno.
+    client_visible: v.optional(v.boolean()),
     created_at: v.number(),
     generated_at: v.optional(v.number()),
     updated_at: v.number(),

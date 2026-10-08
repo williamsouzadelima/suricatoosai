@@ -122,7 +122,7 @@ export const listPortalReportsForBackend = query({
       .order("desc")
       .collect();
     return reports
-      .filter((r) => r.status === "ready")
+      .filter((r) => r.status === "ready" && r.client_visible !== false)
       .map((r) => ({
         id: r._id,
         audience: r.audience,
@@ -165,6 +165,9 @@ export const getPortalReportForDownloadForBackend = query({
     if (!r) return null;
     const access = await resolveMembership(ctx, args.userId, r.client_id);
     if (!access) return null;
+    // Mesmo gate da lista, no ponto de download: um relatório oculto não é
+    // baixável nem com o ID em mãos (a rota audita a negação como access.denied).
+    if (r.client_visible === false) return null;
     return {
       s3Key: r.s3_key ?? null,
       status: r.status,
@@ -176,6 +179,116 @@ export const getPortalReportForDownloadForBackend = query({
       engagementId: r.engagement_id,
       organizationId: r.organization_id ?? null,
     };
+  },
+});
+
+/**
+ * Achados PUBLICADOS de um engajamento, para o portal (read-only). Gate de
+ * visibilidade = status "published" (a curadoria do analista é o portão).
+ * Re-resolve o cliente DO ENGAJAMENTO (membership; IDOR-proof pela URL).
+ */
+export const listPortalFindingsForBackend = query({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    engagementId: v.id("engagements"),
+  },
+  returns: v.array(
+    v.object({
+      id: v.id("findings"),
+      ref: v.union(v.string(), v.null()),
+      title: v.string(),
+      severity: v.string(),
+      affectedAsset: v.string(),
+      weaknessClass: v.string(),
+      cwe: v.union(v.string(), v.null()),
+      cvssScore: v.union(v.number(), v.null()),
+      cvssVector: v.union(v.string(), v.null()),
+      description: v.union(v.string(), v.null()),
+      impact: v.union(v.string(), v.null()),
+      remediation: v.union(v.string(), v.null()),
+      narrative: v.union(v.string(), v.null()),
+      retestStatus: v.union(v.string(), v.null()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const eng = await ctx.db.get(args.engagementId);
+    if (!eng) return [];
+    const access = await resolveMembership(ctx, args.userId, eng.client_id);
+    if (!access) return [];
+    const findings = await ctx.db
+      .query("findings")
+      .withIndex("by_engagement_and_status", (q) =>
+        q.eq("engagement_id", args.engagementId).eq("status", "published"),
+      )
+      .order("desc")
+      .collect();
+    return findings.map((f) => ({
+      id: f._id,
+      ref: f.finding_id ?? null,
+      title: f.title,
+      severity: f.severity,
+      affectedAsset: f.affected_asset,
+      weaknessClass: f.weakness_class,
+      cwe: f.cwe ?? null,
+      cvssScore: f.cvss_score ?? null,
+      cvssVector: f.cvss_vector ?? null,
+      description: f.description ?? null,
+      impact: f.impact ?? null,
+      remediation: f.remediation ?? null,
+      narrative: f.narrative ?? null,
+      retestStatus: f.retest_status ?? null,
+    }));
+  },
+});
+
+/**
+ * Cadeia de evidência de um achado PUBLICADO, para o portal (só TEXTO —
+ * ferramenta/comando/saída/resumo; imagens ficam fora do MVP). Re-resolve o
+ * cliente do PRÓPRIO achado (membership; IDOR-proof) e exige status "published".
+ */
+export const listPortalEvidenceForFindingForBackend = query({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    findingId: v.id("findings"),
+  },
+  returns: v.array(
+    v.object({
+      id: v.id("evidence"),
+      sourceType: v.string(),
+      label: v.union(v.string(), v.null()),
+      snippet: v.union(v.string(), v.null()),
+      stepIndex: v.union(v.number(), v.null()),
+      toolName: v.union(v.string(), v.null()),
+      command: v.union(v.string(), v.null()),
+      resultSummary: v.union(v.string(), v.null()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const f = await ctx.db.get(args.findingId);
+    if (!f || f.status !== "published") return [];
+    const access = await resolveMembership(ctx, args.userId, f.client_id);
+    if (!access) return [];
+    const ev = await ctx.db
+      .query("evidence")
+      .withIndex("by_finding_and_captured", (q) =>
+        q.eq("finding_id", args.findingId),
+      )
+      .order("desc")
+      .take(200);
+    return ev.map((e) => ({
+      id: e._id,
+      sourceType: e.source_type,
+      label: e.label ?? null,
+      snippet: e.snippet ?? null,
+      stepIndex: e.step_index ?? null,
+      toolName: e.tool_name ?? null,
+      command: e.command ?? null,
+      resultSummary: e.result_summary ?? null,
+    }));
   },
 });
 

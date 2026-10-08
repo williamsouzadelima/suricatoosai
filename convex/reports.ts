@@ -737,6 +737,38 @@ export const deleteReportGroup = mutation({
 });
 
 /**
+ * Liga/desliga a visibilidade de um relatório no portal do cliente (identity +
+ * posse). Opera por GRUPO (todos os formatos da mesma audience+versão juntos),
+ * igual ao delete. O gate é aplicado na lista E no download do portal
+ * (convex/portal.ts); isto só grava a decisão. Ver [[suricatoosai-portal-cliente]].
+ */
+export const setReportGroupClientVisibility = mutation({
+  args: { reportGroupId: v.string(), visible: v.boolean() },
+  returns: v.object({ updated: v.number() }),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Não autenticado",
+      });
+    }
+    const rows = await ctx.db
+      .query("reports")
+      .withIndex("by_group", (q) => q.eq("report_group_id", args.reportGroupId))
+      .collect();
+    let updated = 0;
+    for (const r of rows) {
+      if (r.user_id === identity.subject) {
+        await ctx.db.patch(r._id, { client_visible: args.visible });
+        updated += 1;
+      }
+    }
+    return { updated };
+  },
+});
+
+/**
  * Saúde da geração de relatórios para o /admin (serviceKey). Conta por status
  * (índice by_status), detecta "presos" (queued/rendering há mais de stuckMs — o
  * sinal do worker do trigger mudo, ver watchdog) e lista presos + falhas

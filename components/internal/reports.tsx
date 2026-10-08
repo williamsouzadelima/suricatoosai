@@ -58,5 +58,7 @@ export type ReportRow = {
   error?: string;
   size_bytes?: number;
   title?: string;
+  // Visibilidade no portal do cliente: ausente/true = visível; false = oculto.
+  client_visible?: boolean;
   created_at: number;
 };
