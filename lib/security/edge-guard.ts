@@ -21,6 +21,113 @@ const REFRESH_MS = 30_000;
 const MAX_TRACKED_IPS = 5000;
 const SENSITIVE_PREFIXES = ["/api/admin", "/admin", "/api/portal"];
 
+interface Cidr {
+  v6: boolean;
+  prefix: number;
+  net4: number;
+  net6: number[];
+}
+
+/** IPv4 → inteiro (0..2^32-1) ou null. Sem bitwise (evita o signed 32-bit do JS). */
+function ipv4ToInt(ip: string): number | null {
+  const parts = ip.split(".");
+  if (parts.length !== 4) return null;
+  let v = 0;
+  for (const p of parts) {
+    const n = Number(p);
+    if (!Number.isInteger(n) || n < 0 || n > 255) return null;
+    v = v * 256 + n;
+  }
+  return v;
+}
+
+/** IPv6 → 8 grupos de 16 bits, ou null. Expande "::". */
+function ipv6ToGroups(ip: string): number[] | null {
+  const dc = ip.indexOf("::");
+  let head: string[];
+  let tail: string[];
+  if (dc >= 0) {
+    head = ip.slice(0, dc).split(":").filter(Boolean);
+    tail = ip
+      .slice(dc + 2)
+      .split(":")
+      .filter(Boolean);
+  } else {
+    head = ip.split(":");
+    tail = [];
+  }
+  const miss = 8 - head.length - tail.length;
+  if (miss < 0) return null;
+  const groups = [...head, ...Array(miss).fill("0"), ...tail];
+  if (groups.length !== 8) return null;
+  const out: number[] = [];
+  for (const g of groups) {
+    const n = parseInt(g || "0", 16);
+    if (Number.isNaN(n) || n < 0 || n > 0xffff) return null;
+    out.push(n);
+  }
+  return out;
+}
+
+/** Top `prefix` bits de um IPv4, via divisão (exato p/ inteiros até 2^53). */
+function v4Prefix(ipInt: number, prefix: number): number {
+  if (prefix <= 0) return 0;
+  if (prefix >= 32) return ipInt;
+  return Math.floor(ipInt / Math.pow(2, 32 - prefix));
+}
+
+/** Os `prefix` bits de dois IPv6 (grupos de 16) batem? */
+function v6GroupsMatch(a: number[], b: number[], prefix: number): boolean {
+  const full = Math.floor(prefix / 16);
+  for (let i = 0; i < full; i++) if (a[i] !== b[i]) return false;
+  const rem = prefix % 16;
+  if (rem > 0) {
+    const mask = (0xffff << (16 - rem)) & 0xffff;
+    if ((a[full] & mask) !== (b[full] & mask)) return false;
+  }
+  return true;
+}
+
+/** Faz parse de "net/prefix" (v4 ou v6); null se inválido. */
+export function parseCidr(cidr: string): Cidr | null {
+  const i = cidr.indexOf("/");
+  if (i < 0) return null;
+  const addr = cidr.slice(0, i);
+  const prefix = Number(cidr.slice(i + 1));
+  const v6 = addr.includes(":");
+  const bits = v6 ? 128 : 32;
+  if (!Number.isInteger(prefix) || prefix < 0 || prefix > bits) return null;
+  if (v6) {
+    const g = ipv6ToGroups(addr);
+    if (!g) return null;
+    return { v6: true, prefix, net4: 0, net6: g };
+  }
+  const n = ipv4ToInt(addr);
+  if (n === null) return null;
+  return { v6: false, prefix, net4: n, net6: [] };
+}
+
+/** O IP cai em algum CIDR bloqueado? Inválido → false (fail-open). */
+export function ipInAnyCidr(ip: string, cidrs: Cidr[]): boolean {
+  if (cidrs.length === 0) return false;
+  if (ip.includes(":")) {
+    const g = ipv6ToGroups(ip);
+    if (!g) return false;
+    for (const c of cidrs) {
+      if (c.v6 && v6GroupsMatch(g, c.net6, c.prefix)) return true;
+    }
+    return false;
+  }
+  const n = ipv4ToInt(ip);
+  if (n === null) return false;
+  for (const c of cidrs) {
+    if (!c.v6 && v4Prefix(n, c.prefix) === v4Prefix(c.net4, c.prefix)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 interface EdgeConfig {
   mode: string;
   autoBlock: boolean;
@@ -32,6 +139,7 @@ interface EdgeConfig {
 }
 
 let blockSet = new Set<string>();
+let blockCidrs: Cidr[] = [];
 let safeSet = new Set<string>();
 let killSwitch = false;
 let config: EdgeConfig = {
@@ -55,6 +163,9 @@ function refreshInBackground(): void {
     .query(api.security.getEdgeBlocklistForBackend, { serviceKey })
     .then((d) => {
       blockSet = new Set(d.blocked);
+      blockCidrs = (d.blockedCidrs ?? [])
+        .map(parseCidr)
+        .filter((c): c is Cidr => c !== null);
       safeSet = new Set(d.safelist);
       killSwitch = d.killSwitch;
       config = {
@@ -200,10 +311,10 @@ export function checkIpBlock(req: NextRequest): NextResponse | null {
       refreshInBackground();
     }
     if (killSwitch) return null;
-    if (blockSet.size === 0) return null;
+    if (blockSet.size === 0 && blockCidrs.length === 0) return null;
     const ip = getClientIp(req);
     if (!ip || safeSet.has(ip)) return null;
-    if (blockSet.has(ip)) {
+    if (blockSet.has(ip) || ipInAnyCidr(ip, blockCidrs)) {
       return NextResponse.json(
         { error: "forbidden", code: "ip_blocked" },
         { status: 403 },
