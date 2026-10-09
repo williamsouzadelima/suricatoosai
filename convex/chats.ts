@@ -27,6 +27,7 @@ import {
 } from "./lib/suspensionGuards";
 import { resolveBranchedFromTitle } from "./lib/branchedChatTitle";
 import { isUserDeletionFenced } from "./lib/userDeletionFence";
+import { syncEngagementNameFromChat } from "./lib/engagementNameSync";
 
 const DELETE_ALL_CHATS_MESSAGE_BATCH_SIZE = 10;
 const DELETE_ALL_CHATS_SUMMARY_BATCH_SIZE = 25;
@@ -866,6 +867,10 @@ export const updateChatTitle = mutation({
       update_time: Date.now(),
     });
 
+    // Auto-título (gerado pelo agente) → reflete no engajamento vinculado
+    // (só no 1:1 e só se o nome do engajamento não tiver sido travado à mão).
+    await syncEngagementNameFromChat(ctx, chat, title, { manual: false });
+
     return null;
   },
 });
@@ -987,6 +992,14 @@ export const updateChat = mutation({
 
       // Update the chat
       await ctx.db.patch(chat._id, updateData);
+
+      // Se o título mudou (auto-título de fim de run), reflete no engajamento
+      // vinculado (só no 1:1 e respeitando o lock manual).
+      if (args.title !== undefined) {
+        await syncEngagementNameFromChat(ctx, chat, args.title, {
+          manual: false,
+        });
+      }
 
       return null;
     } catch (error) {
@@ -1483,6 +1496,12 @@ export const renameChat = mutation({
       await ctx.db.patch(chat._id, {
         title: trimmedTitle,
         update_time: Date.now(),
+      });
+
+      // Rename manual da task → reflete no engajamento vinculado (só no 1:1)
+      // e trava o nome contra o auto-título.
+      await syncEngagementNameFromChat(ctx, chat, trimmedTitle, {
+        manual: true,
       });
 
       return null;

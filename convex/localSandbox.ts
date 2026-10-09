@@ -942,6 +942,13 @@ export const revokeConnection = mutation({
         connection_name: connection.connection_name,
         revoked_at: Date.now(),
       });
+    } else if (existing.dismissed_at !== undefined) {
+      // Já estava revogada mas dispensada da lista; revogar de novo a traz de
+      // volta para a lista visível (limpa o dismiss) e atualiza o horário.
+      await ctx.db.patch(existing._id, {
+        dismissed_at: undefined,
+        revoked_at: Date.now(),
+      });
     }
 
     if (connection.status === "connected") {
@@ -986,6 +993,40 @@ export const unrevokeConnection = mutation({
 });
 
 /**
+ * "Dispensa" um connector revogado da lista: marca a linha com `dismissed_at`
+ * para ela sumir de `listRevokedConnectors`. A revogação PERMANECE em vigor —
+ * `isConnectorRevoked` checa a presença da linha, não o `dismissed_at` — então
+ * a máquina continua bloqueada de reconectar. Para de fato desbloquear, use
+ * `unrevokeConnection` ("Permitir novamente"), que apaga a linha.
+ */
+export const dismissRevokedConnector = mutation({
+  args: { connectionName: v.string() },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, { connectionName }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Unauthorized: User not authenticated",
+      });
+    }
+    const userId = identity.subject;
+
+    const existing = await ctx.db
+      .query("local_sandbox_revoked_connectors")
+      .withIndex("by_user_and_name", (q) =>
+        q.eq("user_id", userId).eq("connection_name", connectionName),
+      )
+      .first();
+    // Só grava se houver linha e ainda não estiver dispensada (idempotente).
+    if (existing && existing.dismissed_at === undefined) {
+      await ctx.db.patch(existing._id, { dismissed_at: Date.now() });
+    }
+    return { success: true };
+  },
+});
+
+/**
  * List the current user's revoked connectors (most recent first).
  */
 export const listRevokedConnectors = query({
@@ -1008,11 +1049,15 @@ export const listRevokedConnectors = query({
       .withIndex("by_user_id", (q) => q.eq("user_id", userId))
       .collect();
 
-    return rows
-      .map((row) => ({
-        connectionName: row.connection_name,
-        revokedAt: row.revoked_at,
-      }))
-      .sort((left, right) => right.revokedAt - left.revokedAt);
+    return (
+      rows
+        // Dispensadas ("Remover da lista") somem daqui, mas continuam revogadas.
+        .filter((row) => row.dismissed_at === undefined)
+        .map((row) => ({
+          connectionName: row.connection_name,
+          revokedAt: row.revoked_at,
+        }))
+        .sort((left, right) => right.revokedAt - left.revokedAt)
+    );
   },
 });

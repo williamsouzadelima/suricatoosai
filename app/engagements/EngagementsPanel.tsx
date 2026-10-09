@@ -20,6 +20,7 @@ import {
   Trash2,
   Server,
   BarChart3,
+  Pencil,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -282,6 +283,28 @@ function EngagementDetail({
     api.engagementCapture.listRecentChatsForCapture,
     {},
   );
+  const engagement = useQuery(api.engagements.getEngagement, { engagementId });
+  const updateEngagement = useMutation(api.engagements.updateEngagement);
+
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+
+  // Rename manual do engajamento → reflete no título da task vinculada (1:1).
+  const saveName = async () => {
+    const name = nameDraft.trim();
+    if (!name) {
+      toast.error("O nome não pode ficar vazio.");
+      return;
+    }
+    try {
+      await updateEngagement({ engagementId, name });
+      setEditingName(false);
+      toast.success("Engajamento renomeado.");
+    } catch (e) {
+      toast.error("Falha ao renomear engajamento.");
+      console.error(e);
+    }
+  };
 
   const [pickChatId, setPickChatId] = useState<string>("");
   const [capturingChatId, setCapturingChatId] = useState<string | null>(null);
@@ -440,6 +463,61 @@ function EngagementDetail({
 
   return (
     <>
+      {/* Cabeçalho do engajamento: nome editável (espelha na task 1:1) */}
+      <Card className="gap-0 py-0">
+        <div className="flex items-center justify-between gap-3 p-5">
+          {editingName ? (
+            <div className="flex flex-1 items-center gap-2">
+              <Input
+                autoFocus
+                value={nameDraft}
+                maxLength={100}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void saveName();
+                  else if (e.key === "Escape") setEditingName(false);
+                }}
+                placeholder="Nome do engajamento"
+              />
+              <Button size="sm" onClick={() => void saveName()}>
+                Salvar
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setEditingName(false)}
+              >
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="min-w-0">
+                <div className="truncate text-lg font-semibold">
+                  {engagement?.name ?? "—"}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Renomear reflete no título da task vinculada (quando há só
+                  uma).
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0 gap-1.5"
+                disabled={!engagement}
+                onClick={() => {
+                  setNameDraft(engagement?.name ?? "");
+                  setEditingName(true);
+                }}
+              >
+                <Pencil className="h-3.5 w-3.5" /> Renomear
+              </Button>
+            </>
+          )}
+        </div>
+      </Card>
+
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatCard
           label="Achados"

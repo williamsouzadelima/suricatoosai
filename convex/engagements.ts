@@ -4,6 +4,10 @@ import type { Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { validateServiceKey } from "./lib/utils";
 import { requireOwnedDoc } from "./lib/tenantGuards";
+import {
+  MAX_TITLE,
+  syncChatTitleFromEngagement,
+} from "./lib/engagementNameSync";
 
 /**
  * Engajamentos (agrupam chats + evidências + achados de um cliente).
@@ -114,6 +118,9 @@ export const createEngagement = mutation({
       client_id: args.clientId,
       code: args.code?.trim() || undefined,
       name: args.name.trim(),
+      // Criação manual = nome definido pelo usuário → travado contra o
+      // auto-título de uma task que venha a ser anexada 1:1 depois.
+      name_locked: true,
       status: "planned",
       scope: args.scope,
       starts_at: args.startsAt,
@@ -137,11 +144,22 @@ export const updateEngagement = mutation({
   handler: async (ctx, args) => {
     await assertOwnedEngagement(ctx, args.engagementId);
     const patch: Record<string, unknown> = { updated_at: Date.now() };
+    let renamedTo: string | null = null;
     if (args.name !== undefined) {
-      if (!args.name.trim()) {
+      const name = args.name.trim();
+      if (!name) {
         throw new ConvexError({ code: "INVALID", message: "Nome vazio" });
       }
-      patch.name = args.name.trim();
+      if (name.length > MAX_TITLE) {
+        throw new ConvexError({
+          code: "INVALID",
+          message: `Nome não pode exceder ${MAX_TITLE} caracteres`,
+        });
+      }
+      patch.name = name;
+      // Rename manual do engajamento trava o nome contra o auto-título da task.
+      patch.name_locked = true;
+      renamedTo = name;
     }
     if (args.code !== undefined) patch.code = args.code.trim() || undefined;
     if (args.status !== undefined) patch.status = args.status;
@@ -149,6 +167,10 @@ export const updateEngagement = mutation({
     if (args.startsAt !== undefined) patch.starts_at = args.startsAt;
     if (args.endsAt !== undefined) patch.ends_at = args.endsAt;
     await ctx.db.patch(args.engagementId, patch);
+    // Rename manual do engajamento → reflete no título da task vinculada (1:1).
+    if (renamedTo !== null) {
+      await syncChatTitleFromEngagement(ctx, args.engagementId, renamedTo);
+    }
     return null;
   },
 });
