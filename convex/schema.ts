@@ -1089,6 +1089,10 @@ export default defineSchema({
     user_id: v.string(),
     connection_name: v.string(),
     revoked_at: v.number(),
+    // "Dispensado" da lista de revogados (botão "Remover da lista"): a linha
+    // PERMANECE (a revogação continua em vigor — `isConnectorRevoked` checa a
+    // presença da linha), só não aparece mais em `listRevokedConnectors`.
+    dismissed_at: v.optional(v.number()),
   })
     .index("by_user_id", ["user_id"])
     .index("by_user_and_name", ["user_id", "connection_name"]),
@@ -1803,6 +1807,11 @@ export default defineSchema({
     ends_at: v.optional(v.number()),
     created_at: v.number(),
     updated_at: v.number(),
+    // Nome definido manualmente (rename explícito do engajamento, ou criação
+    // manual). Quando true, o auto-título da task NÃO sobrescreve o nome do
+    // engajamento. Falsy = nome auto-derivado, segue o título da task (1:1).
+    // Ver convex/lib/engagementNameSync.ts.
+    name_locked: v.optional(v.boolean()),
   })
     .index("by_user_and_updated", ["user_id", "updated_at"])
     .index("by_client_and_updated", ["client_id", "updated_at"])

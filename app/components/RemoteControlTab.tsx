@@ -18,6 +18,7 @@ import {
   Trash2,
   RotateCcw,
   ArrowUpCircle,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { runCommand, convexUrlFlag } from "@/lib/utils/sandbox-command";
@@ -182,6 +183,9 @@ const RemoteControlTab = () => {
   const regenerateToken = useMutation(api.localSandbox.regenerateToken);
   const revokeConnection = useMutation(api.localSandbox.revokeConnection);
   const unrevokeConnection = useMutation(api.localSandbox.unrevokeConnection);
+  const dismissRevokedConnector = useMutation(
+    api.localSandbox.dismissRevokedConnector,
+  );
   const revokedConnectors = useQuery(api.localSandbox.listRevokedConnectors);
   const requestAgentUpdate = useMutation(api.localSandbox.requestAgentUpdate);
   const hideConnectSetup = useCallback(() => setShowConnectSetup(false), []);
@@ -359,6 +363,19 @@ const RemoteControlTab = () => {
     } catch (error) {
       console.error("Failed to allow connector:", error);
       toast.error(t("remoteControl.failedAllow"));
+    }
+  };
+
+  // Dispensa o connector da lista de revogados: ele some da lista, mas a
+  // revogação CONTINUA em vigor (a máquina segue bloqueada de reconectar).
+  // Para desbloquear de fato, use "Permitir novamente" (unrevokeConnection).
+  const handleRemoveRevoked = async (connectionName: string) => {
+    try {
+      await dismissRevokedConnector({ connectionName });
+      toast.success(t("remoteControl.connectorRemoved"));
+    } catch (error) {
+      console.error("Failed to dismiss revoked connector:", error);
+      toast.error(t("remoteControl.failedRemove"));
     }
   };
 
@@ -550,6 +567,16 @@ const RemoteControlTab = () => {
                 >
                   <RotateCcw className="h-3 w-3" />
                   {t("remoteControl.allowAgain")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 shrink-0 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => handleRemoveRevoked(revoked.connectionName)}
+                  title={t("remoteControl.removeFromListHint")}
+                >
+                  <X className="h-3 w-3" />
+                  {t("remoteControl.removeFromList")}
                 </Button>
               </div>
             ))}
