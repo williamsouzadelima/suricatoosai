@@ -37,6 +37,7 @@ const {
   dismissRevokedConnector,
   unrevokeConnection,
   listRevokedConnectors,
+  listDismissedRevokedConnectors,
   pollAgentUpdate,
 } = require("../localSandbox") as typeof import("../localSandbox");
 
@@ -322,5 +323,23 @@ describe("connector revocation list", () => {
     await expect(
       listRevokedConnectors.handler(ctx as any, {}),
     ).resolves.toEqual([{ connectionName: "a", revokedAt: 2 }]);
+  });
+
+  it("listDismissed returns ONLY dismissed rows (so they can be un-blocked)", async () => {
+    const collect = jest.fn<any>().mockResolvedValue([
+      { connection_name: "a", revoked_at: 2, dismissed_at: undefined },
+      { connection_name: "b", revoked_at: 1, dismissed_at: 5 },
+      { connection_name: "c", revoked_at: 3, dismissed_at: 9 },
+    ]);
+    const { query } = queryReturning({ collect });
+    const ctx = { auth: authed, db: { query } };
+
+    // Só as dispensadas (b, c), mais recentes primeiro por revoked_at.
+    await expect(
+      listDismissedRevokedConnectors.handler(ctx as any, {}),
+    ).resolves.toEqual([
+      { connectionName: "c", revokedAt: 3 },
+      { connectionName: "b", revokedAt: 1 },
+    ]);
   });
 });

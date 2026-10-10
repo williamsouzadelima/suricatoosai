@@ -1093,3 +1093,40 @@ export const listRevokedConnectors = query({
     );
   },
 });
+
+/**
+ * List the current user's DISMISSED revoked connectors — the ones hidden from
+ * `listRevokedConnectors` via "Remove from list" but still blocked. Surfaced
+ * behind a "show dismissed" toggle so a revoked+dismissed connector whose
+ * machine can no longer reconnect can still be un-blocked ("Allow again")
+ * instead of being stranded (invisible yet blocking). Most recent first.
+ */
+export const listDismissedRevokedConnectors = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      connectionName: v.string(),
+      revokedAt: v.number(),
+    }),
+  ),
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return [];
+    }
+    const userId = identity.subject;
+
+    const rows = await ctx.db
+      .query("local_sandbox_revoked_connectors")
+      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+      .collect();
+
+    return rows
+      .filter((row) => row.dismissed_at !== undefined)
+      .map((row) => ({
+        connectionName: row.connection_name,
+        revokedAt: row.revoked_at,
+      }))
+      .sort((left, right) => right.revokedAt - left.revokedAt);
+  },
+});
