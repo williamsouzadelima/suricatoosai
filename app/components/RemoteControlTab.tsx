@@ -164,6 +164,7 @@ const RemoteControlTab = () => {
   const [isCommandCopied, setIsCommandCopied] = useState(false);
   const [showConnectSetup, setShowConnectSetup] = useState(false);
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
+  const [showDismissed, setShowDismissed] = useState(false);
   const copiedResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -187,6 +188,9 @@ const RemoteControlTab = () => {
     api.localSandbox.dismissRevokedConnector,
   );
   const revokedConnectors = useQuery(api.localSandbox.listRevokedConnectors);
+  const dismissedConnectors = useQuery(
+    api.localSandbox.listDismissedRevokedConnectors,
+  );
   const requestAgentUpdate = useMutation(api.localSandbox.requestAgentUpdate);
   const hideConnectSetup = useCallback(() => setShowConnectSetup(false), []);
 
@@ -581,6 +585,56 @@ const RemoteControlTab = () => {
               </div>
             ))}
           </div>
+        </div>
+      ) : null}
+
+      {/* Dismissed (hidden) revoked connectors — reachable behind a toggle so a
+          revoked+dismissed connector whose machine can no longer reconnect can
+          still be un-blocked instead of being stranded (invisible yet blocking). */}
+      {dismissedConnectors && dismissedConnectors.length > 0 ? (
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => setShowDismissed((v) => !v)}
+            className="text-xs font-medium text-muted-foreground uppercase tracking-wide hover:text-foreground"
+          >
+            {showDismissed
+              ? t("remoteControl.hideDismissed")
+              : t("remoteControl.showDismissed", {
+                  count: dismissedConnectors.length,
+                })}
+          </button>
+          {showDismissed ? (
+            <div className="space-y-2">
+              {dismissedConnectors.map((dismissed) => (
+                <div
+                  key={dismissed.connectionName}
+                  className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg"
+                >
+                  <Server className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm">
+                      {dismissed.connectionName}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {t("remoteControl.dismissedBlocked")}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 shrink-0 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() =>
+                      handleAllowConnector(dismissed.connectionName)
+                    }
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    {t("remoteControl.allowAgain")}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
