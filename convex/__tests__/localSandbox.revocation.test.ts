@@ -37,6 +37,7 @@ const {
   dismissRevokedConnector,
   unrevokeConnection,
   listRevokedConnectors,
+  pollAgentUpdate,
 } = require("../localSandbox") as typeof import("../localSandbox");
 
 const authed = {
@@ -86,6 +87,137 @@ function revokeDb(opts: {
   });
   return { query, patch, insert, delete: del };
 }
+
+// pollAgentUpdate toca três tabelas: tokens (validateToken), connections e
+// revoked_connectors (isConnectorRevoked). O mock ramifica por nome de tabela
+// e todas as leituras terminam em .first().
+function pollDb(opts: {
+  token: Record<string, unknown> | null;
+  connection: Record<string, unknown> | null;
+  revoked: Record<string, unknown> | null;
+}) {
+  const patch = jest.fn<any>().mockResolvedValue(undefined);
+  const firstFor = (val: unknown) => {
+    const eq = jest.fn<any>().mockReturnThis();
+    return {
+      withIndex: (_name: string, apply: (q: any) => any) => {
+        apply({ eq });
+        return { first: jest.fn<any>().mockResolvedValue(val) };
+      },
+    };
+  };
+  const query = jest.fn<any>((table: string) => {
+    if (table === "local_sandbox_tokens") return firstFor(opts.token);
+    if (table === "local_sandbox_connections") return firstFor(opts.connection);
+    if (table === "local_sandbox_revoked_connectors")
+      return firstFor(opts.revoked);
+    throw new Error(`unexpected table in query(): ${table}`);
+  });
+  return { query, patch };
+}
+
+describe("pollAgentUpdate heartbeat + revoke signal", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("bumps last_heartbeat on a healthy connected poll (not revoked)", async () => {
+    const db = pollDb({
+      token: { user_id: "user-1" },
+      connection: {
+        _id: "conn1",
+        user_id: "user-1",
+        connection_name: "kali-x",
+        status: "connected",
+      },
+      revoked: null,
+    });
+    const ctx = { db };
+
+    await expect(
+      pollAgentUpdate.handler(ctx as any, {
+        token: "hsb_x",
+        connectionId: "cid",
+      }),
+    ).resolves.toEqual({
+      updateRequested: false,
+      targetVersion: null,
+      revoked: false,
+    });
+    expect(db.patch).toHaveBeenCalledWith("conn1", {
+      last_heartbeat: expect.any(Number),
+    });
+  });
+
+  it("reports revoked:true (and does not bump) when the name is revoked", async () => {
+    const db = pollDb({
+      token: { user_id: "user-1" },
+      connection: {
+        _id: "conn1",
+        user_id: "user-1",
+        connection_name: "kali-x",
+        status: "connected",
+      },
+      revoked: { _id: "r1" },
+    });
+    const ctx = { db };
+
+    await expect(
+      pollAgentUpdate.handler(ctx as any, {
+        token: "hsb_x",
+        connectionId: "cid",
+      }),
+    ).resolves.toEqual({
+      updateRequested: false,
+      targetVersion: null,
+      revoked: true,
+    });
+    // Revogado → não ressuscita heartbeat.
+    expect(db.patch).not.toHaveBeenCalled();
+  });
+
+  it("reports revoked:true when the row was force-disconnected as user_revoked", async () => {
+    const db = pollDb({
+      token: { user_id: "user-1" },
+      connection: {
+        _id: "conn1",
+        user_id: "user-1",
+        connection_name: "kali-x",
+        status: "disconnected",
+        disconnect_reason: "user_revoked",
+      },
+      revoked: null,
+    });
+    const ctx = { db };
+
+    await expect(
+      pollAgentUpdate.handler(ctx as any, {
+        token: "hsb_x",
+        connectionId: "cid",
+      }),
+    ).resolves.toEqual({
+      updateRequested: false,
+      targetVersion: null,
+      revoked: true,
+    });
+    expect(db.patch).not.toHaveBeenCalled();
+  });
+
+  it("invalid token → no-op (no revoke, no heartbeat)", async () => {
+    const db = pollDb({ token: null, connection: null, revoked: null });
+    const ctx = { db };
+
+    await expect(
+      pollAgentUpdate.handler(ctx as any, {
+        token: "bad",
+        connectionId: "cid",
+      }),
+    ).resolves.toEqual({
+      updateRequested: false,
+      targetVersion: null,
+      revoked: false,
+    });
+    expect(db.patch).not.toHaveBeenCalled();
+  });
+});
 
 describe("connector revocation list", () => {
   beforeEach(() => {

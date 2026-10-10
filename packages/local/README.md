@@ -28,16 +28,19 @@ Commands run directly on your host OS. The client connects to Suricatoos and rel
 
 ## Options
 
-| Option             | Description                                                    |
-| ------------------ | -------------------------------------------------------------- |
-| `--token TOKEN`    | Authentication token included in the copied command (required) |
-| `--name NAME`      | Optional connection name fallback (default: hostname)          |
-| `--convex-url URL` | Override backend URL included for non-production environments  |
-| `--help, -h`       | Show help message                                              |
+| Option               | Description                                                           |
+| -------------------- | --------------------------------------------------------------------- |
+| `--token TOKEN`      | Authentication token included in the copied command (required)        |
+| `--name NAME`        | Optional connection name fallback (default: hostname)                 |
+| `--idle-timeout MIN` | Auto-terminate after MIN minutes with no commands (default: disabled) |
+| `--convex-url URL`   | Override backend URL included for non-production environments         |
+| `--help, -h`         | Show help message                                                     |
 
 ## Security
 
-Commands run directly on your OS without any isolation. Only connect machines you trust and control. The client auto-terminates after 1 hour of inactivity.
+Commands run directly on your OS without any isolation. Only connect machines you trust and control.
+
+The connector stays active until you revoke it in Remote Control settings. On revocation it detects it automatically (within ~20s), shuts down, and removes itself from this machine so nothing keeps consuming resources. Pass `--idle-timeout <minutes>` to also auto-terminate after a period of inactivity (disabled by default).
 
 ## License
 
