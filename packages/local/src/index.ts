@@ -17,6 +17,8 @@ import { Centrifuge, Subscription, PublicationContext } from "centrifuge";
 import WebSocket from "ws";
 import { spawn, ChildProcess } from "child_process";
 import os from "os";
+import path from "node:path";
+import { rm } from "node:fs/promises";
 import {
   truncateOutput,
   MAX_OUTPUT_SIZE,
@@ -38,15 +40,18 @@ import { buildCentrifugoTransportConfig } from "./centrifugo-endpoints";
 
 const DEFAULT_SHELL = getDefaultShell(os.platform());
 
-// Idle timeout: auto-terminate after 1 hour without commands
-const IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
+// Idle auto-termination is DISABLED by default: a connector stays active until
+// it is revoked from the Remote Control panel (revocation now also makes it
+// self-remove). Opt back in with `--idle-timeout <minutes>` to reclaim a
+// forgotten connector. 0 (the default) = never auto-terminate.
+const DEFAULT_IDLE_TIMEOUT_MS = 0;
 
-// Idle check interval: check every 5 minutes
+// Idle check interval: check every 5 minutes (only armed when a timeout is set)
 const IDLE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 // Agent version — KEEP IN SYNC with packages/local/package.json "version".
 // Reported to the server so the Remote Control UI can flag "update available".
-const AGENT_VERSION = "0.1.4";
+const AGENT_VERSION = "0.1.5";
 
 // How often the agent polls the server for a pending update (Update button).
 const UPDATE_POLL_INTERVAL_MS = 20 * 1000; // 20s
@@ -79,6 +84,9 @@ export interface Config {
   convexUrl: string;
   token: string;
   name: string;
+  // 0 = persistent (never auto-terminate); >0 = auto-terminate after this many
+  // ms with no commands. Set via --idle-timeout <minutes>. Default 0.
+  idleTimeoutMs: number;
 }
 
 interface OsInfo {
@@ -269,6 +277,7 @@ type RefreshTokenResult =
         | "token_regenerated"
         | "presence_sweep"
         | "command_unresponsive"
+        | "user_revoked"
         | null;
       msSinceDisconnected: number | null;
       msSinceLastHeartbeat: number | null;
@@ -305,6 +314,7 @@ export class LocalSandboxClient {
   private publishQueue?: CentrifugoPublishQueue;
   private cleanupPromise?: Promise<void>;
   private exitRequested = false;
+  private revoking = false;
   private relayTransport: string | null = null;
 
   constructor(
@@ -433,6 +443,15 @@ export class LocalSandboxClient {
         } as never,
       )) as ConnectResult;
 
+      // Revoked connector trying to (re)connect — e.g. a manual `npx` re-run, or
+      // a systemd service relaunching after exit. Self-remove instead of
+      // erroring in a loop, so nothing is left running or on disk.
+      if (!result.success && result.error && /revoked/i.test(result.error)) {
+        console.error(chalk.yellow(result.error));
+        await this.handleRevoked();
+        return;
+      }
+
       if (
         !result.success ||
         !result.centrifugoToken ||
@@ -523,6 +542,15 @@ export class LocalSandboxClient {
           throw error;
         }
         if (result.ok) return result.centrifugoToken;
+
+        // Revoked from the panel: self-remove and exit 0 rather than the generic
+        // exit(1) below (which would crash-loop under a Restart=always
+        // supervisor into a connect() the server now rejects). This is the
+        // fallback path; the 20s poll usually catches revocation first.
+        if (result.disconnectReason === "user_revoked") {
+          void this.handleRevoked();
+          throw new Error("connector revoked");
+        }
 
         console.error(
           chalk.red(`\n❌ Connection terminated by server (${result.reason})`),
@@ -1127,13 +1155,18 @@ export class LocalSandboxClient {
   }
 
   private startIdleCheck(): void {
+    const timeoutMs = this.config.idleTimeoutMs;
+    if (!timeoutMs || timeoutMs <= 0) {
+      // Persistent by default: stay connected until revoked from the panel.
+      return;
+    }
     this.idleCheckInterval = setInterval(() => {
       const idleTime = Date.now() - this.lastActivityTime;
-      if (idleTime >= IDLE_TIMEOUT_MS) {
+      if (idleTime >= timeoutMs) {
         const idleMinutes = Math.floor(idleTime / 60000);
         console.log(
           chalk.yellow(
-            `\n⏰ Idle timeout: No commands received for ${idleMinutes} minutes`,
+            `\n⏰ Idle timeout: no commands received for ${idleMinutes} minutes`,
           ),
         );
         console.log(chalk.yellow("Auto-terminating to save resources..."));
@@ -1173,7 +1206,16 @@ export class LocalSandboxClient {
           token: this.config.token,
           connectionId: this.connectionId,
         } as never,
-      )) as { updateRequested: boolean; targetVersion: string | null };
+      )) as {
+        updateRequested: boolean;
+        targetVersion: string | null;
+        revoked?: boolean;
+      };
+      if (directive?.revoked) {
+        // Revoked in the panel → shut down and remove ourselves from this host.
+        await this.handleRevoked();
+        return;
+      }
       if (directive?.updateRequested) {
         await this.performAgentUpdate(directive.targetVersion ?? "latest");
       }
@@ -1214,7 +1256,9 @@ export class LocalSandboxClient {
         shell: process.platform === "win32",
       });
       child.on("error", (err) => {
-        console.error(chalk.red(`Agent update: npm failed to start: ${err.message}`));
+        console.error(
+          chalk.red(`Agent update: npm failed to start: ${err.message}`),
+        );
         resolve(false);
       });
       child.on("exit", (code) => resolve(code === 0));
@@ -1250,6 +1294,75 @@ export class LocalSandboxClient {
         ),
       );
       this.isUpdating = false;
+    }
+  }
+
+  // Revoked from the Remote Control panel: shut down cleanly and remove the
+  // agent from this machine so nothing keeps running or lingers in the OS.
+  // Exits 0 (not 1) so a supervisor with Restart=on-failure does NOT relaunch
+  // us into a connect() the server would now reject.
+  private async handleRevoked(): Promise<void> {
+    if (this.revoking || this.isShuttingDown || this.exitRequested) return;
+    this.revoking = true;
+    this.exitRequested = true;
+
+    console.log(
+      chalk.yellow("\n🔒 This connector was revoked in the Suricatoos panel."),
+    );
+    console.log(
+      chalk.yellow("Shutting down and removing the agent from this machine..."),
+    );
+
+    try {
+      await this.cleanup();
+    } catch (error) {
+      console.warn(
+        chalk.yellow(
+          `⚠️  Cleanup incomplete: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        ),
+      );
+    }
+
+    await this.selfRemoveFromDisk();
+
+    const reason = new Error("connector revoked");
+    if (this.options.onExitRequested) {
+      this.options.onExitRequested(0, reason);
+    } else {
+      process.exit(0);
+    }
+  }
+
+  // Best-effort on-disk removal for the documented `npx @suricatoos/local`
+  // usage: delete the agent's own package directory when it lives in the npx
+  // cache, so a revoked connector leaves nothing behind. Scoped to `_npx` cache
+  // paths only — never a global or user-managed install — and fully guarded: on
+  // Windows the running files are locked and the delete simply no-ops. The
+  // process exits regardless, so nothing keeps consuming resources either way.
+  private async selfRemoveFromDisk(): Promise<void> {
+    try {
+      const pkgDir = path.resolve(__dirname, "..");
+      const inNpxCache = /[\\/]_npx[\\/]/.test(pkgDir);
+      if (!inNpxCache) {
+        console.log(
+          chalk.gray(
+            "ℹ️  Not an npx-cache install; skipped on-disk removal. The process has stopped, so nothing keeps consuming resources.",
+          ),
+        );
+        return;
+      }
+      await rm(pkgDir, { recursive: true, force: true });
+      console.log(chalk.gray("🧽 Removed the agent's npx cache from disk."));
+    } catch (error) {
+      console.log(
+        chalk.gray(
+          `ℹ️  Could not remove the on-disk cache (${
+            error instanceof Error ? error.message : String(error)
+          }); the process has stopped regardless.`,
+        ),
+      );
     }
   }
 
@@ -1339,28 +1452,38 @@ ${chalk.yellow("Usage:")}
 ${chalk.yellow("Options:")}
   --token TOKEN       Authentication token from Settings (required)
   --name NAME         Optional connection name fallback (default: hostname)
+  --idle-timeout MIN  Auto-terminate after MIN minutes with no commands
+                      (default: disabled — stays active until revoked)
   --convex-url URL    Override Convex backend URL (for development)
   --help, -h          Show this help message
 
 ${chalk.yellow("Examples:")}
   npx @suricatoos/local --token hsb_abc123
   npx @suricatoos/local --token hsb_abc123 --name "Work PC"
+  npx @suricatoos/local --token hsb_abc123 --idle-timeout 60
 
 ${chalk.red("⚠️  Security Warning:")}
   Commands run directly on your OS without any isolation.
   Only connect machines you trust and control.
 
-${chalk.cyan("Auto-termination:")}
-  The client automatically terminates after 1 hour of inactivity (no commands
-  executed) to save system resources.
+${chalk.cyan("Lifecycle:")}
+  The connector stays active until you revoke it in Remote Control settings.
+  On revocation it detects it automatically (within ~20s), shuts down, and
+  removes itself from this machine so nothing keeps consuming resources.
+  Use --idle-timeout to also auto-terminate after a period of inactivity.
 `);
     process.exit(0);
   }
 
+  const idleTimeoutMinutes = Number.parseFloat(getArg("--idle-timeout") ?? "");
   const config: Config = {
     convexUrl: getArg("--convex-url") || PRODUCTION_CONVEX_URL,
     token: getArg("--token") || "",
     name: getArg("--name") || os.hostname(),
+    idleTimeoutMs:
+      Number.isFinite(idleTimeoutMinutes) && idleTimeoutMinutes > 0
+        ? idleTimeoutMinutes * 60 * 1000
+        : DEFAULT_IDLE_TIMEOUT_MS,
   };
 
   if (!config.token) {

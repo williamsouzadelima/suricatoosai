@@ -21,6 +21,7 @@ const config = {
   convexUrl: "http://127.0.0.1:3210",
   token: "test-token",
   name: "test",
+  idleTimeoutMs: 0,
 };
 
 describe("LocalSandboxClient cleanup", () => {
@@ -169,5 +170,81 @@ describe("LocalSandboxClient cleanup", () => {
       "Local sandbox is ready",
     );
     logSpy.mockRestore();
+  });
+
+  it("self-removes and exits 0 when the poll reports the connector was revoked", async () => {
+    const onExitRequested = jest.fn();
+    const exitSpy = jest
+      .spyOn(process, "exit")
+      .mockImplementation((() => undefined) as never);
+    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+
+    const client = new LocalSandboxClient(config, { onExitRequested });
+    const priv = client as unknown as {
+      connectionId?: string;
+      convexHttp: { mutation: jest.Mock };
+      checkForAgentUpdate: () => Promise<void>;
+    };
+    priv.connectionId = "connection-1";
+    priv.convexHttp.mutation = jest.fn().mockResolvedValue({
+      updateRequested: false,
+      targetVersion: null,
+      revoked: true,
+    });
+
+    await priv.checkForAgentUpdate();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Clean shutdown: process resources stopped, then exit(0) (not 1) so a
+    // supervisor won't relaunch into a connect() the server now rejects.
+    expect(mockStopAll).toHaveBeenCalledTimes(1);
+    expect(onExitRequested).toHaveBeenCalledWith(
+      0,
+      expect.objectContaining({ message: "connector revoked" }),
+    );
+    expect(exitSpy).not.toHaveBeenCalled();
+
+    exitSpy.mockRestore();
+    logSpy.mockRestore();
+  });
+
+  it("self-removes when connect() is rejected because the connector is revoked", async () => {
+    const onExitRequested = jest.fn();
+    const exitSpy = jest
+      .spyOn(process, "exit")
+      .mockImplementation((() => undefined) as never);
+    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    const errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const client = new LocalSandboxClient(config, { onExitRequested });
+    (
+      client as unknown as { convexHttp: { mutation: jest.Mock } }
+    ).convexHttp.mutation = jest.fn().mockResolvedValue({
+      success: false,
+      error:
+        "This connector has been revoked. Allow it again in Remote Control settings to reconnect.",
+    });
+
+    await client.start();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(onExitRequested).toHaveBeenCalledWith(
+      0,
+      expect.objectContaining({ message: "connector revoked" }),
+    );
+    expect(mockStopAll).toHaveBeenCalledTimes(1);
+    expect(exitSpy).not.toHaveBeenCalled();
+
+    exitSpy.mockRestore();
+    logSpy.mockRestore();
+    errSpy.mockRestore();
+  });
+
+  it("does not arm the idle timer when idleTimeoutMs is 0 (persistent)", () => {
+    const setIntervalSpy = jest.spyOn(global, "setInterval");
+    const client = new LocalSandboxClient(config); // config.idleTimeoutMs === 0
+    (client as unknown as { startIdleCheck: () => void }).startIdleCheck();
+    expect(setIntervalSpy).not.toHaveBeenCalled();
+    setIntervalSpy.mockRestore();
   });
 });

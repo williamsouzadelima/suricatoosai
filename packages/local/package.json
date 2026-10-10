@@ -1,6 +1,6 @@
 {
   "name": "@suricatoos/local",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Suricatoos Local Sandbox Client - Execute commands on your local machine",
   "bin": {
     "suricatoos-local": "dist/index.js"

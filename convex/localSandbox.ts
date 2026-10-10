@@ -6,7 +6,7 @@ import { SignJWT } from "jose";
 
 // Latest agent (@suricatoos/local) version — bump on each agent release so the
 // Remote Control UI flags older connectors and requestAgentUpdate targets it.
-const LATEST_AGENT_VERSION = "0.1.4";
+const LATEST_AGENT_VERSION = "0.1.5";
 
 function parseVersion(v: string): number[] | null {
   const parts = v.split(".").map((p) => Number.parseInt(p, 10));
@@ -860,19 +860,33 @@ export const requestAgentUpdate = mutation({
 });
 
 /**
- * Called by the agent (token-authed) on a short poll. Reads-and-clears the
- * pending-update flag so a failed update never loops.
+ * Called by the agent (token-authed) on its short poll (~20s). Does three
+ * things in one round-trip:
+ *   1. Bumps `last_heartbeat` so the presence-grace fallback stays fresh even
+ *      between the hourly Centrifugo token refreshes — a healthy connector that
+ *      just sits idle is no longer at risk of being swept as stale.
+ *   2. Reads-and-clears the pending-update flag (Remote Control "Update"
+ *      button) so a failed update never loops.
+ *   3. Reports `revoked: true` once the user has revoked this connector, so the
+ *      agent can self-terminate and remove itself within one poll instead of
+ *      waiting for the next hourly token refresh to notice.
+ *
+ * `revoked` is true ONLY on a positive revocation signal (a revoked-connector
+ * row for this name, or a row force-disconnected as `user_revoked`). A missing
+ * or foreign row returns `revoked: false` — a false positive here would wrongly
+ * self-destruct a healthy connector.
  */
 export const pollAgentUpdate = mutation({
   args: { token: v.string(), connectionId: v.string() },
   returns: v.object({
     updateRequested: v.boolean(),
     targetVersion: v.union(v.string(), v.null()),
+    revoked: v.boolean(),
   }),
   handler: async (ctx, { token, connectionId }) => {
     const tokenResult = await validateToken(ctx.db, token);
     if (!tokenResult.valid) {
-      return { updateRequested: false, targetVersion: null };
+      return { updateRequested: false, targetVersion: null, revoked: false };
     }
 
     const connection = await ctx.db
@@ -880,18 +894,36 @@ export const pollAgentUpdate = mutation({
       .withIndex("by_connection_id", (q) => q.eq("connection_id", connectionId))
       .first();
 
-    if (
-      !connection ||
-      connection.user_id !== tokenResult.userId ||
-      !connection.update_requested
-    ) {
-      return { updateRequested: false, targetVersion: null };
+    if (!connection || connection.user_id !== tokenResult.userId) {
+      return { updateRequested: false, targetVersion: null, revoked: false };
+    }
+
+    // Positive revocation signal → tell the agent to shut down and self-remove.
+    const revoked =
+      connection.disconnect_reason === "user_revoked" ||
+      (await isConnectorRevoked(
+        ctx.db,
+        connection.user_id,
+        connection.connection_name,
+      ));
+    if (revoked) {
+      return { updateRequested: false, targetVersion: null, revoked: true };
+    }
+
+    // Healthy poll: keep presence fresh. Only bump a still-connected row so we
+    // never resurrect one the backend already marked disconnected.
+    if (connection.status === "connected") {
+      await ctx.db.patch(connection._id, { last_heartbeat: Date.now() });
+    }
+
+    if (!connection.update_requested) {
+      return { updateRequested: false, targetVersion: null, revoked: false };
     }
 
     const targetVersion =
       connection.target_agent_version ?? LATEST_AGENT_VERSION;
     await ctx.db.patch(connection._id, { update_requested: false });
-    return { updateRequested: true, targetVersion };
+    return { updateRequested: true, targetVersion, revoked: false };
   },
 });
 
