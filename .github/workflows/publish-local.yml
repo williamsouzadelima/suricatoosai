@@ -1,0 +1,211 @@
+# Publishes @suricatoos/local (packages/local) to npm using OIDC Trusted
+# Publishing + signed provenance. NO long-lived npm token exists anywhere.
+#
+# THREAT MODEL: the client-side auto-updater runs `npm install -g @suricatoos/local`
+# as ROOT on customer/Kali nodes. A spoofed publish == fleet-wide root RCE.
+#
+# Controls:
+#   - tag-only trigger (never pull_request/pull_request_target) + repo guard,
+#     so untrusted forks can never reach registry credentials;
+#   - SPLIT build/publish: the OIDC credential lives ONLY in a minimal publish
+#     job that installs no third-party deps and runs no third-party scripts, so
+#     a compromised dependency postinstall can never mint/steal the token;
+#   - protected `environment: npm-publish` => human approval before each publish;
+#   - least-privilege job-level permissions; SHA-pinned actions; pinned npm;
+#   - tag <-> package.json <-> AGENT_VERSION consistency gate before shipping.
+#
+# ONE-TIME SETUP REQUIRED before this workflow can publish — see the PR body:
+#   1. npmjs.com: add a Trusted Publisher on @suricatoos/local (org
+#      williamsouzadelima, repo suricatoosai, workflow file "publish-local.yml",
+#      environment "npm-publish") and ENABLE direct `npm publish`.
+#   2. GitHub: create an Environment named "npm-publish" with required reviewers.
+#   3. (Recommended) Tag protection rules restricting who can push `local-v*`.
+name: Publish @suricatoos/local
+
+on:
+  # Publish only when a version tag is pushed to THIS repo. The `local-v*`
+  # prefix keeps this release stream separate from `desktop-v*`.
+  push:
+    tags:
+      - "local-v*"
+  # Break-glass manual re-run. Constrained below to run only from `main` and to
+  # require the operator to state the exact version being published.
+  workflow_dispatch:
+    inputs:
+      expected_version:
+        description: "Exact version to publish; must equal packages/local/package.json version."
+        required: true
+        type: string
+
+# Serialize publishes for the same ref; never cancel one mid-flight.
+concurrency:
+  group: publish-local-${{ github.ref }}
+  cancel-in-progress: false
+
+# Least-privilege default for the whole workflow; each job narrows further.
+permissions:
+  contents: read
+
+jobs:
+  # ─── Job 1: BUILD in an UNPRIVILEGED context ────────────────────────────────
+  # Holds NO id-token. Even if a compromised dependency runs a malicious
+  # postinstall here, there is no OIDC publish credential to steal. Emits the
+  # `dist` artifact consumed by the publish job.
+  build:
+    name: Build dist (no credentials)
+    runs-on: ubuntu-latest
+    if: github.repository == 'williamsouzadelima/suricatoosai'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      # --ignore-scripts: never run third-party dependency lifecycle scripts.
+      # tsc only needs the packages' files + type declarations (node-pty ships
+      # its .d.ts in the tarball), so the build needs no native postinstall.
+      # --filter narrows the install to just this package's subtree.
+      - name: Install deps for @suricatoos/local (no scripts)
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter @suricatoos/local...
+
+      # First-party scripts only: prebuild (check-version-sync: asserts
+      # AGENT_VERSION in src/index.ts == package.json version) then tsc -> dist.
+      - name: Build @suricatoos/local
+        run: pnpm --filter @suricatoos/local run build
+
+      - name: Verify build output
+        run: test -f packages/local/dist/index.js
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: local-dist
+          path: packages/local/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  # ─── Job 2: PUBLISH in a MINIMAL privileged context ─────────────────────────
+  # The ONLY job with id-token: write. It installs NO third-party deps and runs
+  # NO third-party lifecycle scripts, so the short-lived OIDC publish credential
+  # is never reachable by untrusted code. Gated behind a protected environment
+  # (human approval) whose name MUST match the npm Trusted Publisher config, or
+  # the OIDC subject will not match and the publish is rejected.
+  publish:
+    name: Publish to npm (OIDC + provenance)
+    needs: build
+    runs-on: ubuntu-latest
+    # Repo guard blocks fork copies. workflow_dispatch is allowed ONLY from main,
+    # whose workflow content (incl. this guard + the environment) is branch-
+    # protected — so a dispatch cannot run a branch with the gates removed.
+    if: >-
+      github.repository == 'williamsouzadelima/suricatoosai' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
+    environment: npm-publish
+    permissions:
+      id-token: write # mint OIDC token -> short-lived publish cred + provenance
+      contents: read # checkout package.json for the gate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Node >= 22.14.0 is required for npm's OIDC codepath (the repo's usual
+      # Node 20 CANNOT drive OIDC). registry-url points npm at the registry;
+      # NODE_AUTH_TOKEN is deliberately NEVER set (a present token shadows OIDC).
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      # Pin npm to an exact, OIDC-capable version (no floating dist-tag inside
+      # the privileged job); the fleet already runs 11.19.0.
+      - name: Pin npm to an OIDC-capable version
+        run: npm install -g npm@11.19.0
+
+      - name: Assert toolchain floors (fail closed)
+        run: |
+          set -euo pipefail
+          NODE_V="$(node --version)"; NPM_V="$(npm --version)"
+          echo "node: $NODE_V   npm: $NPM_V"
+          # npm must be >= 11.5.1 (OIDC floor).
+          if [ "$(printf '%s\n11.5.1\n' "$NPM_V" | sort -V | head -n1)" != "11.5.1" ]; then
+            echo "::error::npm $NPM_V is below the OIDC floor 11.5.1"; exit 1
+          fi
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: local-dist
+          path: packages/local/dist
+
+      # Authoritative gate, on the SAME commit that publishes. Untrusted github
+      # context is passed via env: (never interpolated into the shell) to avoid
+      # script injection.
+      - name: Gate — version consistency and availability
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          EVENT_NAME: ${{ github.event_name }}
+          EXPECTED_VERSION: ${{ github.event.inputs.expected_version }}
+        run: |
+          set -euo pipefail
+          PKG_VERSION="$(node -p "require('./packages/local/package.json').version")"
+          echo "packages/local/package.json version: $PKG_VERSION"
+
+          # Strict semver (mirrors desktop-build.yml).
+          if ! printf '%s' "$PKG_VERSION" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+            echo "::error::package.json version '$PKG_VERSION' is not strict semver"; exit 1
+          fi
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            # Break-glass from main: operator must state the exact version.
+            if [ "$EXPECTED_VERSION" != "$PKG_VERSION" ]; then
+              echo "::error::expected_version ('$EXPECTED_VERSION') != package.json ('$PKG_VERSION')"; exit 1
+            fi
+            echo "Manual dispatch confirmed for version $PKG_VERSION (from main)"
+          else
+            # Tag push: tag must be local-v<package.json version>.
+            if [ "$REF_TYPE" != "tag" ]; then
+              echo "::error::push trigger without a tag ref ($REF_NAME)"; exit 1
+            fi
+            case "$REF_NAME" in
+              local-v*) REF_VERSION="${REF_NAME#local-v}" ;;
+              *) echo "::error::tag '$REF_NAME' does not match 'local-v*'"; exit 1 ;;
+            esac
+            if [ "$REF_VERSION" != "$PKG_VERSION" ]; then
+              echo "::error::git tag ($REF_VERSION) != package.json ($PKG_VERSION)"; exit 1
+            fi
+            echo "Tag $REF_NAME matches package.json $PKG_VERSION"
+          fi
+
+          # Refuse to republish an existing version (avoids E409 + clobber).
+          # `npm view` exits non-zero when the exact version does not exist.
+          if npm view "@suricatoos/local@${PKG_VERSION}" version > /dev/null 2>&1; then
+            echo "::error::@suricatoos/local@${PKG_VERSION} is already on npm — refusing to republish"; exit 1
+          fi
+          echo "@suricatoos/local@${PKG_VERSION} not yet published — OK to proceed"
+
+      - name: Verify downloaded dist
+        run: test -f packages/local/dist/index.js
+
+      # Publish the pre-built dist with the short-lived OIDC credential and
+      # signed provenance. --ignore-scripts: run NO lifecycle script in the
+      # privileged job (dist was already built + version-checked in job 1).
+      # No token env is set, so npm uses the OIDC path and emits provenance.
+      - name: Publish (OIDC trusted publishing + provenance)
+        working-directory: packages/local
+        run: npm publish --provenance --access public --ignore-scripts
