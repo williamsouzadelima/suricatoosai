@@ -626,10 +626,10 @@ def _evidence_flow(fl, f):
             fl.para(head, size=11, bold=True, color=T.PRIMARY, after=0.02)
             if e.get("command"):
                 fl.para("$ " + str(e["command"]), size=9, color=T.MUTED,
-                        font="Consolas", indent=0.12, after=0.02)
+                        font=T.FONT_MONO, indent=0.12, after=0.02)
             if e.get("snippet"):
                 fl.para(str(e["snippet"]), size=9, color=T.MUTED,
-                        font="Consolas", indent=0.12, after=0.02)
+                        font=T.FONT_MONO, indent=0.12, after=0.02)
             if e.get("resultSummary"):
                 fl.para("→ prova: " + str(e["resultSummary"]), size=10,
                         color=T.SUCCESS, indent=0.12, after=0.08)

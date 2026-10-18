@@ -27,8 +27,56 @@ import theme as T
 import logo
 
 
+_FONTS_READY = False
+FONT_SANS = "Helvetica"
+FONT_SANS_BOLD = "Helvetica-Bold"
+FONT_MONO = "Courier"
+
+
+def _register_fonts():
+    """Registra IBM Plex (reportlab EMBUTE os glifos no PDF). Idempotente;
+    mantem o fallback Helvetica/Courier se os .ttf nao estiverem presentes."""
+    global _FONTS_READY, FONT_SANS, FONT_SANS_BOLD, FONT_MONO
+    if _FONTS_READY:
+        return
+    _FONTS_READY = True
+    try:
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+
+        reg = T.font_path("IBM Plex Sans", "normal")
+        bold = T.font_path("IBM Plex Sans", "bold")
+        mono = T.font_path("IBM Plex Mono", "normal")
+        if reg and bold and mono:
+            pdfmetrics.registerFont(TTFont("IBMPlexSans", reg))
+            pdfmetrics.registerFont(TTFont("IBMPlexSans-Bold", bold))
+            pdfmetrics.registerFont(TTFont("IBMPlexMono", mono))
+            pdfmetrics.registerFontFamily(
+                "IBMPlexSans", normal="IBMPlexSans",
+                bold="IBMPlexSans-Bold", italic="IBMPlexSans",
+                boldItalic="IBMPlexSans-Bold")
+            # Fonte-base padrao do canvas (senao o reportlab emite um bloco
+            # BT/ET vazio de init com /Helvetica em cada pagina — inofensivo,
+            # mas deixaria "Helvetica" no PDF).
+            from reportlab import rl_config
+
+            rl_config.canvas_basefontname = "IBMPlexSans"
+            FONT_SANS = "IBMPlexSans"
+            FONT_SANS_BOLD = "IBMPlexSans-Bold"
+            FONT_MONO = "IBMPlexMono"
+    except Exception:
+        pass
+
+
 def C(h):
     return colors.HexColor("#" + h)
+
+
+def _ts(cmds):
+    """TableStyle com FONTNAME base em IBM Plex, p/ celulas string nao caírem no
+    Helvetica padrao do reportlab. Comandos especificos (ex.: header bold) vem
+    depois e sobrepoem."""
+    return TableStyle([("FONTNAME", (0, 0), (-1, -1), FONT_SANS)] + list(cmds))
 
 
 def _clip(s, n):
@@ -57,27 +105,32 @@ def _apply_brand(meta):
 
 
 def _styles():
+    _register_fonts()
     ss = getSampleStyleSheet()
-    ss.add(ParagraphStyle("Cover", parent=ss["Title"], fontName="Helvetica-Bold",
+    # Estilos base herdados tambem em IBM Plex (evita vazar Helvetica/Times).
+    ss["Normal"].fontName = FONT_SANS
+    ss["Title"].fontName = FONT_SANS_BOLD
+    ss["Heading1"].fontName = FONT_SANS_BOLD
+    ss.add(ParagraphStyle("Cover", parent=ss["Title"], fontName=FONT_SANS_BOLD,
                           fontSize=30, textColor=C(T.INK), spaceAfter=8, leading=34,
                           alignment=TA_LEFT))
-    ss.add(ParagraphStyle("Wordmark", parent=ss["Normal"], fontName="Helvetica-Bold",
+    ss.add(ParagraphStyle("Wordmark", parent=ss["Normal"], fontName=FONT_SANS_BOLD,
                           fontSize=18, textColor=C(T.CORAL)))
-    ss.add(ParagraphStyle("H1", parent=ss["Heading1"], fontName="Helvetica-Bold",
+    ss.add(ParagraphStyle("H1", parent=ss["Heading1"], fontName=FONT_SANS_BOLD,
                           fontSize=15, textColor=C(T.PRIMARY), spaceBefore=12, spaceAfter=4))
-    ss.add(ParagraphStyle("Body2", parent=ss["Normal"], fontName="Helvetica",
+    ss.add(ParagraphStyle("Body2", parent=ss["Normal"], fontName=FONT_SANS,
                           fontSize=10.5, textColor=C(T.INK), leading=15, spaceAfter=5))
-    ss.add(ParagraphStyle("Small", parent=ss["Normal"], fontName="Helvetica",
+    ss.add(ParagraphStyle("Small", parent=ss["Normal"], fontName=FONT_SANS,
                           fontSize=8.5, textColor=C(T.MUTED)))
-    ss.add(ParagraphStyle("CardTitle", parent=ss["Normal"], fontName="Helvetica-Bold",
+    ss.add(ParagraphStyle("CardTitle", parent=ss["Normal"], fontName=FONT_SANS_BOLD,
                           fontSize=12, textColor=C(T.INK), spaceBefore=8, spaceAfter=2))
-    ss.add(ParagraphStyle("KpiVal", parent=ss["Normal"], fontName="Helvetica-Bold",
+    ss.add(ParagraphStyle("KpiVal", parent=ss["Normal"], fontName=FONT_SANS_BOLD,
                           fontSize=22, textColor=C(T.PRIMARY), alignment=TA_CENTER))
-    ss.add(ParagraphStyle("KpiLabel", parent=ss["Normal"], fontName="Helvetica-Bold",
+    ss.add(ParagraphStyle("KpiLabel", parent=ss["Normal"], fontName=FONT_SANS_BOLD,
                           fontSize=7.5, textColor=C(T.MUTED), alignment=TA_CENTER))
     # Código/evidência: monoespaçada com quebra em qualquer ponto (wordWrap CJK)
     # p/ não estourar a largura do frame com tokens longos (comandos/saídas).
-    ss.add(ParagraphStyle("Mono", parent=ss["Normal"], fontName="Courier",
+    ss.add(ParagraphStyle("Mono", parent=ss["Normal"], fontName=FONT_MONO,
                           fontSize=8, textColor=C(T.MUTED), leading=10,
                           wordWrap="CJK", spaceAfter=3))
     return ss
@@ -105,7 +158,7 @@ def _cover_canvas_factory(meta, cover):
                     pass
             return
         canvas.saveState()
-        canvas.setFont("Helvetica", 7)
+        canvas.setFont(FONT_SANS, 7)
         canvas.setFillColor(C(T.MUTED))
         canvas.drawString(18 * mm, 8 * mm, _clip(meta.get("classification", ""), 80))
         canvas.drawRightString(A4[0] - 18 * mm, 8 * mm,
@@ -122,7 +175,7 @@ def _stat_table(ss, stats):
     val = [Paragraph(_esc(s.get("value", "")), ss["KpiVal"]) for s in stats]
     w = (170.0 / len(stats)) * mm
     tbl = Table([lab, val], colWidths=[w] * len(stats))
-    tbl.setStyle(TableStyle([
+    tbl.setStyle(_ts([
         ("BACKGROUND", (0, 0), (-1, -1), C(T.SURFACE_ALT)),
         ("BOX", (0, 0), (-1, -1), 0.5, C(T.BORDER)),
         ("INNERGRID", (0, 0), (-1, -1), 0.5, C(T.SURFACE)),
@@ -156,7 +209,7 @@ def _placeholder_pdf(S, ss, text):
     tbl = Table(
         [[Paragraph(f'<font color="#{T.WARNING}"><b>{_esc(text)}</b></font>',
                     ss["Body2"])]], colWidths=[165 * mm])
-    tbl.setStyle(TableStyle([
+    tbl.setStyle(_ts([
         ("BACKGROUND", (0, 0), (-1, -1), C(T.SURFACE_ALT)),
         ("LINEBEFORE", (0, 0), (0, -1), 3, C(T.WARNING)),
         ("LEFTPADDING", (0, 0), (-1, -1), 8),
@@ -171,7 +224,7 @@ def _part_divider(ss, sec):
     out = [PageBreak(), Spacer(1, 40 * mm)]
     out.append(Paragraph(_esc(sec.get("part", "")),
                          ParagraphStyle("pdpart", parent=ss["Small"],
-                                        fontName="Helvetica-Bold", fontSize=12,
+                                        fontName=FONT_SANS_BOLD, fontSize=12,
                                         textColor=C(T.CORAL))))
     out.append(Paragraph(_esc(sec.get("title", "")),
                          ParagraphStyle("pdtitle", parent=ss["Cover"], fontSize=26)))
@@ -227,7 +280,7 @@ def _attack_chain(ss, sec):
             for ci in range(0, len(cells), 2):
                 sc.append(("BACKGROUND", (ci, 0), (ci, 0), C(T.SURFACE_ALT)))
                 sc.append(("LINEABOVE", (ci, 0), (ci, 0), 1.2, C(T.PRIMARY)))
-            tbl.setStyle(TableStyle(sc))
+            tbl.setStyle(_ts(sc))
             out.append(tbl)
         out.append(Spacer(1, 4 * mm))
     return out
@@ -246,7 +299,7 @@ def _roadmap(ss, sec):
                      Paragraph(_esc(ph.get("label", "")), ss["Small"]),
                      Paragraph(acts, ss["Small"])])
     tbl = Table(data, colWidths=[26 * mm, 34 * mm, 114 * mm], repeatRows=1)
-    tbl.setStyle(TableStyle([
+    tbl.setStyle(_ts([
         ("BACKGROUND", (0, 0), (-1, 0), C(T.PRIMARY)),
         ("GRID", (0, 0), (-1, -1), 0.4, C(T.BORDER)),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
@@ -273,7 +326,7 @@ def _cost_incident(ss, sec):
               Paragraph('<font color="white"><b>INCIDENTE NÃO REMEDIADO — RISCO</b></font>', ss["Body2"])]
     body = [Paragraph(remlist, ss["Small"]), Paragraph(inclist, ss["Small"])]
     tbl = Table([header, body], colWidths=[87 * mm, 87 * mm])
-    tbl.setStyle(TableStyle([
+    tbl.setStyle(_ts([
         ("BACKGROUND", (0, 0), (0, 0), C(T.SUCCESS)),
         ("BACKGROUND", (1, 0), (1, 0), C(T.DESTRUCTIVE)),
         ("BOX", (0, 0), (-1, -1), 0.5, C(T.BORDER)),
@@ -419,7 +472,7 @@ def render_pdf(model, out_path):
                  Paragraph(str(bysev.get("critical", 0) + bysev.get("high", 0)), ss["KpiVal"])],
             ]
             tbl = Table(data, colWidths=[42 * mm] * 4)
-            tbl.setStyle(TableStyle([
+            tbl.setStyle(_ts([
                 ("BACKGROUND", (0, 0), (-1, -1), C(T.SURFACE_ALT)),
                 ("BOX", (0, 0), (-1, -1), 0.5, C(T.BORDER)),
                 ("INNERGRID", (0, 0), (-1, -1), 0.5, C(T.SURFACE)),
@@ -440,7 +493,7 @@ def render_pdf(model, out_path):
                 rows.append([Paragraph(T.SEVERITY_LABEL.get(sev, sev), ss["Body2"]),
                              Paragraph(f'<font color="#{T.SEVERITY_COLOR.get(sev, T.MUTED)}">{bar}</font> {c}', ss["Body2"])])
             tbl = Table(rows, colWidths=[35 * mm, 130 * mm])
-            tbl.setStyle(TableStyle(style))
+            tbl.setStyle(_ts(style))
             S.append(tbl)
             S.append(Spacer(1, 5 * mm))
         elif t == "riskMatrix":
@@ -461,7 +514,7 @@ def render_pdf(model, out_path):
                     stylecmds.append(("BACKGROUND", (col, r), (col, r), C(_band(li + im))))
                 data.append(row)
             tbl = Table(data, colWidths=[22 * mm] * 5, rowHeights=[16 * mm] * 5)
-            tbl.setStyle(TableStyle(stylecmds))
+            tbl.setStyle(_ts(stylecmds))
             S.append(tbl)
             S.append(Paragraph("Probabilidade (linhas) × Impacto (colunas)", ss["Small"]))
             S.append(Spacer(1, 5 * mm))
@@ -505,7 +558,7 @@ def render_pdf(model, out_path):
                     n = e.get("stepIndex") or i
                     head = f"<b>{n}.</b>"
                     if e.get("toolName"):
-                        head += f' <font face="Courier">[{esc(e["toolName"])}]</font>'
+                        head += f' <font face="{FONT_MONO}">[{esc(e["toolName"])}]</font>'
                     if e.get("label") and e.get("label") != e.get("toolName"):
                         head += f' {esc(_clip(e["label"],160))}'
                     S.append(Paragraph(head, ss["Small"]))
@@ -541,10 +594,10 @@ def render_pdf(model, out_path):
             widths = ([16 * mm, 18 * mm, 45 * mm, 86 * mm] if rem
                       else [15 * mm, 17 * mm, 70 * mm, 42 * mm, 16 * mm])
             tbl = Table(data, colWidths=widths, repeatRows=1)
-            tbl.setStyle(TableStyle([
+            tbl.setStyle(_ts([
                 ("BACKGROUND", (0, 0), (-1, 0), C(T.PRIMARY)),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTNAME", (0, 0), (-1, 0), FONT_SANS_BOLD),
                 ("FONTSIZE", (0, 0), (-1, -1), 8.5),
                 ("GRID", (0, 0), (-1, -1), 0.4, C(T.BORDER)),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
@@ -565,7 +618,7 @@ def render_pdf(model, out_path):
             col = T.CALLOUT_COLOR.get(sec.get("tone", "info"), T.PRIMARY)
             tbl = Table([[Paragraph(f'<font color="#{col}"><b>{_ml(sec.get("text",""))}</b></font>', ss["Body2"])]],
                         colWidths=[165 * mm])
-            tbl.setStyle(TableStyle([
+            tbl.setStyle(_ts([
                 ("BACKGROUND", (0, 0), (-1, -1), C(T.SURFACE_ALT)),
                 ("LINEBEFORE", (0, 0), (0, -1), 3, C(col)),
                 ("LEFTPADDING", (0, 0), (-1, -1), 8),

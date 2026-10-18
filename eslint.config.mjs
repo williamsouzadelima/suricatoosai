@@ -3,6 +3,12 @@ import nextConfig from "eslint-config-next";
 export default [
   ...nextConfig,
   {
-    ignores: [".claude/**", ".cursor/**", ".github/**", "convex/_generated/**"],
+    ignores: [
+      ".claude/**",
+      ".cursor/**",
+      ".github/**",
+      "convex/_generated/**",
+      "packages/report-renderer/fonts.ts",
+    ],
   },
 ];

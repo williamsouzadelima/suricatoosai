@@ -2,9 +2,11 @@
 
 Hex SEM '#'. Fontes: usa-se Calibri (presente em Word/PowerPoint) para body e
 titulos por seguranca de renderizacao no cliente; a marca vem sobretudo da
-PALETA (azul/coral) e do layout. Fontes proprias (Archivo/Geist) podem ser
-embutidas depois.
+PALETA (azul/coral) e do layout. A tipografia da marca e IBM Plex (OFL),
+embutida nos .ttf em fonts/ (ver FONT_* e font_path() abaixo).
 """
+
+import os
 
 PRIMARY = "2456E6"
 CORAL = "FF7678"
@@ -42,7 +44,29 @@ CALLOUT_COLOR = {
     "success": SUCCESS,
 }
 
-FONT_DISPLAY = "Calibri"
-FONT_BODY = "Calibri"
+# Tipografia da marca: IBM Plex (OFL). O PDF (reportlab) EMBUTE os glifos dos
+# .ttf em fonts/; DOCX/PPTX referenciam o NOME da familia (o embed real no
+# pacote OOXML e follow-up, com validacao via Office/COM). Sem os .ttf
+# presentes, os renderers caem para Calibri/Helvetica.
+FONT_DISPLAY = "IBM Plex Sans"
+FONT_BODY = "IBM Plex Sans"
+FONT_MONO = "IBM Plex Mono"
+
+_FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+_FONT_FILES = {
+    ("IBM Plex Sans", "normal"): "IBMPlexSans-Regular.ttf",
+    ("IBM Plex Sans", "bold"): "IBMPlexSans-Bold.ttf",
+    ("IBM Plex Mono", "normal"): "IBMPlexMono-Regular.ttf",
+}
+
+
+def font_path(family, variant="normal"):
+    """Caminho absoluto do .ttf (ou None se ausente). Resolve tanto no sandbox
+    E2B (fonts/ ao lado dos .py) quanto nos testes locais."""
+    fn = _FONT_FILES.get((family, variant))
+    if not fn:
+        return None
+    p = os.path.join(_FONT_DIR, fn)
+    return p if os.path.exists(p) else None
 
 WORDMARK = "Suricatoos"

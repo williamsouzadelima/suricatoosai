@@ -5,3 +5,5 @@
 .github/
 convex/_generated/
 third_party/strix-skills/
+# Blob base64 gerado (fontes IBM Plex) — nao formatar
+packages/report-renderer/fonts.ts

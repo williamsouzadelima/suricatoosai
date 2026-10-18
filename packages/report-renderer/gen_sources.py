@@ -6,6 +6,7 @@ template), lendo-os de RENDERER_SOURCES. Regenerar sempre que um .py mudar:
     python gen_sources.py
 """
 
+import base64
 import json
 import os
 import glob
@@ -36,6 +37,33 @@ def main():
         fh.write(out)
     print(f"sources.ts: {len(files)} arquivos -> {len(out)} bytes")
     for f in files:
+        print("  •", os.path.basename(f))
+    _gen_fonts()
+
+
+def _gen_fonts():
+    """Gera fonts.ts: os .ttf de fonts/ em base64, que o job do trigger escreve
+    no sandbox E2B (${base}/fonts/) para o renderer PDF embutir (IBM Plex)."""
+    ttfs = sorted(glob.glob(os.path.join(HERE, "fonts", "*.ttf")))
+    parts = []
+    for f in ttfs:
+        name = os.path.basename(f)
+        with open(f, "rb") as fh:
+            b64 = base64.b64encode(fh.read()).decode("ascii")
+        parts.append(f"  {json.dumps(name)}: {json.dumps(b64)},")
+    out = (
+        "// GERADO por packages/report-renderer/gen_sources.py (nao editar a mao).\n"
+        "// Fontes IBM Plex (OFL) em base64; o job do trigger as escreve no\n"
+        "// sandbox E2B (${base}/fonts/) p/ o renderer PDF embutir os glifos.\n"
+        "// Esta em .prettierignore (blob grande). Regenerar: python gen_sources.py\n\n"
+        "export const RENDERER_FONTS: Record<string, string> = {\n"
+        + "\n".join(parts)
+        + "\n};\n"
+    )
+    with open(os.path.join(HERE, "fonts.ts"), "w", encoding="utf-8") as fh:
+        fh.write(out)
+    print(f"fonts.ts: {len(ttfs)} fontes -> {len(out)} bytes")
+    for f in ttfs:
         print("  •", os.path.basename(f))
 
 

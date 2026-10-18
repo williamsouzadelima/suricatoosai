@@ -18,7 +18,14 @@ full-bleed em PPTX e PDF; no DOCX, imagem de capa grande centralizada (dentro da
 margens — evita o bug de página em branco de capa com seção 0-margin). Fallback
 para a capa programática.
 
+Tipografia: **IBM Plex** (OFL) — **embutida** no PDF (glifos; independe do
+visualizador); em DOCX/PPTX o nome da família é aplicado (o embed real no pacote
+OOXML é follow-up, com validação via Office/COM). Os `.ttf` ficam em `fonts/`,
+são empacotados em `fonts.ts` (base64) e escritos no sandbox pelo job do trigger.
+Sem os `.ttf`, cai para Calibri/Helvetica.
+
 Testes (offline): `python tests/smoke.py` renderiza um modelo sintético rico
 (`tests/make_sample.py`) nos 4 formatos e falha se houver truncamento, achado
-perdido ou print/capa faltando. Deps de teste: `pip install -r
+perdido, print/capa faltando ou a tipografia IBM Plex ausente/trocada (verifica o
+PDF embutido e os nomes em DOCX/PPTX). Deps de teste: `pip install -r
 tests/requirements-dev.txt`.

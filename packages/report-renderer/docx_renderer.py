@@ -28,11 +28,24 @@ def _shade(cell, hexfill):
     tcPr.append(shd)
 
 
+def _set_font(r, name):
+    """Define a familia do run em ascii+hAnsi+cs — garante IBM Plex em todo o
+    texto (ASCII, acentos pt-BR e scripts complexos), nao so no ASCII."""
+    r.font.name = name
+    rpr = r._element.get_or_add_rPr()
+    rf = rpr.find(qn("w:rFonts"))
+    if rf is None:
+        rf = OxmlElement("w:rFonts")
+        rpr.append(rf)
+    for attr in ("w:ascii", "w:hAnsi", "w:cs"):
+        rf.set(qn(attr), name)
+
+
 def _run(p, text, size=11, bold=False, color=T.INK, font=T.FONT_BODY):
     r = p.add_run(str(text))
     r.font.size = Pt(size)
     r.font.bold = bold
-    r.font.name = font
+    _set_font(r, font)
     r.font.color.rgb = _rgb(color)
     return r
 
@@ -84,7 +97,7 @@ def _body(doc, text, size=11, bold=False, color=T.INK, after=6, font=None):
     r = p.add_run()
     r.font.size = Pt(size)
     r.font.bold = bold
-    r.font.name = font or T.FONT_BODY
+    _set_font(r, font or T.FONT_BODY)
     r.font.color.rgb = _rgb(color)
     parts = s.split("\n")
     for i, ln in enumerate(parts):
@@ -341,10 +354,10 @@ def _severity_chart(doc, data):
         p = doc.add_paragraph()
         p.paragraph_format.space_after = Pt(2)
         _run(p, f"{T.SEVERITY_LABEL.get(sev, sev):<12} ", size=11, bold=True,
-             color=T.SEVERITY_COLOR.get(sev, T.INK), font="Consolas")
+             color=T.SEVERITY_COLOR.get(sev, T.INK), font=T.FONT_MONO)
         blocks = int(round((c / maxc) * 30)) if c > 0 else 0
         _run(p, "█" * blocks + f"  {c}", size=11,
-             color=T.SEVERITY_COLOR.get(sev, T.MUTED), font="Consolas")
+             color=T.SEVERITY_COLOR.get(sev, T.MUTED), font=T.FONT_MONO)
     doc.add_paragraph()
 
 
@@ -464,9 +477,9 @@ def _evidence_docx(doc, f):
             _para(doc, head, size=10, bold=True, color=T.INK, after=1)
             if e.get("command"):
                 _body(doc, "$ " + str(e["command"]), size=9, color=T.MUTED,
-                      font="Consolas", after=1)
+                      font=T.FONT_MONO, after=1)
             if e.get("snippet"):
-                _body(doc, e["snippet"], size=9, color=T.MUTED, font="Consolas",
+                _body(doc, e["snippet"], size=9, color=T.MUTED, font=T.FONT_MONO,
                       after=1)
             if e.get("resultSummary"):
                 pp = doc.add_paragraph()

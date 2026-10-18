@@ -9,7 +9,9 @@ invariantes que as regressões quebravam:
   • prints embutidos (>=1 imagem) e placeholder visível quando um alto/crítico
     não tem imagem;
   • capa full-bleed no PPTX;
-  • export json com todos os achados.
+  • export json com todos os achados;
+  • tipografia IBM Plex: EMBUTIDA no PDF (sem Helvetica/Courier) e nomeada em
+    DOCX/PPTX (sem Consolas) — verifica o OUTPUT, p/ pegar fallback silencioso.
 Sai com código !=0 se algum invariante falhar (uso em CI).
 """
 
@@ -81,6 +83,12 @@ def main():
             fails.append("docx: placeholder de evidência ausente")
         if "F-14" not in txt or "F-01" not in txt:
             fails.append("docx: achado sumiu da tabela")
+        if "IBM Plex Sans" not in xml:
+            fails.append("docx: fonte da marca (IBM Plex Sans) ausente")
+        if "IBM Plex Mono" not in xml:
+            fails.append("docx: fonte mono (IBM Plex Mono) ausente")
+        if "Consolas" in xml:
+            fails.append("docx: Consolas ainda presente (mono nao trocado)")
 
         # PPTX
         with zipfile.ZipFile(pptx_p) as z:
@@ -98,6 +106,12 @@ def main():
             fails.append("pptx: placeholder de evidência ausente")
         if "<p:pic>" not in s1:
             fails.append("pptx: capa sem imagem full-bleed")
+        if "IBM Plex Sans" not in pxml:
+            fails.append("pptx: fonte da marca (IBM Plex Sans) ausente")
+        if "IBM Plex Mono" not in pxml:
+            fails.append("pptx: fonte mono (IBM Plex Mono) ausente")
+        if "Consolas" in pxml:
+            fails.append("pptx: Consolas ainda presente (mono nao trocado)")
 
         # PDF — extração de texto precisa de pypdf (dev); sem ele, cai p/ um
         # extrator cru e só exige os checks quando há texto suficiente.
@@ -119,6 +133,17 @@ def main():
                   "checagem de truncamento do PDF pulada nesta execução.")
         if os.path.getsize(pdf_p) < 1000:
             fails.append("pdf: arquivo vazio/inválido")
+        # Fonte IBM Plex EMBUTIDA no PDF — verifica o OUTPUT, não só "sem erro":
+        # o fallback silencioso p/ Helvetica é exatamente a regressão a pegar.
+        pdfb = open(pdf_p, "rb").read()
+        if b"IBMPlexSans" not in pdfb:
+            fails.append("pdf: IBM Plex Sans nao embutida (fallback Helvetica?)")
+        if b"IBMPlexMono" not in pdfb:
+            fails.append("pdf: IBM Plex Mono nao embutida")
+        if b"Helvetica" in pdfb:
+            fails.append("pdf: Helvetica ainda presente (fonte nao trocada)")
+        if b"Courier" in pdfb:
+            fails.append("pdf: Courier ainda presente (mono nao trocado)")
 
     if fails:
         print("SMOKE FAIL:")

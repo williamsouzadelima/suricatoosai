@@ -14,6 +14,7 @@ import { buildReportModel } from "@/lib/reports/build-report-model";
 import type { ReportInput } from "@/lib/reports/report-model";
 import type { Id } from "@/convex/_generated/dataModel";
 import { RENDERER_SOURCES } from "../packages/report-renderer/sources";
+import { RENDERER_FONTS } from "../packages/report-renderer/fonts";
 
 export const REPORT_GENERATION_TASK_ID = "generate-engagement-report";
 
@@ -321,6 +322,17 @@ export const generateEngagementReport = schemaTask({
 
       for (const [fn, src] of Object.entries(RENDERER_SOURCES)) {
         await sbx.files.write(`${base}/${fn}`, src);
+      }
+      // Fontes IBM Plex (OFL) p/ o renderer PDF embutir os glifos — escritas em
+      // ${base}/fonts/ (mesmo path relativo que theme.font_path resolve via
+      // __file__). base64 -> ArrayBuffer (igual às imagens); e2b cria o dir.
+      for (const [fn, b64] of Object.entries(RENDERER_FONTS)) {
+        const buf = Buffer.from(b64, "base64");
+        const ab = buf.buffer.slice(
+          buf.byteOffset,
+          buf.byteOffset + buf.byteLength,
+        ) as ArrayBuffer;
+        await sbx.files.write(`${base}/fonts/${fn}`, ab);
       }
       // Inclui `findings` no topo do model.json: o export `json` o reemite
       // (meta + kpis + charts + sections + findings); docx/pptx/pdf ignoram
