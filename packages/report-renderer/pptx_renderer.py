@@ -86,6 +86,137 @@ def _clip(s, n):
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
+# ───────────────────────────────────────────────────────────────────────────
+# Motor de layout com paginação (WS2): PPTX não mede texto, então estimamos
+# linhas por caixa e quebramos conteúdo longo em slides "(cont.)" — NUNCA
+# truncamos corpo de achado/evidência. Unidades em EMU (int).
+# ───────────────────────────────────────────────────────────────────────────
+_CONTENT_BOTTOM = int(Inches(6.95))   # acima do rodapé (7.08)
+_LINE_FACTOR = 1.3                      # entrelinha aproximada
+
+
+def _wrap(text, cpl):
+    """Quebra texto em linhas de ~cpl chars, respeitando \\n e palavras longas."""
+    out = []
+    for raw in str(text or "").split("\n"):
+        if not raw:
+            out.append("")
+            continue
+        line = ""
+        for w in raw.split(" "):
+            while len(w) > cpl:               # token gigante → quebra forçada
+                if line:
+                    out.append(line)
+                    line = ""
+                out.append(w[:cpl])
+                w = w[cpl:]
+            cand = w if not line else line + " " + w
+            if len(cand) <= cpl:
+                line = cand
+            else:
+                out.append(line)
+                line = w
+        out.append(line)
+    return out
+
+
+def _img_size(path):
+    try:
+        from PIL import Image
+        with Image.open(path) as im:
+            return im.size
+    except Exception:
+        return None
+
+
+class _Flow:
+    """Cursor de conteúdo que flui slide a slide, abrindo continuações."""
+
+    def __init__(self, prs, title):
+        self.prs = prs
+        self.title = title
+        self.slide, y = _title_slide(prs, title)
+        self.y = int(y)
+
+    def _newslide(self):
+        self.slide, y = _title_slide(self.prs, _clip(self.title, 58) + " (cont.)")
+        self.y = int(y)
+
+    def space(self, emu):
+        self.y += int(emu)
+
+    def ensure(self, emu):
+        if self.y + int(emu) > _CONTENT_BOTTOM:
+            self._newslide()
+
+    def heading(self, text, size=12, color=None):
+        color = color or T.PRIMARY
+        self.ensure(Inches(0.5))
+        _text(self.slide, ML, Emu(self.y), CW, Inches(0.32), text, size=size,
+              bold=True, color=color)
+        self.y += int(Inches(0.42))
+
+    def para(self, text, size=11, color=T.INK, bold=False, font=T.FONT_BODY,
+             indent=0.0, after=0.08):
+        left = int(ML) + int(Inches(indent))
+        width = int(CW) - int(Inches(indent))
+        cpl = max(12, int((width / EMU_IN) * 72 / (size * 0.5)))
+        lines = _wrap(text, cpl)
+        lh = int(size * _LINE_FACTOR / 72.0 * EMU_IN)
+        i = 0
+        while i < len(lines):
+            self.ensure(lh)
+            cap = max(1, (_CONTENT_BOTTOM - self.y) // lh)
+            take = lines[i:i + cap]
+            i += len(take)
+            h = len(take) * lh
+            tb = self.slide.shapes.add_textbox(Emu(left), Emu(self.y),
+                                               Emu(width), Emu(h))
+            tf = tb.text_frame
+            tf.word_wrap = True
+            for j, ln in enumerate(take):
+                p = tf.paragraphs[0] if j == 0 else tf.add_paragraph()
+                r = p.add_run()
+                r.text = ln
+                r.font.size = Pt(size)
+                r.font.bold = bold
+                r.font.name = font
+                r.font.color.rgb = _rgb(color)
+            self.y += h
+        self.y += int(Inches(after))
+
+    def image(self, path, caption=None):
+        """Embute imagem escalada à coluna; paginando. Retorna True se embutiu."""
+        sz = _img_size(path)
+        if not sz or not path or not os.path.exists(path):
+            return False
+        iw, ih = sz
+        maxw, maxh = int(CW), int(Inches(4.6))
+        scale = min(maxw / iw, maxh / ih)
+        w, h = int(iw * scale), int(ih * scale)
+        self.ensure(h + int(Inches(0.1)))
+        left = int(ML) + (int(CW) - w) // 2
+        try:
+            self.slide.shapes.add_picture(path, Emu(left), Emu(self.y),
+                                          width=Emu(w), height=Emu(h))
+        except Exception:
+            return False
+        self.y += h + int(Inches(0.08))
+        if caption:
+            self.para("▲ " + str(caption), size=10, color=T.MUTED, after=0.14)
+        return True
+
+    def placeholder(self, text, tone=None):
+        tone = tone or T.WARNING
+        self.ensure(Inches(0.6))
+        _rect(self.slide, ML, Emu(self.y), CW, Inches(0.5), T.SURFACE_ALT,
+              line=tone)
+        _text(self.slide, ML + Inches(0.15), Emu(self.y), CW - Inches(0.3),
+              Inches(0.5), text, size=11, bold=True, color=tone,
+              anchor=MSO_ANCHOR.MIDDLE)
+        self.y += int(Inches(0.62))
+
+
 def _footer(slide, dark=False):
     """Rodape numerado em todo slide de conteudo (cover nao chama)."""
     m = _STATE["meta"]
@@ -111,9 +242,17 @@ def _title_slide(prs, title):
 
 def _cover(prs, sec, meta):
     slide = _blank(prs)
-    _rect(slide, 0, 0, SW, SH, T.INK)
     brand = meta.get("brand", {})
     accent = brand.get("accent") or T.CORAL
+    # Capa full-bleed: arte da marca (coverImagePath) ao fundo; senão, navy sólido.
+    cover = brand.get("coverImagePath")
+    if cover and os.path.exists(cover):
+        try:
+            slide.shapes.add_picture(cover, 0, 0, width=SW, height=SH)
+        except Exception:
+            _rect(slide, 0, 0, SW, SH, T.INK)
+    else:
+        _rect(slide, 0, 0, SW, SH, T.INK)
     # Wordmark (topo-esq): logo custom da marca > logo Suricatoos embutido > texto.
     used_logo = False
     logo_path = brand.get("logoPath")
@@ -218,7 +357,7 @@ def _stat_band(prs, sec):
                   color=T.MUTED)
         y = y + Inches(1.95)
     if sec.get("body"):
-        _text(slide, ML, y, CW, Inches(2.4), _clip(sec["body"], 720), size=14,
+        _text(slide, ML, y, CW, Inches(2.4), _clip(sec["body"], 2000), size=14,
               color=T.INK)
     _footer(slide)
 
@@ -430,12 +569,16 @@ def _risk_matrix(prs, data):
 def _finding_card(prs, sec):
     f = sec["finding"]
     sev = f.get("severity", "info")
-    slide, y = _title_slide(prs, _clip(f.get("title", "Achado"), 70))
-    _rect(slide, ML, y, CW, Inches(0.5), T.SEVERITY_COLOR.get(sev, T.MUTED))
-    _text(slide, ML + Inches(0.15), y + Inches(0.05), CW, Inches(0.4),
-          f"{T.SEVERITY_LABEL.get(sev, sev).upper()}  ·  {f.get('ref','')}  ·  {_clip(f.get('affectedAsset',''),60)}",
+    fl = _Flow(prs, _clip(f.get("title", "Achado"), 70))
+    # Faixa de severidade
+    fl.ensure(Inches(0.6))
+    _rect(fl.slide, ML, Emu(fl.y), CW, Inches(0.5),
+          T.SEVERITY_COLOR.get(sev, T.MUTED))
+    _text(fl.slide, ML + Inches(0.15), Emu(fl.y + int(Inches(0.05))), CW,
+          Inches(0.4),
+          f"{T.SEVERITY_LABEL.get(sev, sev).upper()}  ·  {f.get('ref','')}  ·  {_clip(f.get('affectedAsset',''),70)}",
           size=13, bold=True, color="FFFFFF", anchor=MSO_ANCHOR.MIDDLE)
-    yy = y + Inches(0.7)
+    fl.space(Inches(0.66))
     meta = []
     if f.get("weaknessClass"):
         meta.append(f"Classe: {f['weaknessClass']}")
@@ -444,154 +587,124 @@ def _finding_card(prs, sec):
     if f.get("cwe"):
         meta.append(f"CWE: {f['cwe']}")
     if meta:
-        _text(slide, ML, yy, CW, Inches(0.4), "   ".join(meta), size=11, color=T.MUTED)
-        yy += Inches(0.45)
+        fl.para("   ".join(meta), size=11, color=T.MUTED, after=0.12)
     for label, key in [("Descrição", "description"), ("Impacto", "impact"),
                        ("Remediação", "remediation")]:
         if f.get(key):
-            _text(slide, ML, yy, CW, Inches(0.3), label.upper(), size=10, bold=True, color=T.PRIMARY)
-            yy += Inches(0.28)
-            _text(slide, ML, yy, CW, Inches(0.8), _clip(f[key], 500), size=12, color=T.INK)
-            yy += Inches(0.85)
+            fl.heading(label.upper(), size=11)
+            fl.para(f[key], size=12, color=T.INK, after=0.14)
+    if f.get("narrative"):
+        fl.heading("NARRATIVA", size=11)
+        fl.para(f["narrative"], size=12, color=T.INK, after=0.14)
     if sec.get("showPoc") and f.get("reproductionSteps"):
-        steps = "\n".join(f"{i+1}. {_clip(s,140)}" for i, s in enumerate(f["reproductionSteps"][:6]))
-        _text(slide, ML, yy, CW, Inches(0.3), "REPRODUÇÃO", size=10, bold=True, color=T.PRIMARY)
-        _text(slide, ML, yy + Inches(0.28), CW, Inches(1.4), steps, size=11, color=T.INK)
-    # Evidencia (texto + imagem) em slides dedicados — so em relatorios com PoC.
+        fl.heading("REPRODUÇÃO", size=11)
+        for i, s in enumerate(f["reproductionSteps"], 1):
+            fl.para(f"{i}. {s}", size=11, color=T.INK, indent=0.1, after=0.04)
     if sec.get("showPoc"):
-        _evidence_slides(prs, f)
+        _evidence_flow(fl, f)
 
 
-def _image_slide(prs, title, path, caption=None):
-    if not path or not os.path.exists(path):
-        return
-    slide, y = _title_slide(prs, title)
-    try:
-        pic = slide.shapes.add_picture(path, ML, y)
-    except Exception:
-        return
-    max_w = int(CW)
-    max_h = int(Inches(5.0))
-    scale = min(max_w / pic.width, max_h / pic.height, 1.0)
-    pic.width = int(pic.width * scale)
-    pic.height = int(pic.height * scale)
-    pic.left = int(ML + (int(CW) - pic.width) / 2)
-    pic.top = int(y)
-    if caption:
-        _text(slide, ML, int(y) + pic.height + Inches(0.1), CW, Inches(0.4),
-              _clip(caption, 120), size=11, color=T.MUTED)
-
-
-def _evidence_slides(prs, f):
+def _evidence_flow(fl, f):
+    """Cadeia de evidência + prints INLINE no fluxo do achado (sem cap). Mostra
+    placeholder visível quando um achado alto/crítico não tem imagem."""
     ev = sorted(
         f.get("evidence") or [],
         key=lambda e: e.get("stepIndex") if e.get("stepIndex") is not None else 1_000_000,
     )
-    chain = [e for e in ev if e.get("snippet") or e.get("command")]
+    chain = [e for e in ev
+             if e.get("snippet") or e.get("command") or e.get("resultSummary")]
     imgs = [e for e in ev if e.get("imagePath")]
-
-    if f.get("narrative"):
-        slide, y = _title_slide(prs, _clip(f"Narrativa — {f.get('title','')}", 70))
-        _text(slide, ML, y, CW, Inches(5.0), _clip(f["narrative"], 1400),
-              size=14, color=T.INK)
-
     if chain:
-        slide, y = _title_slide(
-            prs, _clip(f"Cadeia de evidência — {f.get('title','')}", 70))
-        tb = slide.shapes.add_textbox(ML, y, CW, Inches(5.2))
-        tf = tb.text_frame
-        tf.word_wrap = True
-        first = True
-
-        def _line(text, size, bold, color, before=0):
-            nonlocal first
-            p = tf.paragraphs[0] if first else tf.add_paragraph()
-            first = False
-            r = p.add_run()
-            r.text = text
-            r.font.size = Pt(size)
-            r.font.bold = bold
-            r.font.name = T.FONT_BODY
-            r.font.color.rgb = _rgb(color)
-            if before:
-                p.space_before = Pt(before)
-
-        for i, e in enumerate(chain[:6], 1):
+        fl.heading("CADEIA DE EVIDÊNCIA", size=11)
+        for i, e in enumerate(chain, 1):
             n = e.get("stepIndex") or i
             head = f"{n}."
             if e.get("toolName"):
                 head += f"  [{e['toolName']}]"
-            _line(head, 12, True, T.PRIMARY, before=6)
+            if e.get("label") and e.get("label") != e.get("toolName"):
+                head += f"  {e['label']}"
+            fl.para(head, size=11, bold=True, color=T.PRIMARY, after=0.02)
             if e.get("command"):
-                _line("$ " + _clip(e["command"], 180), 10, False, T.MUTED)
+                fl.para("$ " + str(e["command"]), size=9, color=T.MUTED,
+                        font="Consolas", indent=0.12, after=0.02)
             if e.get("snippet"):
-                _line(_clip(e["snippet"], 340), 10, False, T.INK)
+                fl.para(str(e["snippet"]), size=9, color=T.MUTED,
+                        font="Consolas", indent=0.12, after=0.02)
             if e.get("resultSummary"):
-                _line("-> prova: " + _clip(e["resultSummary"], 180), 10, False,
-                      T.SUCCESS)
-
-    for e in imgs[:4]:
-        _image_slide(prs, _clip(f"Evidência Visual — {f.get('title','')}", 70),
-                     e.get("imagePath"), e.get("label"))
+                fl.para("→ prova: " + str(e["resultSummary"]), size=10,
+                        color=T.SUCCESS, indent=0.12, after=0.08)
+    rendered = 0
+    if imgs:
+        fl.heading("EVIDÊNCIA VISUAL", size=11)
+        for e in imgs:
+            if fl.image(e.get("imagePath"), e.get("label")):
+                rendered += 1
+            elif f.get("severity") in ("critical", "high"):
+                fl.placeholder(
+                    "⚠ Evidência visual referenciada não disponível no pacote.")
+    if rendered == 0 and not imgs and f.get("severity") in ("critical", "high"):
+        fl.placeholder("⚠ Evidência visual não capturada para este achado.")
 
 
 def _table(prs, findings, title, remediation=False):
-    slide, y = _title_slide(prs, title)
-    rows = min(len(findings), 12) + 1
+    # Pagina as linhas em slides "(cont.)" — nenhum achado some (antes: [:12]).
+    ROWS_PER = 13
+    chunks = [findings[i:i + ROWS_PER]
+              for i in range(0, len(findings), ROWS_PER)] or [[]]
     if remediation:
         headers = ["Ref", "Sev", "Ativo", "Remediacao"]
         widths = [Inches(1.2), Inches(1.4), Inches(3.5), Inches(6.0)]
     else:
         headers = ["Ref", "Sev", "Titulo", "Ativo"]
         widths = [Inches(1.2), Inches(1.4), Inches(5.5), Inches(4.0)]
-    gt = slide.shapes.add_table(rows, len(headers), ML, y, CW, Inches(0.4) * rows).table
-    for j, hd in enumerate(headers):
-        gt.columns[j].width = widths[j]
-        cell = gt.cell(0, j)
-        cell.fill.solid()
-        cell.fill.fore_color.rgb = _rgb(T.PRIMARY)
-        # add_run() sempre cria um run — ao contrário de `cell.text = ""`, que
-        # deixa o parágrafo SEM run e faz runs[0] estourar IndexError.
-        pr = cell.text_frame.paragraphs[0].add_run()
-        pr.text = str(hd)
-        pr.font.size = Pt(11)
-        pr.font.bold = True
-        pr.font.color.rgb = _rgb("FFFFFF")
-    for i, f in enumerate(findings[:12], start=1):
-        sev = f.get("severity", "info")
-        vals = ([f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev), _clip(f.get("affectedAsset", ""), 40), _clip(f.get("remediation", ""), 90)]
-                if remediation else
-                [f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev), _clip(f.get("title", ""), 70), _clip(f.get("affectedAsset", ""), 40)])
-        for j, v in enumerate(vals):
-            cell = gt.cell(i, j)
-            # add_run() tolera valor vazio (achado sem remediation/ref/ativo) —
-            # o `cell.text` antigo estourava IndexError quando v == "".
-            r = cell.text_frame.paragraphs[0].add_run()
-            r.text = str(v)
-            r.font.size = Pt(10)
-            r.font.color.rgb = _rgb(T.SEVERITY_COLOR.get(sev, T.INK) if j == 1 else T.INK)
-            if j == 1:
-                r.font.bold = True
+    for ci, chunk in enumerate(chunks):
+        slide, y = _title_slide(
+            prs, title if ci == 0 else _clip(title, 58) + " (cont.)")
+        rows = len(chunk) + 1
+        gt = slide.shapes.add_table(rows, len(headers), ML, y, CW,
+                                    Inches(0.4) * rows).table
+        for j, hd in enumerate(headers):
+            gt.columns[j].width = widths[j]
+            cell = gt.cell(0, j)
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = _rgb(T.PRIMARY)
+            # add_run() sempre cria um run — ao contrário de `cell.text = ""`,
+            # que deixa o parágrafo SEM run e faz runs[0] estourar IndexError.
+            pr = cell.text_frame.paragraphs[0].add_run()
+            pr.text = str(hd)
+            pr.font.size = Pt(11)
+            pr.font.bold = True
+            pr.font.color.rgb = _rgb("FFFFFF")
+        for i, f in enumerate(chunk, start=1):
+            sev = f.get("severity", "info")
+            vals = ([f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev),
+                     _clip(f.get("affectedAsset", ""), 44),
+                     _clip(f.get("remediation", ""), 140)]
+                    if remediation else
+                    [f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev),
+                     _clip(f.get("title", ""), 80),
+                     _clip(f.get("affectedAsset", ""), 44)])
+            for j, v in enumerate(vals):
+                cell = gt.cell(i, j)
+                # add_run() tolera valor vazio (achado sem remediation/ref/ativo).
+                r = cell.text_frame.paragraphs[0].add_run()
+                r.text = str(v)
+                r.font.size = Pt(10)
+                r.font.color.rgb = _rgb(
+                    T.SEVERITY_COLOR.get(sev, T.INK) if j == 1 else T.INK)
+                if j == 1:
+                    r.font.bold = True
 
 
 def _bullets(prs, items, title):
-    slide, y = _title_slide(prs, title or "Itens")
-    tb = slide.shapes.add_textbox(ML, y, CW, Inches(5.0))
-    tf = tb.text_frame
-    tf.word_wrap = True
-    for i, it in enumerate(items[:16]):
-        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-        r = p.add_run()
-        r.text = "•  " + _clip(it, 130)
-        r.font.size = Pt(14)
-        r.font.name = T.FONT_BODY
-        r.font.color.rgb = _rgb(T.INK)
-        p.space_after = Pt(6)
+    fl = _Flow(prs, title or "Itens")
+    for it in items:
+        fl.para("•  " + str(it), size=14, color=T.INK, after=0.09)
 
 
 def _paragraph(prs, text, title):
-    slide, y = _title_slide(prs, title or "")
-    _text(slide, ML, y, CW, Inches(5.0), _clip(text, 1200), size=15, color=T.INK)
+    fl = _Flow(prs, title or "")
+    fl.para(text, size=15, color=T.INK)
 
 
 def _callout(prs, sec, title):

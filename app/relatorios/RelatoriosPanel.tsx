@@ -667,15 +667,17 @@ function ReportGroupRow({
                 />
                 {ready && (
                   <>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => onPreview(r._id)}
-                      title="Pré-visualizar páginas e evidências"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      Prévia
-                    </Button>
+                    {r.format !== "json" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onPreview(r._id)}
+                        title="Pré-visualizar páginas e evidências"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        Prévia
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"

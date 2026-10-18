@@ -886,6 +886,7 @@ export const captureFindingTool = tool({
 - Achados com o mesmo (título|ativo|classe) no mesmo engajamento são deduplicados automaticamente; recapturar só anexa evidência nova.
 - Inclua evidência concreta em 'evidence' (trecho da saída, requisição/resposta, comando) — cole só o trecho relevante (é truncado ~8KB).
 - Para EVIDÊNCIA VISUAL, salve/tire o screenshot no sandbox e passe 'file_path' no item de evidência (ex.: /tmp/poc.png); o sistema faz upload e embute a imagem no relatório técnico.
+- OBRIGATÓRIO em achados CRÍTICOS e ALTOS: capture ao menos UM screenshot ('file_path') que prove a exploração (ex.: shell, dado sensível exposto, painel acessado). Tire o print ANTES de registrar — sem ele o relatório marca o achado como "evidência visual não capturada".
 - Preencha 'severity' sempre; description/impact/remediation/CWE/CVSS quando souber.
 </comportamento>`,
   inputSchema: captureFindingToolInputSchema,

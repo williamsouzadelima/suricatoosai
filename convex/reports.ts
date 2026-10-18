@@ -21,9 +21,10 @@ const formatArg = v.union(
   v.literal("docx"),
   v.literal("pptx"),
   v.literal("pdf"),
+  v.literal("json"),
 );
 
-const EVIDENCE_PER_FINDING = 20;
+const EVIDENCE_PER_FINDING = 40;
 
 function newGroupId(): string {
   return `rg_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
@@ -71,15 +72,23 @@ export const getReportInputForBackend = query({
     });
     let brand: ReturnType<typeof mapBrandRow> | undefined;
     let brandLogo: { s3Key: string; mediaType?: string } | undefined;
+    let brandCover: { s3Key: string; mediaType?: string } | undefined;
     const applyBrandRow = (
       row: Parameters<typeof mapBrandRow>[0] & {
         logo_s3_key?: string;
         logo_media_type?: string;
+        cover_s3_key?: string;
+        cover_media_type?: string;
       },
     ) => {
       brand = mapBrandRow(row);
       if (row.logo_s3_key)
         brandLogo = { s3Key: row.logo_s3_key, mediaType: row.logo_media_type };
+      if (row.cover_s3_key)
+        brandCover = {
+          s3Key: row.cover_s3_key,
+          mediaType: row.cover_media_type,
+        };
     };
     if (engagement.organization_id) {
       const orgId = engagement.organization_id;
@@ -115,7 +124,9 @@ export const getReportInputForBackend = query({
       const evRaw = await ctx.db
         .query("evidence")
         .withIndex("by_finding_and_captured", (q) => q.eq("finding_id", f._id))
-        .order("desc")
+        // asc (crono): ao limitar, mantém os PRIMEIROS passos da cadeia
+        // (recon/setup) — antes, desc perdia justamente o começo (WS3-E).
+        .order("asc")
         .take(EVIDENCE_PER_FINDING);
       // Ordena pela cadeia (step_index; sem índice → pelo tempo de captura).
       const ev = evRaw
@@ -159,6 +170,7 @@ export const getReportInputForBackend = query({
       client: { name: client?.name ?? "(cliente)" },
       brand,
       brandLogo,
+      brandCover,
       engagement: {
         name: engagement.name,
         code: engagement.code,

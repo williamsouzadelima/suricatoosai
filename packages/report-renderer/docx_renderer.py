@@ -69,6 +69,31 @@ def _clip(s, n):
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
+# Salvaguarda contra entradas patológicas; NÃO trunca conteúdo real de achado.
+# DOCX pagina sozinho — corpo de achado/evidência nunca é cortado (regra do dossiê).
+BODY_SOFT_MAX = 200000
+
+
+def _body(doc, text, size=11, bold=False, color=T.INK, after=6, font=None):
+    """Parágrafo de corpo que preserva quebras de linha (\\n) e NUNCA trunca."""
+    s = str(text or "")
+    if len(s) > BODY_SOFT_MAX:
+        s = s[:BODY_SOFT_MAX]
+    p = doc.add_paragraph()
+    p.paragraph_format.space_after = Pt(after)
+    r = p.add_run()
+    r.font.size = Pt(size)
+    r.font.bold = bold
+    r.font.name = font or T.FONT_BODY
+    r.font.color.rgb = _rgb(color)
+    parts = s.split("\n")
+    for i, ln in enumerate(parts):
+        if i:
+            r.add_break()
+        r.add_text(ln)
+    return p
+
+
 def _apply_brand(meta):
     brand = meta.get("brand") or {}
     if brand.get("primary"):
@@ -131,6 +156,17 @@ def _stat_tiles(doc, stats):
 
 def _cover(doc, sec, meta):
     brand = meta.get("brand", {})
+    # Capa com arte da marca (coverImagePath): imagem dominante + quebra. O
+    # rodapé já carrega classificação/docCode. Ausente → capa programática.
+    cover = brand.get("coverImagePath")
+    if cover and os.path.exists(cover):
+        try:
+            doc.add_picture(cover, height=Inches(8.3))
+            doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            doc.add_page_break()
+            return
+        except Exception:
+            pass
     used_logo = False
     logo_path = brand.get("logoPath")
     if logo_path and os.path.exists(logo_path):
@@ -176,7 +212,7 @@ def _stat_band(doc, sec):
               after=8)
     _stat_tiles(doc, sec.get("stats"))
     if sec.get("body"):
-        _para(doc, _clip(sec["body"], 1200), size=11, color=T.INK, after=6)
+        _body(doc, sec["body"], size=11, color=T.INK, after=6)
 
 
 def _attack_chain(doc, sec):
@@ -362,32 +398,42 @@ def _finding_card(doc, sec):
         _para(doc, "   ".join(meta), size=10, color=T.MUTED, after=4)
     if f.get("narrative"):
         _para(doc, "NARRATIVA:", size=10, bold=True, color=T.PRIMARY, after=1)
-        _para(doc, _clip(f["narrative"], 3000), size=10, color=T.INK, after=4)
+        _body(doc, f["narrative"], size=10, color=T.INK, after=4)
     for label, key in [("Descrição", "description"), ("Impacto", "impact"),
                        ("Remediação", "remediation")]:
         if f.get(key):
-            pp = doc.add_paragraph()
-            pp.paragraph_format.space_after = Pt(2)
-            _run(pp, label.upper() + ": ", size=10, bold=True, color=T.PRIMARY)
-            _run(pp, _clip(f[key], 1500), size=11, color=T.INK)
+            _para(doc, label.upper() + ":", size=10, bold=True,
+                  color=T.PRIMARY, after=1)
+            _body(doc, f[key], size=11, color=T.INK, after=6)
     if sec.get("showPoc") and f.get("reproductionSteps"):
         _para(doc, "REPRODUÇÃO:", size=10, bold=True, color=T.PRIMARY, after=2)
-        for i, s in enumerate(f["reproductionSteps"][:12], 1):
-            _para(doc, f"{i}. {_clip(s,300)}", size=10, color=T.INK, after=1)
+        for i, s in enumerate(f["reproductionSteps"], 1):
+            _body(doc, f"{i}. {s}", size=10, color=T.INK, after=1)
     if sec.get("showPoc"):
         _evidence_docx(doc, f)
 
 
 def _embed_image_docx(doc, path, caption=None):
     if not path or not os.path.exists(path):
-        return
+        return False
     try:
         doc.add_picture(path, width=Inches(6.0))
         doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
     except Exception:
-        return
+        return False
     if caption:
-        _para(doc, _clip(caption, 120), size=8, color=T.MUTED, after=4)
+        _para(doc, _clip(caption, 160), size=8, color=T.MUTED, after=4)
+    return True
+
+
+def _placeholder_docx(doc, text):
+    """Aviso visível de evidência ausente — nunca pular em silêncio (WS3)."""
+    t = doc.add_table(rows=1, cols=1)
+    cell = t.cell(0, 0)
+    cell.text = ""
+    _shade(cell, T.SURFACE_ALT)
+    _run(cell.paragraphs[0], text, size=10, bold=True, color=T.WARNING)
+    doc.add_paragraph()
 
 
 def _ev_sorted(f):
@@ -400,36 +446,42 @@ def _ev_sorted(f):
 
 def _evidence_docx(doc, f):
     ev = _ev_sorted(f)
-    if not any(
-        e.get("snippet") or e.get("imagePath") or e.get("command") for e in ev
-    ):
-        return
-    _para(doc, "CADEIA DE EVIDÊNCIA:", size=10, bold=True, color=T.PRIMARY, after=2)
-    for i, e in enumerate(ev[:20], 1):
-        n = e.get("stepIndex") or i
-        head = f"{n}."
-        if e.get("toolName"):
-            head += f"  [{e['toolName']}]"
-        if e.get("label") and e.get("label") != e.get("toolName"):
-            head += f"  {_clip(e['label'], 80)}"
-        _para(doc, head, size=10, bold=True, color=T.INK, after=1)
-        if e.get("command"):
-            p = doc.add_paragraph()
-            p.paragraph_format.space_after = Pt(1)
-            _run(p, "$ " + _clip(e["command"], 600), size=9, color=T.MUTED,
-                 font="Consolas")
-        if e.get("snippet"):
-            p = doc.add_paragraph()
-            p.paragraph_format.space_after = Pt(1)
-            _run(p, _clip(e["snippet"], 1500), size=9, color=T.MUTED,
-                 font="Consolas")
-        if e.get("resultSummary"):
-            pp = doc.add_paragraph()
-            pp.paragraph_format.space_after = Pt(3)
-            _run(pp, "→ prova: ", size=9, bold=True, color=T.SUCCESS)
-            _run(pp, _clip(e["resultSummary"], 400), size=9, color=T.INK)
-        if e.get("imagePath"):
-            _embed_image_docx(doc, e["imagePath"], e.get("label"))
+    has_any = any(
+        e.get("snippet") or e.get("imagePath") or e.get("command")
+        or e.get("resultSummary") for e in ev
+    )
+    img_rendered = 0
+    if has_any:
+        _para(doc, "CADEIA DE EVIDÊNCIA:", size=10, bold=True, color=T.PRIMARY,
+              after=2)
+        for i, e in enumerate(ev, 1):
+            n = e.get("stepIndex") or i
+            head = f"{n}."
+            if e.get("toolName"):
+                head += f"  [{e['toolName']}]"
+            if e.get("label") and e.get("label") != e.get("toolName"):
+                head += f"  {_clip(e['label'], 160)}"
+            _para(doc, head, size=10, bold=True, color=T.INK, after=1)
+            if e.get("command"):
+                _body(doc, "$ " + str(e["command"]), size=9, color=T.MUTED,
+                      font="Consolas", after=1)
+            if e.get("snippet"):
+                _body(doc, e["snippet"], size=9, color=T.MUTED, font="Consolas",
+                      after=1)
+            if e.get("resultSummary"):
+                pp = doc.add_paragraph()
+                pp.paragraph_format.space_after = Pt(3)
+                _run(pp, "→ prova: ", size=9, bold=True, color=T.SUCCESS)
+                _run(pp, e["resultSummary"], size=9, color=T.INK)
+            if e.get("imagePath"):
+                if _embed_image_docx(doc, e["imagePath"], e.get("label")):
+                    img_rendered += 1
+                else:
+                    _placeholder_docx(
+                        doc,
+                        "⚠ Evidência visual referenciada não disponível no pacote.")
+    if img_rendered == 0 and f.get("severity") in ("critical", "high"):
+        _placeholder_docx(doc, "⚠ Evidência visual não capturada para este achado.")
 
 
 def _table(doc, findings, remediation=False):
@@ -469,7 +521,7 @@ def _callout(doc, sec):
     cell = t.cell(0, 0)
     cell.text = ""
     _shade(cell, T.SURFACE_ALT)
-    _run(cell.paragraphs[0], _clip(sec.get("text", ""), 600), size=12, bold=True,
+    _run(cell.paragraphs[0], _clip(sec.get("text", ""), 2000), size=12, bold=True,
          color=col)
     doc.add_paragraph()
 
@@ -494,11 +546,11 @@ def render_docx(model, out_path):
         elif t == "heading":
             _heading(doc, sec.get("text", ""), sec.get("level", 1))
         elif t == "paragraph":
-            _para(doc, sec.get("text", ""), size=11, color=T.INK)
+            _body(doc, sec.get("text", ""), size=11, color=T.INK)
         elif t == "bullets":
             for it in sec.get("items", []):
                 p = doc.add_paragraph(style="List Bullet")
-                _run(p, _clip(it, 300), size=11, color=T.INK)
+                _run(p, str(it), size=11, color=T.INK)
         elif t == "statBand":
             _stat_band(doc, sec)
         elif t == "kpis":

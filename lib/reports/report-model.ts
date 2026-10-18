@@ -11,7 +11,7 @@
 
 export type ReportAudience =
   "technical" | "executive" | "commercial" | "action_plan";
-export type ReportFormat = "docx" | "pptx" | "pdf";
+export type ReportFormat = "docx" | "pptx" | "pdf" | "json";
 export type Severity = "info" | "low" | "medium" | "high" | "critical";
 
 /**
@@ -35,6 +35,11 @@ export type ReportBrand = {
    * a marca padrão; texto para as demais).
    */
   logoPath?: string;
+  /**
+   * Caminho LOCAL da arte de capa full-bleed (relativo à raiz do renderer),
+   * resolvido pelo job do trigger a partir do S3. Ausente → capa programática.
+   */
+  coverImagePath?: string;
 };
 
 export type ReportEvidenceView = {

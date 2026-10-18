@@ -40,6 +40,12 @@ def _esc(s):
     return (str(s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
 
+def _ml(s):
+    """Escapa p/ Paragraph do reportlab e preserva quebras de linha. NÃO trunca —
+    o Platypus pagina sozinho (corpo de achado/evidência nunca é cortado)."""
+    return _esc(s).replace("\n", "<br/>")
+
+
 def _apply_brand(meta):
     brand = meta.get("brand") or {}
     if brand.get("primary"):
@@ -69,6 +75,11 @@ def _styles():
                           fontSize=22, textColor=C(T.PRIMARY), alignment=TA_CENTER))
     ss.add(ParagraphStyle("KpiLabel", parent=ss["Normal"], fontName="Helvetica-Bold",
                           fontSize=7.5, textColor=C(T.MUTED), alignment=TA_CENTER))
+    # Código/evidência: monoespaçada com quebra em qualquer ponto (wordWrap CJK)
+    # p/ não estourar a largura do frame com tokens longos (comandos/saídas).
+    ss.add(ParagraphStyle("Mono", parent=ss["Normal"], fontName="Courier",
+                          fontSize=8, textColor=C(T.MUTED), leading=10,
+                          wordWrap="CJK", spaceAfter=3))
     return ss
 
 
@@ -82,9 +93,16 @@ def _band(score):
     return T.SUCCESS
 
 
-def _footer_factory(meta):
+def _cover_canvas_factory(meta, cover):
     def draw(canvas, doc):
         if doc.page <= 1:
+            # Capa: arte full-bleed da marca (o título é sobreposto por flowables).
+            if cover and os.path.exists(cover):
+                try:
+                    canvas.drawImage(cover, 0, 0, width=A4[0], height=A4[1],
+                                     preserveAspectRatio=False, mask="auto")
+                except Exception:
+                    pass
             return
         canvas.saveState()
         canvas.setFont("Helvetica", 7)
@@ -116,7 +134,7 @@ def _stat_table(ss, stats):
 
 def _append_image_pdf(S, ss, path, caption=None):
     if not path or not os.path.exists(path):
-        return
+        return False
     try:
         iw, ih = ImageReader(path).getSize()
         maxw, maxh = 160 * mm, 120 * mm
@@ -126,10 +144,27 @@ def _append_image_pdf(S, ss, path, caption=None):
         S.append(Spacer(1, 2 * mm))
         S.append(img)
         if caption:
-            S.append(Paragraph(_esc(_clip(caption, 120)), ss["Small"]))
+            S.append(Paragraph(_esc(_clip(caption, 160)), ss["Small"]))
         S.append(Spacer(1, 3 * mm))
+        return True
     except Exception:
-        return
+        return False
+
+
+def _placeholder_pdf(S, ss, text):
+    """Aviso visível de evidência ausente — nunca pular em silêncio (WS3)."""
+    tbl = Table(
+        [[Paragraph(f'<font color="#{T.WARNING}"><b>{_esc(text)}</b></font>',
+                    ss["Body2"])]], colWidths=[165 * mm])
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), C(T.SURFACE_ALT)),
+        ("LINEBEFORE", (0, 0), (0, -1), 3, C(T.WARNING)),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    S.append(tbl)
+    S.append(Spacer(1, 3 * mm))
 
 
 def _part_divider(ss, sec):
@@ -157,7 +192,7 @@ def _stat_band(ss, sec):
     if st:
         out += [st, Spacer(1, 5 * mm)]
     if sec.get("body"):
-        out.append(Paragraph(_esc(_clip(sec["body"], 1500)), ss["Body2"]))
+        out.append(Paragraph(_ml(sec["body"]), ss["Body2"]))
     return out
 
 
@@ -292,7 +327,26 @@ def render_pdf(model, out_path):
 
     for sec in model.get("sections", []):
         t = sec.get("type")
-        if t == "cover":
+        if t == "cover" and brand.get("coverImagePath") and os.path.exists(brand["coverImagePath"]):
+            # Arte full-bleed desenhada no canvas; sobrepomos o título em branco.
+            S.append(Spacer(1, 150 * mm))
+            S.append(Paragraph(
+                f'<b><font color="#FFFFFF">{esc(meta.get("classification",""))}   ·   {esc(meta.get("docCode",""))}</font></b>',
+                ss["Small"]))
+            S.append(Paragraph(
+                f'<font color="#FFFFFF"><b>{esc(meta.get("volume",""))}</b></font>',
+                ss["Small"]))
+            S.append(Spacer(1, 6 * mm))
+            S.append(Paragraph(
+                f'<font color="#FFFFFF">{esc(sec.get("title",""))}</font>',
+                ss["Cover"]))
+            if sec.get("subtitle"):
+                S.append(Paragraph(
+                    f'<font color="#FFFFFF">{esc(sec["subtitle"])}</font>',
+                    ParagraphStyle("subl", parent=ss["Body2"], fontSize=13,
+                                   textColor=colors.white)))
+            S.append(PageBreak())
+        elif t == "cover":
             S.append(Spacer(1, 30 * mm))
             used_logo = False
             logo_path = brand.get("logoPath")
@@ -347,10 +401,10 @@ def render_pdf(model, out_path):
             S.append(Paragraph(esc(sec.get("text", "")), ss["H1"]))
             S.append(HRFlowable(width="18%", thickness=2, color=C(T.CORAL), spaceAfter=6))
         elif t == "paragraph":
-            S.append(Paragraph(esc(_clip(sec.get("text", ""), 2000)), ss["Body2"]))
+            S.append(Paragraph(_ml(sec.get("text", "")), ss["Body2"]))
         elif t == "bullets":
             for it in sec.get("items", []):
-                S.append(Paragraph("• " + esc(_clip(it, 300)), ss["Body2"]))
+                S.append(Paragraph("• " + _ml(it), ss["Body2"]))
         elif t == "statBand":
             S += _stat_band(ss, sec)
         elif t == "kpis":
@@ -418,7 +472,7 @@ def render_pdf(model, out_path):
             sev = f.get("severity", "info")
             S.append(Paragraph(
                 f'<font color="#{T.SEVERITY_COLOR.get(sev, T.MUTED)}"><b>[{T.SEVERITY_LABEL.get(sev, sev).upper()}]</b></font> '
-                f'{esc(f.get("ref",""))} · {esc(_clip(f.get("title",""),110))}', ss["CardTitle"]))
+                f'{esc(f.get("ref",""))} · {esc(_clip(f.get("title",""),200))}', ss["CardTitle"]))
             meta_bits = []
             if f.get("affectedAsset"):
                 meta_bits.append(f"Ativo: {esc(f['affectedAsset'])}")
@@ -431,14 +485,14 @@ def render_pdf(model, out_path):
             if meta_bits:
                 S.append(Paragraph("   ".join(meta_bits), ss["Small"]))
             if f.get("narrative"):
-                S.append(Paragraph(f'<b><font color="#{T.PRIMARY}">Narrativa:</font></b> {esc(_clip(f["narrative"],3000))}', ss["Body2"]))
+                S.append(Paragraph(f'<b><font color="#{T.PRIMARY}">Narrativa:</font></b> {_ml(f["narrative"])}', ss["Body2"]))
             for label, key in [("Descrição", "description"), ("Impacto", "impact"), ("Remediação", "remediation")]:
                 if f.get(key):
-                    S.append(Paragraph(f'<b><font color="#{T.PRIMARY}">{label}:</font></b> {esc(_clip(f[key],2000))}', ss["Body2"]))
+                    S.append(Paragraph(f'<b><font color="#{T.PRIMARY}">{label}:</font></b> {_ml(f[key])}', ss["Body2"]))
             if sec.get("showPoc") and f.get("reproductionSteps"):
                 S.append(Paragraph(f'<b><font color="#{T.PRIMARY}">Reprodução:</font></b>', ss["Body2"]))
-                for i, s in enumerate(f["reproductionSteps"][:12], 1):
-                    S.append(Paragraph(f"{i}. {esc(_clip(s,400))}", ss["Body2"]))
+                for i, s in enumerate(f["reproductionSteps"], 1):
+                    S.append(Paragraph(f"{i}. {_ml(s)}", ss["Body2"]))
             if sec.get("showPoc"):
                 ev = sorted(
                     f.get("evidence") or [],
@@ -446,22 +500,28 @@ def render_pdf(model, out_path):
                 )
                 if any(e.get("snippet") or e.get("imagePath") or e.get("command") for e in ev):
                     S.append(Paragraph(f'<b><font color="#{T.PRIMARY}">Cadeia de evidência:</font></b>', ss["Body2"]))
-                for i, e in enumerate(ev[:20], 1):
+                img_rendered = 0
+                for i, e in enumerate(ev, 1):
                     n = e.get("stepIndex") or i
                     head = f"<b>{n}.</b>"
                     if e.get("toolName"):
                         head += f' <font face="Courier">[{esc(e["toolName"])}]</font>'
                     if e.get("label") and e.get("label") != e.get("toolName"):
-                        head += f' {esc(_clip(e["label"],80))}'
+                        head += f' {esc(_clip(e["label"],160))}'
                     S.append(Paragraph(head, ss["Small"]))
                     if e.get("command"):
-                        S.append(Paragraph(f'<font face="Courier" size="8">$ {esc(_clip(e["command"],600))}</font>', ss["Small"]))
+                        S.append(Paragraph("$ " + _ml(e["command"]), ss["Mono"]))
                     if e.get("snippet"):
-                        S.append(Paragraph(f'<font face="Courier" size="8">{esc(_clip(e["snippet"],1500))}</font>', ss["Small"]))
+                        S.append(Paragraph(_ml(e["snippet"]), ss["Mono"]))
                     if e.get("resultSummary"):
-                        S.append(Paragraph(f'<font color="#{T.SUCCESS}"><b>&#8594; prova:</b></font> {esc(_clip(e["resultSummary"],400))}', ss["Small"]))
+                        S.append(Paragraph(f'<font color="#{T.SUCCESS}"><b>&#8594; prova:</b></font> {_ml(e["resultSummary"])}', ss["Small"]))
                     if e.get("imagePath"):
-                        _append_image_pdf(S, ss, e["imagePath"], e.get("label"))
+                        if _append_image_pdf(S, ss, e["imagePath"], e.get("label")):
+                            img_rendered += 1
+                        else:
+                            _placeholder_pdf(S, ss, "⚠ Evidência visual referenciada não disponível no pacote.")
+                if img_rendered == 0 and sev in ("critical", "high"):
+                    _placeholder_pdf(S, ss, "⚠ Evidência visual não capturada para este achado.")
         elif t in ("findingsTable", "remediationMatrix"):
             findings = sec.get("findings", [])
             rem = t == "remediationMatrix"
@@ -503,7 +563,7 @@ def render_pdf(model, out_path):
             S += _next_steps(ss, sec, brand)
         elif t == "callout":
             col = T.CALLOUT_COLOR.get(sec.get("tone", "info"), T.PRIMARY)
-            tbl = Table([[Paragraph(f'<font color="#{col}"><b>{esc(_clip(sec.get("text",""),600))}</b></font>', ss["Body2"])]],
+            tbl = Table([[Paragraph(f'<font color="#{col}"><b>{_ml(sec.get("text",""))}</b></font>', ss["Body2"])]],
                         colWidths=[165 * mm])
             tbl.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, -1), C(T.SURFACE_ALT)),
@@ -518,5 +578,5 @@ def render_pdf(model, out_path):
     doc = SimpleDocTemplate(out_path, pagesize=A4, leftMargin=18 * mm,
                             rightMargin=18 * mm, topMargin=16 * mm, bottomMargin=16 * mm,
                             title="Relatório")
-    foot = _footer_factory(meta)
+    foot = _cover_canvas_factory(meta, brand.get("coverImagePath"))
     doc.build(S, onFirstPage=foot, onLaterPages=foot)

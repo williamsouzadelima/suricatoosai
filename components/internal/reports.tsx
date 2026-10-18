@@ -7,7 +7,7 @@ import type { Tone } from "@/app/admin/_ui";
 
 export type ReportAudience =
   "technical" | "executive" | "commercial" | "action_plan";
-export type ReportFormat = "docx" | "pptx" | "pdf";
+export type ReportFormat = "docx" | "pptx" | "pdf" | "json";
 export type ReportStatus = "queued" | "rendering" | "ready" | "failed";
 
 export const AUDIENCE_LABEL: Record<ReportAudience, string> = {
@@ -38,7 +38,7 @@ export const REPORT_STATUS_LABEL: Record<ReportStatus, string> = {
   failed: "Falhou",
 };
 
-export const ALL_FORMATS: ReportFormat[] = ["docx", "pptx", "pdf"];
+export const ALL_FORMATS: ReportFormat[] = ["docx", "pptx", "pdf", "json"];
 
 /** A geração sob demanda cobre estas audiences (reportAudienceValidator). */
 export const GENERATABLE_AUDIENCES: ReportAudience[] = [

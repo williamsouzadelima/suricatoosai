@@ -17,18 +17,24 @@ import { RENDERER_SOURCES } from "../packages/report-renderer/sources";
 
 export const REPORT_GENERATION_TASK_ID = "generate-engagement-report";
 
-const EXT: Record<string, string> = { docx: "docx", pptx: "pptx", pdf: "pdf" };
+const EXT: Record<string, string> = {
+  docx: "docx",
+  pptx: "pptx",
+  pdf: "pdf",
+  json: "json",
+};
 const MIME: Record<string, string> = {
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   pdf: "application/pdf",
+  json: "application/json",
 };
 
 const payloadSchema = z.object({
   engagementId: z.string().min(1),
   userId: z.string().min(1),
   audience: z.enum(["technical", "executive", "commercial", "action_plan"]),
-  formats: z.array(z.enum(["docx", "pptx", "pdf"])).min(1),
+  formats: z.array(z.enum(["docx", "pptx", "pdf", "json"])).min(1),
   reportGroupId: z.string().min(1),
   version: z.number().int().positive(),
   generatedBy: z.string().min(1),
@@ -160,16 +166,34 @@ export const generateEngagementReport = schemaTask({
 
       // 2a) Baixa as evidências em imagem do S3 para dentro do sandbox e mapeia
       //     s3Key → caminho local (relativo ao renderer). Bounded p/ limitar o job.
-      const MAX_IMAGES = 40;
+      // Teto POR ACHADO (não global) + prioridade a crítico/alto, para que
+      // achados finais de engajamentos grandes não fiquem sem print (WS3-D).
+      const MAX_IMAGES_TOTAL = 150;
+      const MAX_IMAGES_PER_FINDING = 8;
       const imagePathByS3 = new Map<string, string>();
       let imgIdx = 0;
-      for (const f of input.findings) {
+      const sevRank: Record<string, number> = {
+        critical: 0,
+        high: 1,
+        medium: 2,
+        low: 3,
+        info: 4,
+      };
+      const orderedFindings = [...input.findings].sort(
+        (a, b) => (sevRank[a.severity] ?? 9) - (sevRank[b.severity] ?? 9),
+      );
+      for (const f of orderedFindings) {
+        let perFinding = 0;
         for (const e of f.evidence) {
-          if (imgIdx >= MAX_IMAGES) break;
+          if (imgIdx >= MAX_IMAGES_TOTAL) break;
+          if (perFinding >= MAX_IMAGES_PER_FINDING) break;
           const key = e.s3Key;
           const mt = e.mediaType;
-          if (!key || !mt || !mt.startsWith("image/") || imagePathByS3.has(key))
+          if (!key || !mt || !mt.startsWith("image/")) continue;
+          if (imagePathByS3.has(key)) {
+            perFinding++;
             continue;
+          }
           try {
             const obj = await s3.send(
               new GetObjectCommand({ Bucket: bucket, Key: key }),
@@ -185,6 +209,7 @@ export const generateEngagementReport = schemaTask({
             await sbx.files.write(`${base}/${rel}`, ab);
             imagePathByS3.set(key, rel);
             imgIdx++;
+            perFinding++;
           } catch (imgErr) {
             console.error(
               "report: falha ao baixar evidência de imagem",
@@ -221,6 +246,36 @@ export const generateEngagementReport = schemaTask({
         }
       }
 
+      // 2a-ter) Arte de capa da marca (se houver) → caminho local full-bleed.
+      let brandCoverPath: string | undefined;
+      if (input.brandCover?.s3Key) {
+        try {
+          const obj = await s3.send(
+            new GetObjectCommand({
+              Bucket: bucket,
+              Key: input.brandCover.s3Key,
+            }),
+          );
+          const bytes = await obj.Body?.transformToByteArray();
+          if (bytes) {
+            const mt = input.brandCover.mediaType || "image/png";
+            const ext = mt.split("/")[1]?.split("+")[0] || "png";
+            const rel = `brand/cover.${ext}`;
+            const ab = bytes.buffer.slice(
+              bytes.byteOffset,
+              bytes.byteOffset + bytes.byteLength,
+            ) as ArrayBuffer;
+            await sbx.files.write(`${base}/${rel}`, ab);
+            brandCoverPath = rel;
+          }
+        } catch (coverErr) {
+          console.error(
+            "report: falha ao baixar arte de capa da marca",
+            coverErr,
+          );
+        }
+      }
+
       // 2b) Monta o ReportModel em TS, já com imagePath resolvido.
       const reportInput: ReportInput = {
         client: input.client,
@@ -229,10 +284,11 @@ export const generateEngagementReport = schemaTask({
         generatedAt: Date.now(),
         version: payload.version,
         brand:
-          input.brand || brandLogoPath
+          input.brand || brandLogoPath || brandCoverPath
             ? {
                 ...(input.brand ?? {}),
                 ...(brandLogoPath ? { logoPath: brandLogoPath } : {}),
+                ...(brandCoverPath ? { coverImagePath: brandCoverPath } : {}),
               }
             : undefined,
         findings: input.findings.map((f) => ({
@@ -266,7 +322,13 @@ export const generateEngagementReport = schemaTask({
       for (const [fn, src] of Object.entries(RENDERER_SOURCES)) {
         await sbx.files.write(`${base}/${fn}`, src);
       }
-      await sbx.files.write(`${base}/model.json`, JSON.stringify(model));
+      // Inclui `findings` no topo do model.json: o export `json` o reemite
+      // (meta + kpis + charts + sections + findings); docx/pptx/pdf ignoram
+      // chaves extras. Nada truncado.
+      await sbx.files.write(
+        `${base}/model.json`,
+        JSON.stringify({ ...model, findings: reportInput.findings }),
+      );
 
       const readyFormats: string[] = [];
       const failedFormats: string[] = [];

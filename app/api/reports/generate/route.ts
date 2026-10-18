@@ -10,14 +10,14 @@ export const runtime = "nodejs";
 
 const TASK_ID = "generate-engagement-report";
 type Audience = "technical" | "executive" | "commercial" | "action_plan";
-type Format = "docx" | "pptx" | "pdf";
+type Format = "docx" | "pptx" | "pdf" | "json";
 const AUDIENCES: readonly Audience[] = [
   "technical",
   "executive",
   "commercial",
   "action_plan",
 ];
-const FORMATS: readonly Format[] = ["docx", "pptx", "pdf"];
+const FORMATS: readonly Format[] = ["docx", "pptx", "pdf", "json"];
 
 function isAudience(v: unknown): v is Audience {
   return typeof v === "string" && (AUDIENCES as readonly string[]).includes(v);

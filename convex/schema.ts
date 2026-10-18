@@ -69,6 +69,7 @@ const reportFormatValidator = v.union(
   v.literal("docx"),
   v.literal("pptx"),
   v.literal("pdf"),
+  v.literal("json"),
 );
 const reportStatusValidator = v.union(
   v.literal("queued"),
@@ -1784,6 +1785,8 @@ export default defineSchema({
     classification: v.optional(v.string()),
     logo_s3_key: v.optional(v.string()),
     logo_media_type: v.optional(v.string()),
+    cover_s3_key: v.optional(v.string()),
+    cover_media_type: v.optional(v.string()),
     updated_at: v.number(),
   })
     .index("by_org", ["organization_id"])
