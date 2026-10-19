@@ -61,6 +61,12 @@ def _para(doc, text, size=11, bold=False, color=T.INK, after=6, align=None):
 
 def _heading(doc, text, level=1):
     p = doc.add_paragraph()
+    # Estilo de cabeçalho nomeado → entra no outline/navegação/TOC do Word.
+    # A formatação da marca (run abaixo) sobrepõe a aparência do estilo.
+    try:
+        p.style = doc.styles["Heading 1" if level == 1 else "Heading 2"]
+    except KeyError:
+        pass
     p.paragraph_format.space_before = Pt(14)
     p.paragraph_format.space_after = Pt(6)
     _run(p, text, size=17 if level == 1 else 14, bold=True, color=T.PRIMARY,
@@ -393,6 +399,11 @@ def _finding_card(doc, sec):
     f = sec["finding"]
     sev = f.get("severity", "info")
     p = doc.add_paragraph()
+    # Título do achado como Heading 2 → aparece no outline/TOC do Word.
+    try:
+        p.style = doc.styles["Heading 2"]
+    except KeyError:
+        pass
     p.paragraph_format.space_before = Pt(10)
     _run(p, f"[{T.SEVERITY_LABEL.get(sev, sev).upper()}] ", size=13, bold=True,
          color=T.SEVERITY_COLOR.get(sev, T.MUTED))

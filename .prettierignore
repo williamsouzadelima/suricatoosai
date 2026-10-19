@@ -5,5 +5,6 @@
 .github/
 convex/_generated/
 third_party/strix-skills/
-# Blob base64 gerado (fontes IBM Plex) — nao formatar
+# Arquivos TS gerados por gen_sources.py (código Python embutido) — nao formatar
 packages/report-renderer/fonts.ts
+packages/report-renderer/sources.ts

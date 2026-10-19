@@ -861,7 +861,12 @@ export const captureFindingToolInputSchema = z.object({
     .optional()
     .describe("Passos de reprodução, um por item."),
   cwe: z.string().optional().describe("CWE, ex.: 'CWE-89'."),
-  cvss_vector: z.string().optional().describe("Vetor CVSS 3.1/4.0, se souber."),
+  cvss_vector: z
+    .string()
+    .optional()
+    .describe(
+      "Vetor CVSS 3.1/4.0 (ex.: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H). Calcule e informe em achados CRÍTICO/ALTO — aparece no card do relatório.",
+    ),
   confidence: z
     .enum(["low", "medium", "high"])
     .optional()
@@ -887,7 +892,8 @@ export const captureFindingTool = tool({
 - Inclua evidência concreta em 'evidence' (trecho da saída, requisição/resposta, comando) — cole só o trecho relevante (é truncado ~8KB).
 - Para EVIDÊNCIA VISUAL, salve/tire o screenshot no sandbox e passe 'file_path' no item de evidência (ex.: /tmp/poc.png); o sistema faz upload e embute a imagem no relatório técnico.
 - OBRIGATÓRIO em achados CRÍTICOS e ALTOS: capture ao menos UM screenshot ('file_path') que prove a exploração (ex.: shell, dado sensível exposto, painel acessado). Tire o print ANTES de registrar — sem ele o relatório marca o achado como "evidência visual não capturada".
-- Preencha 'severity' sempre; description/impact/remediation/CWE/CVSS quando souber.
+- Preencha 'severity' sempre; description/impact/remediation/CWE quando souber.
+- Em achados CRÍTICO/ALTO, informe o 'cvss_vector' (você mesmo calcula o vetor) — ele aparece no card do relatório técnico.
 </comportamento>`,
   inputSchema: captureFindingToolInputSchema,
 });

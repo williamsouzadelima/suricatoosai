@@ -569,6 +569,11 @@ def _risk_matrix(prs, data):
 def _finding_card(prs, sec):
     f = sec["finding"]
     sev = f.get("severity", "info")
+    # Deck de apresentação: só crít/alto ganham slide dedicado; os demais constam
+    # na tabela de achados (que pagina TODOS). Mantém o PPTX enxuto — DOCX/PDF
+    # seguem detalhando todos os achados.
+    if sev not in ("critical", "high"):
+        return
     fl = _Flow(prs, _clip(f.get("title", "Achado"), 70))
     # Faixa de severidade
     fl.ensure(Inches(0.6))
@@ -598,8 +603,13 @@ def _finding_card(prs, sec):
         fl.para(f["narrative"], size=12, color=T.INK, after=0.14)
     if sec.get("showPoc") and f.get("reproductionSteps"):
         fl.heading("REPRODUÇÃO", size=11)
-        for i, s in enumerate(f["reproductionSteps"], 1):
+        _steps = f["reproductionSteps"]
+        for i, s in enumerate(_steps[:6], 1):
             fl.para(f"{i}. {s}", size=11, color=T.INK, indent=0.1, after=0.04)
+        if len(_steps) > 6:
+            fl.para(
+                f"(+{len(_steps) - 6} passos — detalhe completo no relatório técnico DOCX/PDF)",
+                size=10, color=T.MUTED, indent=0.1, after=0.04)
     if sec.get("showPoc"):
         _evidence_flow(fl, f)
 
@@ -616,7 +626,7 @@ def _evidence_flow(fl, f):
     imgs = [e for e in ev if e.get("imagePath")]
     if chain:
         fl.heading("CADEIA DE EVIDÊNCIA", size=11)
-        for i, e in enumerate(chain, 1):
+        for i, e in enumerate(chain[:6], 1):
             n = e.get("stepIndex") or i
             head = f"{n}."
             if e.get("toolName"):
@@ -633,15 +643,23 @@ def _evidence_flow(fl, f):
             if e.get("resultSummary"):
                 fl.para("→ prova: " + str(e["resultSummary"]), size=10,
                         color=T.SUCCESS, indent=0.12, after=0.08)
+    if len(chain) > 6:
+        fl.para(
+            f"(+{len(chain) - 6} passos de evidência — cadeia completa no relatório técnico DOCX/PDF)",
+            size=10, color=T.MUTED, after=0.08)
     rendered = 0
     if imgs:
         fl.heading("EVIDÊNCIA VISUAL", size=11)
-        for e in imgs:
+        for e in imgs[:4]:
             if fl.image(e.get("imagePath"), e.get("label")):
                 rendered += 1
             elif f.get("severity") in ("critical", "high"):
                 fl.placeholder(
                     "⚠ Evidência visual referenciada não disponível no pacote.")
+        if len(imgs) > 4:
+            fl.para(
+                f"(+{len(imgs) - 4} imagens — veja o relatório técnico completo)",
+                size=10, color=T.MUTED, after=0.08)
     if rendered == 0 and not imgs and f.get("severity") in ("critical", "high"):
         fl.placeholder("⚠ Evidência visual não capturada para este achado.")
 
