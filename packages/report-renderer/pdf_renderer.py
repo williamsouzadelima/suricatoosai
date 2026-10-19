@@ -152,7 +152,8 @@ def _cover_canvas_factory(meta, cover):
             # Capa: arte full-bleed da marca (o título é sobreposto por flowables).
             if cover and os.path.exists(cover):
                 try:
-                    canvas.drawImage(cover, 0, 0, width=A4[0], height=A4[1],
+                    fitted = T.cover_fit(cover, A4[0], A4[1])
+                    canvas.drawImage(fitted, 0, 0, width=A4[0], height=A4[1],
                                      preserveAspectRatio=False, mask="auto")
                 except Exception:
                     pass

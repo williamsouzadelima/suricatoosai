@@ -260,6 +260,42 @@ export const setReportBrandLogoForBackend = mutation({
   },
 });
 
+/**
+ * Seta a arte de capa da marca (cover_s3_key). Espelha
+ * setReportBrandLogoForBackend; o trigger baixa a imagem e o renderer a usa como
+ * fundo full-bleed da capa (PPTX/PDF, com crop-to-fill) / banner no topo (DOCX),
+ * caindo para a capa programática navy quando ausente. serviceKey-only.
+ */
+export const setReportBrandCoverForBackend = mutation({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    s3Key: v.optional(v.string()),
+    mediaType: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const key = (args.s3Key ?? "").trim();
+    const coverFields = {
+      cover_s3_key: key === "" ? undefined : key,
+      cover_media_type: key === "" ? undefined : (args.mediaType ?? undefined),
+      updated_at: Date.now(),
+    };
+    const existing = await ctx.db
+      .query("report_brands")
+      .withIndex("by_user", (q) => q.eq("user_id", args.userId))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, coverFields);
+      return existing._id;
+    }
+    return await ctx.db.insert("report_brands", {
+      user_id: args.userId,
+      ...coverFields,
+    });
+  },
+});
+
 export const upsertReportBrandForBackend = mutation({
   args: {
     serviceKey: v.string(),

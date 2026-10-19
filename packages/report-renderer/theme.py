@@ -70,3 +70,30 @@ def font_path(family, variant="normal"):
     return p if os.path.exists(p) else None
 
 WORDMARK = "Suricatoos"
+
+
+def cover_fit(src, tw, th):
+    """Crop-to-fill: recorta a imagem (centro) ao aspecto tw:th, preenchendo o
+    alvo SEM distorcer. Retorna um .png temporário; em falha, devolve `src`.
+    Usado pela capa dos 3 renderers (antes esticavam a arte → distorção/estouro)."""
+    try:
+        from PIL import Image
+        import tempfile
+        im = Image.open(src).convert("RGB")
+        iw, ih = im.size
+        ta = float(tw) / float(th)
+        ia = (iw / ih) if ih else ta
+        if ia > ta:  # imagem mais larga → corta laterais
+            nw = max(1, int(round(ih * ta)))
+            x = (iw - nw) // 2
+            im = im.crop((x, 0, x + nw, ih))
+        elif ia < ta:  # imagem mais alta → corta topo/base
+            nh = max(1, int(round(iw / ta)))
+            y = (ih - nh) // 2
+            im = im.crop((0, y, iw, y + nh))
+        fd, out = tempfile.mkstemp(suffix=".png")
+        os.close(fd)
+        im.save(out, "PNG")
+        return out
+    except Exception:
+        return src

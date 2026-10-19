@@ -248,7 +248,8 @@ def _cover(prs, sec, meta):
     cover = brand.get("coverImagePath")
     if cover and os.path.exists(cover):
         try:
-            slide.shapes.add_picture(cover, 0, 0, width=SW, height=SH)
+            fitted = T.cover_fit(cover, int(SW), int(SH))
+            slide.shapes.add_picture(fitted, 0, 0, width=SW, height=SH)
         except Exception:
             _rect(slide, 0, 0, SW, SH, T.INK)
     else:

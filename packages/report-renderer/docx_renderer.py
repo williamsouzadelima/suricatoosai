@@ -179,11 +179,14 @@ def _cover(doc, sec, meta):
     # rodapé já carrega classificação/docCode. Ausente → capa programática.
     cover = brand.get("coverImagePath")
     if cover and os.path.exists(cover):
+        # Banner da arte da marca no topo (crop-to-fill numa faixa larga); segue a
+        # capa programática (logo/título/stats) abaixo — mantém o TÍTULO do
+        # relatório, que o DOCX não sobrepõe sobre imagem. (Evita o bug de capa
+        # full-bleed 0-margin do WS5.)
         try:
-            doc.add_picture(cover, height=Inches(8.3))
+            fitted = T.cover_fit(cover, 210, 74)
+            doc.add_picture(fitted, width=Inches(6.3))
             doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
-            doc.add_page_break()
-            return
         except Exception:
             pass
     used_logo = False
