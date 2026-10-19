@@ -75,12 +75,18 @@ export async function POST(req: NextRequest) {
       },
     );
 
+    // Inclui o reportGroupId (único por createReportRequest) na chave. SEM ele,
+    // remover + regerar o mesmo (engajamento, audience, versão) dentro do TTL de
+    // 6h colide a chave: o tasks.trigger devolve o run ANTIGO já concluído e o
+    // novo grupo fica órfão, preso "na fila" sem nunca rodar. Com o reportGroupId
+    // cada "Gerar" é único e sempre dispara um run fresco.
     const idempotencyKey = await idempotencyKeys.create(
       [
         engagementId,
         audience,
         [...formats].sort().join(","),
         String(request.version),
+        request.reportGroupId,
       ],
       { scope: "global" },
     );
