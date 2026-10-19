@@ -352,18 +352,35 @@ def _kpis(doc, kpis):
 
 
 def _severity_chart(doc, data):
+    # Barras horizontais de verdade: célula sombreada com a cor da severidade e
+    # largura proporcional à contagem (antes era "████" em texto). A célula
+    # restante fica sem borda/preenchimento (invisível) — só a barra aparece.
     dist = data.get("severityDistribution", [])
     maxc = max([d.get("count", 0) for d in dist] + [1])
+    TRACK = 5.6  # polegadas da trilha total da barra
     for d in dist:
         sev = d.get("severity")
         c = d.get("count", 0)
-        p = doc.add_paragraph()
-        p.paragraph_format.space_after = Pt(2)
-        _run(p, f"{T.SEVERITY_LABEL.get(sev, sev):<12} ", size=11, bold=True,
-             color=T.SEVERITY_COLOR.get(sev, T.INK), font=T.FONT_MONO)
-        blocks = int(round((c / maxc) * 30)) if c > 0 else 0
-        _run(p, "█" * blocks + f"  {c}", size=11,
-             color=T.SEVERITY_COLOR.get(sev, T.MUTED), font=T.FONT_MONO)
+        color = T.SEVERITY_COLOR.get(sev, T.MUTED)
+        lbl = doc.add_paragraph()
+        lbl.paragraph_format.space_before = Pt(4)
+        lbl.paragraph_format.space_after = Pt(1)
+        _run(lbl, f"{T.SEVERITY_LABEL.get(sev, sev)}  ·  {c}", size=10,
+             bold=True, color=color)
+        frac = (c / maxc) if maxc else 0.0
+        barw = max(0.06, TRACK * frac)
+        t = doc.add_table(rows=1, cols=2)
+        t.allow_autofit = False
+        bar, rest = t.cell(0, 0), t.cell(0, 1)
+        bar.width = Inches(barw)
+        rest.width = Inches(max(0.02, TRACK - barw))
+        _shade(bar, color)
+        for cell in (bar, rest):
+            pc = cell.paragraphs[0]
+            pc.paragraph_format.space_before = Pt(0)
+            pc.paragraph_format.space_after = Pt(0)
+            r = pc.add_run(" ")
+            r.font.size = Pt(7)
     doc.add_paragraph()
 
 
