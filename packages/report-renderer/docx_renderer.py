@@ -193,7 +193,7 @@ def _cover(doc, sec, meta):
     logo_path = brand.get("logoPath")
     if logo_path and os.path.exists(logo_path):
         try:
-            doc.add_picture(logo_path, width=Inches(2.6))
+            doc.add_picture(logo_path, width=Inches(1.1))
             used_logo = True
         except Exception:
             used_logo = False
@@ -201,7 +201,7 @@ def _cover(doc, sec, meta):
         lp = logo.write_logo(dark=False)
         if lp and os.path.exists(lp):
             try:
-                doc.add_picture(lp, width=Inches(2.6))
+                doc.add_picture(lp, width=Inches(1.1))
                 used_logo = True
             except Exception:
                 used_logo = False
