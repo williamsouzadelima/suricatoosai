@@ -867,6 +867,14 @@ export const captureFindingToolInputSchema = z.object({
     .describe(
       "Vetor CVSS 3.1/4.0 (ex.: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H). Calcule e informe em achados CRÍTICO/ALTO — aparece no card do relatório.",
     ),
+  cvss_score: z
+    .number()
+    .min(0)
+    .max(10)
+    .optional()
+    .describe(
+      "Score CVSS numérico 0-10 (derivado do vetor). Informe em CRÍTICO/ALTO — aparece na coluna CVSS da tabela de achados.",
+    ),
   confidence: z
     .enum(["low", "medium", "high"])
     .optional()

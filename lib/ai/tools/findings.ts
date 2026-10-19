@@ -49,6 +49,7 @@ export const createCaptureFinding = (context: ToolContext) => {
       reproduction_steps,
       cwe,
       cvss_vector,
+      cvss_score,
       confidence,
       evidence,
     }: CaptureFindingToolInput) => {
@@ -126,6 +127,7 @@ export const createCaptureFinding = (context: ToolContext) => {
           reproductionSteps: reproduction_steps,
           cwe,
           cvssVector: cvss_vector,
+          cvssScore: cvss_score,
           confidence,
           origin: "agent",
           sourceMessageId: context.assistantMessageId,
