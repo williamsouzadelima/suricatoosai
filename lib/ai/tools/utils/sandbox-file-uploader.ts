@@ -6,7 +6,8 @@ import { Id } from "@/convex/_generated/dataModel";
 import type { AnySandbox } from "@/types";
 import { isCentrifugoSandbox, isE2BSandbox } from "./sandbox-types";
 import { buildSandboxCommandOptions } from "./sandbox-command-options";
-import { generateS3UploadUrl } from "@/convex/s3Utils";
+import { generateS3UploadUrl, getS3Client } from "@/convex/s3Utils";
+import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getConvexClient } from "@/lib/db/convex-client";
 import { MAX_GENERATED_FILE_SIZE_BYTES } from "@/lib/constants/s3";
 import { logger } from "@/lib/logger";
@@ -387,6 +388,121 @@ async function uploadGeneratedFileFromSandboxToUrl(args: {
   }
 }
 
+/**
+ * Lê os bytes de um arquivo do sandbox via `base64` no canal de comando.
+ * Usado pelo fallback server-side quando o upload direto do exec node não
+ * persistiu o objeto. Rejeita leitura truncada (compara com o tamanho real).
+ */
+async function readSandboxFileBytesViaBase64(
+  sandbox: AnySandbox,
+  fullPath: string,
+  expectedSize: number,
+): Promise<Buffer> {
+  const quoted = shellQuote(fullPath);
+  const command = `base64 -w0 ${quoted} 2>/dev/null || base64 ${quoted}`;
+  let result: SandboxCommandResult;
+  try {
+    result = await sandbox.commands.run(command, {
+      ...buildSandboxCommandOptions(sandbox),
+      timeoutMs: SANDBOX_UPLOAD_TIMEOUT_MS,
+    } as ReturnType<typeof buildSandboxCommandOptions>);
+  } catch (error) {
+    const commandResult = commandErrorToResult(error);
+    if (!commandResult) throw error;
+    result = commandResult;
+  }
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `base64 read failed for ${fullPath} (exit ${result.exitCode}): ${(
+        result.stderr || ""
+      ).slice(0, 200)}`,
+    );
+  }
+  const b64 = (result.stdout || "").replace(/\s+/g, "");
+  if (!b64)
+    throw new Error(`base64 read returned empty output for ${fullPath}`);
+  const buf = Buffer.from(b64, "base64");
+  // Guarda contra truncamento no canal de comando: bytes decodificados têm de
+  // bater EXATAMENTE com o tamanho via stat. Divergência = leitura incompleta.
+  if (buf.length !== expectedSize) {
+    throw new Error(
+      `sandbox base64 read truncated for ${fullPath}: expected ${expectedSize} bytes, got ${buf.length}`,
+    );
+  }
+  return buf;
+}
+
+/**
+ * Confirma que o objeto realmente persistiu no bucket após o upload. O PUT
+ * pré-assinado roda DENTRO do sandbox (exec node remoto); ele pode retornar 2xx
+ * sem gravar no bucket de produção (destino divergente/egress), o que deixaria um
+ * `s3_key` fantasma — a evidência some do relatório silenciosamente. Se o HEAD
+ * falhar, sobe os bytes pelo cliente do SERVIDOR (caminho comprovadamente
+ * confiável) e revalida. Qualquer falha é lançada → a tool capture_finding já
+ * trata por-evidência (mantém o achado, sem s3_key), então não há regressão.
+ */
+async function ensureObjectPersisted(args: {
+  sandbox: AnySandbox;
+  fullPath: string;
+  s3Key: string;
+  mediaType: string;
+  fileSize: number;
+  userId: string;
+  name: string;
+}): Promise<void> {
+  const { sandbox, fullPath, s3Key, mediaType, fileSize, userId, name } = args;
+  const bucket = process.env.AWS_S3_BUCKET_NAME;
+  if (!bucket) return;
+  const s3 = getS3Client();
+  const exists = async (): Promise<boolean> => {
+    try {
+      await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: s3Key }));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  if (await exists()) return;
+
+  logger.warn("sandbox_upload_not_persisted_server_fallback", {
+    event: "sandbox_upload_not_persisted_server_fallback",
+    service: "chat-handler",
+    user_id: userId,
+    file_name: name,
+    file_path: fullPath,
+    media_type: mediaType,
+    size_bytes: fileSize,
+    s3_key: s3Key,
+    sandbox_type: getSandboxLogType(sandbox),
+  });
+
+  const buf = await readSandboxFileBytesViaBase64(sandbox, fullPath, fileSize);
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: s3Key,
+      Body: buf,
+      ContentType: mediaType,
+    }),
+  );
+  if (!(await exists())) {
+    throw new Error(
+      `server-side fallback upload did not persist object ${s3Key}`,
+    );
+  }
+  logger.warn("sandbox_upload_server_fallback_ok", {
+    event: "sandbox_upload_server_fallback_ok",
+    service: "chat-handler",
+    user_id: userId,
+    file_name: name,
+    media_type: mediaType,
+    size_bytes: fileSize,
+    s3_key: s3Key,
+    sandbox_type: getSandboxLogType(sandbox),
+  });
+}
+
 export async function uploadSandboxFileToConvex(args: {
   sandbox: AnySandbox;
   userId: string;
@@ -482,6 +598,18 @@ export async function uploadSandboxFileToConvex(args: {
     );
     throw error;
   }
+
+  // Defesa contra "upload fantasma": confirma que o objeto persistiu no bucket;
+  // se o PUT do exec node retornou 2xx sem gravar, sobe pelo servidor e revalida.
+  await ensureObjectPersisted({
+    sandbox,
+    fullPath,
+    s3Key,
+    mediaType,
+    fileSize,
+    userId,
+    name,
+  });
 
   try {
     const saved = await convex.action(
