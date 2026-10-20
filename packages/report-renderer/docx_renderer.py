@@ -129,6 +129,10 @@ def _add_page_field(p, size=8, color=None):
     fld.set(qn("w:instr"), "PAGE")
     run = OxmlElement("w:r")
     rpr = OxmlElement("w:rPr")
+    rf = OxmlElement("w:rFonts")  # sem isto o nº de página cai p/ serifa
+    for attr in ("w:ascii", "w:hAnsi", "w:cs"):
+        rf.set(qn(attr), T.FONT_BODY)
+    rpr.append(rf)
     sz = OxmlElement("w:sz")
     sz.set(qn("w:val"), str(size * 2))
     rpr.append(sz)
@@ -302,7 +306,7 @@ def _part_divider(doc, sec, lead_break=True):
     for _ in range(3):
         doc.add_paragraph()
     _para(doc, sec.get("part", ""), size=13, bold=True, color=T.CORAL, after=2)
-    _para(doc, sec.get("title", ""), size=30, bold=True, color=T.INK, after=4)
+    _outline_title(doc, sec.get("title", ""), 30, T.INK, level=1, after=4)
     if sec.get("subtitle"):
         _para(doc, sec["subtitle"], size=15, color=T.MUTED)
 
@@ -607,33 +611,63 @@ def _evidence_docx(doc, f):
         _placeholder_docx(doc, "⚠ Evidência visual não capturada para este achado.")
 
 
-def _table(doc, findings, remediation=False):
-    if remediation:
-        headers = ["Ref", "Sev", "Ativo", "Remediação"]
-    else:
-        headers = ["Ref", "Sev", "Título", "Ativo", "CVSS"]
+def _fixed_table(doc, headers, widths):
+    """Tabela de layout FIXO (não deixa o autofit esmagar colunas), cabeçalho
+    navy que REPETE em cada página, larguras por coluna (polegadas)."""
     t = doc.add_table(rows=1, cols=len(headers))
-    t.style = "Table Grid"
+    t.alignment = WD_TABLE_ALIGNMENT.CENTER
+    t.autofit = False
+    t.allow_autofit = False
+    lay = OxmlElement("w:tblLayout")
+    lay.set(qn("w:type"), "fixed")
+    t._tbl.tblPr.append(lay)
+    hr = t.rows[0]
+    th = OxmlElement("w:tblHeader")  # repete o cabeçalho a cada página
+    th.set(qn("w:val"), "true")
+    hr._tr.get_or_add_trPr().append(th)
     for j, hd in enumerate(headers):
         c = t.cell(0, j)
         c.text = ""
+        c.width = Inches(widths[j])
         _shade(c, T.PRIMARY)
-        _run(c.paragraphs[0], hd, size=10, bold=True, color="FFFFFF")
-    for f in findings:
+        p = c.paragraphs[0]
+        p.paragraph_format.space_before = Pt(2)
+        p.paragraph_format.space_after = Pt(2)
+        _run(p, hd, size=9, bold=True, color="FFFFFF")
+    return t
+
+
+def _table(doc, findings, remediation=False):
+    if remediation:
+        headers = ["Ref", "Sev", "Ativo", "Remediação"]
+        widths = [0.75, 0.85, 1.95, 3.35]
+        clips = [None, None, 70, 240]
+    else:
+        headers = ["Ref", "Sev", "Título", "Ativo", "CVSS"]
+        widths = [0.75, 0.85, 3.05, 1.75, 0.55]
+        clips = [None, None, 130, 58, None]
+    t = _fixed_table(doc, headers, widths)
+    for idx, f in enumerate(findings):
         sev = f.get("severity", "info")
         row = t.add_row()
+        fill = T.SURFACE_ALT if idx % 2 == 0 else T.SURFACE  # zebra
         cvss = f.get("cvssScore")
         cvss_s = f"{cvss:.1f}" if isinstance(cvss, (int, float)) else "—"
-        vals = ([f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev),
-                 _clip(f.get("affectedAsset", ""), 50), _clip(f.get("remediation", ""), 160)]
-                if remediation else
-                [f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev),
-                 _clip(f.get("title", ""), 90), _clip(f.get("affectedAsset", ""), 40), cvss_s])
-        for j, v in enumerate(vals):
+        raw = ([f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev),
+                f.get("affectedAsset", ""), f.get("remediation", "")]
+               if remediation else
+               [f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev),
+                f.get("title", ""), f.get("affectedAsset", ""), cvss_s])
+        for j, v in enumerate(raw):
             cell = row.cells[j]
             cell.text = ""
-            _run(cell.paragraphs[0], v, size=9,
-                 bold=(j == 1),
+            cell.width = Inches(widths[j])
+            _shade(cell, fill)
+            val = _clip(v, clips[j]) if clips[j] else v
+            p = cell.paragraphs[0]
+            p.paragraph_format.space_before = Pt(1)
+            p.paragraph_format.space_after = Pt(1)
+            _run(p, val, size=9, bold=(j == 1),
                  color=(T.SEVERITY_COLOR.get(sev, T.INK) if j == 1 else T.INK))
     doc.add_paragraph()
 
@@ -649,6 +683,57 @@ def _callout(doc, sec):
     doc.add_paragraph()
 
 
+def _outline_title(doc, text, size, color, level=1, after=4, before=0):
+    """Título com estilo Heading NOMEADO (entra no SUMÁRIO/outline do Word) mas
+    com a aparência da marca via run — sem a borda do _heading."""
+    p = doc.add_paragraph()
+    try:
+        p.style = doc.styles["Heading 1" if level == 1 else "Heading 2"]
+    except KeyError:
+        pass
+    p.paragraph_format.space_before = Pt(before)
+    p.paragraph_format.space_after = Pt(after)
+    _run(p, text, size=size, bold=True, color=color, font=T.FONT_DISPLAY)
+    return p
+
+
+def _toc(doc, entries):
+    """SUMÁRIO à prova de falha: campo TOC (Heading 1) marcado `dirty` → o Word
+    popula as páginas ao atualizar. O RESULTADO do campo já traz a LISTA ESTÁTICA
+    das seções, então, atualizando ou não, NUNCA fica vazio/placeholder (vira o
+    sumário paginado OU a lista de seções limpa)."""
+    _para(doc, "SUMÁRIO", size=20, bold=True, color=T.INK, after=10)
+
+    def _fldchar(p, ftype, dirty=False):
+        r = p.add_run()
+        fc = OxmlElement("w:fldChar")
+        fc.set(qn("w:fldCharType"), ftype)
+        if dirty:
+            fc.set(qn("w:dirty"), "true")
+        r._r.append(fc)
+
+    p0 = doc.add_paragraph()
+    _fldchar(p0, "begin", dirty=True)
+    r = p0.add_run()
+    it = OxmlElement("w:instrText")
+    it.set(qn("xml:space"), "preserve")
+    it.text = ' TOC \\o "1-1" \\h \\z \\u '
+    r._r.append(it)
+    _fldchar(p0, "separate")
+    items = [e for e in (entries or []) if e]
+    if not items:
+        _fldchar(p0, "end")
+        doc.add_page_break()
+        return
+    for i, title in enumerate(items):
+        pe = doc.add_paragraph()
+        pe.paragraph_format.space_after = Pt(5)
+        _run(pe, title, size=12, color=T.INK)
+        if i == len(items) - 1:
+            _fldchar(pe, "end")  # fecha o campo na última entrada
+    doc.add_page_break()
+
+
 def render_docx(model, out_path):
     doc = Document()
     meta = model.get("meta", {})
@@ -658,11 +743,18 @@ def render_docx(model, out_path):
     style.font.size = Pt(11)
     _setup_footer(doc, meta)
     brand = meta.get("brand", {})
+    toc_entries = [
+        (s.get("title") if s.get("type") == "partDivider" else s.get("text"))
+        for s in model.get("sections", [])
+        if s.get("type") == "partDivider"
+        or (s.get("type") == "heading" and s.get("level", 1) == 1)
+    ]
     prev_type = None
     for sec in model.get("sections", []):
         t = sec.get("type")
         if t == "cover":
             _cover(doc, sec, meta)
+            _toc(doc, toc_entries)
         elif t == "partDivider":
             _part_divider(doc, sec, lead_break=(prev_type != "cover"))
         elif t == "divider":
@@ -704,3 +796,10 @@ def render_docx(model, out_path):
             _callout(doc, sec)
         prev_type = t
     doc.save(out_path)
+    # Embute IBM Plex no pacote OOXML (best-effort: falha → DOCX válido só com o
+    # nome da fonte). Sem isso o Word do cliente cai p/ serifa de substituição.
+    try:
+        import fontembed
+        fontembed.embed_fonts(out_path)
+    except Exception:
+        pass
