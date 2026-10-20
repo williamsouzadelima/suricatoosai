@@ -5,11 +5,11 @@ classificacao + docCode + numero de pagina, divisorias de PARTE. Marca
 configuravel por MSSP (meta.brand sobrescreve paleta/wordmark)."""
 
 from docx import Document
-from docx.shared import Pt, RGBColor, Inches
+from docx.shared import Pt, RGBColor, Inches, Emu
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn
-from docx.oxml import OxmlElement
+from docx.oxml import OxmlElement, parse_xml
 import os
 
 import theme as T
@@ -173,22 +173,87 @@ def _stat_tiles(doc, stats):
     doc.add_paragraph()
 
 
+# Namespaces OOXML p/ a âncora de imagem flutuante (capa full-bleed).
+_WP_NS = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+_A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
+_R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+_PIC_NS = "http://schemas.openxmlformats.org/drawingml/2006/picture"
+
+
+def _page_background(doc, img_path, pw_emu, ph_emu):
+    """Imagem full-page ancorada à PÁGINA, ATRÁS do texto (behindDoc + wrapNone).
+    No Word, relativeFrom=page + offset 0 = canto físico da página = full-bleed
+    real (independe das margens da seção); o parágrafo-portador fica na pág. 1, então
+    a arte só aparece na capa. OBS: o LibreOffice trata page como área de texto e
+    mostra margem branca — o alvo é o Word (entregável do cliente)."""
+    p = doc.add_paragraph()
+    run = p.add_run()
+    run.add_picture(img_path, width=Emu(int(pw_emu)), height=Emu(int(ph_emu)))
+    drawing = run._r.find(qn("w:drawing"))
+    inline = drawing.find(qn("wp:inline"))
+    graphic = inline.find(qn("a:graphic"))
+    anchor = parse_xml(
+        f'<wp:anchor xmlns:wp="{_WP_NS}" xmlns:a="{_A_NS}" xmlns:r="{_R_NS}" '
+        f'xmlns:pic="{_PIC_NS}" behindDoc="1" distT="0" distB="0" distL="0" '
+        'distR="0" simplePos="0" locked="0" layoutInCell="1" allowOverlap="1" '
+        'relativeHeight="0">'
+        '<wp:simplePos x="0" y="0"/>'
+        '<wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset>'
+        "</wp:positionH>"
+        '<wp:positionV relativeFrom="page"><wp:posOffset>0</wp:posOffset>'
+        "</wp:positionV>"
+        f'<wp:extent cx="{int(pw_emu)}" cy="{int(ph_emu)}"/>'
+        '<wp:effectExtent l="0" t="0" r="0" b="0"/>'
+        "<wp:wrapNone/>"
+        '<wp:docPr id="1000" name="CoverBackground"/>'
+        "<wp:cNvGraphicFramePr/>"
+        "</wp:anchor>"
+    )
+    anchor.append(graphic)
+    drawing.remove(inline)
+    drawing.append(anchor)
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after = Pt(0)
+    return p
+
+
+def _cover_stats_white(doc, stats):
+    """Faixa de KPIs da capa full-bleed: texto branco, SEM sombreamento (células
+    transparentes deixam o navy do fundo aparecer)."""
+    stats = (stats or [])[:4]
+    if not stats:
+        return
+    t = doc.add_table(rows=2, cols=len(stats))
+    t.alignment = WD_TABLE_ALIGNMENT.LEFT
+    for j, s in enumerate(stats):
+        c0 = t.cell(0, j)
+        c0.text = ""
+        _run(c0.paragraphs[0], str(s.get("value", "")), size=24, bold=True,
+             color="FFFFFF", font=T.FONT_DISPLAY)
+        c1 = t.cell(1, j)
+        c1.text = ""
+        _run(c1.paragraphs[0], str(s.get("label", "")).upper(), size=9,
+             bold=True, color="C9D3E6")
+    doc.add_paragraph()
+
+
 def _cover(doc, sec, meta):
     brand = meta.get("brand", {})
-    # Capa com arte da marca (coverImagePath): imagem dominante + quebra. O
-    # rodapé já carrega classificação/docCode. Ausente → capa programática.
+    # Capa com arte da marca (coverImagePath) → FULL-BLEED real: a arte preenche a
+    # página inteira (imagem flutuante behindDoc) e o texto branco fica por cima,
+    # como no PPTX/PDF. Ausente → capa programática clara (título escuro).
     cover = brand.get("coverImagePath")
-    if cover and os.path.exists(cover):
-        # Banner da arte da marca no topo (crop-to-fill numa faixa larga); segue a
-        # capa programática (logo/título/stats) abaixo — mantém o TÍTULO do
-        # relatório, que o DOCX não sobrepõe sobre imagem. (Evita o bug de capa
-        # full-bleed 0-margin do WS5.)
+    fullbleed = bool(cover and os.path.exists(cover))
+    if fullbleed:
+        secpg = doc.sections[0]
         try:
-            fitted = T.cover_fit(cover, 210, 74)
-            doc.add_picture(fitted, width=Inches(6.3))
-            doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            fitted = T.cover_fit(cover, int(secpg.page_width),
+                                 int(secpg.page_height))
+            _page_background(doc, fitted, secpg.page_width, secpg.page_height)
         except Exception:
-            pass
+            fullbleed = False
+    # Wordmark (topo-esq): logo custom > logo Suricatoos (claro p/ navy full-bleed,
+    # escuro p/ capa clara) > texto.
     used_logo = False
     logo_path = brand.get("logoPath")
     if logo_path and os.path.exists(logo_path):
@@ -198,7 +263,7 @@ def _cover(doc, sec, meta):
         except Exception:
             used_logo = False
     if not used_logo and brand.get("wordmark", "") == "Suricatoos":
-        lp = logo.write_logo(dark=False)
+        lp = logo.write_logo(dark=fullbleed)
         if lp and os.path.exists(lp):
             try:
                 doc.add_picture(lp, width=Inches(1.1))
@@ -208,18 +273,32 @@ def _cover(doc, sec, meta):
     if not used_logo:
         _para(doc, brand.get("wordmark", T.WORDMARK), size=22, bold=True,
               color=T.CORAL, align=WD_ALIGN_PARAGRAPH.LEFT)
+    title_color = "FFFFFF" if fullbleed else T.INK
+    muted_color = "C9D3E6" if fullbleed else T.MUTED
+    if fullbleed:
+        for _ in range(6):
+            doc.add_paragraph()
     _para(doc, f"{meta.get('classification', '')}   ·   {meta.get('docCode', '')}",
           size=10, bold=True, color=T.CORAL, after=2)
-    _para(doc, meta.get("volume", ""), size=10, bold=True, color=T.MUTED, after=10)
-    _para(doc, sec.get("title", ""), size=34, bold=True, color=T.INK, after=4)
+    _para(doc, meta.get("volume", ""), size=10, bold=True, color=muted_color,
+          after=10)
+    _para(doc, sec.get("title", ""), size=34, bold=True, color=title_color,
+          after=4)
     if sec.get("subtitle"):
-        _para(doc, sec["subtitle"], size=16, color=T.MUTED, after=10)
-    _stat_tiles(doc, sec.get("stats"))
+        _para(doc, sec["subtitle"], size=16, color=muted_color, after=10)
+    if fullbleed:
+        _cover_stats_white(doc, sec.get("stats"))
+    else:
+        _stat_tiles(doc, sec.get("stats"))
     doc.add_page_break()
 
 
-def _part_divider(doc, sec):
-    doc.add_page_break()
+def _part_divider(doc, sec, lead_break=True):
+    # Sem quebra de entrada quando vem logo após a capa (que já quebrou) — evita a
+    # página em branco entre a capa e a 1ª PARTE. Divisores no meio do documento
+    # mantêm a quebra (começam em página nova).
+    if lead_break:
+        doc.add_page_break()
     for _ in range(3):
         doc.add_paragraph()
     _para(doc, sec.get("part", ""), size=13, bold=True, color=T.CORAL, after=2)
@@ -579,12 +658,13 @@ def render_docx(model, out_path):
     style.font.size = Pt(11)
     _setup_footer(doc, meta)
     brand = meta.get("brand", {})
+    prev_type = None
     for sec in model.get("sections", []):
         t = sec.get("type")
         if t == "cover":
             _cover(doc, sec, meta)
         elif t == "partDivider":
-            _part_divider(doc, sec)
+            _part_divider(doc, sec, lead_break=(prev_type != "cover"))
         elif t == "divider":
             doc.add_page_break()
         elif t == "heading":
@@ -622,4 +702,5 @@ def render_docx(model, out_path):
             _next_steps(doc, sec)
         elif t == "callout":
             _callout(doc, sec)
+        prev_type = t
     doc.save(out_path)
