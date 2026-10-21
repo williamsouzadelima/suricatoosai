@@ -151,10 +151,23 @@ def build_model(out_dir):
             {"title": f"{findings[0]['ref']} · cadeia crítica",
              "steps": [{"label": "recon", "detail": "nmap"}, {"label": "exploit", "detail": "sqlmap"},
                        {"label": "privesc", "detail": "painel"}, {"label": "pivot", "detail": "interna"}]}]},
-        {"type": "partDivider", "part": "PARTE III", "title": "Achados Detalhados"},
+        {"type": "partDivider", "part": "NARRATIVA",
+         "title": "Narrativa da Análise Técnica",
+         "subtitle": "Anatomia da invasão — do reconhecimento ao impacto"},
+        {"type": "paragraph", "text": "Visão geral da intrusão. " + long("OVERVIEW", "X")},
     ]
-    for f in findings:
-        sections.append({"type": "findingCard", "finding": f, "showPoc": True})
+    # Narrativa por fase (achados tecidos na história) — espelha o buildTechnical novo.
+    _phases = [
+        ("Reconhecimento e Mapeamento", findings[0:5]),
+        ("Exploração e Acesso Inicial", findings[5:10]),
+        ("Movimento Lateral e Impacto", findings[10:]),
+    ]
+    for _ptitle, _pf in _phases:
+        sections.append({"type": "heading", "text": _ptitle, "level": 2})
+        sections.append({"type": "paragraph",
+                         "text": f"Nesta fase ({_ptitle}), " + long("PHASE", _ptitle[:4])})
+        for f in _pf:
+            sections.append({"type": "findingCard", "finding": f, "showPoc": True})
     sections += [
         {"type": "partDivider", "part": "REMEDIAÇÃO", "title": "Plano por fase"},
         {"type": "roadmap", "phases": [

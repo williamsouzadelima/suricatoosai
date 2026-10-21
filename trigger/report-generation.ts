@@ -11,6 +11,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { api } from "@/convex/_generated/api";
 import { buildReportModel } from "@/lib/reports/build-report-model";
+import { generateEngagementNarrative } from "./generate-narrative";
 import type { ReportInput } from "@/lib/reports/report-model";
 import type { Id } from "@/convex/_generated/dataModel";
 import { RENDERER_SOURCES } from "../packages/report-renderer/sources";
@@ -318,6 +319,21 @@ export const generateEngagementReport = schemaTask({
           })),
         })),
       };
+      // 2b.1) Narrativa "Anatomia da Invasão" (IA) — SÓ técnico. Defensivo:
+      // qualquer falha → segue sem narrativa (o relatório cai no formato plano).
+      if (payload.audience === "technical") {
+        try {
+          metadata.set("phase", "narrative");
+          const narrative = await generateEngagementNarrative({
+            clientName: reportInput.client.name,
+            engagementName: reportInput.engagement.name,
+            findings: reportInput.findings,
+          });
+          if (narrative) reportInput.engagementNarrative = narrative;
+        } catch (e) {
+          console.error("narrative: passo falhou — seguindo sem narrativa", e);
+        }
+      }
       const model = buildReportModel(payload.audience, reportInput);
 
       for (const [fn, src] of Object.entries(RENDERER_SOURCES)) {

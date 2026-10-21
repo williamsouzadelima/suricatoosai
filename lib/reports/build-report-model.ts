@@ -356,6 +356,71 @@ function baseMeta(
   };
 }
 
+/**
+ * Monta a PARTE de achados do técnico. Com `engagementNarrative` (IA), os achados
+ * são TECIDOS na história por fase ("Anatomia da Invasão"): divisória + overview +
+ * por fase (heading + prosa + os findingCard daquela fase). Achados não citados em
+ * nenhuma fase caem em "Outros Achados" — nada some. Sem narrativa → cai no formato
+ * PLANO de hoje (PARTE III · Achados Detalhados por severidade).
+ */
+function narrativeSections(
+  input: ReportInput,
+  sorted: ReportFindingView[],
+): Section[] {
+  const nar = input.engagementNarrative;
+  if (!nar || !nar.phases?.length) {
+    const flat: Section[] = [
+      {
+        type: "partDivider",
+        part: "PARTE III",
+        title: "Achados Detalhados",
+        subtitle: "Cada achado com severidade, CVSS, evidência e remediação",
+      },
+    ];
+    for (const f of sorted) {
+      flat.push({ type: "findingCard", finding: f, showPoc: true });
+    }
+    return flat;
+  }
+  const byRef = new Map(
+    input.findings.map((f): [string, ReportFindingView] => [f.ref, f]),
+  );
+  const used = new Set<string>();
+  const out: Section[] = [
+    {
+      type: "partDivider",
+      part: "NARRATIVA",
+      title: "Narrativa da Análise Técnica",
+      subtitle: "Anatomia da invasão — do reconhecimento ao impacto",
+    },
+  ];
+  if (nar.overview?.trim()) {
+    out.push({ type: "paragraph", text: nar.overview.trim() });
+  }
+  for (const phase of nar.phases) {
+    if (!phase.title?.trim()) continue;
+    out.push({ type: "heading", text: phase.title.trim(), level: 2 });
+    if (phase.prose?.trim()) {
+      out.push({ type: "paragraph", text: phase.prose.trim() });
+    }
+    for (const ref of phase.findingRefs ?? []) {
+      const f = byRef.get(ref);
+      if (f && !used.has(ref)) {
+        used.add(ref);
+        out.push({ type: "findingCard", finding: f, showPoc: true });
+      }
+    }
+  }
+  const leftover = sorted.filter((f) => !used.has(f.ref));
+  if (leftover.length) {
+    out.push({ type: "heading", text: "Outros Achados", level: 2 });
+    for (const f of leftover) {
+      out.push({ type: "findingCard", finding: f, showPoc: true });
+    }
+  }
+  return out;
+}
+
 // ── Técnico ────────────────────────────────────────────────────────────────
 function buildTechnical(input: ReportInput): ReportModel {
   const kpis = computeKpis(input.findings);
@@ -397,15 +462,7 @@ function buildTechnical(input: ReportInput): ReportModel {
       { type: "attackChain", lanes },
     );
   }
-  sections.push({
-    type: "partDivider",
-    part: "PARTE III",
-    title: "Achados Detalhados",
-    subtitle: "Cada achado com severidade, CVSS, evidência e remediação",
-  });
-  for (const f of sorted) {
-    sections.push({ type: "findingCard", finding: f, showPoc: true });
-  }
+  sections.push(...narrativeSections(input, sorted));
   sections.push(
     { type: "partDivider", part: "REMEDIAÇÃO", title: "Plano por fase" },
     { type: "roadmap", phases: roadmapPhases(input.findings) },

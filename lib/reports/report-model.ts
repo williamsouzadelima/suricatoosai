@@ -84,6 +84,28 @@ export type ReportScopeItem = {
   inScope: boolean;
 };
 
+/** Fase da narrativa "Anatomia da Invasão" — um ato da história da intrusão. */
+export type NarrativePhase = {
+  /** Título da fase, ex.: "Reconhecimento" ou "Movimento Lateral: Active Directory". */
+  title: string;
+  /** Prosa conectada (pt-BR) que conta esta fase, ancorada nos achados citados. */
+  prose: string;
+  /** Refs (F-XX) dos achados desta fase, na ordem da história. */
+  findingRefs: string[];
+};
+
+/**
+ * Narrativa de ENGAJAMENTO (cross-achado), composta por IA a partir dos achados
+ * REAIS e organizada em fases (kill-chain). A prosa é editorial (a história); os
+ * achados citados por `findingRefs` são renderizados com os DADOS reais do finding
+ * — a IA não fabrica dado, só costura a narrativa.
+ */
+export type EngagementNarrative = {
+  /** Parágrafo de abertura da narrativa (visão geral da intrusão). */
+  overview: string;
+  phases: NarrativePhase[];
+};
+
 export type ReportInput = {
   client: { name: string };
   engagement: {
@@ -106,6 +128,12 @@ export type ReportInput = {
   docSeq?: number;
   /** Somente achados aprovados/publicados entram no relatório. */
   findings: ReportFindingView[];
+  /**
+   * Narrativa "Anatomia da Invasão" (IA, cross-achado) — organiza os achados em
+   * fases e compõe a prosa conectada. Ausente (sem findings / IA falhou) → o
+   * relatório técnico cai no formato plano de achados detalhados. Só o técnico usa.
+   */
+  engagementNarrative?: EngagementNarrative;
 };
 
 export type Kpis = {
