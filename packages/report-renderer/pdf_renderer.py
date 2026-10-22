@@ -8,7 +8,7 @@ chromium."""
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_LEFT, TA_CENTER
+from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -198,6 +198,42 @@ class _TocDocTemplate(BaseDocTemplate):
         txt = flowable.getPlainText()
         if txt:
             self.notify("TOCEntry", (lvl, txt, self.page))
+
+
+class _CleanTOC(TableOfContents):
+    """TOC que renderiza o numero de pagina como COLUNA DIREITA de uma Table, em
+    vez do onDraw do reportlab. O onDraw (`drawPageNumbers`) le o cursor de texto
+    GLOBAL do canvas (`_curr_tx_info`), que — com rodape desenhado a cada pagina +
+    capa + niveis mistos — fica "uma linha atras", jogando cada numero p/ a linha
+    anterior (o 1o numero orfao sob o titulo, cada entrada mostrando a pagina da
+    SEGUINTE). Aqui cada linha e [titulo | pagina] numa Table: posicao exata, sem
+    cursor global. Mantem notify/beforeBuild/isSatisfied/addEntry da base, entao a
+    convergencia do multiBuild segue igual. (Sem dot leaders por ora.)"""
+
+    def wrap(self, availWidth, availHeight):
+        entries = self._lastEntries or [(0, "Sumário", 0, None)]
+        rows = []
+        for i, (level, text, pageNum, key) in enumerate(entries):
+            st = self.getLevelStyle(level)
+            rst = ParagraphStyle(f"tocnum{i}", parent=st, alignment=TA_RIGHT,
+                                 leftIndent=0, rightIndent=0)
+            rows.append([Paragraph(text, st), Paragraph(str(pageNum), rst)])
+        numw = 13 * mm
+        self._table = Table(rows, colWidths=[availWidth - numw, numw])
+        self._table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("FONTNAME", (0, 0), (-1, -1), FONT_SANS),
+        ]))
+        self.width, self.height = self._table.wrapOn(self.canv, availWidth,
+                                                     availHeight)
+        return self.width, self.height
+
+    def drawOn(self, canvas, x, y, _sW=0):
+        self._table.drawOn(canvas, x, y, _sW)
 
 
 def _summary_block(ss, toc):
@@ -442,24 +478,17 @@ def render_pdf(model, out_path):
     meta = model.get("meta", {})
     _apply_brand(meta)
     ss = _styles()
-    toc = TableOfContents()
+    toc = _CleanTOC()
+    # spaceBefore (nao leading) da o ritmo vertical; cada entrada e uma linha de
+    # Table [titulo | pagina] no _CleanTOC, com o titulo recuado por nivel.
     toc.levelStyles = [
-        ParagraphStyle("TOCl0", fontName=FONT_SANS_BOLD, fontSize=12, leading=20,
-                       textColor=C(T.INK)),
-        ParagraphStyle("TOCl1", fontName=FONT_SANS, fontSize=10.5, leading=17,
-                       leftIndent=14, textColor=C(T.INK)),
-        ParagraphStyle("TOCl2", fontName=FONT_SANS, fontSize=10, leading=15,
-                       leftIndent=28, textColor=C(T.MUTED)),
+        ParagraphStyle("TOCl0", fontName=FONT_SANS_BOLD, fontSize=12, leading=15,
+                       spaceBefore=9, textColor=C(T.INK)),
+        ParagraphStyle("TOCl1", fontName=FONT_SANS, fontSize=10.5, leading=14,
+                       spaceBefore=4, leftIndent=14, textColor=C(T.INK)),
+        ParagraphStyle("TOCl2", fontName=FONT_SANS, fontSize=10, leading=14,
+                       spaceBefore=3, leftIndent=28, textColor=C(T.MUTED)),
     ]
-    # O Table interno do TOC herda FONTNAME 'Helvetica' do TableStyle padrão
-    # (embutiria Helvetica no PDF e quebraria a pureza de fonte do dossiê) —
-    # força IBM Plex.
-    toc.tableStyle = TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("FONTNAME", (0, 0), (-1, -1), FONT_SANS),
-    ])
     S = []
     title = None
     brand = meta.get("brand", {})

@@ -178,6 +178,30 @@ def main():
         if b"Courier" in pdfb:
             fails.append("pdf: Courier ainda presente (mono nao trocado)")
 
+        # SUMARIO: o numero de pagina tem que BATER com a pagina real do cabecalho
+        # (pega o bug de numero deslocado 1 entrada). Opcional: precisa de pymupdf.
+        try:
+            import pymupdf  # noqa: E402
+            pd = pymupdf.open(pdf_p)
+            pgtext = [pd[i].get_text() for i in range(pd.page_count)]
+            w2 = pd[1].get_text("words")  # pagina 2 = SUMARIO
+            lab = [(x[1] + x[3]) / 2 for x in w2 if x[4] == "Reconhecimento"]
+            claim = None
+            if lab:
+                nums = [int(x[4]) for x in w2 if x[4].isdigit()
+                        and x[0] > pd[1].rect.width * 0.6
+                        and abs((x[1] + x[3]) / 2 - lab[0]) < 9]
+                claim = nums[0] if nums else None
+            real_pg = next((i + 1 for i in range(2, pd.page_count)
+                            if "Reconhecimento e Mapeamento" in pgtext[i]), None)
+            if claim is None or real_pg is None:
+                print("  NOTA: cross-check de pagina do SUMARIO inconclusivo.")
+            elif claim != real_pg:
+                fails.append(f"pdf: SUMARIO aponta pag {claim} p/ 'Reconhecimento' "
+                             f"mas o cabecalho esta na pag {real_pg} (numero deslocado)")
+        except ImportError:
+            print("  NOTA: pymupdf ausente — cross-check de pagina do SUMARIO pulado.")
+
     if fails:
         print("SMOKE FAIL:")
         for f in fails:
