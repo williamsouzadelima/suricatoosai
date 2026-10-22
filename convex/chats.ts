@@ -5,6 +5,7 @@ import { v, ConvexError, type Value } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { internal } from "./_generated/api";
 import { fileCountAggregate } from "./fileAggregate";
+import { deleteMessageFileUnlessEvidence } from "./fileStorage";
 import { MAX_PREVIOUS_SUMMARIES } from "./constants";
 import { validateServiceKey } from "./lib/utils";
 import {
@@ -255,15 +256,7 @@ async function deleteMessageForChatDeletion(
       try {
         const file = await ctx.db.get(fileId);
         if (file) {
-          if (file.s3_key) {
-            await ctx.scheduler.runAfter(
-              0,
-              internal.s3Cleanup.deleteS3ObjectAction,
-              { s3Key: file.s3_key },
-            );
-          }
-          await fileCountAggregate.deleteIfExists(ctx, file);
-          await ctx.db.delete(file._id);
+          await deleteMessageFileUnlessEvidence(ctx, file);
         }
       } catch (error) {
         console.error(`Failed to delete file ${fileId}:`, error);

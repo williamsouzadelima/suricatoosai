@@ -7,7 +7,8 @@ import {
 import { v, ConvexError } from "convex/values";
 import { validateServiceKey } from "./lib/utils";
 import { internal } from "./_generated/api";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
 import { isSupportedImageMediaType } from "../lib/utils/file-utils";
 import { fileCountAggregate } from "./fileAggregate";
 import { convexLogger } from "./lib/logger";
@@ -114,6 +115,69 @@ export const deleteFile = mutation({
     return null;
   },
 });
+
+/**
+ * Apaga de fato um arquivo: agenda a exclusão do objeto S3, tira do agregado de
+ * contagem/tamanho e remove a linha. PRIVADO de propósito — quem apaga arquivo
+ * de mensagem/evidência deve usar os wrappers abaixo, que checam referência de
+ * evidência ANTES (senão reintroduz o bug de apagar a evidência do relatório).
+ */
+async function hardDeleteFile(
+  ctx: MutationCtx,
+  file: Doc<"files">,
+): Promise<void> {
+  if (file.s3_key) {
+    await ctx.scheduler.runAfter(0, internal.s3Cleanup.deleteS3ObjectAction, {
+      s3Key: file.s3_key,
+    });
+  }
+  await fileCountAggregate.deleteIfExists(ctx, file);
+  await ctx.db.delete(file._id);
+}
+
+/**
+ * Apaga o arquivo de uma MENSAGEM a menos que ele seja evidência de um achado.
+ * Excluir chat/mensagem (chats.ts/messages.ts) é incidental ao domínio de
+ * evidência — o screenshot tem que sobreviver p/ o relatório. Retorna true se
+ * apagou, false se preservou (consulta o índice evidence.by_file_id).
+ */
+export async function deleteMessageFileUnlessEvidence(
+  ctx: MutationCtx,
+  file: Doc<"files">,
+): Promise<boolean> {
+  const evidenceRef = await ctx.db
+    .query("evidence")
+    .withIndex("by_file_id", (q) => q.eq("file_id", file._id))
+    .first();
+  if (evidenceRef) return false; // preservado: referenciado por evidência
+  await hardDeleteFile(ctx, file);
+  return true;
+}
+
+/**
+ * Apaga um arquivo de evidência SE ficou órfão (nenhuma evidência RESTANTE
+ * aponta p/ ele). Usado ao limpar achados/evidências (findings.ts), que antes
+ * deixava o arquivo órfão; como is_attached=true agora o protege do purge, a
+ * limpeza tem que acontecer aqui. `deletedEvidenceIds` = evidências já removidas
+ * nesta mesma mutação, tratadas como inexistentes (robusto mesmo que o índice
+ * ainda enxergue linhas recém-deletadas). Retorna true se apagou.
+ */
+export async function deleteOrphanedEvidenceFile(
+  ctx: MutationCtx,
+  fileId: Id<"files">,
+  deletedEvidenceIds: Set<Id<"evidence">>,
+): Promise<boolean> {
+  const refs = await ctx.db
+    .query("evidence")
+    .withIndex("by_file_id", (q) => q.eq("file_id", fileId))
+    .collect();
+  const survivingRef = refs.some((ev) => !deletedEvidenceIds.has(ev._id));
+  if (survivingRef) return false;
+  const file = await ctx.db.get(fileId);
+  if (!file) return false;
+  await hardDeleteFile(ctx, file);
+  return true;
+}
 
 /**
  * Get file token sizes by file IDs using service key (for backend processing)

@@ -4,6 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { validateServiceKey } from "./lib/utils";
 import { requireOwnedDoc } from "./lib/tenantGuards";
+import { deleteOrphanedEvidenceFile } from "./fileStorage";
 
 /**
  * Achados + evidências da feature de relatórios.
@@ -489,6 +490,8 @@ export const clearFindingsForEngagement = mutation({
       .collect();
     let removedFindings = 0;
     let removedEvidence = 0;
+    const touchedFileIds = new Set<Id<"files">>();
+    const deletedEvidenceIds = new Set<Id<"evidence">>();
     for (const f of findings) {
       if (f.user_id !== identity.subject) continue;
       const es = await ctx.db
@@ -496,13 +499,28 @@ export const clearFindingsForEngagement = mutation({
         .withIndex("by_finding_and_captured", (q) => q.eq("finding_id", f._id))
         .collect();
       for (const ev of es) {
+        if (ev.file_id) touchedFileIds.add(ev.file_id);
+        deletedEvidenceIds.add(ev._id);
         await ctx.db.delete(ev._id);
         removedEvidence += 1;
       }
       await ctx.db.delete(f._id);
       removedFindings += 1;
     }
-    return { findings: removedFindings, evidence: removedEvidence };
+    // Limpa os arquivos de evidência que ficaram órfãos (nenhuma evidência
+    // restante aponta p/ eles). Antes do fix is_attached o purge os varria;
+    // agora is_attached=true os protege, então a limpeza acontece aqui.
+    let removedFiles = 0;
+    for (const fileId of touchedFileIds) {
+      if (await deleteOrphanedEvidenceFile(ctx, fileId, deletedEvidenceIds)) {
+        removedFiles += 1;
+      }
+    }
+    return {
+      findings: removedFindings,
+      evidence: removedEvidence,
+      files: removedFiles,
+    };
   },
 });
 
