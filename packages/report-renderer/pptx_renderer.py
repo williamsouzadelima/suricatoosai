@@ -8,7 +8,7 @@ vira um slide."""
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR, MSO_AUTO_SIZE
 from pptx.enum.shapes import MSO_SHAPE
 import os
 
@@ -160,7 +160,13 @@ class _Flow:
              indent=0.0, after=0.08):
         left = int(ML) + int(Inches(indent))
         width = int(CW) - int(Inches(indent))
-        cpl = max(12, int((width / EMU_IN) * 72 / (size * 0.5)))
+        # Largura média por caractere CONSERVADORA (em "em"): proporcional ~0.58,
+        # mono ~0.63, + bold. Subcontar linhas causa estouro/sobreposição (a caixa
+        # de altura fixa transborda e o bloco seguinte sobrepõe); superestimar só
+        # deixa folga. _wrap controla TODAS as quebras e word_wrap=False impede o
+        # PowerPoint de RE-quebrar uma linha (a cascata que gerava a sobreposição).
+        cwf = (0.63 if font == T.FONT_MONO else 0.58) + (0.04 if bold else 0.0)
+        cpl = max(8, int((width / EMU_IN) * 72 / (size * cwf)))
         lines = _wrap(text, cpl)
         lh = int(size * _LINE_FACTOR / 72.0 * EMU_IN)
         i = 0
@@ -173,7 +179,11 @@ class _Flow:
             tb = self.slide.shapes.add_textbox(Emu(left), Emu(self.y),
                                                Emu(width), Emu(h))
             tf = tb.text_frame
-            tf.word_wrap = True
+            tf.word_wrap = False
+            try:
+                tf.auto_size = MSO_AUTO_SIZE.NONE
+            except Exception:
+                pass
             for j, ln in enumerate(take):
                 p = tf.paragraphs[0] if j == 0 else tf.add_paragraph()
                 r = p.add_run()
@@ -233,11 +243,15 @@ def _footer(slide, dark=False):
 def _title_slide(prs, title):
     slide = _blank(prs)
     _rect(slide, 0, 0, SW, Inches(0.12), T.PRIMARY)
-    _text(slide, ML, Inches(0.35), CW, Inches(0.7), title, size=24, bold=True,
+    title = _clip(str(title or ""), 104)
+    # Título longo encolhe (24→18pt) p/ caber na faixa ACIMA do traço coral, sem
+    # a 2ª linha invadir o acento (bug: títulos de achado cruzavam o traço).
+    tsize = 24 if len(title) <= 56 else 18
+    _text(slide, ML, Inches(0.33), CW, Inches(0.68), title, size=tsize, bold=True,
           color=T.INK, font=T.FONT_DISPLAY)
-    _rect(slide, ML, Inches(1.05), Inches(1.2), Emu(int(0.045 * EMU_IN)), _accent())
+    _rect(slide, ML, Inches(1.08), Inches(1.2), Emu(int(0.045 * EMU_IN)), _accent())
     _footer(slide)
-    return slide, Inches(1.35)
+    return slide, Inches(1.4)
 
 
 def _cover(prs, sec, meta):
