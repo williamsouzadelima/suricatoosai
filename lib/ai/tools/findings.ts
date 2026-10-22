@@ -23,6 +23,11 @@ const EXT_MEDIA_TYPE: Record<string, string> = {
   webp: "image/webp",
   bmp: "image/bmp",
   svg: "image/svg+xml",
+  tif: "image/tiff",
+  tiff: "image/tiff",
+  avif: "image/avif",
+  heic: "image/heic",
+  heif: "image/heif",
 };
 
 function inferMediaType(path: string, explicit?: string): string | undefined {

@@ -174,6 +174,9 @@ export const generateEngagementReport = schemaTask({
       const MAX_IMAGES_TOTAL = 150;
       const MAX_IMAGES_PER_FINDING = 8;
       const imagePathByS3 = new Map<string, string>();
+      // s3Keys de evidência em imagem cujo download FALHOU (objeto ausente/
+      // expirado) — distingue "capturada mas indisponível" de "nunca capturada".
+      const failedS3Keys = new Set<string>();
       let imgIdx = 0;
       const sevRank: Record<string, number> = {
         critical: 0,
@@ -214,6 +217,7 @@ export const generateEngagementReport = schemaTask({
             imgIdx++;
             perFinding++;
           } catch (imgErr) {
+            if (key) failedS3Keys.add(key);
             console.error(
               "report: falha ao baixar evidência de imagem",
               imgErr,
@@ -319,6 +323,7 @@ export const generateEngagementReport = schemaTask({
             command: e.command ?? undefined,
             resultSummary: e.resultSummary ?? undefined,
             imagePath: e.s3Key ? imagePathByS3.get(e.s3Key) : undefined,
+            imageUnavailable: !!(e.s3Key && failedS3Keys.has(e.s3Key)),
           })),
         })),
       };

@@ -58,6 +58,12 @@ export type ReportEvidenceView = {
    * fora do job (ex.: amostras locais) → renderer ignora graciosamente.
    */
   imagePath?: string;
+  /**
+   * true quando a evidência TINHA imagem (s3Key + media_type image/*) mas o
+   * download do S3 falhou (objeto ausente/expirado) — distingue "capturada mas
+   * indisponível" de "nunca capturada" na mensagem do relatório.
+   */
+  imageUnavailable?: boolean;
 };
 
 export type ReportFindingView = {

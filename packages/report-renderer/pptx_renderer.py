@@ -683,7 +683,11 @@ def _evidence_flow(fl, f):
                 f"(+{len(imgs) - 4} imagens — veja o relatório técnico completo)",
                 size=10, color=T.MUTED, after=0.08)
     if rendered == 0 and not imgs and f.get("severity") in ("critical", "high"):
-        fl.placeholder("⚠ Evidência visual não capturada para este achado.")
+        if any(e.get("imageUnavailable") for e in ev):
+            fl.placeholder(
+                "⚠ Evidência visual capturada, porém indisponível (expirada/removida do armazenamento).")
+        else:
+            fl.placeholder("⚠ Evidência visual não capturada para este achado.")
 
 
 def _table(prs, findings, title, remediation=False):

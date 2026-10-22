@@ -651,7 +651,12 @@ def _evidence_docx(doc, f):
             _placeholder_docx(
                 doc, "⚠ Evidência visual referenciada não disponível no pacote.")
     if img_rendered == 0 and f.get("severity") in ("critical", "high"):
-        _placeholder_docx(doc, "⚠ Evidência visual não capturada para este achado.")
+        if any(e.get("imageUnavailable") for (n, e) in steps):
+            _placeholder_docx(
+                doc, "⚠ Evidência visual capturada, porém indisponível (expirada/removida do armazenamento).")
+        else:
+            _placeholder_docx(
+                doc, "⚠ Evidência visual não capturada para este achado.")
 
 
 def _fixed_table(doc, headers, widths):

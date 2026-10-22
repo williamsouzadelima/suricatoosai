@@ -628,7 +628,10 @@ def render_pdf(model, out_path):
                         else:
                             _placeholder_pdf(S, ss, "⚠ Evidência visual referenciada não disponível no pacote.")
                 if img_rendered == 0 and sev in ("critical", "high"):
-                    _placeholder_pdf(S, ss, "⚠ Evidência visual não capturada para este achado.")
+                    if any(e.get("imageUnavailable") for e in ev):
+                        _placeholder_pdf(S, ss, "⚠ Evidência visual capturada, porém indisponível (expirada/removida do armazenamento).")
+                    else:
+                        _placeholder_pdf(S, ss, "⚠ Evidência visual não capturada para este achado.")
         elif t in ("findingsTable", "remediationMatrix"):
             findings = sec.get("findings", [])
             rem = t == "remediationMatrix"
