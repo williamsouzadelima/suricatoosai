@@ -149,6 +149,19 @@ async function insertEvidence(
     captured_at: now,
     created_at: now,
   });
+  // Protege a EVIDÊNCIA-ARQUIVO do purge de 24h de arquivos NÃO anexados
+  // (fileStorage.purgeExpiredUnattachedFiles): toda evidência com file_id marca
+  // seu files.is_attached=true, espelhando o que messages.ts já faz p/ anexos de
+  // mensagem. Sem isto o screenshot era apagado 24h após a captura — antes da
+  // geração do relatório (download -> NoSuchKey) — e o relatório mostrava
+  // "Evidência visual não capturada" indevidamente. Cobre captura ao vivo,
+  // extração retroativa e merges (todos passam por aqui).
+  if (item.file_id) {
+    const file = await ctx.db.get(item.file_id);
+    if (file && !file.is_attached) {
+      await ctx.db.patch(item.file_id, { is_attached: true });
+    }
+  }
 }
 
 /** Evita reinserir evidência idêntica ao mesclar recapturas (contém acúmulo). */

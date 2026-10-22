@@ -342,6 +342,89 @@ export const purgeExpiredUnattachedFiles = internalMutation({
   },
 });
 
+/**
+ * Backfill ÚNICO (idempotente): protege retroativamente as EVIDÊNCIAS-ARQUIVO já
+ * existentes do purge de 24h (purgeExpiredUnattachedFiles). Antes do fix em
+ * findings.insertEvidence, o screenshot de evidência nascia com
+ * files.is_attached=false e era apagado 24h depois — antes da geração do
+ * relatório (download -> NoSuchKey -> "Evidência visual não capturada" indevido).
+ * Varre a tabela `evidence`; para cada file_id ainda existente com
+ * is_attached=false, marca is_attached=true (mesma marcação do fix e de
+ * messages.ts; sem toque no fileCountAggregate — sortKey null, não indexa
+ * is_attached). Re-rodar é no-op. Só salva arquivos que o purge ainda não
+ * alcançou, então rode UMA vez logo após o deploy:
+ *   npx convex run fileStorage:backfillEvidenceFileAttachment
+ * Auto-paginado via scheduler (lotes de 200). Paginamos `evidence` enquanto
+ * mutamos só `files` (outra tabela): o cursor é estável entre lotes/transações.
+ */
+export const backfillEvidenceFileAttachment = internalMutation({
+  args: {
+    cursor: v.optional(v.union(v.string(), v.null())),
+    batchSize: v.optional(v.number()),
+    scanned: v.optional(v.number()),
+    patched: v.optional(v.number()),
+  },
+  returns: v.object({
+    batchScanned: v.number(),
+    batchPatched: v.number(),
+    totalScanned: v.number(),
+    totalPatched: v.number(),
+    isDone: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const batchSize = args.batchSize ?? 200;
+    const page = await ctx.db
+      .query("evidence")
+      .paginate({ cursor: args.cursor ?? null, numItems: batchSize });
+
+    let batchPatched = 0;
+    for (const ev of page.page) {
+      if (!ev.file_id) continue;
+      const file = await ctx.db.get(ev.file_id);
+      if (file && !file.is_attached) {
+        await ctx.db.patch(ev.file_id, { is_attached: true });
+        batchPatched++;
+      }
+    }
+
+    const totalScanned = (args.scanned ?? 0) + page.page.length;
+    const totalPatched = (args.patched ?? 0) + batchPatched;
+
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.fileStorage.backfillEvidenceFileAttachment,
+        {
+          cursor: page.continueCursor,
+          batchSize,
+          scanned: totalScanned,
+          patched: totalPatched,
+        },
+      );
+    } else {
+      // O `convex run` devolve só o 1o lote; o total fica greppavel aqui nos
+      // logs do deployment (dashboard Convex -> busque "COMPLETO").
+      console.log(
+        `[backfill is_attached] COMPLETO: evidencias=${totalScanned} arquivos_marcados=${totalPatched}`,
+      );
+    }
+
+    console.log(
+      `[backfill is_attached] lote escaneadas=${page.page.length} ` +
+        `marcadas=${batchPatched} acumulado=${totalScanned}/${totalPatched} ` +
+        `fim=${page.isDone}`,
+    );
+
+    return {
+      batchScanned: page.page.length,
+      batchPatched,
+      totalScanned,
+      totalPatched,
+      isDone: page.isDone,
+    };
+  },
+});
+
 const fileForStorageLookupValidator = v.union(
   v.object({
     s3_key: v.optional(v.string()),
