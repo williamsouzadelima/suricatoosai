@@ -511,9 +511,11 @@ def _finding_card(doc, sec):
     f = sec["finding"]
     sev = f.get("severity", "info")
     p = doc.add_paragraph()
-    # Título do achado como Heading 2 → aparece no outline/TOC do Word.
+    # Título do achado como Heading 3: fica no outline/navegação do Word MAS fora
+    # do campo TOC (\o "1-2" pega só níveis 1-2) → "atualizar campo" no Word não
+    # inunda o SUMÁRIO com os achados. A aparência vem dos runs abaixo.
     try:
-        p.style = doc.styles["Heading 2"]
+        p.style = doc.styles["Heading 3"]
     except KeyError:
         pass
     p.paragraph_format.space_before = Pt(10)
@@ -746,7 +748,8 @@ def _outline_title(doc, text, size, color, level=1, after=4, before=0):
 
 
 def _toc(doc, entries):
-    """SUMÁRIO à prova de falha: campo TOC (Heading 1) marcado `dirty` → o Word
+    """SUMÁRIO à prova de falha: campo TOC (níveis 1-2: partes/seções/fases;
+    títulos de achado são Heading 3 → ficam de fora) marcado `dirty` → o Word
     popula as páginas ao atualizar. O RESULTADO do campo já traz a LISTA ESTÁTICA
     das seções, então, atualizando ou não, NUNCA fica vazio/placeholder (vira o
     sumário paginado OU a lista de seções limpa)."""
@@ -765,7 +768,7 @@ def _toc(doc, entries):
     r = p0.add_run()
     it = OxmlElement("w:instrText")
     it.set(qn("xml:space"), "preserve")
-    it.text = ' TOC \\o "1-1" \\h \\z \\u '
+    it.text = ' TOC \\o "1-2" \\h \\z \\u '
     r._r.append(it)
     _fldchar(p0, "separate")
     items = [e for e in (entries or []) if e and e[0]]
