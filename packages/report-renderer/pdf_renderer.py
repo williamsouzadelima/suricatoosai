@@ -186,6 +186,32 @@ def _stat_table(ss, stats):
     return tbl
 
 
+def _stat_table_white(ss, stats):
+    """KPIs da capa ESCURA (navy/foto): células transparentes + texto BRANCO —
+    espelha o _cover_stats_white do DOCX (valor grande em cima, rótulo embaixo)."""
+    stats = (stats or [])[:4]
+    if not stats:
+        return None
+    valst = ParagraphStyle("KpiValW", parent=ss["KpiVal"], textColor=colors.white,
+                           leading=24)
+    labst = ParagraphStyle("KpiLabelW", parent=ss["KpiLabel"], textColor=colors.white,
+                           leading=11)
+    val = [Paragraph(_esc(s.get("value", "")), valst) for s in stats]
+    lab = [Paragraph(_esc(s.get("label", "")).upper(), labst) for s in stats]
+    w = (170.0 / len(stats)) * mm
+    # Alturas de linha EXPLICITAS: valor (grande) em cima, rotulo embaixo, sem
+    # sobreposicao (VALIGN TOP + padding 0).
+    tbl = Table([val, lab], colWidths=[w] * len(stats), rowHeights=[12 * mm, 7 * mm])
+    tbl.setStyle(_ts([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    return tbl
+
+
 def _append_image_pdf(S, ss, path, caption=None):
     if not path or not os.path.exists(path):
         return False
@@ -375,6 +401,18 @@ def render_pdf(model, out_path):
     S = []
     title = None
     brand = meta.get("brand", {})
+    # Capa: arte da marca (coverImagePath) OU, na ausência, o navy PADRÃO (gold
+    # SYN) — mesmo tratamento do DOCX. O fundo é desenhado no canvas (page 1);
+    # _cover_navy_default avisa o bloco da capa p/ usar texto/logo/KPIs BRANCOS.
+    _cover_bg = brand.get("coverImagePath")
+    _cover_navy_default = False
+    if not (_cover_bg and os.path.exists(_cover_bg)):
+        try:
+            _cover_bg = T.default_cover_bg()
+            _cover_navy_default = bool(_cover_bg and os.path.exists(_cover_bg))
+        except Exception:
+            _cover_bg = None
+            _cover_navy_default = False
 
     def esc(s):
         return _esc(s)
@@ -401,6 +439,11 @@ def render_pdf(model, out_path):
                                    textColor=colors.white)))
             S.append(PageBreak())
         elif t == "cover":
+            # Sem arte da marca → capa NAVY padrão (gold SYN): texto/logo/KPIs em
+            # BRANCO sobre o navy desenhado no canvas. Se o navy não pôde ser
+            # gerado (_cover_navy_default=False), degrada p/ a capa clara (INK).
+            _ctitle = "FFFFFF" if _cover_navy_default else T.INK
+            _cmuted = "C9D3E6" if _cover_navy_default else T.MUTED
             S.append(Spacer(1, 30 * mm))
             used_logo = False
             logo_path = brand.get("logoPath")
@@ -419,11 +462,10 @@ def render_pdf(model, out_path):
                 except Exception:
                     used_logo = False
             if not used_logo and brand.get("wordmark", "") == "Suricatoos":
-                lp = logo.write_logo(dark=False)
+                lp = logo.write_logo(dark=_cover_navy_default)  # branco no navy
                 if lp and os.path.exists(lp):
                     try:
-                        # Altura derivada do ratio REAL do PNG (logo oficial
-                        # 1600x274) — robusto a trocas futuras do logotipo.
+                        # Altura do ratio REAL do PNG (logo oficial 1600x274).
                         _iw, _ih = ImageReader(lp).getSize()
                         _w = 70 * mm
                         im = Image(lp, width=_w, height=_w * _ih / _iw)
@@ -433,20 +475,27 @@ def render_pdf(model, out_path):
                     except Exception:
                         used_logo = False
             if not used_logo:
-                S.append(Paragraph(esc(brand.get("wordmark", T.WORDMARK)), ss["Wordmark"]))
-            S.append(Spacer(1, 4 * mm))
+                S.append(Paragraph(
+                    f'<font color="#{_ctitle}">{esc(brand.get("wordmark", T.WORDMARK))}</font>',
+                    ss["Wordmark"]))
+            S.append(Spacer(1, 55 * mm))
             S.append(Paragraph(
                 f'<b><font color="#{T.CORAL}">{esc(meta.get("classification", ""))}   ·   {esc(meta.get("docCode", ""))}</font></b>',
                 ss["Small"]))
-            S.append(Paragraph(f'<b>{esc(meta.get("volume", ""))}</b>', ss["Small"]))
+            S.append(Paragraph(
+                f'<font color="#{_cmuted}"><b>{esc(meta.get("volume", ""))}</b></font>',
+                ss["Small"]))
             S.append(Spacer(1, 8 * mm))
-            S.append(Paragraph(esc(sec.get("title", "")), ss["Cover"]))
+            S.append(Paragraph(
+                f'<font color="#{_ctitle}">{esc(sec.get("title", ""))}</font>',
+                ss["Cover"]))
             if sec.get("subtitle"):
-                S.append(Paragraph(esc(sec["subtitle"]),
-                                   ParagraphStyle("sub", parent=ss["Body2"], fontSize=13,
-                                                  textColor=C(T.MUTED))))
-            S.append(Spacer(1, 14 * mm))
-            st = _stat_table(ss, sec.get("stats"))
+                S.append(Paragraph(
+                    f'<font color="#{_cmuted}">{esc(sec["subtitle"])}</font>',
+                    ParagraphStyle("sub", parent=ss["Body2"], fontSize=13)))
+            S.append(Spacer(1, 12 * mm))
+            st = (_stat_table_white if _cover_navy_default else _stat_table)(
+                ss, sec.get("stats"))
             if st:
                 S.append(st)
             S.append(PageBreak())
@@ -636,5 +685,5 @@ def render_pdf(model, out_path):
     doc = SimpleDocTemplate(out_path, pagesize=A4, leftMargin=18 * mm,
                             rightMargin=18 * mm, topMargin=16 * mm, bottomMargin=16 * mm,
                             title="Relatório")
-    foot = _cover_canvas_factory(meta, brand.get("coverImagePath"))
+    foot = _cover_canvas_factory(meta, _cover_bg)
     doc.build(S, onFirstPage=foot, onLaterPages=foot)

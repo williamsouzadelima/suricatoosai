@@ -246,6 +246,13 @@ def _cover(prs, sec, meta):
     accent = brand.get("accent") or T.CORAL
     # Capa full-bleed: arte da marca (coverImagePath) ao fundo; senão, navy sólido.
     cover = brand.get("coverImagePath")
+    if not (cover and os.path.exists(cover)):
+        # Sem arte da marca → navy PADRÃO (gold SYN): mesma arte do DOCX/PDF
+        # (navy INK + faixa azul + traço coral), em vez do retângulo sólido.
+        try:
+            cover = T.default_cover_bg()
+        except Exception:
+            cover = None
     if cover and os.path.exists(cover):
         try:
             fitted = T.cover_fit(cover, int(SW), int(SH))

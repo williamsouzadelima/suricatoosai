@@ -125,7 +125,10 @@ def default_cover_bg():
     W, H = 1700, 2200
     img = Image.new("RGB", (W, H), _t(INK))
     d = ImageDraw.Draw(img)
+    # Faixa fina azul no topo (sem texto por cima) — unico acento no fundo.
+    # (Sem traco coral fixo no meio: a posicao do texto varia por renderer e o
+    # traco cruzaria o titulo/classificacao em alguns; o acento coral ja vem da
+    # linha de classificacao, que e CORAL.)
     d.rectangle([0, 0, W, 24], fill=_t(PRIMARY))
-    d.rectangle([120, 900, 420, 912], fill=_t(CORAL))
     img.save(out, "PNG")
     return out
