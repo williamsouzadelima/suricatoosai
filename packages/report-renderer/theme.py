@@ -106,3 +106,26 @@ def cover_fit(src, tw, th):
         return out
     except Exception:
         return src
+
+
+def default_cover_bg():
+    """Fundo navy PADRÃO da capa quando a marca NÃO tem arte própria — padrão-ouro
+    SYN. Em vez de uma capa clara, a capa nasce navy: navy sólido (INK) + faixa
+    fina azul (PRIMARY) no topo + traço coral (CORAL). Retrato ~US Letter (0.773),
+    cacheado no tempdir; regenerado a cada chamada p/ refletir overrides de marca.
+    Retorna o caminho do PNG; o chamador o trata como `coverImagePath` (full-bleed,
+    título/logo/KPIs em branco)."""
+    import tempfile
+    from PIL import Image, ImageDraw
+
+    def _t(h):
+        return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+
+    out = os.path.join(tempfile.gettempdir(), "suricatoos_cover_default_navy.png")
+    W, H = 1700, 2200
+    img = Image.new("RGB", (W, H), _t(INK))
+    d = ImageDraw.Draw(img)
+    d.rectangle([0, 0, W, 24], fill=_t(PRIMARY))
+    d.rectangle([120, 900, 420, 912], fill=_t(CORAL))
+    img.save(out, "PNG")
+    return out

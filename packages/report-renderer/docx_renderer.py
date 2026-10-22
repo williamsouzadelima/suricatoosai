@@ -247,6 +247,13 @@ def _cover(doc, sec, meta):
     # página inteira (imagem flutuante behindDoc) e o texto branco fica por cima,
     # como no PPTX/PDF. Ausente → capa programática clara (título escuro).
     cover = brand.get("coverImagePath")
+    if not (cover and os.path.exists(cover)):
+        # Sem arte da marca → a capa NASCE navy (padrão-ouro SYN), não clara:
+        # fundo navy full-page + título/logo/KPIs em branco.
+        try:
+            cover = T.default_cover_bg()
+        except Exception:
+            cover = None
     fullbleed = bool(cover and os.path.exists(cover))
     if fullbleed:
         secpg = doc.sections[0]
@@ -270,7 +277,9 @@ def _cover(doc, sec, meta):
         lp = logo.write_logo(dark=fullbleed)
         if lp and os.path.exists(lp):
             try:
-                doc.add_picture(lp, width=Inches(1.1))
+                # Wordmark oficial Suricatoos (1600x274, ~5.84:1) — destaque de
+                # capa; largura generosa p/ o logotipo dominar o topo-esquerdo.
+                doc.add_picture(lp, width=Inches(2.6))
                 used_logo = True
             except Exception:
                 used_logo = False

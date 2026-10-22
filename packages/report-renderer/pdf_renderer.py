@@ -422,7 +422,11 @@ def render_pdf(model, out_path):
                 lp = logo.write_logo(dark=False)
                 if lp and os.path.exists(lp):
                     try:
-                        im = Image(lp, width=70 * mm, height=70 * mm * 155.0 / 900.0)
+                        # Altura derivada do ratio REAL do PNG (logo oficial
+                        # 1600x274) — robusto a trocas futuras do logotipo.
+                        _iw, _ih = ImageReader(lp).getSize()
+                        _w = 70 * mm
+                        im = Image(lp, width=_w, height=_w * _ih / _iw)
                         im.hAlign = "LEFT"
                         S.append(im)
                         used_logo = True
