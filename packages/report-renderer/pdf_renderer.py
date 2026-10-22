@@ -12,6 +12,9 @@ from reportlab.lib.enums import TA_LEFT, TA_CENTER
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import (
     SimpleDocTemplate,
+    BaseDocTemplate,
+    PageTemplate,
+    Frame,
     Paragraph,
     Spacer,
     Table,
@@ -20,6 +23,7 @@ from reportlab.platypus import (
     HRFlowable,
     Image,
 )
+from reportlab.platypus.tableofcontents import TableOfContents
 from reportlab.lib.utils import ImageReader
 import os
 
@@ -166,6 +170,46 @@ def _cover_canvas_factory(meta, cover):
                                f'{meta.get("docCode", "")} · {doc.page}')
         canvas.restoreState()
     return draw
+
+
+class _TocDocTemplate(BaseDocTemplate):
+    """Doc com SUMÁRIO paginado: afterFlowable notifica TOCEntry p/ as partes
+    (estilo 'pdtitle') e os headings de seção/fase ('TOCH1'/'TOCH2'); multiBuild
+    resolve os números de página em 2+ passagens. onPage=foot trata capa vs
+    páginas internas (o próprio foot checa doc.page <= 1)."""
+
+    def __init__(self, filename, foot, **kw):
+        BaseDocTemplate.__init__(self, filename, **kw)
+        fw = self.pagesize[0] - self.leftMargin - self.rightMargin
+        fh = self.pagesize[1] - self.topMargin - self.bottomMargin
+        frame = Frame(self.leftMargin, self.bottomMargin, fw, fh, id="normal")
+        self.addPageTemplates([
+            PageTemplate(id="main", frames=[frame], onPage=foot,
+                         pagesize=self.pagesize),
+        ])
+
+    def afterFlowable(self, flowable):
+        if not isinstance(flowable, Paragraph):
+            return
+        lvl = {"pdtitle": 0, "TOCH1": 1, "TOCH2": 2}.get(
+            getattr(flowable.style, "name", ""))
+        if lvl is None:
+            return
+        txt = flowable.getPlainText()
+        if txt:
+            self.notify("TOCEntry", (lvl, txt, self.page))
+
+
+def _summary_block(ss, toc):
+    """Página de SUMÁRIO (após a capa): título + TOC paginado (preenchido pelo
+    afterFlowable do _TocDocTemplate via multiBuild)."""
+    return [
+        Paragraph("SUMÁRIO", ParagraphStyle("sumh", parent=ss["Cover"],
+                                             fontSize=22)),
+        Spacer(1, 4 * mm),
+        toc,
+        PageBreak(),
+    ]
 
 
 def _stat_table(ss, stats):
@@ -398,6 +442,24 @@ def render_pdf(model, out_path):
     meta = model.get("meta", {})
     _apply_brand(meta)
     ss = _styles()
+    toc = TableOfContents()
+    toc.levelStyles = [
+        ParagraphStyle("TOCl0", fontName=FONT_SANS_BOLD, fontSize=12, leading=20,
+                       textColor=C(T.INK)),
+        ParagraphStyle("TOCl1", fontName=FONT_SANS, fontSize=10.5, leading=17,
+                       leftIndent=14, textColor=C(T.INK)),
+        ParagraphStyle("TOCl2", fontName=FONT_SANS, fontSize=10, leading=15,
+                       leftIndent=28, textColor=C(T.MUTED)),
+    ]
+    # O Table interno do TOC herda FONTNAME 'Helvetica' do TableStyle padrão
+    # (embutiria Helvetica no PDF e quebraria a pureza de fonte do dossiê) —
+    # força IBM Plex.
+    toc.tableStyle = TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("FONTNAME", (0, 0), (-1, -1), FONT_SANS),
+    ])
     S = []
     title = None
     brand = meta.get("brand", {})
@@ -438,6 +500,7 @@ def render_pdf(model, out_path):
                     ParagraphStyle("subl", parent=ss["Body2"], fontSize=13,
                                    textColor=colors.white)))
             S.append(PageBreak())
+            S += _summary_block(ss, toc)
         elif t == "cover":
             # Sem arte da marca → capa NAVY padrão (gold SYN): texto/logo/KPIs em
             # BRANCO sobre o navy desenhado no canvas. Se o navy não pôde ser
@@ -499,13 +562,16 @@ def render_pdf(model, out_path):
             if st:
                 S.append(st)
             S.append(PageBreak())
+            S += _summary_block(ss, toc)
         elif t == "partDivider":
             S += _part_divider(ss, sec)
         elif t == "divider":
             S.append(PageBreak())
         elif t == "heading":
             title = sec.get("text")
-            S.append(Paragraph(esc(sec.get("text", "")), ss["H1"]))
+            _hname = "TOCH2" if sec.get("level", 1) == 2 else "TOCH1"
+            S.append(Paragraph(esc(sec.get("text", "")),
+                               ParagraphStyle(_hname, parent=ss["H1"])))
             S.append(HRFlowable(width="18%", thickness=2, color=C(T.CORAL), spaceAfter=6))
         elif t == "paragraph":
             S.append(Paragraph(_ml(sec.get("text", "")), ss["Body2"]))
@@ -685,8 +751,8 @@ def render_pdf(model, out_path):
             S.append(tbl)
             S.append(Spacer(1, 5 * mm))
 
-    doc = SimpleDocTemplate(out_path, pagesize=A4, leftMargin=18 * mm,
-                            rightMargin=18 * mm, topMargin=16 * mm, bottomMargin=16 * mm,
-                            title="Relatório")
     foot = _cover_canvas_factory(meta, _cover_bg)
-    doc.build(S, onFirstPage=foot, onLaterPages=foot)
+    doc = _TocDocTemplate(out_path, foot, pagesize=A4, leftMargin=18 * mm,
+                          rightMargin=18 * mm, topMargin=16 * mm,
+                          bottomMargin=16 * mm, title="Relatório")
+    doc.multiBuild(S)

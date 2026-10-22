@@ -36,6 +36,26 @@ from pdf_renderer import render_pdf  # noqa: E402
 SENT = ["DESCR_END_F-01", "NARR_END_F-01", "IMPACT_END_F-01", "REMED_END_F-01",
         "PARA_END_X", "STATBAND_END_X"]
 PLACE = "capturada"  # "Evidência visual não capturada" (F-02 Alto, sem imagem)
+SUMMARY = "SUMÁRIO"  # título do sumário (docx) / slide agenda (pptx)
+# Fases da narrativa (make_sample._phases): devem aparecer no SUMÁRIO, ANTES do
+# corpo. Âncora = sentinela do parágrafo de overview (1ª coisa do corpo após o
+# sumário) → se a fase aparece antes da âncora, está no sumário; senão, só no corpo.
+PHASES = ["Reconhecimento e Mapeamento", "Exploração e Acesso Inicial",
+          "Movimento Lateral e Impacto"]
+ANCHOR = "OVERVIEW_END_X"
+
+
+def _summary_phase_fails(fmt, text):
+    tns = text.replace(" ", "")
+    if ANCHOR not in tns:
+        return [f"{fmt}: âncora {ANCHOR} ausente (make_sample mudou?)"]
+    a = tns.index(ANCHOR)
+    out = []
+    for ph in PHASES:
+        p = ph.replace(" ", "")
+        if p not in tns or tns.index(p) > a:
+            out.append(f"{fmt}: fase '{ph}' fora do SUMÁRIO (só no corpo)")
+    return out
 
 
 def _strip(xml):
@@ -89,6 +109,9 @@ def main():
             fails.append("docx: fonte mono (IBM Plex Mono) ausente")
         if "Consolas" in xml:
             fails.append("docx: Consolas ainda presente (mono nao trocado)")
+        if SUMMARY not in txt:
+            fails.append("docx: SUMÁRIO ausente")
+        fails += _summary_phase_fails("docx", txt)
 
         # PPTX
         with zipfile.ZipFile(pptx_p) as z:
@@ -112,6 +135,15 @@ def main():
             fails.append("pptx: fonte mono (IBM Plex Mono) ausente")
         if "Consolas" in pxml:
             fails.append("pptx: Consolas ainda presente (mono nao trocado)")
+        # Agenda = 2º slide (cover=slide1, agenda=slide2); checa direto (a ordem
+        # lexical de slideN.xml concatenada em pxml não é a ordem de criação).
+        with zipfile.ZipFile(pptx_p) as z:
+            agenda = _strip(z.read("ppt/slides/slide2.xml").decode("utf-8", "replace"))
+        if SUMMARY not in agenda:
+            fails.append("pptx: slide de SUMÁRIO (agenda) ausente/sem título")
+        for ph in PHASES:
+            if ph not in agenda:
+                fails.append(f"pptx: fase '{ph}' ausente do slide de SUMÁRIO")
 
         # PDF — extração de texto precisa de pypdf (dev); sem ele, cai p/ um
         # extrator cru e só exige os checks quando há texto suficiente.
@@ -128,6 +160,7 @@ def main():
                     fails.append(f"pdf: sentinela ausente {s} (texto truncado)")
             if PLACE not in pt:
                 fails.append("pdf: placeholder de evidência ausente")
+            fails += _summary_phase_fails("pdf", t)
         else:
             print("  NOTA: texto do PDF não extraído (instale pypdf) — "
                   "checagem de truncamento do PDF pulada nesta execução.")

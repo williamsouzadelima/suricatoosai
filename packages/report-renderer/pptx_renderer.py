@@ -355,6 +355,39 @@ def _divider(prs, meta):
     _footer(slide)
 
 
+def _agenda(prs, entries, meta):
+    """Slide SUMÁRIO: partes (nível 0, negrito) + seções/fases (níveis 1-2,
+    recuadas). entries = [(title, level)]. Duas colunas quando longo (evita
+    overflow — ver histórico de estouro no PPTX)."""
+    lines = [(str(t), lv) for (t, lv) in (entries or []) if t]
+    if not lines:
+        return
+    slide = _blank(prs)
+    _rect(slide, 0, 0, SW, Inches(0.12), T.PRIMARY)
+    _text(slide, ML, Inches(0.5), CW, Inches(0.8), "SUMÁRIO", size=28, bold=True,
+          color=T.INK, font=T.FONT_DISPLAY)
+    two = len(lines) > 14
+    half = (len(lines) + 1) // 2 if two else len(lines)
+    cols = [lines[:half]] + ([lines[half:]] if two else [])
+    col_w = Inches(5.9) if two else CW
+    for ci, col in enumerate(cols):
+        tb = slide.shapes.add_textbox(ML + Inches(6.2) * ci, Inches(1.55),
+                                      col_w, Inches(5.5))
+        tf = tb.text_frame
+        tf.word_wrap = True
+        for i, (txt, lv) in enumerate(col):
+            p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+            p.space_after = Pt(4)
+            p.level = min(lv, 2)
+            r = p.add_run()
+            r.text = txt
+            r.font.size = Pt(14 if lv == 0 else 11)
+            r.font.bold = (lv == 0)
+            r.font.name = T.FONT_DISPLAY if lv == 0 else T.FONT_BODY
+            r.font.color.rgb = _rgb(T.INK if lv <= 1 else T.MUTED)
+    _footer(slide)
+
+
 def _stat_band(prs, sec):
     slide = _blank(prs)
     _rect(slide, 0, 0, SW, Inches(0.12), T.PRIMARY)
@@ -780,10 +813,18 @@ def render_pptx(model, out_path):
     _STATE["page"] = 0
     _apply_brand(meta)
     title = None
+    _agenda_entries = []
+    for s in model.get("sections", []):
+        _st = s.get("type")
+        if _st == "partDivider":
+            _agenda_entries.append((s.get("title", ""), 0))
+        elif _st == "heading" and s.get("level", 1) in (1, 2):
+            _agenda_entries.append((s.get("text", ""), s.get("level", 1)))
     for sec in model.get("sections", []):
         t = sec.get("type")
         if t == "cover":
             _cover(prs, sec, meta)
+            _agenda(prs, _agenda_entries, meta)
         elif t == "partDivider":
             _part_divider(prs, sec)
         elif t == "divider":

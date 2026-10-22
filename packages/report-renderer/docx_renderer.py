@@ -768,15 +768,18 @@ def _toc(doc, entries):
     it.text = ' TOC \\o "1-1" \\h \\z \\u '
     r._r.append(it)
     _fldchar(p0, "separate")
-    items = [e for e in (entries or []) if e]
+    items = [e for e in (entries or []) if e and e[0]]
     if not items:
         _fldchar(p0, "end")
         doc.add_page_break()
         return
-    for i, title in enumerate(items):
+    for i, (title, level) in enumerate(items):
         pe = doc.add_paragraph()
         pe.paragraph_format.space_after = Pt(5)
-        _run(pe, title, size=12, color=T.INK)
+        if level:
+            pe.paragraph_format.left_indent = Inches(0.28 * level)  # recuo hierárquico
+        _run(pe, title, size=(12 if level == 0 else 11),
+             bold=(level == 0), color=T.INK)
         if i == len(items) - 1:
             _fldchar(pe, "end")  # fecha o campo na última entrada
     doc.add_page_break()
@@ -791,12 +794,18 @@ def render_docx(model, out_path):
     style.font.size = Pt(11)
     _setup_footer(doc, meta)
     brand = meta.get("brand", {})
-    toc_entries = [
-        (s.get("title") if s.get("type") == "partDivider" else s.get("text"))
-        for s in model.get("sections", [])
-        if s.get("type") == "partDivider"
-        or (s.get("type") == "heading" and s.get("level", 1) == 1)
-    ]
+    # SUMÁRIO completo: partes (nível 0) + headings de seção (nível 1) + as
+    # sub-seções/fases da narrativa (nível 2). Títulos de achado são findingCard
+    # (não "heading"), então NÃO entram — o sumário não incha com os N achados.
+    toc_entries = []
+    for s in model.get("sections", []):
+        st = s.get("type")
+        if st == "partDivider":
+            toc_entries.append((s.get("title", ""), 0))
+        elif st == "heading":
+            lvl = s.get("level", 1)
+            if lvl in (1, 2):
+                toc_entries.append((s.get("text", ""), lvl))
     prev_type = None
     for sec in model.get("sections", []):
         t = sec.get("type")
