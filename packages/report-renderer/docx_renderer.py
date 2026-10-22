@@ -548,8 +548,9 @@ def _embed_image_docx(doc, path, caption=None):
         doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
     except Exception:
         return False
-    if caption:
-        _para(doc, _clip(caption, 160), size=8, color=T.MUTED, after=4)
+    cap = "▲ " + _clip(caption, 160) if caption else "▲ Evidência visual capturada"
+    _para(doc, cap, size=8, color=T.MUTED, after=8,
+          align=WD_ALIGN_PARAGRAPH.CENTER)
     return True
 
 
@@ -571,42 +572,75 @@ def _ev_sorted(f):
     )
 
 
+def _evidence_block(doc, steps):
+    """Cadeia de evidência estilo TERMINAL (modelo-ouro SYN): uma célula de fundo
+    navy escuro com o texto MONO colorido — cabeçalho do passo cinza, comando
+    ciano, output neutro, prova verde. Um bloco por achado (toda a cadeia junta)."""
+    t = doc.add_table(rows=1, cols=1)
+    cell = t.cell(0, 0)
+    cell.text = ""
+    _shade(cell, T.EV_BG)
+    state = {"first": True}
+
+    def line(before=0):
+        p = cell.paragraphs[0] if state["first"] else cell.add_paragraph()
+        state["first"] = False
+        p.paragraph_format.space_before = Pt(before)
+        p.paragraph_format.space_after = Pt(0)
+        return p
+
+    def mono(p, text, color, bold=False):
+        r = p.add_run()
+        r.font.size = Pt(8.5)
+        r.font.bold = bold
+        _set_font(r, T.FONT_MONO)
+        r.font.color.rgb = _rgb(color)
+        for i, ln in enumerate(str(text).split("\n")):
+            if i:
+                r.add_break()
+            r.add_text(ln)
+
+    for idx, (n, e) in enumerate(steps):
+        ph = line(before=(2 if idx == 0 else 8))
+        head = f"{n}."
+        if e.get("toolName"):
+            head += f" [{e['toolName']}]"
+        mono(ph, head, T.EV_META, bold=True)
+        lbl = e.get("label")
+        if lbl and lbl != e.get("toolName"):
+            mono(ph, "  " + _clip(lbl, 160), T.EV_META)
+        if e.get("command"):
+            pc = line()
+            mono(pc, "$ ", T.EV_OK, bold=True)
+            mono(pc, str(e["command"]), T.EV_CMD)
+        if e.get("snippet"):
+            mono(line(), e["snippet"], T.EV_OUT)
+        if e.get("resultSummary"):
+            pr = line()
+            mono(pr, "→ prova: ", T.EV_OK, bold=True)
+            mono(pr, e["resultSummary"], T.EV_OUT)
+    doc.add_paragraph()
+
+
 def _evidence_docx(doc, f):
     ev = _ev_sorted(f)
-    has_any = any(
-        e.get("snippet") or e.get("imagePath") or e.get("command")
-        or e.get("resultSummary") for e in ev
-    )
+    steps = [(e.get("stepIndex") or i, e) for i, e in enumerate(ev, 1)]
+    text_steps = [
+        (n, e) for (n, e) in steps
+        if e.get("command") or e.get("snippet") or e.get("resultSummary")
+    ]
+    img_steps = [e for (n, e) in steps if e.get("imagePath")]
+    if text_steps:
+        _para(doc, "CADEIA DE EVIDÊNCIA", size=9, bold=True, color=T.PRIMARY,
+              after=3)
+        _evidence_block(doc, text_steps)
     img_rendered = 0
-    if has_any:
-        _para(doc, "CADEIA DE EVIDÊNCIA:", size=10, bold=True, color=T.PRIMARY,
-              after=2)
-        for i, e in enumerate(ev, 1):
-            n = e.get("stepIndex") or i
-            head = f"{n}."
-            if e.get("toolName"):
-                head += f"  [{e['toolName']}]"
-            if e.get("label") and e.get("label") != e.get("toolName"):
-                head += f"  {_clip(e['label'], 160)}"
-            _para(doc, head, size=10, bold=True, color=T.INK, after=1)
-            if e.get("command"):
-                _body(doc, "$ " + str(e["command"]), size=9, color=T.MUTED,
-                      font=T.FONT_MONO, after=1)
-            if e.get("snippet"):
-                _body(doc, e["snippet"], size=9, color=T.MUTED, font=T.FONT_MONO,
-                      after=1)
-            if e.get("resultSummary"):
-                pp = doc.add_paragraph()
-                pp.paragraph_format.space_after = Pt(3)
-                _run(pp, "→ prova: ", size=9, bold=True, color=T.SUCCESS)
-                _run(pp, e["resultSummary"], size=9, color=T.INK)
-            if e.get("imagePath"):
-                if _embed_image_docx(doc, e["imagePath"], e.get("label")):
-                    img_rendered += 1
-                else:
-                    _placeholder_docx(
-                        doc,
-                        "⚠ Evidência visual referenciada não disponível no pacote.")
+    for e in img_steps:
+        if _embed_image_docx(doc, e.get("imagePath"), e.get("label")):
+            img_rendered += 1
+        else:
+            _placeholder_docx(
+                doc, "⚠ Evidência visual referenciada não disponível no pacote.")
     if img_rendered == 0 and f.get("severity") in ("critical", "high"):
         _placeholder_docx(doc, "⚠ Evidência visual não capturada para este achado.")
 

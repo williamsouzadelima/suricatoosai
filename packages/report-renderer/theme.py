@@ -19,6 +19,15 @@ SUCCESS = "12996B"
 WARNING = "C9820B"
 DESTRUCTIVE = "DA2C3C"
 
+# Bloco de evidencia estilo "terminal" (modelo-ouro SYN): fundo navy escuro +
+# texto MONO colorido (cores claras p/ contraste no escuro).
+EV_BG = "0B1424"   # fundo do bloco (navy quase preto)
+EV_CMD = "9FE2FF"  # comando / request (ciano)
+EV_OK = "5FD69A"   # resultado OK / prova (verde)
+EV_CRIT = "FFD27A"  # valor critico / dado sensivel (ambar)
+EV_OUT = "D6E2F0"  # output neutro
+EV_META = "7C93A8"  # comentario / metadado (cabecalho do passo)
+
 CHART = ["2456E6", "3F6EF0", "6F9BF5", "12996B", "C9820B"]
 
 SEVERITY_COLOR = {
