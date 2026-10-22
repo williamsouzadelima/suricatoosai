@@ -11,6 +11,7 @@ import { generateText, Output } from "ai";
 import { z } from "zod";
 import { myProvider, type ModelName } from "@/lib/ai/providers";
 import { api } from "@/convex/_generated/api";
+import { cvssBaseScore } from "@/lib/reports/cvss";
 import type { Id } from "@/convex/_generated/dataModel";
 import { createFindingFingerprint } from "@/lib/ai/subagents/fingerprint";
 import { S3_USER_FILES_PREFIX } from "@/lib/constants/s3";
@@ -430,6 +431,7 @@ export const ingestEvidenceBundle = schemaTask({
               reproductionSteps: f.reproduction_steps,
               cwe: f.cwe,
               cvssVector: f.cvss_vector,
+              cvssScore: cvssBaseScore(f.cvss_vector) ?? undefined,
               confidence: f.confidence,
               evidence: evidence as never,
             },

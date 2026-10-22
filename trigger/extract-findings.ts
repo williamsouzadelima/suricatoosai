@@ -6,6 +6,7 @@ import { myProvider, type ModelName } from "@/lib/ai/providers";
 import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
 import { captureFinding, type CapturedEvidenceItem } from "@/lib/db/findings";
+import { cvssBaseScore } from "@/lib/reports/cvss";
 
 /**
  * Extração RETROATIVA de achados de uma task (chat) já concluída.
@@ -226,6 +227,7 @@ export const extractFindingsFromChat = schemaTask({
           reproductionSteps: f.reproduction_steps,
           cwe: f.cwe,
           cvssVector: f.cvss_vector,
+          cvssScore: cvssBaseScore(f.cvss_vector) ?? undefined,
           confidence: f.confidence,
           origin: "agent",
           evidence: (f.evidence_chain ?? [])

@@ -12,6 +12,7 @@ import { z } from "zod";
 import { api } from "@/convex/_generated/api";
 import { buildReportModel } from "@/lib/reports/build-report-model";
 import { generateEngagementNarrative } from "./generate-narrative";
+import { cvssBaseScore } from "@/lib/reports/cvss";
 import type { ReportInput } from "@/lib/reports/report-model";
 import type { Id } from "@/convex/_generated/dataModel";
 import { RENDERER_SOURCES } from "../packages/report-renderer/sources";
@@ -301,7 +302,9 @@ export const generateEngagementReport = schemaTask({
           weaknessClass: f.weaknessClass,
           cwe: f.cwe ?? undefined,
           cvssVector: f.cvssVector ?? undefined,
-          cvssScore: f.cvssScore ?? undefined,
+          // Deriva o score do vetor quando o achado tem vetor mas nao score
+          // (extracao grava vetor, nao score) -> enche a coluna/media CVSS.
+          cvssScore: f.cvssScore ?? cvssBaseScore(f.cvssVector) ?? undefined,
           description: f.description ?? undefined,
           impact: f.impact ?? undefined,
           remediation: f.remediation ?? undefined,
