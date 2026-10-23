@@ -322,7 +322,7 @@ def _part_divider(doc, sec, lead_break=True):
 
 def _stat_band(doc, sec):
     if sec.get("headline"):
-        _para(doc, _clip(sec["headline"], 200), size=20, bold=True, color=T.INK,
+        _para(doc, sec["headline"], size=20, bold=True, color=T.INK,
               after=8)
     _stat_tiles(doc, sec.get("stats"))
     if sec.get("body"):
@@ -332,16 +332,16 @@ def _stat_band(doc, sec):
 def _attack_chain(doc, sec):
     _heading(doc, "Cadeia de Ataque", 1)
     for lane in (sec.get("lanes") or [])[:6]:
-        _para(doc, _clip(lane.get("title", ""), 120), size=12, bold=True,
+        _para(doc, lane.get("title", ""), size=12, bold=True,
               color=T.INK, after=2)
         steps = (lane.get("steps") or [])[:6]
         if steps:
-            _para(doc, "  →  ".join(_clip(s.get("label", ""), 24) for s in steps),
+            _para(doc, "  →  ".join(s.get("label", "") for s in steps),
                   size=11, bold=True, color=T.PRIMARY, after=2)
         for s in steps:
             if s.get("detail"):
                 p = doc.add_paragraph(style="List Bullet")
-                _run(p, f"{_clip(s.get('label',''),24)}: {_clip(s['detail'],120)}",
+                _run(p, f"{s.get('label','')}: {s['detail']}",
                      size=10, color=T.MUTED)
         doc.add_paragraph()
 
@@ -367,7 +367,7 @@ def _roadmap(doc, sec):
         cell.text = ""
         for k, a in enumerate(acts[:6]):
             p = cell.paragraphs[0] if k == 0 else cell.add_paragraph()
-            _run(p, "▸ " + _clip(a, 90), size=9, color=T.INK)
+            _run(p, "▸ " + str(a), size=9, color=T.INK)
     doc.add_paragraph()
 
 
@@ -389,32 +389,32 @@ def _cost_incident(doc, sec):
     cr.text = ""
     for k, r in enumerate((sec.get("remediation") or [])[:6]):
         p = cr.paragraphs[0] if k == 0 else cr.add_paragraph()
-        _run(p, "◆ " + _clip(r, 90), size=10, color=T.INK)
+        _run(p, "◆ " + str(r), size=10, color=T.INK)
     ci = t.cell(1, 1)
     ci.text = ""
     inc = (sec.get("incident") or [])[:4]
     for k, it in enumerate(inc):
         p = ci.paragraphs[0] if k == 0 else ci.add_paragraph()
-        _run(p, "◆ " + _clip(it.get("label", ""), 60), size=10, bold=True,
+        _run(p, "◆ " + it.get("label", ""), size=10, bold=True,
              color=T.DESTRUCTIVE)
         if it.get("detail"):
             pp = ci.add_paragraph()
-            _run(pp, "   " + _clip(it["detail"], 90), size=9, color=T.MUTED)
+            _run(pp, "   " + str(it["detail"]), size=9, color=T.MUTED)
     doc.add_paragraph()
 
 
 def _partner_value(doc, sec):
-    _heading(doc, _clip(sec.get("title", "Parceria"), 80), 1)
+    _heading(doc, sec.get("title", "Parceria"), 1)
     for p in (sec.get("points") or [])[:6]:
-        _para(doc, _clip(p.get("title", ""), 60), size=13, bold=True,
+        _para(doc, p.get("title", ""), size=13, bold=True,
               color=T.PRIMARY, after=1)
-        _para(doc, _clip(p.get("body", ""), 400), size=11, color=T.INK, after=6)
+        _para(doc, p.get("body", ""), size=11, color=T.INK, after=6)
 
 
 def _next_steps(doc, sec):
     _heading(doc, "Próximos Passos", 1)
     for i, s in enumerate((sec.get("steps") or [])[:6], 1):
-        _para(doc, f"{i}.  {_clip(s, 200)}", size=12, color=T.INK, after=4)
+        _para(doc, f"{i}.  {s}", size=12, color=T.INK, after=4)
     brand = sec.get("_brand") or {}
     contact = " · ".join(
         [x for x in [brand.get("name", ""), brand.get("contact", ""),

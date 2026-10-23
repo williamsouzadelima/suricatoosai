@@ -304,7 +304,7 @@ def _append_image_pdf(S, ss, path, caption=None):
         S.append(Spacer(1, 2 * mm))
         S.append(img)
         if caption:
-            S.append(Paragraph(_esc(_clip(caption, 160)), ss["Small"]))
+            S.append(Paragraph(_esc(caption), ss["Small"]))
         S.append(Spacer(1, 3 * mm))
         return True
     except Exception:
@@ -345,7 +345,7 @@ def _part_divider(ss, sec):
 def _stat_band(ss, sec):
     out = []
     if sec.get("headline"):
-        out.append(Paragraph(_esc(_clip(sec["headline"], 200)),
+        out.append(Paragraph(_esc(sec["headline"]),
                              ParagraphStyle("sbh", parent=ss["Cover"], fontSize=18,
                                             spaceAfter=6)))
     st = _stat_table(ss, sec.get("stats"))
@@ -363,14 +363,14 @@ def _attack_chain(ss, sec):
                               textColor=C(T.INK), leading=10)
     arrstyle = ParagraphStyle("arr", parent=ss["Small"], alignment=TA_CENTER)
     for lane in (sec.get("lanes") or [])[:6]:
-        out.append(Paragraph(_esc(_clip(lane.get("title", ""), 120)), ss["CardTitle"]))
+        out.append(Paragraph(_esc(lane.get("title", "")), ss["CardTitle"]))
         steps = (lane.get("steps") or [])[:5]
         cells = []
         widths = []
         for i, s in enumerate(steps):
             cells.append(Paragraph(
-                f'<b><font color="#{T.PRIMARY}">{_esc(_clip(s.get("label", ""), 22))}</font></b>'
-                f'<br/><font size="7" color="#{T.MUTED}">{_esc(_clip(s.get("detail", ""), 40))}</font>',
+                f'<b><font color="#{T.PRIMARY}">{_esc(s.get("label", ""))}</font></b>'
+                f'<br/><font size="7" color="#{T.MUTED}">{_esc(s.get("detail", ""))}</font>',
                 boxstyle))
             widths.append(28 * mm)
             if i < len(steps) - 1:
@@ -400,7 +400,7 @@ def _roadmap(ss, sec):
              Paragraph('<font color="white"><b>Foco</b></font>', ss["Body2"]),
              Paragraph('<font color="white"><b>Ações</b></font>', ss["Body2"])]]
     for ph in (sec.get("phases") or [])[:4]:
-        acts = "<br/>".join("• " + _esc(_clip(a, 90))
+        acts = "<br/>".join("• " + _esc(a)
                             for a in (ph.get("actions") or [])[:6])
         data.append([Paragraph(f'<b>{_esc(ph.get("window", ""))}</b>', ss["Small"]),
                      Paragraph(_esc(ph.get("label", "")), ss["Small"]),
@@ -420,13 +420,13 @@ def _roadmap(ss, sec):
 def _cost_incident(ss, sec):
     out = [Paragraph("Custo da Remediação × Custo do Incidente", ss["H1"]),
            HRFlowable(width="18%", thickness=2, color=C(T.CORAL), spaceAfter=6)]
-    remlist = "<br/>".join("• " + _esc(_clip(r, 90))
+    remlist = "<br/>".join("• " + _esc(r)
                            for r in (sec.get("remediation") or [])[:6])
     inc_parts = []
     for it in (sec.get("incident") or [])[:4]:
-        line = f'<b><font color="#{T.DESTRUCTIVE}">• {_esc(_clip(it.get("label", ""), 60))}</font></b>'
+        line = f'<b><font color="#{T.DESTRUCTIVE}">• {_esc(it.get("label", ""))}</font></b>'
         if it.get("detail"):
-            line += f'<br/><font size="8" color="#{T.MUTED}">   {_esc(_clip(it["detail"], 90))}</font>'
+            line += f'<br/><font size="8" color="#{T.MUTED}">   {_esc(it["detail"])}</font>'
         inc_parts.append(line)
     inclist = "<br/>".join(inc_parts)
     header = [Paragraph('<font color="white"><b>REMEDIAÇÃO — INVESTIMENTO</b></font>', ss["Body2"]),
@@ -449,13 +449,13 @@ def _cost_incident(ss, sec):
 
 
 def _partner_value(ss, sec):
-    out = [Paragraph(_esc(_clip(sec.get("title", "Parceria"), 80)), ss["H1"]),
+    out = [Paragraph(_esc(sec.get("title", "Parceria")), ss["H1"]),
            HRFlowable(width="18%", thickness=2, color=C(T.CORAL), spaceAfter=6)]
     for p in (sec.get("points") or [])[:6]:
         out.append(Paragraph(
-            f'<b><font color="#{T.PRIMARY}">{_esc(_clip(p.get("title", ""), 60))}</font></b>',
+            f'<b><font color="#{T.PRIMARY}">{_esc(p.get("title", ""))}</font></b>',
             ss["Body2"]))
-        out.append(Paragraph(_esc(_clip(p.get("body", ""), 400)), ss["Body2"]))
+        out.append(Paragraph(_esc(p.get("body", "")), ss["Body2"]))
     return out
 
 
@@ -463,7 +463,7 @@ def _next_steps(ss, sec, brand):
     out = [Paragraph("Próximos Passos", ss["H1"]),
            HRFlowable(width="18%", thickness=2, color=C(T.CORAL), spaceAfter=6)]
     for i, s in enumerate((sec.get("steps") or [])[:6], 1):
-        out.append(Paragraph(f'<b>{i}.</b>  {_esc(_clip(s, 200))}',
+        out.append(Paragraph(f'<b>{i}.</b>  {_esc(s)}',
                              ParagraphStyle("ns", parent=ss["Body2"], fontSize=12,
                                             spaceAfter=4)))
     contact = " · ".join([x for x in [brand.get("name", ""), brand.get("contact", ""),

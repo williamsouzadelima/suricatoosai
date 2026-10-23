@@ -43,11 +43,6 @@ function monthYearPt(ms: number): string {
   return `${MONTHS_PT[d.getUTCMonth()]} · ${d.getUTCFullYear()}`;
 }
 
-function clip(s: string, n: number): string {
-  const t = (s ?? "").trim();
-  return t.length <= n ? t : t.slice(0, n - 1) + "…";
-}
-
 function sevRank(s: Severity): number {
   return SEVERITY_ORDER.indexOf(s);
 }
@@ -191,17 +186,17 @@ function attackLanes(findings: ReportFindingView[]): AttackLane[] {
       .filter((e) => e.toolName || e.command || e.resultSummary)
       .slice(0, 5)
       .map((e) => ({
-        label: clip(e.toolName || e.sourceType || "passo", 22),
-        detail: clip(e.resultSummary || e.command || "", 40),
+        label: e.toolName || e.sourceType || "passo",
+        detail: e.resultSummary || e.command || "",
       }));
     if (steps.length === 0 && (f.reproductionSteps || []).length > 0) {
       steps = f.reproductionSteps!.slice(0, 5).map((s, i) => ({
         label: `Passo ${i + 1}`,
-        detail: clip(s, 40),
+        detail: s,
       }));
     }
     if (steps.length === 0) continue;
-    lanes.push({ title: `${f.ref} · ${clip(f.title, 48)}`, steps });
+    lanes.push({ title: `${f.ref} · ${f.title}`, steps });
     if (lanes.length >= 3) break;
   }
   return lanes;
@@ -217,10 +212,10 @@ function roadmapPhases(findings: ReportFindingView[]): RoadmapPhase[] {
       const r = (f.remediation || "").trim();
       // Ignora remediações vazias ou não-acionáveis ("N/A", "—", "informativo").
       if (!r || /^(n\/?a\b|—|-|informativo)/i.test(r)) continue;
-      const key = r.toLowerCase().slice(0, 40);
+      const key = r.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push(clip(r, 72));
+      out.push(r);
       if (out.length >= 5) break;
     }
     return out;
@@ -302,9 +297,7 @@ function businessScenarios(findings: ReportFindingView[]): string[] {
     return ["Postura sólida; sem cenários de risco crítico ativos."];
   return ch.map((f) => {
     const impact = (f.impact || "").trim();
-    return impact
-      ? `${clip(f.title, 60)} — ${clip(impact, 120)}`
-      : clip(f.title, 140);
+    return impact ? `${f.title} — ${impact}` : f.title;
   });
 }
 
@@ -632,7 +625,7 @@ function actionPlanPhases(findings: ReportFindingView[]): RoadmapPhase[] {
       if (seen.has(key)) continue;
       seen.add(key);
       out.push(
-        `${f.ref} · ${SEVERITY_LABEL_PT[f.severity]} (${PRAZO_ALVO[f.severity]}) — ${clip(action, 80)}`,
+        `${f.ref} · ${SEVERITY_LABEL_PT[f.severity]} (${PRAZO_ALVO[f.severity]}) — ${action}`,
       );
       if (out.length >= 8) break;
     }

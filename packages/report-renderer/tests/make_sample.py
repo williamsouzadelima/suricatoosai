@@ -147,15 +147,19 @@ def build_model(out_dir):
         {"type": "severityChart", "data": charts},
         {"type": "heading", "text": "Escopo & Metodologia", "level": 1},
         {"type": "bullets", "items": ["Em escopo: *.exemplo.com", "Fora de escopo: produção crítica",
-                                       "Metodologia PTES/OWASP " + ("z" * 200)]},
+                                       "Metodologia PTES/OWASP " + ("z" * 200) + " BULLETS_END_X"]},
         {"type": "paragraph", "text": long("PARA", "X")},
         {"type": "partDivider", "part": "PANORAMA", "title": f"Os {len(findings)} achados, num relance"},
         {"type": "findingsTable", "findings": findings},
         {"type": "partDivider", "part": "PARTE II", "title": "Cadeias de Ataque"},
         {"type": "attackChain", "lanes": [
-            {"title": f"{findings[0]['ref']} · cadeia crítica",
-             "steps": [{"label": "recon", "detail": "nmap"}, {"label": "exploit", "detail": "sqlmap"},
-                       {"label": "privesc", "detail": "painel"}, {"label": "pivot", "detail": "interna"}]}]},
+            {"title": f"{findings[0]['ref']} · cadeia crítica com título longo que excede o clip "
+                      "antigo sem truncar em DOCX/PDF ATTACK_TITLE_END_X",
+             "steps": [{"label": "recon", "detail": "nmap -sV com resumo de passo deliberadamente "
+                        "longo acima de 40 chars para exercer a quebra ATTACK_DETAIL_END_X"},
+                       {"label": "exploit", "detail": "sqlmap"},
+                       {"label": "privesc", "detail": "painel"},
+                       {"label": "pivot", "detail": "interna"}]}]},
         {"type": "partDivider", "part": "NARRATIVA",
          "title": "Narrativa da Análise Técnica",
          "subtitle": "Anatomia da invasão — do reconhecimento ao impacto"},
@@ -176,7 +180,8 @@ def build_model(out_dir):
     sections += [
         {"type": "partDivider", "part": "REMEDIAÇÃO", "title": "Plano por fase"},
         {"type": "roadmap", "phases": [
-            {"window": "0-7 dias", "label": "Contenção", "actions": ["Corrigir SQLi " + ("w" * 80)]},
+            {"window": "0-7 dias", "label": "Contenção",
+             "actions": ["Corrigir SQLi " + ("w" * 80) + " ROADMAP_END_X"]},
             {"window": "8-30 dias", "label": "Fechar vetores", "actions": ["Revisar IDOR"]},
             {"window": "31-90 dias", "label": "Hardening", "actions": ["WAF"]},
             {"window": "91-180 dias", "label": "Maturidade", "actions": ["Reteste"]}]},

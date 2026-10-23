@@ -38,6 +38,11 @@ SENT = ["DESCR_END_F-01", "NARR_END_F-01", "IMPACT_END_F-01", "REMED_END_F-01",
         # Título longo (>90) do F-01 termina neste sentinela — se QUALQUER formato
         # truncar o título do achado (o "…" que o William pegou), ele some.
         "TITLE_END_F-01"]
+# 2ª leva (seções de layout fixo: cadeia de ataque, plano por fase, bullets):
+# DOCX/PDF pararam de cortar; o PPTX AINDA corta (clip local proposital até a
+# decisão de layout do deck) → estes sentinelas são checados SÓ em docx/pdf.
+SENT_DOCPDF = ["ATTACK_TITLE_END_X", "ATTACK_DETAIL_END_X", "ROADMAP_END_X",
+               "BULLETS_END_X"]
 PLACE = "capturada"  # "Evidência visual não capturada" (F-02 Alto, sem imagem)
 SUMMARY = "SUMÁRIO"  # título do sumário (docx) / slide agenda (pptx)
 # Fases da narrativa (make_sample._phases): devem aparecer no SUMÁRIO, ANTES do
@@ -115,6 +120,9 @@ def main():
         if SUMMARY not in txt:
             fails.append("docx: SUMÁRIO ausente")
         fails += _summary_phase_fails("docx", txt)
+        for s in SENT_DOCPDF:
+            if s not in txt:
+                fails.append(f"docx: 2a leva truncada ({s})")
 
         # PPTX
         with zipfile.ZipFile(pptx_p) as z:
@@ -164,6 +172,9 @@ def main():
             if PLACE not in pt:
                 fails.append("pdf: placeholder de evidência ausente")
             fails += _summary_phase_fails("pdf", t)
+            for s in SENT_DOCPDF:
+                if s not in pt:
+                    fails.append(f"pdf: 2a leva truncada ({s})")
         else:
             print("  NOTA: texto do PDF não extraído (instale pypdf) — "
                   "checagem de truncamento do PDF pulada nesta execução.")
