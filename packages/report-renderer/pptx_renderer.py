@@ -16,10 +16,11 @@ import theme as T
 import logo
 
 EMU_IN = 914400
-SW = Inches(13.333)
-SH = Inches(7.5)
+# Retrato CARTA (8,5 x 11 pol) — estilo "documento", igual ao modelo netdeep.
+SW = Inches(8.5)
+SH = Inches(11.0)
 ML = Inches(0.6)
-CW = Inches(12.13)
+CW = Inches(7.3)       # = SW - 2*ML
 
 MONTHS = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO",
           "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"]
@@ -91,7 +92,7 @@ def _clip(s, n):
 # linhas por caixa e quebramos conteúdo longo em slides "(cont.)" — NUNCA
 # truncamos corpo de achado/evidência. Unidades em EMU (int).
 # ───────────────────────────────────────────────────────────────────────────
-_CONTENT_BOTTOM = int(Inches(6.95))   # acima do rodapé (7.08)
+_CONTENT_BOTTOM = int(SH) - int(Inches(0.55))   # acima do rodapé
 _LINE_FACTOR = 1.3                      # entrelinha aproximada
 
 
@@ -242,9 +243,11 @@ def _footer(slide, dark=False):
     _STATE["page"] += 1
     n = _STATE["page"]
     col = "8FA0BC" if dark else T.MUTED
-    _text(slide, ML, Inches(7.08), Inches(6.0), Inches(0.3),
+    fy = SH - Inches(0.42)
+    half = Emu(int(CW) // 2)
+    _text(slide, ML, fy, half, Inches(0.3),
           m.get("classification", ""), size=8, color=col)
-    _text(slide, Inches(9.0), Inches(7.08), Inches(3.73), Inches(0.3),
+    _text(slide, Emu(int(ML) + int(CW) // 2), fy, half, Inches(0.3),
           f"{m.get('docCode', '')} · {n:02d}", size=8, color=col,
           align=PP_ALIGN.RIGHT)
 
@@ -309,38 +312,40 @@ def _cover(prs, sec, meta):
             except Exception:
                 used_logo = False
     if not used_logo:
-        _text(slide, ML, Inches(0.5), Inches(7.0), Inches(0.5),
-              brand.get("wordmark", T.WORDMARK), size=22, bold=True,
+        _text(slide, ML, Inches(0.5), Inches(3.2), Inches(0.5),
+              brand.get("wordmark", T.WORDMARK), size=20, bold=True,
               color=accent, font=T.FONT_DISPLAY)
-    # Topo-dir: selo + codigo do documento.
-    _text(slide, Inches(7.9), Inches(0.5), Inches(4.83), Inches(0.3),
+    # Topo-dir: selo + codigo do documento (dentro da largura retrato).
+    _text(slide, Inches(4.0), Inches(0.5), Inches(3.9), Inches(0.3),
           meta.get("classification", ""), size=10, bold=True, color=accent,
           align=PP_ALIGN.RIGHT)
-    _text(slide, Inches(7.9), Inches(0.85), Inches(4.83), Inches(0.3),
+    _text(slide, Inches(4.0), Inches(0.85), Inches(3.9), Inches(0.3),
           meta.get("docCode", ""), size=10, color="8FA0BC", align=PP_ALIGN.RIGHT)
-    # Titulo.
-    _rect(slide, ML, Inches(2.2), Inches(1.4), Emu(int(0.06 * EMU_IN)), accent)
-    _text(slide, ML, Inches(2.35), CW, Inches(0.35), meta.get("volume", ""),
+    # Titulo (meio-superior da pagina retrato).
+    _rect(slide, ML, Inches(4.3), Inches(1.4), Emu(int(0.06 * EMU_IN)), accent)
+    _text(slide, ML, Inches(4.5), CW, Inches(0.35), meta.get("volume", ""),
           size=12, bold=True, color=accent)
-    _text(slide, ML, Inches(2.75), CW, Inches(1.3), sec.get("title", ""),
-          size=40, bold=True, color="FFFFFF", font=T.FONT_DISPLAY)
+    _text(slide, ML, Inches(4.95), CW, Inches(2.0), sec.get("title", ""),
+          size=34, bold=True, color="FFFFFF", font=T.FONT_DISPLAY)
     if sec.get("subtitle"):
-        _text(slide, ML, Inches(4.1), CW, Inches(0.6), sec["subtitle"], size=18,
+        _text(slide, ML, Inches(7.0), CW, Inches(0.8), sec["subtitle"], size=16,
               color="C9D3E6")
-    # Faixa de KPIs.
+    # Faixa de KPIs em 2x2 (cabe na largura retrato).
     stats = sec.get("stats") or []
     if stats:
-        tw = Inches(2.7)
-        gap = Inches(0.2)
-        yv = Inches(5.15)
+        gap = int(Inches(0.2))
+        tw = (int(CW) - gap) // 2
+        yv = int(Inches(7.9))
         for i, s in enumerate(stats[:4]):
-            x = ML + (tw + gap) * i
-            _text(slide, x, yv, tw, Inches(0.8), str(s.get("value", "")),
-                  size=40, bold=True, color=accent, font=T.FONT_DISPLAY)
-            _text(slide, x, yv + Inches(0.85), tw, Inches(0.5),
+            cx = int(ML) + (tw + gap) * (i % 2)
+            cy = yv + int(Inches(1.25)) * (i // 2)
+            _text(slide, Emu(cx), Emu(cy), Emu(tw), Inches(0.8),
+                  str(s.get("value", "")), size=34, bold=True, color=accent,
+                  font=T.FONT_DISPLAY)
+            _text(slide, Emu(cx), Emu(cy + int(Inches(0.8))), Emu(tw), Inches(0.4),
                   str(s.get("label", "")), size=10, bold=True, color="8FA0BC")
     # Rodape da capa.
-    _text(slide, ML, Inches(6.85), CW, Inches(0.4),
+    _text(slide, ML, Inches(10.4), CW, Inches(0.4),
           f"{meta.get('client', '')}  ·  {_month_year(meta.get('generatedAt', 0))}  ·  {brand.get('name', '')}",
           size=12, color="C9D3E6")
     _STATE["page"] = 1
@@ -350,13 +355,13 @@ def _part_divider(prs, sec):
     slide = _blank(prs)
     _rect(slide, 0, 0, SW, SH, T.INK)
     accent = _accent()
-    _rect(slide, ML, Inches(3.0), Inches(1.6), Emu(int(0.06 * EMU_IN)), accent)
-    _text(slide, ML, Inches(2.35), CW, Inches(0.4), sec.get("part", ""),
+    _rect(slide, ML, Inches(5.0), Inches(1.6), Emu(int(0.06 * EMU_IN)), accent)
+    _text(slide, ML, Inches(4.35), CW, Inches(0.4), sec.get("part", ""),
           size=14, bold=True, color=accent)
-    _text(slide, ML, Inches(3.2), CW, Inches(1.2), sec.get("title", ""),
+    _text(slide, ML, Inches(5.2), CW, Inches(1.5), sec.get("title", ""),
           size=34, bold=True, color="FFFFFF", font=T.FONT_DISPLAY)
     if sec.get("subtitle"):
-        _text(slide, ML, Inches(4.5), CW, Inches(0.6), sec["subtitle"],
+        _text(slide, ML, Inches(6.8), CW, Inches(0.8), sec["subtitle"],
               size=16, color="C9D3E6")
     _footer(slide, dark=True)
 
@@ -364,8 +369,8 @@ def _part_divider(prs, sec):
 def _divider(prs, meta):
     slide = _blank(prs)
     _rect(slide, 0, 0, SW, SH, T.SURFACE_ALT)
-    _rect(slide, ML, Inches(3.4), Inches(1.6), Emu(int(0.06 * EMU_IN)), _accent())
-    _text(slide, ML, Inches(3.6), CW, Inches(0.6),
+    _rect(slide, ML, Inches(4.9), Inches(1.6), Emu(int(0.06 * EMU_IN)), _accent())
+    _text(slide, ML, Inches(5.1), CW, Inches(0.6),
           meta.get("brand", {}).get("wordmark", T.WORDMARK), size=22,
           bold=True, color=T.PRIMARY, font=T.FONT_DISPLAY)
     _footer(slide)
@@ -382,25 +387,20 @@ def _agenda(prs, entries, meta):
     _rect(slide, 0, 0, SW, Inches(0.12), T.PRIMARY)
     _text(slide, ML, Inches(0.5), CW, Inches(0.8), "SUMÁRIO", size=28, bold=True,
           color=T.INK, font=T.FONT_DISPLAY)
-    two = len(lines) > 14
-    half = (len(lines) + 1) // 2 if two else len(lines)
-    cols = [lines[:half]] + ([lines[half:]] if two else [])
-    col_w = Inches(5.9) if two else CW
-    for ci, col in enumerate(cols):
-        tb = slide.shapes.add_textbox(ML + Inches(6.2) * ci, Inches(1.55),
-                                      col_w, Inches(5.5))
-        tf = tb.text_frame
-        tf.word_wrap = True
-        for i, (txt, lv) in enumerate(col):
-            p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-            p.space_after = Pt(4)
-            p.level = min(lv, 2)
-            r = p.add_run()
-            r.text = txt
-            r.font.size = Pt(14 if lv == 0 else 11)
-            r.font.bold = (lv == 0)
-            r.font.name = T.FONT_DISPLAY if lv == 0 else T.FONT_BODY
-            r.font.color.rgb = _rgb(T.INK if lv <= 1 else T.MUTED)
+    # Retrato é alto → coluna única (cabe muito item na vertical).
+    tb = slide.shapes.add_textbox(ML, Inches(1.55), CW, Inches(8.6))
+    tf = tb.text_frame
+    tf.word_wrap = True
+    for i, (txt, lv) in enumerate(lines):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.space_after = Pt(4)
+        p.level = min(lv, 2)
+        r = p.add_run()
+        r.text = txt
+        r.font.size = Pt(14 if lv == 0 else 11)
+        r.font.bold = (lv == 0)
+        r.font.name = T.FONT_DISPLAY if lv == 0 else T.FONT_BODY
+        r.font.color.rgb = _rgb(T.INK if lv <= 1 else T.MUTED)
     _footer(slide)
 
 
@@ -415,23 +415,30 @@ def _stat_band(prs, sec):
               size=24, bold=True, color=T.INK, font=T.FONT_DISPLAY)
         y = int(y) + hh + int(Inches(0.25))
     stats = sec.get("stats") or []
+    y = int(y)
     if stats:
-        tw = Inches(2.85)
-        gap = Inches(0.13)
+        gap = int(Inches(0.13))
+        tw = (int(CW) - gap) // 2
+        bh = int(Inches(1.6))
         for i, s in enumerate(stats[:4]):
-            x = ML + (tw + gap) * i
-            _rect(slide, x, y, tw, Inches(1.6), T.SURFACE_ALT, line=T.BORDER)
-            _rect(slide, x, y, Emu(int(0.06 * EMU_IN)), Inches(1.6), _accent())
-            _text(slide, x + Inches(0.2), y + Inches(0.2), tw - Inches(0.3),
-                  Inches(0.85), str(s.get("value", "")), size=40, bold=True,
-                  color=T.PRIMARY, font=T.FONT_DISPLAY)
-            _text(slide, x + Inches(0.2), y + Inches(1.1), tw - Inches(0.3),
-                  Inches(0.4), str(s.get("label", "")), size=10, bold=True,
-                  color=T.MUTED)
-        y = y + Inches(1.95)
+            cx = int(ML) + (tw + gap) * (i % 2)
+            cy = y + (bh + gap) * (i // 2)
+            _rect(slide, Emu(cx), Emu(cy), Emu(tw), Emu(bh), T.SURFACE_ALT,
+                  line=T.BORDER)
+            _rect(slide, Emu(cx), Emu(cy), Emu(int(0.06 * EMU_IN)), Emu(bh),
+                  _accent())
+            _text(slide, Emu(cx + int(Inches(0.2))), Emu(cy + int(Inches(0.2))),
+                  Emu(tw - int(Inches(0.3))), Inches(0.85),
+                  str(s.get("value", "")), size=40, bold=True, color=T.PRIMARY,
+                  font=T.FONT_DISPLAY)
+            _text(slide, Emu(cx + int(Inches(0.2))), Emu(cy + int(Inches(1.1))),
+                  Emu(tw - int(Inches(0.3))), Inches(0.4),
+                  str(s.get("label", "")), size=10, bold=True, color=T.MUTED)
+        rows = (min(len(stats), 4) + 1) // 2
+        y = y + rows * (bh + gap) + int(Inches(0.2))
     if sec.get("body"):
-        _text(slide, ML, y, CW, Inches(2.4), _clip(sec["body"], 2000), size=14,
-              color=T.INK)
+        _text(slide, ML, Emu(y), CW, Inches(2.4), _clip(sec["body"], 2000),
+              size=14, color=T.INK)
     _footer(slide)
 
 
@@ -619,24 +626,25 @@ def _cost_incident(prs, sec):
 
 
 def _partner_value(prs, sec):
-    slide, y = _title_slide(prs, _clip(sec.get("title", "Parceria"), 60))
+    slide, y = _title_slide(prs, sec.get("title", "Parceria"))
     pts = sec.get("points") or []
-    cw = Inches(5.9)
-    ch = Inches(2.2)
-    gapx = Inches(0.33)
-    gapy = Inches(0.3)
+    gapx = int(Inches(0.33))
+    gapy = int(Inches(0.3))
+    cw = (int(CW) - gapx) // 2
+    ch = int(Inches(2.2))
+    y = int(y)
     for i, p in enumerate(pts[:4]):
-        col = i % 2
-        row = i // 2
-        x = ML + (cw + gapx) * col
-        yy = y + (ch + gapy) * row
-        _rect(slide, x, yy, cw, ch, T.SURFACE_ALT, line=T.BORDER)
-        _rect(slide, x, yy, Emu(int(0.06 * EMU_IN)), ch, _accent())
-        _text(slide, x + Inches(0.25), yy + Inches(0.15), cw - Inches(0.4),
-              Inches(0.4), _clip(p.get("title", ""), 40), size=15, bold=True,
-              color=T.PRIMARY, font=T.FONT_DISPLAY)
-        _text(slide, x + Inches(0.25), yy + Inches(0.6), cw - Inches(0.4),
-              Inches(1.5), _clip(p.get("body", ""), 260), size=11, color=T.INK)
+        x = int(ML) + (cw + gapx) * (i % 2)
+        yy = y + (ch + gapy) * (i // 2)
+        _rect(slide, Emu(x), Emu(yy), Emu(cw), Emu(ch), T.SURFACE_ALT,
+              line=T.BORDER)
+        _rect(slide, Emu(x), Emu(yy), Emu(int(0.06 * EMU_IN)), Emu(ch), _accent())
+        _text(slide, Emu(x + int(Inches(0.25))), Emu(yy + int(Inches(0.15))),
+              Emu(cw - int(Inches(0.4))), Inches(0.4), p.get("title", ""),
+              size=15, bold=True, color=T.PRIMARY, font=T.FONT_DISPLAY)
+        _text(slide, Emu(x + int(Inches(0.25))), Emu(yy + int(Inches(0.6))),
+              Emu(cw - int(Inches(0.4))), Inches(1.5), p.get("body", ""),
+              size=11, color=T.INK)
 
 
 def _next_steps(prs, sec):
@@ -649,14 +657,13 @@ def _next_steps(prs, sec):
               bold=True, color="FFFFFF", align=PP_ALIGN.CENTER,
               anchor=MSO_ANCHOR.MIDDLE)
         _text(slide, ML + Inches(0.75), yy + Inches(0.05), CW - Inches(1.0),
-              Inches(0.5), _clip(s, 110), size=15, color=T.INK,
-              anchor=MSO_ANCHOR.MIDDLE)
+              Inches(0.5), s, size=15, color=T.INK, anchor=MSO_ANCHOR.MIDDLE)
         yy += Inches(0.75)
     brand = _STATE["meta"].get("brand", {})
     contact = " · ".join(
         [x for x in [brand.get("name", ""), brand.get("contact", ""),
                      brand.get("tagline", "")] if x])
-    _text(slide, ML, Inches(6.4), CW, Inches(0.4), contact, size=11,
+    _text(slide, ML, Inches(10.0), CW, Inches(0.4), contact, size=11,
           color=T.MUTED)
 
 
@@ -671,23 +678,29 @@ def _kpis(prs, kpis):
          str(kpis.get("bySeverity", {}).get("critical", 0) + kpis.get("bySeverity", {}).get("high", 0)),
          _accent()),
     ]
-    tw = Inches(2.85)
-    gap = Inches(0.13)
+    gap = int(Inches(0.13))
+    tw = (int(CW) - gap) // 2
+    bh = int(Inches(1.7))
+    y = int(y)
     for i, (label, val, col) in enumerate(tiles):
-        x = ML + (tw + gap) * i
-        _rect(slide, x, y, tw, Inches(1.7), T.SURFACE_ALT, line=T.BORDER)
-        _rect(slide, x, y, Emu(int(0.06 * EMU_IN)), Inches(1.7), col)
-        _text(slide, x + Inches(0.2), y + Inches(0.2), tw - Inches(0.3), Inches(0.4),
-              label.upper(), size=10, bold=True, color=T.MUTED)
-        _text(slide, x + Inches(0.2), y + Inches(0.6), tw - Inches(0.3), Inches(0.9),
-              val, size=40, bold=True, color=col, font=T.FONT_DISPLAY)
+        cx = int(ML) + (tw + gap) * (i % 2)
+        cy = y + (bh + gap) * (i // 2)
+        _rect(slide, Emu(cx), Emu(cy), Emu(tw), Emu(bh), T.SURFACE_ALT,
+              line=T.BORDER)
+        _rect(slide, Emu(cx), Emu(cy), Emu(int(0.06 * EMU_IN)), Emu(bh), col)
+        _text(slide, Emu(cx + int(Inches(0.2))), Emu(cy + int(Inches(0.2))),
+              Emu(tw - int(Inches(0.3))), Inches(0.4), label.upper(), size=10,
+              bold=True, color=T.MUTED)
+        _text(slide, Emu(cx + int(Inches(0.2))), Emu(cy + int(Inches(0.6))),
+              Emu(tw - int(Inches(0.3))), Inches(0.9), val, size=40, bold=True,
+              color=col, font=T.FONT_DISPLAY)
 
 
 def _severity_chart(prs, data):
     slide, y = _title_slide(prs, "Distribuição por severidade")
     dist = data.get("severityDistribution", [])
     maxc = max([d.get("count", 0) for d in dist] + [1])
-    barmax = Inches(9.0)
+    barmax = Inches(4.0)
     row_h = Inches(0.62)
     for i, d in enumerate(dist):
         sev = d.get("severity")
@@ -845,10 +858,10 @@ def _table(prs, findings, title, remediation=False):
     # por contagem fixa de linhas), senão o conteúdo quebrado estouraria o slide.
     if remediation:
         headers = ["Ref", "Sev", "Ativo", "Remediacao"]
-        widths = [Inches(1.2), Inches(1.4), Inches(3.5), Inches(6.0)]
+        widths = [Inches(0.75), Inches(0.9), Inches(1.9), Inches(3.75)]
     else:
         headers = ["Ref", "Sev", "Titulo", "Ativo"]
-        widths = [Inches(1.2), Inches(1.4), Inches(5.5), Inches(4.0)]
+        widths = [Inches(0.75), Inches(0.9), Inches(3.25), Inches(2.4)]
     CELL_PT = 10
     line_in = CELL_PT * _LINE_FACTOR / 72.0
 
