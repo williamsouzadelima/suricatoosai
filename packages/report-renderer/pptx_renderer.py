@@ -167,42 +167,60 @@ class _Flow:
         self.y += int(Inches(0.42))
 
     def para(self, text, size=11, color=T.INK, bold=False, font=T.FONT_BODY,
-             indent=0.0, after=0.08):
+             indent=0.0, after=0.08, align=PP_ALIGN.JUSTIFY):
         left = int(ML) + int(Inches(indent))
         width = int(CW) - int(Inches(indent))
-        # Largura média por caractere CONSERVADORA (em "em"): proporcional ~0.58,
-        # mono ~0.63, + bold. Subcontar linhas causa estouro/sobreposição (a caixa
-        # de altura fixa transborda e o bloco seguinte sobrepõe); superestimar só
-        # deixa folga. _wrap controla TODAS as quebras e word_wrap=False impede o
-        # PowerPoint de RE-quebrar uma linha (a cascata que gerava a sobreposição).
-        cwf = (0.63 if font == T.FONT_MONO else 0.58) + (0.04 if bold else 0.0)
+        # cwf conservador (em "em") só p/ DIMENSIONAR a caixa (superestimar =
+        # folga). O texto vai INTEIRO com word_wrap=True → o PowerPoint quebra na
+        # largura (NUNCA passa da margem) e JUSTIFICA. Paginamos por PALAVRA p/
+        # não corromper token longo (juntar linhas quebraria uma URL no meio).
+        cwf = (0.63 if font == T.FONT_MONO else 0.60) + (0.04 if bold else 0.0)
         cpl = max(8, int((width / EMU_IN) * 72 / (size * cwf)))
-        lines = _wrap(text, cpl)
         lh = int(size * _LINE_FACTOR / 72.0 * EMU_IN)
-        i = 0
-        while i < len(lines):
-            self.ensure(lh)
-            cap = max(1, (_CONTENT_BOTTOM - self.y) // lh)
-            take = lines[i:i + cap]
-            i += len(take)
-            h = len(take) * lh
+
+        def _nl(s):
+            return max(1, len(_wrap(s, cpl)))
+
+        def _emit(s):
+            n = _nl(s)
             tb = self.slide.shapes.add_textbox(Emu(left), Emu(self.y),
-                                               Emu(width), Emu(h))
+                                               Emu(width), Emu(n * lh))
             tf = tb.text_frame
-            tf.word_wrap = False
+            tf.word_wrap = True
             try:
                 tf.auto_size = MSO_AUTO_SIZE.NONE
             except Exception:
                 pass
-            for j, ln in enumerate(take):
-                p = tf.paragraphs[0] if j == 0 else tf.add_paragraph()
-                r = p.add_run()
-                r.text = ln
-                r.font.size = Pt(size)
-                r.font.bold = bold
-                r.font.name = font
-                r.font.color.rgb = _rgb(color)
-            self.y += h
+            p = tf.paragraphs[0]
+            p.alignment = align if n > 1 else PP_ALIGN.LEFT
+            r = p.add_run()
+            r.text = s
+            r.font.size = Pt(size)
+            r.font.bold = bold
+            r.font.name = font
+            r.font.color.rgb = _rgb(color)
+            self.y += n * lh
+
+        for seg in str(text or "").split("\n"):
+            if not seg.strip():
+                self.y += lh // 2
+                continue
+            self.ensure(lh)
+            cap = max(1, (_CONTENT_BOTTOM - self.y) // lh)
+            if _nl(seg) <= cap:
+                _emit(seg)
+                continue
+            words = seg.split(" ")
+            idx = 0
+            while idx < len(words):
+                self.ensure(lh)
+                cap = max(1, (_CONTENT_BOTTOM - self.y) // lh)
+                take = idx + 1
+                while take < len(words) and \
+                        _nl(" ".join(words[idx:take + 1])) <= cap:
+                    take += 1
+                _emit(" ".join(words[idx:take]))
+                idx = take
         self.y += int(Inches(after))
 
     def image(self, path, caption=None):
@@ -279,13 +297,9 @@ def _cover(prs, sec, meta):
     accent = brand.get("accent") or T.CORAL
     # Capa full-bleed: arte da marca (coverImagePath) ao fundo; senão, navy sólido.
     cover = brand.get("coverImagePath")
-    if not (cover and os.path.exists(cover)):
-        # Sem arte da marca → navy PADRÃO (gold SYN): mesma arte do DOCX/PDF
-        # (navy INK + faixa azul + traço coral), em vez do retângulo sólido.
-        try:
-            cover = T.default_cover_bg()
-        except Exception:
-            cover = None
+    # Retrato: a arte default é PAISAGEM; esticada aqui, o traço coral dela brigava
+    # com o nosso (as "duas barras"). Sem imagem de marca → navy sólido + nossos
+    # elementos (traço único desenhado abaixo).
     if cover and os.path.exists(cover):
         try:
             fitted = T.cover_fit(cover, int(SW), int(SH))
@@ -438,7 +452,7 @@ def _stat_band(prs, sec):
         y = y + rows * (bh + gap) + int(Inches(0.2))
     if sec.get("body"):
         _text(slide, ML, Emu(y), CW, Inches(2.4), _clip(sec["body"], 2000),
-              size=14, color=T.INK)
+              size=14, color=T.INK, align=PP_ALIGN.JUSTIFY)
     _footer(slide)
 
 
@@ -946,7 +960,7 @@ def _callout(prs, sec, title):
     _rect(slide, ML, y, CW, Inches(1.2), T.SURFACE_ALT, line=T.BORDER)
     _rect(slide, ML, y, Emu(int(0.08 * EMU_IN)), Inches(1.2), col)
     _text(slide, ML + Inches(0.3), y + Inches(0.15), CW - Inches(0.5), Inches(0.9),
-          _clip(sec.get("text", ""), 400), size=16, bold=True, color=col,
+          sec.get("text", ""), size=16, bold=True, color=col,
           anchor=MSO_ANCHOR.MIDDLE)
 
 
