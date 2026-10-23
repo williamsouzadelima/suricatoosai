@@ -331,10 +331,10 @@ def _stat_band(doc, sec):
 
 def _attack_chain(doc, sec):
     _heading(doc, "Cadeia de Ataque", 1)
-    for lane in (sec.get("lanes") or [])[:6]:
+    for lane in (sec.get("lanes") or []):
         _para(doc, lane.get("title", ""), size=12, bold=True,
               color=T.INK, after=2)
-        steps = (lane.get("steps") or [])[:6]
+        steps = (lane.get("steps") or [])
         if steps:
             _para(doc, "  →  ".join(s.get("label", "") for s in steps),
                   size=11, bold=True, color=T.PRIMARY, after=2)
@@ -365,7 +365,7 @@ def _roadmap(doc, sec):
         acts = ph.get("actions") or []
         cell = row.cells[2]
         cell.text = ""
-        for k, a in enumerate(acts[:6]):
+        for k, a in enumerate(acts):
             p = cell.paragraphs[0] if k == 0 else cell.add_paragraph()
             _run(p, "▸ " + str(a), size=9, color=T.INK)
     doc.add_paragraph()
@@ -387,12 +387,12 @@ def _cost_incident(doc, sec):
          color="FFFFFF")
     cr = t.cell(1, 0)
     cr.text = ""
-    for k, r in enumerate((sec.get("remediation") or [])[:6]):
+    for k, r in enumerate((sec.get("remediation") or [])):
         p = cr.paragraphs[0] if k == 0 else cr.add_paragraph()
         _run(p, "◆ " + str(r), size=10, color=T.INK)
     ci = t.cell(1, 1)
     ci.text = ""
-    inc = (sec.get("incident") or [])[:4]
+    inc = (sec.get("incident") or [])
     for k, it in enumerate(inc):
         p = ci.paragraphs[0] if k == 0 else ci.add_paragraph()
         _run(p, "◆ " + it.get("label", ""), size=10, bold=True,

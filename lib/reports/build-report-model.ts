@@ -184,20 +184,18 @@ function attackLanes(findings: ReportFindingView[]): AttackLane[] {
     );
     let steps = chain
       .filter((e) => e.toolName || e.command || e.resultSummary)
-      .slice(0, 5)
       .map((e) => ({
         label: e.toolName || e.sourceType || "passo",
         detail: e.resultSummary || e.command || "",
       }));
     if (steps.length === 0 && (f.reproductionSteps || []).length > 0) {
-      steps = f.reproductionSteps!.slice(0, 5).map((s, i) => ({
+      steps = f.reproductionSteps!.map((s, i) => ({
         label: `Passo ${i + 1}`,
         detail: s,
       }));
     }
     if (steps.length === 0) continue;
     lanes.push({ title: `${f.ref} · ${f.title}`, steps });
-    if (lanes.length >= 3) break;
   }
   return lanes;
 }
@@ -216,7 +214,6 @@ function roadmapPhases(findings: ReportFindingView[]): RoadmapPhase[] {
       if (seen.has(key)) continue;
       seen.add(key);
       out.push(r);
-      if (out.length >= 5) break;
     }
     return out;
   };
@@ -248,7 +245,7 @@ function roadmapPhases(findings: ReportFindingView[]): RoadmapPhase[] {
     {
       window: "91 – 180 dias",
       label: "Maturidade contínua",
-      actions: longActions.slice(0, 5),
+      actions: longActions,
     },
   ];
 }
@@ -259,7 +256,7 @@ function costVsIncident(findings: ReportFindingView[]): {
   incident: CostItem[];
 } {
   const phases = roadmapPhases(findings);
-  const remediation = [...phases[0].actions, ...phases[1].actions].slice(0, 6);
+  const remediation = [...phases[0].actions, ...phases[1].actions];
   const has = (sev: Severity) => findings.some((f) => f.severity === sev);
   const text = findings
     .map((f) => `${f.title} ${f.weaknessClass} ${f.description ?? ""}`)
@@ -285,14 +282,14 @@ function costVsIncident(findings: ReportFindingView[]): {
     label: "Indisponibilidade de serviços",
     detail: "perda financeira por hora de operação parada",
   });
-  return { remediation, incident: incident.slice(0, 4) };
+  return { remediation, incident };
 }
 
 /** "O que aconteceria" (comercial) — enquadramento de negócio dos críticos/altos. */
 function businessScenarios(findings: ReportFindingView[]): string[] {
   const ch = sortBySeverity(
     findings.filter((f) => f.severity === "critical" || f.severity === "high"),
-  ).slice(0, 4);
+  );
   if (ch.length === 0)
     return ["Postura sólida; sem cenários de risco crítico ativos."];
   return ch.map((f) => {
@@ -627,7 +624,6 @@ function actionPlanPhases(findings: ReportFindingView[]): RoadmapPhase[] {
       out.push(
         `${f.ref} · ${SEVERITY_LABEL_PT[f.severity]} (${PRAZO_ALVO[f.severity]}) — ${action}`,
       );
-      if (out.length >= 8) break;
     }
     return out;
   };

@@ -362,33 +362,37 @@ def _attack_chain(ss, sec):
     boxstyle = ParagraphStyle("chainbox", parent=ss["Small"], fontSize=8,
                               textColor=C(T.INK), leading=10)
     arrstyle = ParagraphStyle("arr", parent=ss["Small"], alignment=TA_CENTER)
-    for lane in (sec.get("lanes") or [])[:6]:
+    per_row = 5          # máx. de passos por linha (28mm*5 + 6mm*4 ~ 164mm)
+    for lane in (sec.get("lanes") or []):      # SEM cap: todas as raias
         out.append(Paragraph(_esc(lane.get("title", "")), ss["CardTitle"]))
-        steps = (lane.get("steps") or [])[:5]
-        cells = []
-        widths = []
-        for i, s in enumerate(steps):
-            cells.append(Paragraph(
-                f'<b><font color="#{T.PRIMARY}">{_esc(s.get("label", ""))}</font></b>'
-                f'<br/><font size="7" color="#{T.MUTED}">{_esc(s.get("detail", ""))}</font>',
-                boxstyle))
-            widths.append(28 * mm)
-            if i < len(steps) - 1:
-                cells.append(Paragraph(f'<font color="#{T.CORAL}" size="14">&#8594;</font>',
-                                       arrstyle))
-                widths.append(6 * mm)
-        if cells:
-            tbl = Table([cells], colWidths=widths)
-            sc = [("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                  ("TOPPADDING", (0, 0), (-1, -1), 5),
-                  ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-                  ("LEFTPADDING", (0, 0), (-1, -1), 4),
-                  ("RIGHTPADDING", (0, 0), (-1, -1), 4)]
-            for ci in range(0, len(cells), 2):
-                sc.append(("BACKGROUND", (ci, 0), (ci, 0), C(T.SURFACE_ALT)))
-                sc.append(("LINEABOVE", (ci, 0), (ci, 0), 1.2, C(T.PRIMARY)))
-            tbl.setStyle(_ts(sc))
-            out.append(tbl)
+        steps = lane.get("steps") or []        # SEM cap: todos os passos
+        for r0 in range(0, len(steps), per_row):
+            rowsteps = steps[r0:r0 + per_row]
+            cells, widths = [], []
+            for i, s in enumerate(rowsteps):
+                cells.append(Paragraph(
+                    f'<b><font color="#{T.PRIMARY}">{_esc(s.get("label", ""))}</font></b>'
+                    f'<br/><font size="7" color="#{T.MUTED}">{_esc(s.get("detail", ""))}</font>',
+                    boxstyle))
+                widths.append(28 * mm)
+                last_overall = (r0 + i == len(steps) - 1)
+                if i < len(rowsteps) - 1 and not last_overall:
+                    cells.append(Paragraph(
+                        f'<font color="#{T.CORAL}" size="14">&#8594;</font>', arrstyle))
+                    widths.append(6 * mm)
+            if cells:
+                tbl = Table([cells], colWidths=widths)
+                sc = [("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                      ("TOPPADDING", (0, 0), (-1, -1), 5),
+                      ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                      ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                      ("RIGHTPADDING", (0, 0), (-1, -1), 4)]
+                for ci in range(0, len(cells), 2):
+                    sc.append(("BACKGROUND", (ci, 0), (ci, 0), C(T.SURFACE_ALT)))
+                    sc.append(("LINEABOVE", (ci, 0), (ci, 0), 1.2, C(T.PRIMARY)))
+                tbl.setStyle(_ts(sc))
+                out.append(tbl)
+                out.append(Spacer(1, 2 * mm))
         out.append(Spacer(1, 4 * mm))
     return out
 
@@ -401,7 +405,7 @@ def _roadmap(ss, sec):
              Paragraph('<font color="white"><b>Ações</b></font>', ss["Body2"])]]
     for ph in (sec.get("phases") or [])[:4]:
         acts = "<br/>".join("• " + _esc(a)
-                            for a in (ph.get("actions") or [])[:6])
+                            for a in (ph.get("actions") or []))
         data.append([Paragraph(f'<b>{_esc(ph.get("window", ""))}</b>', ss["Small"]),
                      Paragraph(_esc(ph.get("label", "")), ss["Small"]),
                      Paragraph(acts, ss["Small"])])
@@ -421,9 +425,9 @@ def _cost_incident(ss, sec):
     out = [Paragraph("Custo da Remediação × Custo do Incidente", ss["H1"]),
            HRFlowable(width="18%", thickness=2, color=C(T.CORAL), spaceAfter=6)]
     remlist = "<br/>".join("• " + _esc(r)
-                           for r in (sec.get("remediation") or [])[:6])
+                           for r in (sec.get("remediation") or []))
     inc_parts = []
-    for it in (sec.get("incident") or [])[:4]:
+    for it in (sec.get("incident") or []):
         line = f'<b><font color="#{T.DESTRUCTIVE}">• {_esc(it.get("label", ""))}</font></b>'
         if it.get("detail"):
             line += f'<br/><font size="8" color="#{T.MUTED}">   {_esc(it["detail"])}</font>'

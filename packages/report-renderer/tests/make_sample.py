@@ -152,14 +152,19 @@ def build_model(out_dir):
         {"type": "partDivider", "part": "PANORAMA", "title": f"Os {len(findings)} achados, num relance"},
         {"type": "findingsTable", "findings": findings},
         {"type": "partDivider", "part": "PARTE II", "title": "Cadeias de Ataque"},
+        # Pior caso: raia com MUITOS passos (testa quebra em linhas de ~5 +
+        # paginação da raia) + 2ª raia (multi-raia).
         {"type": "attackChain", "lanes": [
             {"title": f"{findings[0]['ref']} · cadeia crítica com título longo que excede o clip "
                       "antigo sem truncar em DOCX/PDF ATTACK_TITLE_END_X",
-             "steps": [{"label": "recon", "detail": "nmap -sV com resumo de passo deliberadamente "
-                        "longo acima de 40 chars para exercer a quebra ATTACK_DETAIL_END_X"},
-                       {"label": "exploit", "detail": "sqlmap"},
-                       {"label": "privesc", "detail": "painel"},
-                       {"label": "pivot", "detail": "interna"}]}]},
+             "steps": [{"label": f"passo{k}",
+                        "detail": (f"resultado objetivo do passo {k} " + ("d" * 45)
+                                   + (" ATTACK_DETAIL_END_X" if k == 0 else ""))}
+                       for k in range(22)]},
+            {"title": f"{findings[1]['ref']} · segunda raia de ataque encadeada",
+             "steps": [{"label": f"etapa{k}", "detail": f"prova objetiva {k}"}
+                       for k in range(7)]},
+        ]},
         {"type": "partDivider", "part": "NARRATIVA",
          "title": "Narrativa da Análise Técnica",
          "subtitle": "Anatomia da invasão — do reconhecimento ao impacto"},
@@ -181,10 +186,18 @@ def build_model(out_dir):
         {"type": "partDivider", "part": "REMEDIAÇÃO", "title": "Plano por fase"},
         {"type": "roadmap", "phases": [
             {"window": "0-7 dias", "label": "Contenção",
-             "actions": ["Corrigir SQLi " + ("w" * 80) + " ROADMAP_END_X"]},
-            {"window": "8-30 dias", "label": "Fechar vetores", "actions": ["Revisar IDOR"]},
+             "actions": ["Corrigir SQLi " + ("w" * 80) + " ROADMAP_END_X"]
+                        + [f"Ação imediata {k} " + ("a" * 35) for k in range(9)]},
+            {"window": "8-30 dias", "label": "Fechar vetores",
+             "actions": ["Revisar IDOR"] + [f"Fechar vetor {k}" for k in range(7)]},
             {"window": "31-90 dias", "label": "Hardening", "actions": ["WAF"]},
             {"window": "91-180 dias", "label": "Maturidade", "actions": ["Reteste"]}]},
+        # Custo×incidente (pior caso) — testa as 2 colunas que crescem e paginam.
+        {"type": "costVsIncident",
+         "remediation": [f"Remediação {k} " + ("r" * 50) for k in range(10)],
+         "incident": [{"label": f"Incidente {k} com rótulo longo " + ("i" * 25),
+                       "detail": "consequência detalhada " + ("c" * 40)}
+                      for k in range(6)]},
         {"type": "heading", "text": "Matriz de Remediação Priorizada", "level": 1},
         {"type": "remediationMatrix", "findings": findings},
         {"type": "callout", "tone": "critical", "text": "5 riscos críticos/altos exigem ação imediata. " + ("q" * 120)},

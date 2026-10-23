@@ -120,6 +120,15 @@ def _wrap(text, cpl):
     return out
 
 
+def _text_h(text, w_emu, pt, bold=False, font=T.FONT_BODY, pad_in=0.0):
+    """Altura (EMU) que um texto ocupa numa caixa de largura w_emu, fonte pt.
+    Conservador (superestima linhas) → a caixa nunca fica curta (sem corte)."""
+    cwf = (0.63 if font == T.FONT_MONO else 0.58) + (0.04 if bold else 0.0)
+    cpl = max(4, int((int(w_emu) / EMU_IN) * 72 / (pt * cwf)))
+    n = max(1, len(_wrap(str(text or ""), cpl)))
+    return int((n * pt * _LINE_FACTOR / 72.0 + pad_in) * EMU_IN)
+
+
 def _img_size(path):
     try:
         from PIL import Image
@@ -400,9 +409,11 @@ def _stat_band(prs, sec):
     _rect(slide, 0, 0, SW, Inches(0.12), T.PRIMARY)
     y = Inches(0.5)
     if sec.get("headline"):
-        _text(slide, ML, y, CW, Inches(0.9), _clip(sec["headline"], 160),
+        hh = _text_h(sec["headline"], int(CW), 24, bold=True,
+                     font=T.FONT_DISPLAY, pad_in=0.12)
+        _text(slide, ML, y, CW, Emu(hh), sec["headline"],
               size=24, bold=True, color=T.INK, font=T.FONT_DISPLAY)
-        y = Inches(1.55)
+        y = int(y) + hh + int(Inches(0.25))
     stats = sec.get("stats") or []
     if stats:
         tw = Inches(2.85)
@@ -425,88 +436,186 @@ def _stat_band(prs, sec):
 
 
 def _attack_chain(prs, sec):
-    slide, y = _title_slide(prs, "Cadeia de Ataque")
-    lanes = sec.get("lanes") or []
-    lane_h = Inches(1.7)
-    box_w = Inches(2.0)
-    arrow_w = Inches(0.35)
-    step = box_w + arrow_w
-    for li, lane in enumerate(lanes[:3]):
-        ly = y + lane_h * li
-        _text(slide, ML, ly, CW, Inches(0.35), _clip(lane.get("title", ""), 80),
+    # Diagrama que CRESCE e pagina (sem corte, sem cap): título da raia quebra
+    # inteiro; passos quebram em LINHAS de ~5 caixas (nunca saem do slide); cada
+    # caixa cresce p/ o texto; _Flow abre "(cont.)" quando enche.
+    fl = _Flow(prs, "Cadeia de Ataque")
+    box_w = int(Inches(2.0))
+    arrow_w = int(Inches(0.35))
+    stepw = box_w + arrow_w
+    per_row = max(1, int(CW) // stepw)
+    inner = box_w - int(Inches(0.2))
+    for lane in (sec.get("lanes") or []):
+        th = _text_h(lane.get("title", ""), int(CW), 12, bold=True, pad_in=0.06)
+        fl.ensure(th + int(Inches(0.6)))
+        _text(fl.slide, ML, Emu(fl.y), CW, Emu(th), lane.get("title", ""),
               size=12, bold=True, color=T.INK)
-        steps = (lane.get("steps") or [])[:5]
-        for si, st in enumerate(steps):
-            x = ML + step * si
-            by = ly + Inches(0.42)
-            _rect(slide, x, by, box_w, Inches(0.9), T.SURFACE_ALT, line=T.BORDER)
-            _rect(slide, x, by, box_w, Emu(int(0.05 * EMU_IN)), T.PRIMARY)
-            _text(slide, x + Inches(0.1), by + Inches(0.1), box_w - Inches(0.2),
-                  Inches(0.35), _clip(st.get("label", ""), 22), size=11,
-                  bold=True, color=T.PRIMARY)
-            if st.get("detail"):
-                _text(slide, x + Inches(0.1), by + Inches(0.45),
-                      box_w - Inches(0.2), Inches(0.42),
-                      _clip(st.get("detail", ""), 44), size=8, color=T.MUTED)
-            if si < len(steps) - 1:
-                _text(slide, x + box_w, by + Inches(0.28), arrow_w, Inches(0.4),
-                      "→", size=18, bold=True, color=_accent(),
-                      align=PP_ALIGN.CENTER)
+        fl.y += th + int(Inches(0.08))
+        steps = lane.get("steps") or []
+        for r0 in range(0, len(steps), per_row):
+            rowsteps = steps[r0:r0 + per_row]
+            hs = []
+            for st in rowsteps:
+                lh = _text_h(st.get("label", ""), inner, 11, bold=True)
+                dh = _text_h(st.get("detail", ""), inner, 8) if st.get("detail") else 0
+                hs.append(lh + dh + int(Inches(0.2)))
+            rowh = max(hs) if hs else int(Inches(0.5))
+            fl.ensure(rowh + int(Inches(0.12)))
+            by = fl.y
+            for si, st in enumerate(rowsteps):
+                x = int(ML) + stepw * si
+                _rect(fl.slide, Emu(x), Emu(by), Emu(box_w), Emu(rowh),
+                      T.SURFACE_ALT, line=T.BORDER)
+                _rect(fl.slide, Emu(x), Emu(by), Emu(box_w),
+                      Emu(int(0.05 * EMU_IN)), T.PRIMARY)
+                lh = _text_h(st.get("label", ""), inner, 11, bold=True)
+                _text(fl.slide, Emu(x + int(Inches(0.1))),
+                      Emu(by + int(Inches(0.1))), Emu(inner), Emu(lh),
+                      st.get("label", ""), size=11, bold=True, color=T.PRIMARY)
+                if st.get("detail"):
+                    _text(fl.slide, Emu(x + int(Inches(0.1))),
+                          Emu(by + int(Inches(0.1)) + lh), Emu(inner),
+                          Emu(max(int(Inches(0.2)), rowh - lh - int(Inches(0.2)))),
+                          st.get("detail", ""), size=8, color=T.MUTED)
+                last_overall = (r0 + si == len(steps) - 1)
+                if si < len(rowsteps) - 1 and not last_overall:
+                    _text(fl.slide, Emu(x + box_w),
+                          Emu(by + rowh // 2 - int(Inches(0.2))),
+                          Emu(arrow_w), Emu(int(Inches(0.4))), "→",
+                          size=18, bold=True, color=_accent(),
+                          align=PP_ALIGN.CENTER)
+            fl.y += rowh + int(Inches(0.12))
+        fl.y += int(Inches(0.2))
 
 
 def _roadmap(prs, sec):
-    slide, y = _title_slide(prs, "Plano de Remediação por Fase")
+    # Colunas (1 por fase) que CRESCEM; as ações paginam por LINHA (todas as
+    # colunas quebram no mesmo ponto) → nada cortado, nada omitido, sem estouro.
     phases = sec.get("phases") or []
-    cw = Inches(2.85)
-    gap = Inches(0.13)
-    for i, ph in enumerate(phases[:4]):
-        x = ML + (cw + gap) * i
-        _rect(slide, x, y, cw, Inches(5.0), T.SURFACE_ALT, line=T.BORDER)
-        _rect(slide, x, y, cw, Inches(0.7), T.PRIMARY)
-        _text(slide, x + Inches(0.15), y + Inches(0.08), cw - Inches(0.25),
-              Inches(0.3), ph.get("window", ""), size=11, bold=True,
-              color="FFFFFF")
-        _text(slide, x + Inches(0.15), y + Inches(0.38), cw - Inches(0.25),
-              Inches(0.3), ph.get("label", ""), size=10, color="C9D3E6")
-        yy = y + Inches(0.9)
-        for a in (ph.get("actions") or [])[:6]:
-            _text(slide, x + Inches(0.15), yy, cw - Inches(0.3), Inches(0.6),
-                  "▸ " + _clip(a, 62), size=9, color=T.INK)
-            yy += Inches(0.62)
+    n = max(1, len(phases))
+    gap = int(Inches(0.13))
+    cw = (int(CW) - gap * (n - 1)) // n
+    head_h = int(Inches(0.9))
+    pad = int(Inches(0.15))
+    act_w = cw - int(Inches(0.3))
+    acts = [ph.get("actions") or [] for ph in phases]
+    maxrows = max((len(a) for a in acts), default=0)
+
+    def _ah(txt):
+        return _text_h("▸ " + str(txt), act_w, 9, pad_in=0.06)
+    rowh = [max((_ah(acts[c][i]) for c in range(n) if i < len(acts[c])),
+                default=int(Inches(0.3))) for i in range(maxrows)]
+    avail = int(_CONTENT_BOTTOM) - int(Inches(1.5)) - head_h
+    chunks, cur, acc = [], [], 0
+    for i in range(maxrows):
+        if cur and acc + rowh[i] > avail:
+            chunks.append(cur)
+            cur, acc = [], 0
+        cur.append(i)
+        acc += rowh[i]
+    if cur:
+        chunks.append(cur)
+    if not chunks:
+        chunks = [[]]
+    for ci, rows in enumerate(chunks):
+        slide, y = _title_slide(
+            prs, "Plano de Remediação por Fase" + (" (cont.)" if ci else ""))
+        y = int(y)
+        colh = head_h + sum(rowh[i] for i in rows) + pad
+        for c in range(n):
+            ph = phases[c]
+            x = int(ML) + (cw + gap) * c
+            _rect(slide, Emu(x), Emu(y), Emu(cw), Emu(colh),
+                  T.SURFACE_ALT, line=T.BORDER)
+            _rect(slide, Emu(x), Emu(y), Emu(cw), Emu(int(Inches(0.7))), T.PRIMARY)
+            _text(slide, Emu(x + pad), Emu(y + int(Inches(0.08))),
+                  Emu(cw - int(Inches(0.25))), Emu(int(Inches(0.3))),
+                  ph.get("window", ""), size=11, bold=True, color="FFFFFF")
+            _text(slide, Emu(x + pad), Emu(y + int(Inches(0.38))),
+                  Emu(cw - int(Inches(0.25))), Emu(int(Inches(0.3))),
+                  ph.get("label", ""), size=10, color="C9D3E6")
+            yy = y + head_h
+            for i in rows:
+                if i < len(acts[c]):
+                    _text(slide, Emu(x + pad), Emu(yy), Emu(act_w), Emu(rowh[i]),
+                          "▸ " + str(acts[c][i]), size=9, color=T.INK)
+                yy += rowh[i]
 
 
 def _cost_incident(prs, sec):
-    slide, y = _title_slide(prs, "Custo da Remediação × Custo do Incidente")
-    colw = Inches(5.9)
-    gap = Inches(0.33)
-    _rect(slide, ML, y, colw, Inches(5.0), T.SURFACE_ALT, line=T.BORDER)
-    _rect(slide, ML, y, colw, Inches(0.55), T.SUCCESS)
-    _text(slide, ML + Inches(0.2), y + Inches(0.1), colw - Inches(0.3),
-          Inches(0.35), "REMEDIAÇÃO — INVESTIMENTO", size=12, bold=True,
-          color="FFFFFF")
-    yy = y + Inches(0.75)
-    for r in (sec.get("remediation") or [])[:6]:
-        _text(slide, ML + Inches(0.2), yy, colw - Inches(0.4), Inches(0.5),
-              "◆ " + _clip(r, 72), size=11, color=T.INK)
-        yy += Inches(0.55)
-    x2 = ML + colw + gap
-    _rect(slide, x2, y, colw, Inches(5.0), T.SURFACE_ALT, line=T.BORDER)
-    _rect(slide, x2, y, colw, Inches(0.55), T.DESTRUCTIVE)
-    _text(slide, x2 + Inches(0.2), y + Inches(0.1), colw - Inches(0.3),
-          Inches(0.35), "INCIDENTE NÃO REMEDIADO — RISCO", size=12, bold=True,
-          color="FFFFFF")
-    yy = y + Inches(0.75)
-    for it in (sec.get("incident") or [])[:4]:
-        _text(slide, x2 + Inches(0.2), yy, colw - Inches(0.4), Inches(0.35),
-              "◆ " + _clip(it.get("label", ""), 60), size=12, bold=True,
-              color=T.DESTRUCTIVE)
-        yy += Inches(0.38)
+    # 2 colunas (remediação × incidente) que crescem e paginam por LINHA —
+    # texto inteiro, sem cap/clip, sem estouro.
+    gap = int(Inches(0.33))
+    colw = (int(CW) - gap) // 2
+    head_h = int(Inches(0.75))
+    pad = int(Inches(0.2))
+    iw = colw - int(Inches(0.4))
+    mlx = int(ML)
+    x2 = mlx + colw + gap
+    rem = sec.get("remediation") or []
+    inc = sec.get("incident") or []
+
+    def _ih(it):
+        h = _text_h("◆ " + str(it.get("label", "")), iw, 12, bold=True, pad_in=0.04)
         if it.get("detail"):
-            _text(slide, x2 + Inches(0.45), yy, colw - Inches(0.6), Inches(0.4),
-                  _clip(it.get("detail", ""), 72), size=10, color=T.MUTED)
-            yy += Inches(0.55)
-        else:
-            yy += Inches(0.2)
+            h += _text_h(str(it.get("detail", "")), colw - int(Inches(0.6)), 10,
+                         pad_in=0.08)
+        return h + int(Inches(0.06))
+    maxrows = max(len(rem), len(inc))
+    rowh = [max(_text_h("◆ " + str(rem[i]), iw, 11, pad_in=0.08) if i < len(rem) else 0,
+                _ih(inc[i]) if i < len(inc) else 0,
+                int(Inches(0.3))) for i in range(maxrows)]
+    avail = int(_CONTENT_BOTTOM) - int(Inches(1.5)) - head_h
+    chunks, cur, acc = [], [], 0
+    for i in range(maxrows):
+        if cur and acc + rowh[i] > avail:
+            chunks.append(cur)
+            cur, acc = [], 0
+        cur.append(i)
+        acc += rowh[i]
+    if cur:
+        chunks.append(cur)
+    if not chunks:
+        chunks = [[]]
+    for ci, rows in enumerate(chunks):
+        slide, y = _title_slide(
+            prs, "Custo da Remediação × Custo do Incidente"
+            + (" (cont.)" if ci else ""))
+        y = int(y)
+        colh = head_h + sum(rowh[i] for i in rows) + int(Inches(0.1))
+        _rect(slide, Emu(mlx), Emu(y), Emu(colw), Emu(colh), T.SURFACE_ALT,
+              line=T.BORDER)
+        _rect(slide, Emu(mlx), Emu(y), Emu(colw), Emu(int(Inches(0.55))), T.SUCCESS)
+        _text(slide, Emu(mlx + pad), Emu(y + int(Inches(0.1))),
+              Emu(colw - int(Inches(0.3))), Emu(int(Inches(0.35))),
+              "REMEDIAÇÃO — INVESTIMENTO", size=12, bold=True, color="FFFFFF")
+        _rect(slide, Emu(x2), Emu(y), Emu(colw), Emu(colh), T.SURFACE_ALT,
+              line=T.BORDER)
+        _rect(slide, Emu(x2), Emu(y), Emu(colw), Emu(int(Inches(0.55))),
+              T.DESTRUCTIVE)
+        _text(slide, Emu(x2 + pad), Emu(y + int(Inches(0.1))),
+              Emu(colw - int(Inches(0.3))), Emu(int(Inches(0.35))),
+              "INCIDENTE NÃO REMEDIADO — RISCO", size=12, bold=True, color="FFFFFF")
+        yr = y + head_h
+        yi = y + head_h
+        for i in rows:
+            if i < len(rem):
+                _text(slide, Emu(mlx + pad), Emu(yr), Emu(iw), Emu(rowh[i]),
+                      "◆ " + str(rem[i]), size=11, color=T.INK)
+            yr += rowh[i]
+            if i < len(inc):
+                it = inc[i]
+                lh = _text_h("◆ " + str(it.get("label", "")), iw, 12, bold=True,
+                             pad_in=0.04)
+                _text(slide, Emu(x2 + pad), Emu(yi), Emu(iw), Emu(lh),
+                      "◆ " + str(it.get("label", "")), size=12, bold=True,
+                      color=T.DESTRUCTIVE)
+                if it.get("detail"):
+                    _text(slide, Emu(x2 + int(Inches(0.45))), Emu(yi + lh),
+                          Emu(colw - int(Inches(0.6))),
+                          Emu(max(int(Inches(0.2)), rowh[i] - lh)),
+                          str(it.get("detail", "")), size=10, color=T.MUTED)
+            yi += rowh[i]
 
 
 def _partner_value(prs, sec):
@@ -641,8 +750,8 @@ def _finding_card(prs, sec):
     fl.ensure(Inches(0.6))
     _rect(fl.slide, ML, Emu(fl.y), CW, Inches(0.5),
           T.SEVERITY_COLOR.get(sev, T.MUTED))
-    _text(fl.slide, ML + Inches(0.15), Emu(fl.y + int(Inches(0.05))), CW,
-          Inches(0.4),
+    _text(fl.slide, ML + Inches(0.15), Emu(fl.y + int(Inches(0.05))),
+          CW - Inches(0.3), Inches(0.4),
           f"{T.SEVERITY_LABEL.get(sev, sev).upper()}  ·  {f.get('ref','')}  ·  {f.get('affectedAsset','')}",
           size=13, bold=True, color="FFFFFF", anchor=MSO_ANCHOR.MIDDLE)
     fl.space(Inches(0.66))

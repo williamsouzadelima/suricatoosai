@@ -37,12 +37,12 @@ SENT = ["DESCR_END_F-01", "NARR_END_F-01", "IMPACT_END_F-01", "REMED_END_F-01",
         "PARA_END_X", "STATBAND_END_X",
         # Título longo (>90) do F-01 termina neste sentinela — se QUALQUER formato
         # truncar o título do achado (o "…" que o William pegou), ele some.
-        "TITLE_END_F-01"]
-# 2ª leva (seções de layout fixo: cadeia de ataque, plano por fase, bullets):
-# DOCX/PDF pararam de cortar; o PPTX AINDA corta (clip local proposital até a
-# decisão de layout do deck) → estes sentinelas são checados SÓ em docx/pdf.
-SENT_DOCPDF = ["ATTACK_TITLE_END_X", "ATTACK_DETAIL_END_X", "ROADMAP_END_X",
-               "BULLETS_END_X"]
+        "TITLE_END_F-01",
+        # 3ª leva: cadeia de ataque / plano por fase / bullets agora SEM corte
+        # nos 3 formatos (PPTX cresce + pagina). Checado em docx/pptx/pdf.
+        "ATTACK_TITLE_END_X", "ATTACK_DETAIL_END_X", "ROADMAP_END_X",
+        "BULLETS_END_X"]
+SENT_DOCPDF = []   # tudo migrou p/ SENT (os 3 formatos mostram inteiro)
 PLACE = "capturada"  # "Evidência visual não capturada" (F-02 Alto, sem imagem)
 SUMMARY = "SUMÁRIO"  # título do sumário (docx) / slide agenda (pptx)
 # Fases da narrativa (make_sample._phases): devem aparecer no SUMÁRIO, ANTES do
