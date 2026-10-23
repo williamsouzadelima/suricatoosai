@@ -123,11 +123,12 @@ def _wrap(text, cpl):
 
 def _text_h(text, w_emu, pt, bold=False, font=T.FONT_BODY, pad_in=0.0):
     """Altura (EMU) que um texto ocupa numa caixa de largura w_emu, fonte pt.
-    Conservador (superestima linhas) → a caixa nunca fica curta (sem corte)."""
-    cwf = (0.63 if font == T.FONT_MONO else 0.58) + (0.04 if bold else 0.0)
+    PPTX NÃO mede texto → subestimar gera sobreposição. cwf GENEROSO (cobre
+    caracteres largos tipo W/M/w) + 12% de folga: a caixa nunca fica curta."""
+    cwf = (0.70 if font == T.FONT_MONO else 0.64) + (0.05 if bold else 0.0)
     cpl = max(4, int((int(w_emu) / EMU_IN) * 72 / (pt * cwf)))
     n = max(1, len(_wrap(str(text or ""), cpl)))
-    return int((n * pt * _LINE_FACTOR / 72.0 + pad_in) * EMU_IN)
+    return int((n * pt * _LINE_FACTOR / 72.0 * 1.12 + pad_in) * EMU_IN)
 
 
 def _img_size(path):
@@ -174,7 +175,7 @@ class _Flow:
         # folga). O texto vai INTEIRO com word_wrap=True → o PowerPoint quebra na
         # largura (NUNCA passa da margem) e JUSTIFICA. Paginamos por PALAVRA p/
         # não corromper token longo (juntar linhas quebraria uma URL no meio).
-        cwf = (0.63 if font == T.FONT_MONO else 0.60) + (0.04 if bold else 0.0)
+        cwf = (0.70 if font == T.FONT_MONO else 0.64) + (0.05 if bold else 0.0)
         cpl = max(8, int((width / EMU_IN) * 72 / (size * cwf)))
         lh = int(size * _LINE_FACTOR / 72.0 * EMU_IN)
 
@@ -183,6 +184,7 @@ class _Flow:
 
         def _emit(s):
             n = _nl(s)
+            self.ensure(n * lh)   # a caixa INTEIRA tem de caber (não só 1 linha)
             tb = self.slide.shapes.add_textbox(Emu(left), Emu(self.y),
                                                Emu(width), Emu(n * lh))
             tf = tb.text_frame
@@ -204,11 +206,6 @@ class _Flow:
         for seg in str(text or "").split("\n"):
             if not seg.strip():
                 self.y += lh // 2
-                continue
-            self.ensure(lh)
-            cap = max(1, (_CONTENT_BOTTOM - self.y) // lh)
-            if _nl(seg) <= cap:
-                _emit(seg)
                 continue
             words = seg.split(" ")
             idx = 0
@@ -890,12 +887,12 @@ def _table(prs, findings, title, remediation=False):
     def _row_h(vals):
         n = 1
         for j, w in enumerate(widths):
-            cpl = max(6, int((int(w) / EMU_IN) * 72 / (CELL_PT * 0.56)))
+            cpl = max(6, int((int(w) / EMU_IN) * 72 / (CELL_PT * 0.64)))
             n = max(n, len(_wrap(str(vals[j]), cpl)))
         return n * line_in + 0.14   # + margens verticais da célula
 
     header_h = line_in + 0.16
-    avail = int(_CONTENT_BOTTOM) / EMU_IN - 1.6 - header_h   # zona do título ~1.6"
+    avail = int(_CONTENT_BOTTOM) / EMU_IN - 2.0 - header_h   # título + folga margens
     chunks, cur, acc = [], [], 0.0
     for f in findings:
         h = _row_h(_vals(f))
@@ -918,6 +915,10 @@ def _table(prs, findings, title, remediation=False):
         for j, hd in enumerate(headers):
             gt.columns[j].width = widths[j]
             cell = gt.cell(0, j)
+            cell.margin_top = Pt(1)
+            cell.margin_bottom = Pt(1)
+            cell.margin_left = Pt(4)
+            cell.margin_right = Pt(4)
             cell.fill.solid()
             cell.fill.fore_color.rgb = _rgb(T.PRIMARY)
             # add_run() sempre cria um run — ao contrário de `cell.text = ""`,
@@ -933,6 +934,10 @@ def _table(prs, findings, title, remediation=False):
             gt.rows[i].height = Emu(int(heights[i] * EMU_IN))
             for j, v in enumerate(_vals(f)):
                 cell = gt.cell(i, j)
+                cell.margin_top = Pt(1)
+                cell.margin_bottom = Pt(1)
+                cell.margin_left = Pt(4)
+                cell.margin_right = Pt(4)
                 cell.text_frame.word_wrap = True   # célula quebra, não corta
                 r = cell.text_frame.paragraphs[0].add_run()
                 r.text = str(v)
@@ -941,6 +946,23 @@ def _table(prs, findings, title, remediation=False):
                     T.SEVERITY_COLOR.get(sev, T.INK) if j == 1 else T.INK)
                 if j == 1:
                     r.font.bold = True
+
+
+def _remediation_matrix(prs, findings, title):
+    # Lista FLUÍDA (não tabela): remediação pode ser longa e a tabela do PPTX não
+    # pagina uma linha (estouraria o slide). Cada achado = cabeçalho Ref·Sev·Ativo
+    # + remediação inteira justificada, paginando normalmente.
+    fl = _Flow(prs, title or "Matriz de Remediação")
+    for f in findings:
+        sev = f.get("severity", "info")
+        head = (f"{f.get('ref','')}  ·  "
+                f"{T.SEVERITY_LABEL.get(sev, sev).upper()}  ·  "
+                f"{f.get('affectedAsset','')}")
+        fl.para(head, size=11, bold=True,
+                color=T.SEVERITY_COLOR.get(sev, T.PRIMARY), after=0.02,
+                align=PP_ALIGN.LEFT)
+        rem = (f.get("remediation") or "").strip()
+        fl.para(rem if rem else "—", size=11, color=T.INK, after=0.18)
 
 
 def _bullets(prs, items, title):
@@ -1016,7 +1038,8 @@ def render_pptx(model, out_path):
         elif t == "findingsTable":
             _table(prs, sec.get("findings", []), title or "Sumário de Achados")
         elif t == "remediationMatrix":
-            _table(prs, sec.get("findings", []), title or "Matriz de Remediação", remediation=True)
+            _remediation_matrix(prs, sec.get("findings", []),
+                                title or "Matriz de Remediação")
         elif t == "roadmap":
             _roadmap(prs, sec)
         elif t == "costVsIncident":

@@ -49,7 +49,8 @@ def make_cover(path):
     img = Image.new("RGB", (1700, 2200), (14, 27, 46))
     d = ImageDraw.Draw(img)
     d.rectangle([0, 0, 1700, 24], fill=(36, 86, 230))
-    d.rectangle([120, 900, 420, 912], fill=(255, 118, 120))
+    # Fundo LIMPO: o traço coral é desenhado pelo _cover (um só). Antes esta
+    # barra extra brigava com ele → "duas barras" na capa.
     img.save(path, "PNG")
 
 
@@ -186,8 +187,12 @@ def build_model(out_dir):
         {"type": "partDivider", "part": "REMEDIAÇÃO", "title": "Plano por fase"},
         {"type": "roadmap", "phases": [
             {"window": "0-7 dias", "label": "Contenção",
-             "actions": ["Corrigir SQLi " + ("w" * 80) + " ROADMAP_END_X"]
-                        + [f"Ação imediata {k} " + ("a" * 35) for k in range(9)]},
+             "actions": ["Corrigir a injecao de SQL no login do e-Saphira aplicando "
+                         "prepared statements e validacao de entrada em todos os "
+                         "endpoints afetados, revisando o ORM ROADMAP_END_X"]
+                        + [f"Acao imediata {k}: aplicar correcao e validar o "
+                           "endpoint afetado nesta janela de contencao"
+                           for k in range(9)]},
             {"window": "8-30 dias", "label": "Fechar vetores",
              "actions": ["Revisar IDOR"] + [f"Fechar vetor {k}" for k in range(7)]},
             {"window": "31-90 dias", "label": "Hardening", "actions": ["WAF"]},
