@@ -702,6 +702,36 @@ export const listFindingsForEngagement = query({
   },
 });
 
+/**
+ * Contagem de SCREENSHOTS (evidência-imagem) por achado do engajamento, para o
+ * chip "📷 N" na LISTA de achados — dá clareza de quais achados têm print sem
+ * abrir um a um. Conta o que é imagem de verdade (media_type image/* + arquivo);
+ * NÃO verifica disponibilidade no S3 (isso é I/O; a tela de detalhe resolve a
+ * disponibilidade por imagem via onLoad/onError). Chaveado por finding _id.
+ */
+export const getEngagementImageEvidenceCounts = query({
+  args: { engagementId: v.id("engagements") },
+  handler: async (ctx, args): Promise<Record<string, number>> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return {};
+    const engagement = await ctx.db.get(args.engagementId);
+    if (!engagement || engagement.user_id !== identity.subject) return {};
+    const evs = await ctx.db
+      .query("evidence")
+      .withIndex("by_engagement_and_captured", (q) =>
+        q.eq("engagement_id", args.engagementId),
+      )
+      .collect();
+    const counts: Record<string, number> = {};
+    for (const e of evs) {
+      if ((e.file_id || e.s3_key) && (e.media_type ?? "").startsWith("image/")) {
+        counts[e.finding_id] = (counts[e.finding_id] ?? 0) + 1;
+      }
+    }
+    return counts;
+  },
+});
+
 export const listEvidenceForFinding = query({
   args: { findingId: v.id("findings"), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {

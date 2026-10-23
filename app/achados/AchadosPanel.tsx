@@ -10,6 +10,7 @@ import {
   Server,
   ChevronRight,
   ArrowLeft,
+  Image as ImageIcon,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
@@ -173,6 +174,11 @@ function AchadosForEngagement({
   const findings = useQuery(api.findings.listFindingsForEngagement, {
     engagementId,
   });
+  // Quantos screenshots cada achado tem (chip "📷 N" na lista).
+  const imageCounts =
+    useQuery(api.findings.getEngagementImageEvidenceCounts, {
+      engagementId,
+    }) ?? {};
 
   const counts = useMemo(() => {
     const sev: Record<Severity, number> = {
@@ -271,6 +277,7 @@ function AchadosForEngagement({
               <FindingRow
                 key={f._id}
                 finding={f}
+                imageCount={imageCounts[f._id] ?? 0}
                 onOpen={() => setOpenFindingId(f._id)}
               />
             ))}
@@ -283,9 +290,11 @@ function AchadosForEngagement({
 
 function FindingRow({
   finding: f,
+  imageCount,
   onOpen,
 }: {
   finding: Doc<"findings">;
+  imageCount?: number;
   onOpen: () => void;
 }) {
   const severity = f.severity as Severity;
@@ -329,6 +338,15 @@ function FindingRow({
         )}
       </span>
       <span className="flex shrink-0 items-center gap-2">
+        {imageCount ? (
+          <span
+            title={`${imageCount} screenshot${imageCount > 1 ? "s" : ""}`}
+            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground"
+          >
+            <ImageIcon className="h-3.5 w-3.5" />
+            {imageCount}
+          </span>
+        ) : null}
         <StatusBadge tone={STATUS_TONE[status]} label={STATUS_LABEL[status]} />
         {rs && RETEST_BADGE[rs] && (
           <StatusBadge
@@ -411,7 +429,7 @@ function AchadoDetail({
         </div>
       </div>
       <div className="p-4">
-        <FindingEvidence findingId={f._id} finding={f} />
+        <FindingEvidence key={f._id} findingId={f._id} finding={f} />
       </div>
     </Card>
   );

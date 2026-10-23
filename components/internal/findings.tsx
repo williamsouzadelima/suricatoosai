@@ -15,6 +15,7 @@ import {
   Paperclip,
   Server,
   Image as ImageIcon,
+  ImageOff,
   type LucideIcon,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
@@ -234,13 +235,26 @@ export function FindingEvidence({
     });
   }, [evidenceRaw]);
 
+  // Screenshot = evidência-arquivo com media_type de imagem EXPLÍCITO (não
+  // assume imagem quando o tipo falta — artefato de texto não vira tile quebrado).
   const imageEvidence = useMemo(
     () =>
       (evidence ?? []).filter(
-        (e) => e.file_id && (e.media_type ?? "image/").startsWith("image/"),
+        (e) =>
+          (e.file_id || e.s3_key) && (e.media_type ?? "").startsWith("image/"),
       ),
     [evidence],
   );
+  // Disponibilidade por imagem: cada <img> resolve ok|err (onLoad/onError). Um
+  // screenshot cujo objeto no S3 expirou (purge de 24h) devolve 404/502 → é
+  // marcado "indisponível" EXPLICITAMENTE, em vez de sumir calado (o
+  // comportamento antigo era display:none, que escondia o buraco).
+  const [imgState, setImgState] = useState<Record<string, "ok" | "err">>({});
+  const markImg = (id: Id<"evidence">, s: "ok" | "err") =>
+    setImgState((m) => (m[id] === s ? m : { ...m, [id]: s }));
+  const okCount = imageEvidence.filter((e) => imgState[e._id] === "ok").length;
+  const errCount = imageEvidence.filter((e) => imgState[e._id] === "err").length;
+  const allResolved = okCount + errCount === imageEvidence.length;
 
   return (
     <div className="space-y-4 rounded-xl border bg-muted/40 p-4">
@@ -267,31 +281,33 @@ export function FindingEvidence({
             label="Evidência visual"
             n={imageEvidence.length}
           />
+          <div className="-mt-1.5 mb-2.5 text-[11px]">
+            {!allResolved ? (
+              <span className="text-muted-foreground">
+                verificando disponibilidade…
+              </span>
+            ) : errCount === 0 ? (
+              <span className="font-medium text-success">
+                {okCount}{" "}
+                {okCount === 1
+                  ? "screenshot disponível"
+                  : "screenshots disponíveis"}
+              </span>
+            ) : (
+              <span className="font-medium text-warning">
+                {okCount} de {imageEvidence.length} disponíveis · {errCount}{" "}
+                indisponíve{errCount > 1 ? "is" : "l"} (expiraram — recapturar)
+              </span>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
             {imageEvidence.map((ev) => (
-              <a
+              <EvidenceThumb
                 key={ev._id}
-                href={`/api/evidence/${ev._id}/image`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Abrir em tamanho real"
-                className="group relative block overflow-hidden rounded-xl border bg-[#0e1b2e] shadow-[var(--shadow-soft)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)]"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/api/evidence/${ev._id}/image`}
-                  alt={ev.label ?? "screenshot"}
-                  loading="lazy"
-                  className="aspect-[16/10] w-full object-cover"
-                  onError={(e) => {
-                    const a = e.currentTarget.closest("a");
-                    if (a) (a as HTMLElement).style.display = "none";
-                  }}
-                />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-[#080f1b]/85 to-transparent px-2 pb-1.5 pt-5 font-mono text-[9.5px] text-[#cdd9ec]">
-                  {ev.label ?? "screenshot"}
-                </div>
-              </a>
+                ev={ev}
+                state={imgState[ev._id]}
+                onState={markImg}
+              />
             ))}
           </div>
         </div>
@@ -367,6 +383,61 @@ export function FindingEvidence({
         )}
       </div>
     </div>
+  );
+}
+
+// Tile de screenshot com estado de disponibilidade. O objeto no S3 pode ter
+// expirado (purge de 24h) → o <img> dá 404/502 e cai no estado "err", que
+// renderiza um placeholder EXPLÍCITO "indisponível" (não um link para um 502).
+function EvidenceThumb({
+  ev,
+  state,
+  onState,
+}: {
+  ev: Doc<"evidence">;
+  state: "ok" | "err" | undefined;
+  onState: (id: Id<"evidence">, s: "ok" | "err") => void;
+}) {
+  const label = ev.label ?? "screenshot";
+  if (state === "err") {
+    return (
+      <div
+        title="Screenshot indisponível — o arquivo expirou e precisa ser recapturado"
+        className="relative flex aspect-[16/10] w-full flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-dashed border-warning/60 bg-[#0e1b2e] px-2 text-center"
+      >
+        <ImageOff className="h-5 w-5 text-warning/80" />
+        <span className="text-[10px] font-semibold text-warning">
+          Indisponível
+        </span>
+        <span className="text-[9px] leading-tight text-[#9fb2cc]">
+          expirou — recapturar
+        </span>
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate px-2 pb-1 font-mono text-[9px] text-[#7f93b0]">
+          {label}
+        </span>
+      </div>
+    );
+  }
+  return (
+    <a
+      href={`/api/evidence/${ev._id}/image`}
+      target="_blank"
+      rel="noopener noreferrer"
+      title="Abrir em tamanho real"
+      className="group relative block overflow-hidden rounded-xl border bg-[#0e1b2e] shadow-[var(--shadow-soft)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)]"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`/api/evidence/${ev._id}/image`}
+        alt={label}
+        className="aspect-[16/10] w-full object-cover"
+        onLoad={() => onState(ev._id, "ok")}
+        onError={() => onState(ev._id, "err")}
+      />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-[#080f1b]/85 to-transparent px-2 pb-1.5 pt-5 font-mono text-[9.5px] text-[#cdd9ec]">
+        {label}
+      </div>
+    </a>
   );
 }
 
