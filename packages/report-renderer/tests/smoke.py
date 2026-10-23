@@ -34,7 +34,10 @@ from docx_renderer import render_docx  # noqa: E402
 from pdf_renderer import render_pdf  # noqa: E402
 
 SENT = ["DESCR_END_F-01", "NARR_END_F-01", "IMPACT_END_F-01", "REMED_END_F-01",
-        "PARA_END_X", "STATBAND_END_X"]
+        "PARA_END_X", "STATBAND_END_X",
+        # Título longo (>90) do F-01 termina neste sentinela — se QUALQUER formato
+        # truncar o título do achado (o "…" que o William pegou), ele some.
+        "TITLE_END_F-01"]
 PLACE = "capturada"  # "Evidência visual não capturada" (F-02 Alto, sem imagem)
 SUMMARY = "SUMÁRIO"  # título do sumário (docx) / slide agenda (pptx)
 # Fases da narrativa (make_sample._phases): devem aparecer no SUMÁRIO, ANTES do

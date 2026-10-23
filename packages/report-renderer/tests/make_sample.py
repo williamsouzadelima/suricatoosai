@@ -78,7 +78,12 @@ def finding(i, img_path=None, many_evidence=False):
         })
     return {
         "ref": ref,
-        "title": f"Achado {ref}: {['SQLi','IDOR','RCE','XSS','SSRF'][i%5]} em endpoint crítico de exemplo",
+        "title": (
+            f"Achado {ref}: {['SQLi','IDOR','RCE','XSS','SSRF'][i%5]} em endpoint crítico de exemplo"
+            + (" com titulo deliberadamente longo acima de noventa caracteres"
+               " para exercer a quebra de linha sem truncar em nenhum formato"
+               " TITLE_END_" + ref if i == 0 else "")
+        ),
         "severity": sev,
         "affectedAsset": f"https://app{i}.exemplo.com/api/v1/recurso",
         "weaknessClass": ["SQL Injection", "IDOR", "RCE", "XSS", "SSRF"][i % 5],

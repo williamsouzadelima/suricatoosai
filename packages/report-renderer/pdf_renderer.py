@@ -674,7 +674,7 @@ def render_pdf(model, out_path):
             sev = f.get("severity", "info")
             S.append(Paragraph(
                 f'<font color="#{T.SEVERITY_COLOR.get(sev, T.MUTED)}"><b>[{T.SEVERITY_LABEL.get(sev, sev).upper()}]</b></font> '
-                f'{esc(f.get("ref",""))} · {esc(_clip(f.get("title",""),200))}', ss["CardTitle"]))
+                f'{esc(f.get("ref",""))} · {esc(f.get("title",""))}', ss["CardTitle"]))
             meta_bits = []
             if f.get("affectedAsset"):
                 meta_bits.append(f"Ativo: {esc(f['affectedAsset'])}")
@@ -709,7 +709,7 @@ def render_pdf(model, out_path):
                     if e.get("toolName"):
                         head += f' <font face="{FONT_MONO}">[{esc(e["toolName"])}]</font>'
                     if e.get("label") and e.get("label") != e.get("toolName"):
-                        head += f' {esc(_clip(e["label"],160))}'
+                        head += f' {esc(e["label"])}'
                     S.append(Paragraph(head, ss["Small"]))
                     if e.get("command"):
                         S.append(Paragraph("$ " + _ml(e["command"]), ss["Mono"]))
@@ -732,6 +732,14 @@ def render_pdf(model, out_path):
             rem = t == "remediationMatrix"
             headers = (["Ref", "Sev", "Ativo", "Remediação"] if rem
                        else ["Ref", "Sev", "Título", "Ativo", "CVSS"])
+            # Texto longo como Paragraph → QUEBRA na largura da coluna (string
+            # crua no reportlab não quebra: transbordaria). Nada é truncado.
+            tcell = ParagraphStyle("tcell", parent=ss["Small"], spaceBefore=0,
+                                   spaceAfter=0)
+
+            def _cell(s):
+                return Paragraph(esc(str(s or "")), tcell)
+
             data = [headers]
             for f in findings:
                 sev = f.get("severity", "info")
@@ -739,10 +747,11 @@ def render_pdf(model, out_path):
                 cvss_s = f"{cvss:.1f}" if isinstance(cvss, (int, float)) else "—"
                 data.append(
                     [f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev),
-                     _clip(f.get("affectedAsset", ""), 40), _clip(f.get("remediation", ""), 110)]
+                     _cell(f.get("affectedAsset", "")), _cell(f.get("remediation", ""))]
                     if rem else
                     [f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev),
-                     _clip(f.get("title", ""), 58), _clip(f.get("affectedAsset", ""), 34), cvss_s])
+                     _cell(f.get("title", "")), _cell(f.get("affectedAsset", "")),
+                     cvss_s])
             widths = ([16 * mm, 18 * mm, 45 * mm, 86 * mm] if rem
                       else [15 * mm, 17 * mm, 70 * mm, 42 * mm, 16 * mm])
             tbl = Table(data, colWidths=widths, repeatRows=1)

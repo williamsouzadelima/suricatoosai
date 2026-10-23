@@ -139,7 +139,7 @@ class _Flow:
         self.y = int(y)
 
     def _newslide(self):
-        self.slide, y = _title_slide(self.prs, _clip(self.title, 58) + " (cont.)")
+        self.slide, y = _title_slide(self.prs, self.title + " (cont.)")
         self.y = int(y)
 
     def space(self, emu):
@@ -243,15 +243,22 @@ def _footer(slide, dark=False):
 def _title_slide(prs, title):
     slide = _blank(prs)
     _rect(slide, 0, 0, SW, Inches(0.12), T.PRIMARY)
-    title = _clip(str(title or ""), 104)
-    # Título longo encolhe (24→18pt) p/ caber na faixa ACIMA do traço coral, sem
-    # a 2ª linha invadir o acento (bug: títulos de achado cruzavam o traço).
+    title = str(title or "")
+    # Título longo encolhe (24→18pt). NÃO é truncado: a caixa cresce pelo nº de
+    # linhas estimado (cpl conservador) e o traço coral + o conteúdo descem junto.
+    # _text quebra o texto (word_wrap); a estimativa só dimensiona a altura
+    # (superestimar = só folga; nunca corta).
     tsize = 24 if len(title) <= 56 else 18
-    _text(slide, ML, Inches(0.33), CW, Inches(0.68), title, size=tsize, bold=True,
+    cpl = max(10, int((int(CW) / EMU_IN) * 72 / (tsize * 0.66)))
+    nlines = max(1, len(_wrap(title, cpl)))
+    box_h = max(0.68, nlines * (tsize * _LINE_FACTOR / 72.0) + 0.06)
+    _text(slide, ML, Inches(0.33), CW, Inches(box_h), title, size=tsize, bold=True,
           color=T.INK, font=T.FONT_DISPLAY)
-    _rect(slide, ML, Inches(1.08), Inches(1.2), Emu(int(0.045 * EMU_IN)), _accent())
+    accent_y = 0.33 + box_h + 0.07
+    _rect(slide, ML, Inches(accent_y), Inches(1.2), Emu(int(0.045 * EMU_IN)),
+          _accent())
     _footer(slide)
-    return slide, Inches(1.4)
+    return slide, Inches(accent_y + 0.30)
 
 
 def _cover(prs, sec, meta):
@@ -629,14 +636,14 @@ def _finding_card(prs, sec):
     # seguem detalhando todos os achados.
     if sev not in ("critical", "high"):
         return
-    fl = _Flow(prs, _clip(f.get("title", "Achado"), 70))
+    fl = _Flow(prs, f.get("title") or "Achado")
     # Faixa de severidade
     fl.ensure(Inches(0.6))
     _rect(fl.slide, ML, Emu(fl.y), CW, Inches(0.5),
           T.SEVERITY_COLOR.get(sev, T.MUTED))
     _text(fl.slide, ML + Inches(0.15), Emu(fl.y + int(Inches(0.05))), CW,
           Inches(0.4),
-          f"{T.SEVERITY_LABEL.get(sev, sev).upper()}  ·  {f.get('ref','')}  ·  {_clip(f.get('affectedAsset',''),70)}",
+          f"{T.SEVERITY_LABEL.get(sev, sev).upper()}  ·  {f.get('ref','')}  ·  {f.get('affectedAsset','')}",
           size=13, bold=True, color="FFFFFF", anchor=MSO_ANCHOR.MIDDLE)
     fl.space(Inches(0.66))
     meta = []
@@ -724,22 +731,54 @@ def _evidence_flow(fl, f):
 
 
 def _table(prs, findings, title, remediation=False):
-    # Pagina as linhas em slides "(cont.)" — nenhum achado some (antes: [:12]).
-    ROWS_PER = 13
-    chunks = [findings[i:i + ROWS_PER]
-              for i in range(0, len(findings), ROWS_PER)] or [[]]
+    # Célula NUNCA truncada (regra do dossiê): título/ativo/remediação quebram em
+    # várias linhas → a linha fica mais alta → paginamos por ALTURA acumulada (não
+    # por contagem fixa de linhas), senão o conteúdo quebrado estouraria o slide.
     if remediation:
         headers = ["Ref", "Sev", "Ativo", "Remediacao"]
         widths = [Inches(1.2), Inches(1.4), Inches(3.5), Inches(6.0)]
     else:
         headers = ["Ref", "Sev", "Titulo", "Ativo"]
         widths = [Inches(1.2), Inches(1.4), Inches(5.5), Inches(4.0)]
+    CELL_PT = 10
+    line_in = CELL_PT * _LINE_FACTOR / 72.0
+
+    def _vals(f):
+        sev = f.get("severity", "info")
+        if remediation:
+            return [f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev),
+                    f.get("affectedAsset", ""), f.get("remediation", "")]
+        return [f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev),
+                f.get("title", ""), f.get("affectedAsset", "")]
+
+    def _row_h(vals):
+        n = 1
+        for j, w in enumerate(widths):
+            cpl = max(6, int((int(w) / EMU_IN) * 72 / (CELL_PT * 0.56)))
+            n = max(n, len(_wrap(str(vals[j]), cpl)))
+        return n * line_in + 0.14   # + margens verticais da célula
+
+    header_h = line_in + 0.16
+    avail = int(_CONTENT_BOTTOM) / EMU_IN - 1.6 - header_h   # zona do título ~1.6"
+    chunks, cur, acc = [], [], 0.0
+    for f in findings:
+        h = _row_h(_vals(f))
+        if cur and acc + h > avail:
+            chunks.append(cur)
+            cur, acc = [], 0.0
+        cur.append(f)
+        acc += h
+    if cur:
+        chunks.append(cur)
+    if not chunks:
+        chunks = [[]]
     for ci, chunk in enumerate(chunks):
-        slide, y = _title_slide(
-            prs, title if ci == 0 else _clip(title, 58) + " (cont.)")
+        slide, y = _title_slide(prs, title if ci == 0 else title + " (cont.)")
         rows = len(chunk) + 1
-        gt = slide.shapes.add_table(rows, len(headers), ML, y, CW,
-                                    Inches(0.4) * rows).table
+        heights = [header_h] + [_row_h(_vals(f)) for f in chunk]
+        gt = slide.shapes.add_table(
+            rows, len(headers), ML, y, CW,
+            Emu(int(sum(heights) * EMU_IN))).table
         for j, hd in enumerate(headers):
             gt.columns[j].width = widths[j]
             cell = gt.cell(0, j)
@@ -752,21 +791,16 @@ def _table(prs, findings, title, remediation=False):
             pr.font.size = Pt(11)
             pr.font.bold = True
             pr.font.color.rgb = _rgb("FFFFFF")
+        gt.rows[0].height = Emu(int(header_h * EMU_IN))
         for i, f in enumerate(chunk, start=1):
             sev = f.get("severity", "info")
-            vals = ([f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev),
-                     _clip(f.get("affectedAsset", ""), 44),
-                     _clip(f.get("remediation", ""), 140)]
-                    if remediation else
-                    [f.get("ref", ""), T.SEVERITY_LABEL.get(sev, sev),
-                     _clip(f.get("title", ""), 80),
-                     _clip(f.get("affectedAsset", ""), 44)])
-            for j, v in enumerate(vals):
+            gt.rows[i].height = Emu(int(heights[i] * EMU_IN))
+            for j, v in enumerate(_vals(f)):
                 cell = gt.cell(i, j)
-                # add_run() tolera valor vazio (achado sem remediation/ref/ativo).
+                cell.text_frame.word_wrap = True   # célula quebra, não corta
                 r = cell.text_frame.paragraphs[0].add_run()
                 r.text = str(v)
-                r.font.size = Pt(10)
+                r.font.size = Pt(CELL_PT)
                 r.font.color.rgb = _rgb(
                     T.SEVERITY_COLOR.get(sev, T.INK) if j == 1 else T.INK)
                 if j == 1:

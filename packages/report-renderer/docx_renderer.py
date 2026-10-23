@@ -521,7 +521,7 @@ def _finding_card(doc, sec):
     p.paragraph_format.space_before = Pt(10)
     _run(p, f"[{T.SEVERITY_LABEL.get(sev, sev).upper()}] ", size=13, bold=True,
          color=T.SEVERITY_COLOR.get(sev, T.MUTED))
-    _run(p, f"{f.get('ref','')} · {_clip(f.get('title',''),90)}", size=13,
+    _run(p, f"{f.get('ref','')} · {f.get('title','')}", size=13,
          bold=True, color=T.INK)
     meta = []
     if f.get("affectedAsset"):
@@ -559,7 +559,7 @@ def _embed_image_docx(doc, path, caption=None):
         doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
     except Exception:
         return False
-    cap = "▲ " + _clip(caption, 160) if caption else "▲ Evidência visual capturada"
+    cap = "▲ " + str(caption) if caption else "▲ Evidência visual capturada"
     _para(doc, cap, size=8, color=T.MUTED, after=8,
           align=WD_ALIGN_PARAGRAPH.CENTER)
     return True
@@ -619,7 +619,7 @@ def _evidence_block(doc, steps):
         mono(ph, head, T.EV_META, bold=True)
         lbl = e.get("label")
         if lbl and lbl != e.get("toolName"):
-            mono(ph, "  " + _clip(lbl, 160), T.EV_META)
+            mono(ph, "  " + str(lbl), T.EV_META)
         if e.get("command"):
             pc = line()
             mono(pc, "$ ", T.EV_OK, bold=True)
@@ -713,7 +713,7 @@ def _table(doc, findings, remediation=False):
             cell.text = ""
             cell.width = Inches(widths[j])
             _shade(cell, fill)
-            val = _clip(v, clips[j]) if clips[j] else v
+            val = v  # sem truncar: a célula do Word quebra linha (nada cortado)
             p = cell.paragraphs[0]
             p.paragraph_format.space_before = Pt(1)
             p.paragraph_format.space_after = Pt(1)
