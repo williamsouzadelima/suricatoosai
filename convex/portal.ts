@@ -122,7 +122,12 @@ export const listPortalReportsForBackend = query({
       .order("desc")
       .collect();
     return reports
-      .filter((r) => r.status === "ready" && r.client_visible !== false)
+      .filter(
+        (r) =>
+          r.status === "ready" &&
+          r.client_visible !== false &&
+          r.deleted_at === undefined,
+      )
       .map((r) => ({
         id: r._id,
         audience: r.audience,
