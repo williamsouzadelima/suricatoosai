@@ -1945,6 +1945,12 @@ export default defineSchema({
     created_at: v.number(),
     generated_at: v.optional(v.number()),
     updated_at: v.number(),
+    // Soft-delete: "Remover" marca deleted_at (lápide) em vez de apagar a linha,
+    // para que max(version) por (engagement, audience) NUNCA caia e o número de
+    // versão fique monotônico (ver createReportRequest). Filtrado das listagens
+    // interna e do portal. O objeto S3 continua sendo apagado (libera storage);
+    // a linha permanece só como marco de versão.
+    deleted_at: v.optional(v.number()),
   })
     .index("by_engagement", ["engagement_id"])
     .index("by_engagement_audience_version", [

@@ -711,6 +711,9 @@ export const listReportsForEngagement = query({
       .withIndex("by_engagement", (q) =>
         q.eq("engagement_id", args.engagementId),
       )
+      // Oculta as lápides de soft-delete (deleted_at setado) — o grupo some da
+      // lista ao "Remover", mas a linha persiste p/ a versão não regredir.
+      .filter((q) => q.eq(q.field("deleted_at"), undefined))
       .order("desc")
       .take(120);
   },
@@ -774,9 +777,15 @@ export const deleteReportGroup = mutation({
       .withIndex("by_group", (q) => q.eq("report_group_id", args.reportGroupId))
       .collect();
     let deleted = 0;
+    const now = Date.now();
     for (const r of rows) {
-      if (r.user_id === identity.subject) {
-        await ctx.db.delete(r._id);
+      if (r.user_id === identity.subject && r.deleted_at === undefined) {
+        // Soft-delete: marca a lápide (deleted_at) em vez de apagar a linha, p/
+        // preservar o high-water-mark de versão (a versão é max+1 sobre as linhas
+        // e NÃO pode cair ao remover). O objeto S3 já foi liberado pela action
+        // (deleteReportGroupWithFiles); a linha some das listagens pelo filtro
+        // deleted_at. Mantém o status p/ não quebrar validadores.
+        await ctx.db.patch(r._id, { deleted_at: now, updated_at: now });
         deleted += 1;
       }
     }
