@@ -6,8 +6,9 @@ Renderiza os 4 formatos de um modelo sintético rico (make_sample) e verifica os
 invariantes que as regressões quebravam:
   • corpo de achado/evidência NÃO truncado (sentinelas no fim de textos longos);
   • nenhum achado some de tabela (F-01..F-14 presentes);
-  • prints embutidos (>=1 imagem) e placeholder visível quando um alto/crítico
-    não tem imagem;
+  • prints embutidos (>=1 imagem); achado com prova textual NUNCA recebe aviso
+    de "evidência não capturada" (seria falso); achado-limite SEM cadeia E SEM
+    imagem recebe NOTA NEUTRA (não some em silêncio);
   • capa full-bleed no PPTX;
   • export json com todos os achados;
   • tipografia IBM Plex: EMBUTIDA no PDF (sem Helvetica/Courier) e nomeada em
@@ -43,7 +44,12 @@ SENT = ["DESCR_END_F-01", "NARR_END_F-01", "IMPACT_END_F-01", "REMED_END_F-01",
         "ATTACK_TITLE_END_X", "ATTACK_DETAIL_END_X", "ROADMAP_END_X",
         "BULLETS_END_X"]
 SENT_DOCPDF = []   # tudo migrou p/ SENT (os 3 formatos mostram inteiro)
-PLACE = "capturada"  # "Evidência visual não capturada" (F-02 Alto, sem imagem)
+# Frases PROIBIDAS em QUALQUER formato: afirmam "evidência tirada e perdida/não
+# capturada" — falso sob achado com prova textual, e alarmante p/ o cliente.
+FORBIDDEN = ["não capturada", "nao capturada", "referenciada não disponível",
+             "removida do armazenamento", "porém indisponível"]
+# Achado-limite (F-BARE: sem cadeia, sem imagem) recebe esta NOTA NEUTRA.
+NEUTRAL = "complementar não anexada"
 SUMMARY = "SUMÁRIO"  # título do sumário (docx) / slide agenda (pptx)
 # Fases da narrativa (make_sample._phases): devem aparecer no SUMÁRIO, ANTES do
 # corpo. Âncora = sentinela do parágrafo de overview (1ª coisa do corpo após o
@@ -107,8 +113,12 @@ def main():
                 fails.append(f"docx: sentinela ausente {s} (texto truncado)")
         if xml.count("<a:blip ") < 1:
             fails.append("docx: nenhuma imagem embutida")
-        if PLACE not in txt:
-            fails.append("docx: placeholder de evidência ausente")
+        for fb in FORBIDDEN:
+            if fb in txt:
+                fails.append(f"docx: frase PROIBIDA de evidência '{fb}' "
+                             "(impressão de evidência perdida)")
+        if NEUTRAL not in txt:
+            fails.append("docx: nota neutra do achado-limite (F-BARE) ausente")
         if "F-14" not in txt or "F-01" not in txt:
             fails.append("docx: achado sumiu da tabela")
         if "IBM Plex Sans" not in xml:
@@ -136,8 +146,11 @@ def main():
                 fails.append(f"pptx: sentinela ausente {s} (texto truncado)")
         if "F-14" not in ptxt or "F-01" not in ptxt:
             fails.append("pptx: achado sumiu da tabela")
-        if PLACE not in ptxt:
-            fails.append("pptx: placeholder de evidência ausente")
+        for fb in FORBIDDEN:
+            if fb in ptxt:
+                fails.append(f"pptx: frase PROIBIDA de evidência '{fb}'")
+        if NEUTRAL not in ptxt:
+            fails.append("pptx: nota neutra do achado-limite (F-BARE) ausente")
         if "<p:pic>" not in s1:
             fails.append("pptx: capa sem imagem full-bleed")
         if "IBM Plex Sans" not in pxml:
@@ -169,8 +182,12 @@ def main():
             for s in SENT:
                 if s not in pt:
                     fails.append(f"pdf: sentinela ausente {s} (texto truncado)")
-            if PLACE not in pt:
-                fails.append("pdf: placeholder de evidência ausente")
+            # extração do PDF mói acentos → âncoras ASCII robustas.
+            if "armazenamento" in pt.lower():
+                fails.append("pdf: 'removida do armazenamento' presente "
+                             "(impressão de evidência perdida)")
+            if "anexada" not in pt.lower():
+                fails.append("pdf: nota neutra do achado-limite ausente")
             fails += _summary_phase_fails("pdf", t)
             for s in SENT_DOCPDF:
                 if s not in pt:

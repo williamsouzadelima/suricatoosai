@@ -565,13 +565,16 @@ def _embed_image_docx(doc, path, caption=None):
     return True
 
 
-def _placeholder_docx(doc, text):
-    """Aviso visível de evidência ausente — nunca pular em silêncio (WS3)."""
+def _placeholder_docx(doc, text, color=None):
+    """Nota NEUTRA de evidência complementar (sem alarme). Só p/ achado de fato
+    não-verificável (sem cadeia textual E sem imagem) — nunca sob achado que já
+    traz prova técnica."""
+    color = color or T.MUTED
     t = doc.add_table(rows=1, cols=1)
     cell = t.cell(0, 0)
     cell.text = ""
     _shade(cell, T.SURFACE_ALT)
-    _run(cell.paragraphs[0], text, size=10, bold=True, color=T.WARNING)
+    _run(cell.paragraphs[0], text, size=10, bold=True, color=color)
     doc.add_paragraph()
 
 
@@ -646,19 +649,19 @@ def _evidence_docx(doc, f):
               after=3)
         _evidence_block(doc, text_steps)
     img_rendered = 0
-    for e in img_steps:
+    # Só anuncia imagem que REALMENTE existe no pacote; print ainda não enviado
+    # (relatório defasado) cai fora SEM aviso — a cadeia textual sustenta.
+    existing = [e for e in img_steps
+                if e.get("imagePath") and os.path.exists(e.get("imagePath"))]
+    for e in existing:
         if _embed_image_docx(doc, e.get("imagePath"), e.get("label")):
             img_rendered += 1
-        else:
-            _placeholder_docx(
-                doc, "⚠ Evidência visual referenciada não disponível no pacote.")
-    if img_rendered == 0 and f.get("severity") in ("critical", "high"):
-        if any(e.get("imageUnavailable") for (n, e) in steps):
-            _placeholder_docx(
-                doc, "⚠ Evidência visual capturada, porém indisponível (expirada/removida do armazenamento).")
-        else:
-            _placeholder_docx(
-                doc, "⚠ Evidência visual não capturada para este achado.")
+    # Nota neutra APENAS p/ achado de fato não-verificável: sem imagem E sem
+    # cadeia técnica. Dizer "não capturada"/"removida" sob achado com prova
+    # textual seria FALSO; "indisponível" é sinal interno, não vai ao cliente.
+    if (img_rendered == 0 and not text_steps
+            and f.get("severity") in ("critical", "high")):
+        _placeholder_docx(doc, "Evidência complementar não anexada a este achado.")
 
 
 def _fixed_table(doc, headers, widths):

@@ -311,14 +311,16 @@ def _append_image_pdf(S, ss, path, caption=None):
         return False
 
 
-def _placeholder_pdf(S, ss, text):
-    """Aviso visível de evidência ausente — nunca pular em silêncio (WS3)."""
+def _placeholder_pdf(S, ss, text, color=None):
+    """Nota NEUTRA de evidência complementar (sem alarme). Só p/ achado de fato
+    não-verificável (sem cadeia textual E sem imagem)."""
+    color = color or T.MUTED
     tbl = Table(
-        [[Paragraph(f'<font color="#{T.WARNING}"><b>{_esc(text)}</b></font>',
+        [[Paragraph(f'<font color="#{color}"><b>{_esc(text)}</b></font>',
                     ss["Body2"])]], colWidths=[165 * mm])
     tbl.setStyle(_ts([
         ("BACKGROUND", (0, 0), (-1, -1), C(T.SURFACE_ALT)),
-        ("LINEBEFORE", (0, 0), (0, -1), 3, C(T.WARNING)),
+        ("LINEBEFORE", (0, 0), (0, -1), 3, C(color)),
         ("LEFTPADDING", (0, 0), (-1, -1), 8),
         ("TOPPADDING", (0, 0), (-1, -1), 6),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
@@ -707,6 +709,9 @@ def render_pdf(model, out_path):
                 if any(e.get("snippet") or e.get("imagePath") or e.get("command") for e in ev):
                     S.append(Paragraph(f'<b><font color="#{T.PRIMARY}">Cadeia de evidência:</font></b>', ss["Body2"]))
                 img_rendered = 0
+                has_chain = any(
+                    e.get("command") or e.get("snippet") or e.get("resultSummary")
+                    for e in ev)
                 for i, e in enumerate(ev, 1):
                     n = e.get("stepIndex") or i
                     head = f"<b>{n}.</b>"
@@ -721,16 +726,15 @@ def render_pdf(model, out_path):
                         S.append(Paragraph(_ml(e["snippet"]), ss["Mono"]))
                     if e.get("resultSummary"):
                         S.append(Paragraph(f'<font color="#{T.SUCCESS}"><b>&#8594; prova:</b></font> {_ml(e["resultSummary"])}', ss["Small"]))
-                    if e.get("imagePath"):
+                    # Só embute print que REALMENTE existe; ausente (ainda não
+                    # enviado / relatório defasado) cai fora SEM aviso.
+                    if e.get("imagePath") and os.path.exists(e["imagePath"]):
                         if _append_image_pdf(S, ss, e["imagePath"], e.get("label")):
                             img_rendered += 1
-                        else:
-                            _placeholder_pdf(S, ss, "⚠ Evidência visual referenciada não disponível no pacote.")
-                if img_rendered == 0 and sev in ("critical", "high"):
-                    if any(e.get("imageUnavailable") for e in ev):
-                        _placeholder_pdf(S, ss, "⚠ Evidência visual capturada, porém indisponível (expirada/removida do armazenamento).")
-                    else:
-                        _placeholder_pdf(S, ss, "⚠ Evidência visual não capturada para este achado.")
+                # Nota neutra só p/ achado de fato não-verificável (sem imagem E
+                # sem cadeia). Nunca "não capturada"/"removida" sob prova textual.
+                if img_rendered == 0 and not has_chain and sev in ("critical", "high"):
+                    _placeholder_pdf(S, ss, "Evidência complementar não anexada a este achado.")
         elif t in ("findingsTable", "remediationMatrix"):
             findings = sec.get("findings", [])
             rem = t == "remediationMatrix"

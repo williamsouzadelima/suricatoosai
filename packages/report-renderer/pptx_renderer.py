@@ -507,57 +507,31 @@ def _attack_chain(prs, sec):
 
 
 def _roadmap(prs, sec):
-    # Colunas (1 por fase) que CRESCEM; as ações paginam por LINHA (todas as
-    # colunas quebram no mesmo ponto) → nada cortado, nada omitido, sem estouro.
+    # Retrato: fases EMPILHADAS em largura total (não colunas estreitas). As
+    # colunas de 1,7" achatavam o rótulo da fase e, numa ação longa (remediação
+    # multipasso real), estouravam o slide — uma tabela/coluna não pagina UMA
+    # linha alta. Agora cada fase = faixa de cabeçalho + ações em bullets fluídos
+    # via _Flow, que pagina sozinho (orçamento derivado do cursor real, limitado
+    # por _CONTENT_BOTTOM) → nada cortado, nada achatado, sem estouro.
     phases = sec.get("phases") or []
-    n = max(1, len(phases))
-    gap = int(Inches(0.13))
-    cw = (int(CW) - gap * (n - 1)) // n
-    head_h = int(Inches(0.9))
-    pad = int(Inches(0.15))
-    act_w = cw - int(Inches(0.3))
-    acts = [ph.get("actions") or [] for ph in phases]
-    maxrows = max((len(a) for a in acts), default=0)
-
-    def _ah(txt):
-        return _text_h("▸ " + str(txt), act_w, 9, pad_in=0.06)
-    rowh = [max((_ah(acts[c][i]) for c in range(n) if i < len(acts[c])),
-                default=int(Inches(0.3))) for i in range(maxrows)]
-    avail = int(_CONTENT_BOTTOM) - int(Inches(1.5)) - head_h
-    chunks, cur, acc = [], [], 0
-    for i in range(maxrows):
-        if cur and acc + rowh[i] > avail:
-            chunks.append(cur)
-            cur, acc = [], 0
-        cur.append(i)
-        acc += rowh[i]
-    if cur:
-        chunks.append(cur)
-    if not chunks:
-        chunks = [[]]
-    for ci, rows in enumerate(chunks):
-        slide, y = _title_slide(
-            prs, "Plano de Remediação por Fase" + (" (cont.)" if ci else ""))
-        y = int(y)
-        colh = head_h + sum(rowh[i] for i in rows) + pad
-        for c in range(n):
-            ph = phases[c]
-            x = int(ML) + (cw + gap) * c
-            _rect(slide, Emu(x), Emu(y), Emu(cw), Emu(colh),
-                  T.SURFACE_ALT, line=T.BORDER)
-            _rect(slide, Emu(x), Emu(y), Emu(cw), Emu(int(Inches(0.7))), T.PRIMARY)
-            _text(slide, Emu(x + pad), Emu(y + int(Inches(0.08))),
-                  Emu(cw - int(Inches(0.25))), Emu(int(Inches(0.3))),
-                  ph.get("window", ""), size=11, bold=True, color="FFFFFF")
-            _text(slide, Emu(x + pad), Emu(y + int(Inches(0.38))),
-                  Emu(cw - int(Inches(0.25))), Emu(int(Inches(0.3))),
-                  ph.get("label", ""), size=10, color="C9D3E6")
-            yy = y + head_h
-            for i in rows:
-                if i < len(acts[c]):
-                    _text(slide, Emu(x + pad), Emu(yy), Emu(act_w), Emu(rowh[i]),
-                          "▸ " + str(acts[c][i]), size=9, color=T.INK)
-                yy += rowh[i]
+    fl = _Flow(prs, "Plano de Remediação por Fase")
+    for ph in phases:
+        window = str(ph.get("window", "")).strip()
+        label = str(ph.get("label", "")).strip()
+        header = window + ("  —  " + label if (window and label) else label)
+        # Cabeçalho da fase + início da 1ª ação cabem juntos (sem título órfão).
+        fl.ensure(Inches(1.1))
+        _rect(fl.slide, ML, Emu(fl.y), CW, Inches(0.5), T.PRIMARY)
+        _text(fl.slide, ML + Inches(0.15), Emu(fl.y), CW - Inches(0.3),
+              Inches(0.5), header, size=12, bold=True, color="FFFFFF",
+              anchor=MSO_ANCHOR.MIDDLE)
+        fl.y += int(Inches(0.6))
+        acts = ph.get("actions") or []
+        if not acts:
+            fl.para("—", size=11, color=T.MUTED, after=0.12)
+        for a in acts:
+            fl.para("▸  " + str(a), size=11, color=T.INK, after=0.1)
+        fl.space(Inches(0.12))
 
 
 def _cost_incident(prs, sec):
@@ -810,8 +784,10 @@ def _finding_card(prs, sec):
 
 
 def _evidence_flow(fl, f):
-    """Cadeia de evidência + prints INLINE no fluxo do achado (sem cap). Mostra
-    placeholder visível quando um achado alto/crítico não tem imagem."""
+    """Cadeia de evidência + prints INLINE no fluxo do achado (sem cap). NÃO
+    anuncia "sem screenshot" quando o achado já tem prova textual (comando/saída)
+    — isso seria falso e passaria impressão de evidência perdida. Aviso neutro só
+    p/ achado de fato não-verificável (sem cadeia E sem imagem)."""
     ev = sorted(
         f.get("evidence") or [],
         key=lambda e: e.get("stepIndex") if e.get("stepIndex") is not None else 1_000_000,
@@ -843,24 +819,27 @@ def _evidence_flow(fl, f):
             f"(+{len(chain) - 6} passos de evidência — cadeia completa no relatório técnico DOCX/PDF)",
             size=10, color=T.MUTED, after=0.08)
     rendered = 0
-    if imgs:
+    # Só anuncia imagem que REALMENTE existe no pacote (arquivo no disco). Chave
+    # S3 não baixada / print ainda não enviado (relatório defasado) => cai fora
+    # SEM aviso; a cadeia textual sustenta o achado.
+    existing = [e for e in imgs
+                if e.get("imagePath") and os.path.exists(e.get("imagePath"))]
+    if existing:
         fl.heading("EVIDÊNCIA VISUAL", size=11)
-        for e in imgs[:4]:
+        for e in existing[:4]:
             if fl.image(e.get("imagePath"), e.get("label")):
                 rendered += 1
-            elif f.get("severity") in ("critical", "high"):
-                fl.placeholder(
-                    "⚠ Evidência visual referenciada não disponível no pacote.")
-        if len(imgs) > 4:
+        if len(existing) > 4:
             fl.para(
-                f"(+{len(imgs) - 4} imagens — veja o relatório técnico completo)",
+                f"(+{len(existing) - 4} imagens — veja o relatório técnico completo)",
                 size=10, color=T.MUTED, after=0.08)
-    if rendered == 0 and not imgs and f.get("severity") in ("critical", "high"):
-        if any(e.get("imageUnavailable") for e in ev):
-            fl.placeholder(
-                "⚠ Evidência visual capturada, porém indisponível (expirada/removida do armazenamento).")
-        else:
-            fl.placeholder("⚠ Evidência visual não capturada para este achado.")
+    # Aviso APENAS p/ achado de fato NÃO-verificável: sem imagem renderizada E
+    # sem cadeia técnica. Dizer "não capturada" sob um achado com prova textual
+    # seria FALSO. O estado "capturada porém indisponível" é sinal INTERNO (fica
+    # no chip da tela de achados) — nunca vai ao cliente neste relatório.
+    if rendered == 0 and not chain and f.get("severity") in ("critical", "high"):
+        fl.placeholder("Evidência complementar não anexada a este achado.",
+                       tone=T.MUTED)
 
 
 def _table(prs, findings, title, remediation=False):

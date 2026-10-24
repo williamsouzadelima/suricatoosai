@@ -106,6 +106,22 @@ def build_model(out_dir):
     cover_path = os.path.join(out_dir, "cover.png")
     make_cover(cover_path)
     findings = [finding(i, img_path if i == 0 else None, many_evidence=(i == 0)) for i in range(14)]
+    # Caso-limite (invariante WS3 revisado): achado CRÍTICO sem cadeia textual e
+    # sem imagem → deve gerar a NOTA NEUTRA "Evidência complementar não anexada"
+    # nos 3 formatos, nunca "não capturada"/"indisponível" (seria falso/alarmante
+    # e passaria impressão de evidência perdida). Cai na fase findings[10:].
+    findings.append({
+        "ref": "F-BARE",
+        "title": "Achado F-BARE: critico sem evidencia anexada (caso-limite)",
+        "severity": "critical",
+        "affectedAsset": "https://bare.exemplo.com/recurso",
+        "weaknessClass": "Security Misconfiguration", "cwe": "CWE-16",
+        "cvssVector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+        "cvssScore": 9.0,
+        "description": long("DESCR", "BARE"), "impact": long("IMPACT", "BARE"),
+        "remediation": long("REMED", "BARE"), "narrative": None,
+        "reproductionSteps": [], "evidence": [],
+    })
     by = {s: sum(1 for f in findings if f["severity"] == s) for s in SEVS}
     stats = [
         {"value": str(len(findings)), "label": "ACHADOS"},
@@ -186,10 +202,30 @@ def build_model(out_dir):
     sections += [
         {"type": "partDivider", "part": "REMEDIAÇÃO", "title": "Plano por fase"},
         {"type": "roadmap", "phases": [
-            {"window": "0-7 dias", "label": "Contenção",
-             "actions": ["Corrigir a injecao de SQL no login do e-Saphira aplicando "
-                         "prepared statements e validacao de entrada em todos os "
-                         "endpoints afetados, revisando o ORM ROADMAP_END_X"]
+            {"window": "0-7 dias", "label": "Contenção imediata do vetor",
+             # Ação multipasso REALISTA (~1k chars), igual às remediações reais:
+             # em coluna estreita vira uma única LINHA (row) altíssima; o layout
+             # antigo (colunas) estourava o slide pois não pagina uma row. Marcador
+             # ROADMAP_END_X no fim prova que nada foi cortado.
+             "actions": ["1. Exigir autenticacao e autorizacao (Bearer, como no "
+                         "restante da API operacional) no controller de integracao "
+                         "de mensageria do e-Saphira, rejeitando qualquer requisicao "
+                         "anonima vinda da borda. 2. Restringir o nome da fila a uma "
+                         "allowlist de consumidores legitimos, nao aceitando string "
+                         "arbitraria vinda do path da URL. 3. Validar o schema das "
+                         "mensagens (tipo, formato e tamanho dos campos) e rejeitar "
+                         "todo conteudo que nao esteja em conformidade com o contrato "
+                         "esperado. 4. Revisar os consumidores downstream de "
+                         "sincronizacao de pedidos para garantir que tratam entradas "
+                         "malformadas sem efeitos colaterais no estoque. 5. "
+                         "Instrumentar logs de auditoria e alertas para qualquer "
+                         "tentativa de publicacao nao autorizada, com retencao minima "
+                         "de 90 dias e revisao periodica pelo time de resposta. 6. "
+                         "Aplicar testes de regressao automatizados cobrindo os "
+                         "cenarios de abuso identificados neste engajamento antes de "
+                         "promover qualquer mudanca para producao. 7. Documentar o "
+                         "fluxo seguro de integracao e treinar os times de "
+                         "desenvolvimento e operacao sobre o novo contrato ROADMAP_END_X"]
                         + [f"Acao imediata {k}: aplicar correcao e validar o "
                            "endpoint afetado nesta janela de contencao"
                            for k in range(9)]},
