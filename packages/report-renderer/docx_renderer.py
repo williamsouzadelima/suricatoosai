@@ -133,12 +133,18 @@ def _clip(s, n):
 BODY_SOFT_MAX = 200000
 
 
-def _body(doc, text, size=11, bold=False, color=T.INK, after=6, font=None):
-    """Parágrafo de corpo que preserva quebras de linha (\\n) e NUNCA trunca."""
+def _body(doc, text, size=11, bold=False, color=T.INK, after=6, font=None,
+          align=WD_ALIGN_PARAGRAPH.JUSTIFY):
+    """Parágrafo de corpo que preserva quebras de linha (\\n) e NUNCA trunca.
+    Justificado por padrão (casa com PDF/PPTX) — só o corpo de prosa passa por
+    aqui (descrição/impacto/remediação/narrativa/cadeia/passos); rótulos, títulos
+    e legendas usam _para e não são afetados."""
     s = str(text or "")
     if len(s) > BODY_SOFT_MAX:
         s = s[:BODY_SOFT_MAX]
     p = doc.add_paragraph()
+    if align is not None:
+        p.alignment = align
     p.paragraph_format.space_after = Pt(after)
     r = p.add_run()
     r.font.size = Pt(size)

@@ -390,7 +390,14 @@ export const generateEngagementReport = schemaTask({
             format: "bytes",
           });
           const buf = Buffer.from(bytes);
-          const s3Key = `engagements/${payload.engagementId}/reports/${payload.audience}/v${payload.version}/${format}.${EXT[format]}`;
+          // Chave inclui o reportGroupId (único por requisição) p/ NUNCA
+          // sobrescrever o objeto de uma geração anterior que tenha reusado o
+          // mesmo número de versão — a versão é max+1 sobre linhas VIVAS e se
+          // repete após o botão "Remover" apagar grupos. A linha do relatório
+          // guarda esta chave (markReportReadyForBackend), e todos os downloads
+          // leem o s3_key guardado (nunca reconstroem), então mudar o formato é
+          // transparente p/ o app.
+          const s3Key = `engagements/${payload.engagementId}/reports/${payload.audience}/v${payload.version}-${payload.reportGroupId}/${format}.${EXT[format]}`;
           await s3.send(
             new PutObjectCommand({
               Bucket: bucket,

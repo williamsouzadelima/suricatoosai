@@ -134,6 +134,9 @@ def main():
         if "0B1424" in xml:
             fails.append("docx: fundo de evidência ESCURO (terminal) ainda "
                          "presente — deveria ser painel claro")
+        # Corpo de prosa JUSTIFICADO (casa com PDF/PPTX): _body emite w:jc both.
+        if 'w:val="both"' not in xml:
+            fails.append("docx: corpo não justificado (w:jc both ausente)")
         if SUMMARY not in txt:
             fails.append("docx: SUMÁRIO ausente")
         fails += _summary_phase_fails("docx", txt)
