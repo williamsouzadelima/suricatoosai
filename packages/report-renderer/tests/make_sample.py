@@ -86,7 +86,15 @@ def finding(i, img_path=None, many_evidence=False):
                " TITLE_END_" + ref if i == 0 else "")
         ),
         "severity": sev,
-        "affectedAsset": f"https://app{i}.exemplo.com/api/v1/recurso",
+        # F-01: ativo LONGO (como os reais) → a faixa de severidade do card PPTX
+        # tem de CRESCER p/ 2-3 linhas sem espremer/cortar a última. Sentinela no
+        # fim prova que o ativo não foi truncado em nenhum formato.
+        "affectedAsset": (
+            f"https://app{i}.exemplo.com/servlet?act=login&tipo=1"
+            + (" (e-Saphira ERP v1.8.2.1 / Pix Software, Apache 2.4.63 + mod_jk"
+               " -> Tomcat 9.0.63, MSSQL 2022, DB Saphira) ASSET_END_F-01"
+               if i == 0 else "")
+        ),
         "weaknessClass": ["SQL Injection", "IDOR", "RCE", "XSS", "SSRF"][i % 5],
         "cwe": ["CWE-89", "CWE-639", "CWE-94", "CWE-79", "CWE-918"][i % 5],
         "cvssVector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",

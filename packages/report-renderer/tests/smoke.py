@@ -39,6 +39,9 @@ SENT = ["DESCR_END_F-01", "NARR_END_F-01", "IMPACT_END_F-01", "REMED_END_F-01",
         # Título longo (>90) do F-01 termina neste sentinela — se QUALQUER formato
         # truncar o título do achado (o "…" que o William pegou), ele some.
         "TITLE_END_F-01",
+        # Ativo longo do F-01: a faixa de severidade (PPTX) e a tabela não podem
+        # truncar — se cortarem, este sentinela some.
+        "ASSET_END_F-01",
         # 3ª leva: cadeia de ataque / plano por fase / bullets agora SEM corte
         # nos 3 formatos (PPTX cresce + pagina). Checado em docx/pptx/pdf.
         "ATTACK_TITLE_END_X", "ATTACK_DETAIL_END_X", "ROADMAP_END_X",

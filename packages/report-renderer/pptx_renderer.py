@@ -744,15 +744,17 @@ def _finding_card(prs, sec):
     if sev not in ("critical", "high"):
         return
     fl = _Flow(prs, f.get("title") or "Achado")
-    # Faixa de severidade
-    fl.ensure(Inches(0.6))
-    _rect(fl.slide, ML, Emu(fl.y), CW, Inches(0.5),
-          T.SEVERITY_COLOR.get(sev, T.MUTED))
-    _text(fl.slide, ML + Inches(0.15), Emu(fl.y + int(Inches(0.05))),
-          CW - Inches(0.3), Inches(0.4),
-          f"{T.SEVERITY_LABEL.get(sev, sev).upper()}  ·  {f.get('ref','')}  ·  {f.get('affectedAsset','')}",
-          size=13, bold=True, color="FFFFFF", anchor=MSO_ANCHOR.MIDDLE)
-    fl.space(Inches(0.66))
+    # Faixa de severidade — CRESCE p/ caber ref + ativo longo (quebra em 2-3
+    # linhas) sem espremer nem cortar a última linha. Altura estimada (mín 0,5").
+    band = (f"{T.SEVERITY_LABEL.get(sev, sev).upper()}  ·  {f.get('ref','')}"
+            f"  ·  {f.get('affectedAsset','')}")
+    bh = max(int(Inches(0.5)),
+             _text_h(band, int(CW) - int(Inches(0.3)), 13, bold=True, pad_in=0.16))
+    fl.ensure(bh + int(Inches(0.12)))
+    _rect(fl.slide, ML, Emu(fl.y), CW, Emu(bh), T.SEVERITY_COLOR.get(sev, T.MUTED))
+    _text(fl.slide, ML + Inches(0.15), Emu(fl.y), CW - Inches(0.3), Emu(bh),
+          band, size=13, bold=True, color="FFFFFF", anchor=MSO_ANCHOR.MIDDLE)
+    fl.y += bh + int(Inches(0.16))
     meta = []
     if f.get("weaknessClass"):
         meta.append(f"Classe: {f['weaknessClass']}")
