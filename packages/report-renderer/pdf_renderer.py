@@ -8,7 +8,7 @@ chromium."""
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT, TA_JUSTIFY
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -20,12 +20,14 @@ from reportlab.platypus import (
     Table,
     TableStyle,
     PageBreak,
+    CondPageBreak,
     HRFlowable,
     Image,
 )
 from reportlab.platypus.tableofcontents import TableOfContents
 from reportlab.lib.utils import ImageReader
 import os
+import re
 
 import theme as T
 import logo
@@ -98,6 +100,32 @@ def _ml(s):
     return _esc(s).replace("\n", "<br/>")
 
 
+_EV_FILE_RE = re.compile(
+    r'^\s*[\w.\-/]+\.(?:png|jpe?g|gif|webp|bmp|svg|tiff?)\s*(?:[—–:\-]\s*)?', re.I)
+_STEP_NUM_RE = re.compile(r'^\s*\d{1,3}[.)\]]\s+')
+
+
+def _clean_ev_label(label, toolname=None):
+    """Rótulo de evidência legível ao cliente: remove o nome de ARQUIVO cru
+    ('radar.png — ...'), deixando só a descrição; se era só o nome do arquivo
+    (sem descrição), retorna '' — nome de arquivo não agrega valor no relatório."""
+    s = str(label or "").strip()
+    if not s:
+        return ""
+    s2 = _EV_FILE_RE.sub("", s).strip()
+    if not s2:
+        return ""
+    if toolname and s2 == str(toolname):
+        return ""
+    return s2
+
+
+def _strip_step_num(s):
+    """Remove numeração que o próprio passo já traz ('1. ...'); o renderer
+    renumera, senão sairia '1. 1. ...'."""
+    return _STEP_NUM_RE.sub("", str(s or "").strip())
+
+
 def _apply_brand(meta):
     brand = meta.get("brand") or {}
     if brand.get("primary"):
@@ -118,18 +146,23 @@ def _styles():
     ss.add(ParagraphStyle("Cover", parent=ss["Title"], fontName=FONT_SANS_BOLD,
                           fontSize=30, textColor=C(T.INK), spaceAfter=8, leading=34,
                           alignment=TA_LEFT))
+    # leading EXPLÍCITO em todo estilo com fontSize próprio: sem ele, herda o
+    # leading do pai (ex.: Normal=12, Cover=34) e o glifo ou transborda a caixa
+    # (KPIs 22pt em leading 12 → números cortados pela borda) ou abre buraco
+    # (headline 18pt em leading 34). Regra: ~1.2–1.3× o fontSize.
     ss.add(ParagraphStyle("Wordmark", parent=ss["Normal"], fontName=FONT_SANS_BOLD,
-                          fontSize=18, textColor=C(T.CORAL)))
+                          fontSize=18, leading=22, textColor=C(T.CORAL)))
     ss.add(ParagraphStyle("H1", parent=ss["Heading1"], fontName=FONT_SANS_BOLD,
-                          fontSize=15, textColor=C(T.PRIMARY), spaceBefore=12, spaceAfter=4))
+                          fontSize=15, leading=19, textColor=C(T.PRIMARY), spaceBefore=12, spaceAfter=4))
     ss.add(ParagraphStyle("Body2", parent=ss["Normal"], fontName=FONT_SANS,
-                          fontSize=10.5, textColor=C(T.INK), leading=15, spaceAfter=5))
+                          fontSize=10.5, textColor=C(T.INK), leading=15, spaceAfter=5,
+                          alignment=TA_JUSTIFY))
     ss.add(ParagraphStyle("Small", parent=ss["Normal"], fontName=FONT_SANS,
                           fontSize=8.5, textColor=C(T.MUTED)))
     ss.add(ParagraphStyle("CardTitle", parent=ss["Normal"], fontName=FONT_SANS_BOLD,
-                          fontSize=12, textColor=C(T.INK), spaceBefore=8, spaceAfter=2))
+                          fontSize=12, leading=15, textColor=C(T.INK), spaceBefore=14, spaceAfter=2))
     ss.add(ParagraphStyle("KpiVal", parent=ss["Normal"], fontName=FONT_SANS_BOLD,
-                          fontSize=22, textColor=C(T.PRIMARY), alignment=TA_CENTER))
+                          fontSize=22, leading=27, textColor=C(T.PRIMARY), alignment=TA_CENTER))
     ss.add(ParagraphStyle("KpiLabel", parent=ss["Normal"], fontName=FONT_SANS_BOLD,
                           fontSize=7.5, textColor=C(T.MUTED), alignment=TA_CENTER))
     # Código/evidência: monoespaçada com quebra em qualquer ponto (wordWrap CJK)
@@ -137,6 +170,23 @@ def _styles():
     ss.add(ParagraphStyle("Mono", parent=ss["Normal"], fontName=FONT_MONO,
                           fontSize=8, textColor=C(T.MUTED), leading=10,
                           wordWrap="CJK", spaceAfter=3))
+    # Painel de evidência CLARO ("exhibit"): cada linha é um Paragraph próprio
+    # com fundo tingido + recuo (NÃO tabela → quebra entre páginas sem o
+    # LayoutError de célula-que-não-parte). spaceBefore/After=0 p/ os fundos se
+    # encostarem num painel visual contínuo.
+    _evpad = (3, 8, 3, 8)   # top, right, bottom, left
+    ss.add(ParagraphStyle("EvHead", parent=ss["Small"], fontName=FONT_SANS_BOLD,
+                          fontSize=8.5, leading=13, textColor=C(T.PRIMARY),
+                          backColor=C(T.SURFACE_ALT), borderPadding=_evpad,
+                          leftIndent=6, rightIndent=6, spaceBefore=0, spaceAfter=0))
+    ss.add(ParagraphStyle("EvMono", parent=ss["Mono"], fontSize=8, leading=11,
+                          textColor=C(T.INK), backColor=C(T.SURFACE_ALT),
+                          borderPadding=_evpad, leftIndent=6, rightIndent=6,
+                          spaceBefore=0, spaceAfter=0))
+    ss.add(ParagraphStyle("EvProva", parent=ss["Small"], fontSize=8.5, leading=13,
+                          textColor=C(T.INK), backColor=C(T.SURFACE_ALT),
+                          borderPadding=_evpad, leftIndent=6, rightIndent=6,
+                          spaceBefore=0, spaceAfter=0))
     return ss
 
 
@@ -241,7 +291,7 @@ def _summary_block(ss, toc):
     afterFlowable do _TocDocTemplate via multiBuild)."""
     return [
         Paragraph("SUMÁRIO", ParagraphStyle("sumh", parent=ss["Cover"],
-                                             fontSize=22)),
+                                             fontSize=22, leading=26)),
         Spacer(1, 4 * mm),
         toc,
         PageBreak(),
@@ -260,6 +310,7 @@ def _stat_table(ss, stats):
         ("BACKGROUND", (0, 0), (-1, -1), C(T.SURFACE_ALT)),
         ("BOX", (0, 0), (-1, -1), 0.5, C(T.BORDER)),
         ("INNERGRID", (0, 0), (-1, -1), 0.5, C(T.SURFACE)),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 7),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
     ]))
@@ -300,12 +351,30 @@ def _append_image_pdf(S, ss, path, caption=None):
         maxw, maxh = 160 * mm, 120 * mm
         scale = min(maxw / iw, maxh / ih, 1.0)
         img = Image(path, width=iw * scale, height=ih * scale)
-        img.hAlign = "CENTER"
+        # Print EMOLDURADO (exibit): moldura fina + leve respiro. Tabela de 1
+        # célula contendo UMA imagem (altura ≤120mm) nunca excede a página →
+        # seguro (não cai no LayoutError de célula-que-não-parte).
+        frame = Table([[img]], colWidths=[iw * scale + 10])
+        # _ts() fixa FONTNAME=IBM Plex: uma Table sem FONTNAME cai no Helvetica
+        # padrão do reportlab e o embute no PDF (mesmo sem texto na célula).
+        frame.setStyle(_ts([
+            ("BOX", (0, 0), (-1, -1), 0.75, C(T.BORDER)),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ]))
+        frame.hAlign = "CENTER"
         S.append(Spacer(1, 2 * mm))
-        S.append(img)
-        if caption:
-            S.append(Paragraph(_esc(caption), ss["Small"]))
-        S.append(Spacer(1, 3 * mm))
+        S.append(frame)
+        cap = _clean_ev_label(caption)
+        if cap:
+            S.append(Paragraph("◆ " + _esc(cap),
+                               ParagraphStyle("evcap", parent=ss["Small"],
+                                              alignment=TA_CENTER, spaceBefore=2)))
+        S.append(Spacer(1, 4 * mm))
         return True
     except Exception:
         return False
@@ -330,13 +399,19 @@ def _placeholder_pdf(S, ss, text, color=None):
 
 
 def _part_divider(ss, sec):
-    out = [PageBreak(), Spacer(1, 40 * mm)]
+    # CondPageBreak (não PageBreak puro): vai p/ nova página SÓ se não estamos já
+    # perto do topo de uma página vazia. PageBreak puro gerava página EM BRANCO
+    # quando a seção anterior terminava exatamente no fim da página (o break caía
+    # numa página já vazia e avançava de novo). 700pt ≈ 247mm (quadro útil ~739pt)
+    # → não quebra só quando praticamente no topo; senão garante nova página.
+    out = [CondPageBreak(700), Spacer(1, 40 * mm)]
     out.append(Paragraph(_esc(sec.get("part", "")),
                          ParagraphStyle("pdpart", parent=ss["Small"],
                                         fontName=FONT_SANS_BOLD, fontSize=12,
-                                        textColor=C(T.CORAL))))
+                                        leading=15, textColor=C(T.CORAL))))
     out.append(Paragraph(_esc(sec.get("title", "")),
-                         ParagraphStyle("pdtitle", parent=ss["Cover"], fontSize=26)))
+                         ParagraphStyle("pdtitle", parent=ss["Cover"], fontSize=26,
+                                        leading=30)))
     if sec.get("subtitle"):
         out.append(Paragraph(_esc(sec["subtitle"]),
                              ParagraphStyle("pdsub", parent=ss["Body2"],
@@ -349,7 +424,7 @@ def _stat_band(ss, sec):
     if sec.get("headline"):
         out.append(Paragraph(_esc(sec["headline"]),
                              ParagraphStyle("sbh", parent=ss["Cover"], fontSize=18,
-                                            spaceAfter=6)))
+                                            leading=22, spaceAfter=6)))
     st = _stat_table(ss, sec.get("stats"))
     if st:
         out += [st, Spacer(1, 5 * mm)]
@@ -512,8 +587,43 @@ def render_pdf(model, out_path):
     for sec in model.get("sections", []):
         t = sec.get("type")
         if t == "cover" and brand.get("coverImagePath") and os.path.exists(brand["coverImagePath"]):
-            # Arte full-bleed desenhada no canvas; sobrepomos o título em branco.
-            S.append(Spacer(1, 150 * mm))
+            # Arte full-bleed desenhada no canvas; sobrepomos LOGO + título em branco.
+            S.append(Spacer(1, 26 * mm))
+            # Logo no topo. A arte da capa é escura (navy) → logo BRANCO. Preferir
+            # o logo oficial Suricatoos (branco, via write_logo) ao brand/logo.png,
+            # que pode ser escuro e sumir no navy; MSSP com marca própria
+            # (wordmark != "Suricatoos") usa o logoPath dele.
+            _cv_logo = False
+            if brand.get("wordmark", "") == "Suricatoos":
+                _clp = logo.write_logo(dark=True)
+                if _clp and os.path.exists(_clp):
+                    try:
+                        _ciw, _cih = ImageReader(_clp).getSize()
+                        _cim = Image(_clp, width=62 * mm, height=62 * mm * _cih / _ciw)
+                        _cim.hAlign = "LEFT"
+                        S.append(_cim)
+                        _cv_logo = True
+                    except Exception:
+                        _cv_logo = False
+            if not _cv_logo and brand.get("logoPath") and os.path.exists(brand["logoPath"]):
+                try:
+                    _ciw, _cih = ImageReader(brand["logoPath"]).getSize()
+                    _cw = 60 * mm
+                    _ch = _cw * _cih / _ciw
+                    if _ch > 24 * mm:
+                        _ch = 24 * mm
+                        _cw = _ch * _ciw / _cih
+                    _cim = Image(brand["logoPath"], width=_cw, height=_ch)
+                    _cim.hAlign = "LEFT"
+                    S.append(_cim)
+                    _cv_logo = True
+                except Exception:
+                    _cv_logo = False
+            if not _cv_logo:
+                S.append(Paragraph(
+                    f'<font color="#FFFFFF">{esc(brand.get("wordmark", T.WORDMARK))}</font>',
+                    ss["Wordmark"]))
+            S.append(Spacer(1, 108 * mm))
             S.append(Paragraph(
                 f'<b><font color="#FFFFFF">{esc(meta.get("classification",""))}   ·   {esc(meta.get("docCode",""))}</font></b>',
                 ss["Small"]))
@@ -626,6 +736,7 @@ def render_pdf(model, out_path):
                 ("BACKGROUND", (0, 0), (-1, -1), C(T.SURFACE_ALT)),
                 ("BOX", (0, 0), (-1, -1), 0.5, C(T.BORDER)),
                 ("INNERGRID", (0, 0), (-1, -1), 0.5, C(T.SURFACE)),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("TOPPADDING", (0, 0), (-1, -1), 8),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
             ]))
@@ -695,7 +806,7 @@ def render_pdf(model, out_path):
             if sec.get("showPoc") and f.get("reproductionSteps"):
                 S.append(Paragraph(f'<b><font color="#{T.PRIMARY}">Reprodução:</font></b>', ss["Body2"]))
                 for i, s in enumerate(f["reproductionSteps"], 1):
-                    S.append(Paragraph(f"{i}. {_ml(s)}", ss["Body2"]))
+                    S.append(Paragraph(f"{i}. {_ml(_strip_step_num(s))}", ss["Body2"]))
             if sec.get("showPoc"):
                 ev = sorted(
                     f.get("evidence") or [],
@@ -709,22 +820,27 @@ def render_pdf(model, out_path):
                     for e in ev)
                 for i, e in enumerate(ev, 1):
                     n = e.get("stepIndex") or i
+                    lbl = _clean_ev_label(e.get("label"), e.get("toolName"))
                     head = f"<b>{n}.</b>"
                     if e.get("toolName"):
                         head += f' <font face="{FONT_MONO}">[{esc(e["toolName"])}]</font>'
-                    if e.get("label") and e.get("label") != e.get("toolName"):
-                        head += f' {esc(e["label"])}'
-                    S.append(Paragraph(head, ss["Small"]))
+                    if lbl:
+                        head += f' {esc(lbl)}'
+                    S.append(Paragraph(head, ss["EvHead"]))
                     if e.get("command"):
-                        S.append(Paragraph("$ " + _ml(e["command"]), ss["Mono"]))
+                        S.append(Paragraph(
+                            f'<font color="#{T.SUCCESS}"><b>$</b></font> ' + _ml(e["command"]),
+                            ss["EvMono"]))
                     if e.get("snippet"):
-                        S.append(Paragraph(_ml(e["snippet"]), ss["Mono"]))
+                        S.append(Paragraph(_ml(e["snippet"]), ss["EvMono"]))
                     if e.get("resultSummary"):
-                        S.append(Paragraph(f'<font color="#{T.SUCCESS}"><b>&#8594; prova:</b></font> {_ml(e["resultSummary"])}', ss["Small"]))
-                    # Só embute print que REALMENTE existe; ausente (ainda não
-                    # enviado / relatório defasado) cai fora SEM aviso.
+                        S.append(Paragraph(
+                            f'<font color="#{T.SUCCESS}"><b>&#8594; prova:</b></font> {_ml(e["resultSummary"])}',
+                            ss["EvProva"]))
+                    # Print emoldurado logo abaixo do passo que o rotula; sem
+                    # legenda redundante (o cabeçalho do passo já o descreve).
                     if e.get("imagePath") and os.path.exists(e["imagePath"]):
-                        if _append_image_pdf(S, ss, e["imagePath"], e.get("label")):
+                        if _append_image_pdf(S, ss, e["imagePath"], None):
                             img_rendered += 1
                 # Nota neutra só p/ achado de fato não-verificável (sem imagem E
                 # sem cadeia). Nunca "não capturada"/"removida" sob prova textual.
@@ -791,6 +907,16 @@ def render_pdf(model, out_path):
             ]))
             S.append(tbl)
             S.append(Spacer(1, 5 * mm))
+
+    # Colapsa PageBreaks consecutivos: _summary_block termina em PageBreak e
+    # _part_divider começa com outro → geraria uma PÁGINA EM BRANCO entre o
+    # SUMÁRIO e a PARTE I. Mantém só o primeiro de cada par adjacente.
+    _cleaned = []
+    for _f in S:
+        if isinstance(_f, PageBreak) and _cleaned and isinstance(_cleaned[-1], PageBreak):
+            continue
+        _cleaned.append(_f)
+    S = _cleaned
 
     foot = _cover_canvas_factory(meta, _cover_bg)
     doc = _TocDocTemplate(out_path, foot, pagesize=A4, leftMargin=18 * mm,

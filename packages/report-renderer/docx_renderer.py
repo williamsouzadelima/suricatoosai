@@ -11,6 +11,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement, parse_xml
 import os
+import re
 
 import theme as T
 import logo
@@ -26,6 +27,45 @@ def _shade(cell, hexfill):
     shd.set(qn("w:val"), "clear")
     shd.set(qn("w:fill"), hexfill)
     tcPr.append(shd)
+
+
+def _cell_borders(cell, specs):
+    """Bordas da célula numa única w:tcBorders. specs: {edge: (color_hex, sz)},
+    sz em oitavos de ponto (4≈0.5pt, 24=3pt)."""
+    tcPr = cell._tc.get_or_add_tcPr()
+    borders = OxmlElement("w:tcBorders")
+    for edge, (color, sz) in specs.items():
+        el = OxmlElement("w:" + edge)
+        el.set(qn("w:val"), "single")
+        el.set(qn("w:sz"), str(sz))
+        el.set(qn("w:space"), "0")
+        el.set(qn("w:color"), color)
+        borders.append(el)
+    tcPr.append(borders)
+
+
+_EV_FILE_RE = re.compile(
+    r'^\s*[\w.\-/]+\.(?:png|jpe?g|gif|webp|bmp|svg|tiff?)\s*(?:[—–:\-]\s*)?', re.I)
+_STEP_NUM_RE = re.compile(r'^\s*\d{1,3}[.)\]]\s+')
+
+
+def _clean_ev_label(label, toolname=None):
+    """Rótulo de evidência legível ao cliente: remove o nome de ARQUIVO cru
+    ('radar.png — ...'); se era só o nome do arquivo, retorna ''."""
+    s = str(label or "").strip()
+    if not s:
+        return ""
+    s2 = _EV_FILE_RE.sub("", s).strip()
+    if not s2:
+        return ""
+    if toolname and s2 == str(toolname):
+        return ""
+    return s2
+
+
+def _strip_step_num(s):
+    """Remove numeração que o passo já traz ('1. ...'); o renderer renumera."""
+    return _STEP_NUM_RE.sub("", str(s or "").strip())
 
 
 def _set_font(r, name):
@@ -546,7 +586,7 @@ def _finding_card(doc, sec):
     if sec.get("showPoc") and f.get("reproductionSteps"):
         _para(doc, "REPRODUÇÃO:", size=10, bold=True, color=T.PRIMARY, after=2)
         for i, s in enumerate(f["reproductionSteps"], 1):
-            _body(doc, f"{i}. {s}", size=10, color=T.INK, after=1)
+            _body(doc, f"{i}. {_strip_step_num(s)}", size=10, color=T.INK, after=1)
     if sec.get("showPoc"):
         _evidence_docx(doc, f)
 
@@ -555,11 +595,24 @@ def _embed_image_docx(doc, path, caption=None):
     if not path or not os.path.exists(path):
         return False
     try:
-        doc.add_picture(path, width=Inches(6.0))
-        doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # Print EMOLDURADO: célula de 1x1 com borda fina (exibit), em vez de uma
+        # imagem solta flutuando no branco (tímida).
+        t = doc.add_table(rows=1, cols=1)
+        t.alignment = WD_TABLE_ALIGNMENT.CENTER
+        cell = t.cell(0, 0)
+        cell.text = ""
+        _shade(cell, T.SURFACE)
+        _cell_borders(cell, {e: (T.BORDER, 4)
+                             for e in ("top", "left", "bottom", "right")})
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_before = Pt(4)
+        p.paragraph_format.space_after = Pt(4)
+        p.add_run().add_picture(path, width=Inches(5.8))
     except Exception:
         return False
-    cap = "▲ " + str(caption) if caption else "▲ Evidência visual capturada"
+    cap = _clean_ev_label(caption)
+    cap = ("◆ " + cap) if cap else "◆ Evidência visual"
     _para(doc, cap, size=8, color=T.MUTED, after=8,
           align=WD_ALIGN_PARAGRAPH.CENTER)
     return True
@@ -586,14 +639,26 @@ def _ev_sorted(f):
     )
 
 
+# Cores da cadeia de evidência em painel CLARO (fundo SURFACE_ALT). As antigas
+# EV_* da marca são claras (feitas p/ fundo escuro de terminal) e sumiriam aqui.
+_EVL_HEAD = T.PRIMARY      # cabeçalho do passo (azul, destaque)
+_EVL_LABEL = T.MUTED       # rótulo/descrição do passo
+_EVL_CMD = T.INK           # comando (escuro, "como digitado")
+_EVL_OUT = "334155"        # output/snippet (ardósia escura, legível)
+_EVL_OK = T.SUCCESS        # prompt "$" e "→ prova" (verde)
+
+
 def _evidence_block(doc, steps):
-    """Cadeia de evidência estilo TERMINAL (modelo-ouro SYN): uma célula de fundo
-    navy escuro com o texto MONO colorido — cabeçalho do passo cinza, comando
-    ciano, output neutro, prova verde. Um bloco por achado (toda a cadeia junta)."""
+    """Cadeia de evidência em PAINEL CLARO ("exhibit"): célula de fundo tingido
+    (SURFACE_ALT) com barra de acento azul à esquerda e texto MONO de ALTO
+    contraste — cabeçalho azul, comando escuro, output ardósia, prova verde. Um
+    bloco por achado (toda a cadeia junta); a célula do Word quebra entre páginas."""
     t = doc.add_table(rows=1, cols=1)
     cell = t.cell(0, 0)
     cell.text = ""
-    _shade(cell, T.EV_BG)
+    _shade(cell, T.SURFACE_ALT)
+    _cell_borders(cell, {"top": (T.BORDER, 4), "bottom": (T.BORDER, 4),
+                         "right": (T.BORDER, 4), "left": (T.PRIMARY, 24)})
     state = {"first": True}
 
     def line(before=0):
@@ -619,20 +684,20 @@ def _evidence_block(doc, steps):
         head = f"{n}."
         if e.get("toolName"):
             head += f" [{e['toolName']}]"
-        mono(ph, head, T.EV_META, bold=True)
-        lbl = e.get("label")
-        if lbl and lbl != e.get("toolName"):
-            mono(ph, "  " + str(lbl), T.EV_META)
+        mono(ph, head, _EVL_HEAD, bold=True)
+        lbl = _clean_ev_label(e.get("label"), e.get("toolName"))
+        if lbl:
+            mono(ph, "  " + lbl, _EVL_LABEL)
         if e.get("command"):
             pc = line()
-            mono(pc, "$ ", T.EV_OK, bold=True)
-            mono(pc, str(e["command"]), T.EV_CMD)
+            mono(pc, "$ ", _EVL_OK, bold=True)
+            mono(pc, str(e["command"]), _EVL_CMD)
         if e.get("snippet"):
-            mono(line(), e["snippet"], T.EV_OUT)
+            mono(line(), e["snippet"], _EVL_OUT)
         if e.get("resultSummary"):
             pr = line()
-            mono(pr, "→ prova: ", T.EV_OK, bold=True)
-            mono(pr, e["resultSummary"], T.EV_OUT)
+            mono(pr, "→ prova: ", _EVL_OK, bold=True)
+            mono(pr, e["resultSummary"], T.INK)
     doc.add_paragraph()
 
 

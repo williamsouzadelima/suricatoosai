@@ -130,6 +130,10 @@ def main():
             fails.append("docx: fonte mono (IBM Plex Mono) ausente")
         if "Consolas" in xml:
             fails.append("docx: Consolas ainda presente (mono nao trocado)")
+        # Evidência é PAINEL CLARO, não bloco de terminal escuro (EV_BG=0B1424).
+        if "0B1424" in xml:
+            fails.append("docx: fundo de evidência ESCURO (terminal) ainda "
+                         "presente — deveria ser painel claro")
         if SUMMARY not in txt:
             fails.append("docx: SUMÁRIO ausente")
         fails += _summary_phase_fails("docx", txt)
@@ -233,6 +237,18 @@ def main():
             elif claim != real_pg:
                 fails.append(f"pdf: SUMARIO aponta pag {claim} p/ 'Reconhecimento' "
                              f"mas o cabecalho esta na pag {real_pg} (numero deslocado)")
+            # Nenhuma página de CORPO vazio: o PageBreak do sumário + o do
+            # partDivider geravam uma página em branco (colapso de PageBreaks).
+            blanks = []
+            for i in range(pd.page_count):
+                H = pd[i].rect.height
+                body = "".join(b[4] for b in pd[i].get_text("blocks")
+                               if b[1] < H - 58 and b[4].strip())
+                if len(body.strip()) < 3 and not pd[i].get_images():
+                    blanks.append(i + 1)
+            if blanks:
+                fails.append(f"pdf: pagina(s) em BRANCO {blanks} "
+                             "(PageBreak consecutivo?)")
         except ImportError:
             print("  NOTA: pymupdf ausente — cross-check de pagina do SUMARIO pulado.")
 
