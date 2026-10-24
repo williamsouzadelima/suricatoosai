@@ -175,6 +175,36 @@ def main():
         for ph in PHASES:
             if ph not in agenda:
                 fails.append(f"pptx: fase '{ph}' ausente do slide de SUMÁRIO")
+        # Evidência = PAINEL CLARO, nunca bloco de terminal escuro (EV_BG=0B1424).
+        if "0B1424" in pxml:
+            fails.append("pptx: fundo de evidência ESCURO (terminal) presente "
+                         "— deveria ser painel claro")
+        # PPTX não mede texto → o modo de falha histórico é a forma ULTRAPASSAR a
+        # borda do slide (overflow silencioso). O painel de evidência que estourar
+        # cairia aqui. Nenhuma forma pode passar de slide_width/height (tolerância
+        # pequena p/ arredondamento de EMU).
+        from pptx import Presentation as _Prs
+        _tol = int(0.03 * 914400)
+        _pp = _Prs(pptx_p)
+        _sw, _sh = int(_pp.slide_width), int(_pp.slide_height)
+        _ov = []
+        for _si, _sl in enumerate(_pp.slides, 1):
+            for _shp in _sl.shapes:
+                try:
+                    _t, _h, _l, _w = _shp.top, _shp.height, _shp.left, _shp.width
+                except Exception:
+                    continue
+                if _t is None or _h is None:
+                    continue
+                over_b = (_t + _h) > _sh + _tol
+                over_r = (_l is not None and _w is not None
+                          and (_l + _w) > _sw + _tol)
+                if over_b or over_r:
+                    _ov.append(_si)
+                    break
+        if _ov:
+            fails.append(f"pptx: forma(s) ultrapassam a borda do slide nas "
+                         f"paginas {_ov} (overflow — evidencia cortada?)")
 
         # PDF — extração de texto precisa de pypdf (dev); sem ele, cai p/ um
         # extrator cru e só exige os checks quando há texto suficiente.

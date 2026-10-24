@@ -11,6 +11,7 @@ from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR, MSO_AUTO_SIZE
 from pptx.enum.shapes import MSO_SHAPE
 import os
+import re
 
 import theme as T
 import logo
@@ -87,6 +88,31 @@ def _clip(s, n):
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
+_EV_FILE_RE = re.compile(
+    r'^\s*[\w.\-/]+\.(?:png|jpe?g|gif|webp|bmp|svg|tiff?)\s*(?:[—–:\-]\s*)?', re.I)
+_STEP_NUM_RE = re.compile(r'^\s*\d{1,3}[.)\]]\s+')
+_EVL_OUT = "334155"   # saída/terminal em cinza-ardósia (painel CLARO, não escuro)
+
+
+def _clean_ev_label(label, toolname=None):
+    """Rótulo de evidência legível ao cliente: remove o nome de ARQUIVO cru
+    ('radar.png — ...'); se era só o nome do arquivo, retorna ''."""
+    s = str(label or "").strip()
+    if not s:
+        return ""
+    s2 = _EV_FILE_RE.sub("", s).strip()
+    if not s2:
+        return ""
+    if toolname and s2 == str(toolname):
+        return ""
+    return s2
+
+
+def _strip_step_num(s):
+    """Remove numeração que o passo já traz ('1. ...'); o renderer renumera."""
+    return _STEP_NUM_RE.sub("", str(s or "").strip())
+
+
 # ───────────────────────────────────────────────────────────────────────────
 # Motor de layout com paginação (WS2): PPTX não mede texto, então estimamos
 # linhas por caixa e quebramos conteúdo longo em slides "(cont.)" — NUNCA
@@ -94,6 +120,17 @@ def _clip(s, n):
 # ───────────────────────────────────────────────────────────────────────────
 _CONTENT_BOTTOM = int(SH) - int(Inches(0.55))   # acima do rodapé
 _LINE_FACTOR = 1.3                      # entrelinha aproximada
+
+# Painel CLARO de evidência (espelha o DOCX/PDF): cada linha é um retângulo
+# preenchido (SURFACE_ALT) encostado no próximo → o painel é a UNIÃO dos
+# retângulos (contínuo, pagina por palavra, nunca estoura o slide); barra de
+# acento PRIMARY à esquerda. Medir SEMPRE com a largura ÚTIL (descontado
+# acento+respiros), nunca com CW — senão o texto quebra mais do que o medido e
+# corta embaixo. Linhas ENCOSTAM (y += altura exata em EMU int, sem round-trip).
+_PANEL_ACCENT_W = int(Inches(0.05))
+_PANEL_GAP = int(Inches(0.12))     # vão entre o acento e o texto
+_PANEL_PAD_R = int(Inches(0.14))   # respiro à direita
+_PANEL_VPAD = int(Inches(0.04))    # respiro vertical DENTRO de cada linha
 
 
 def _wrap(text, cpl):
@@ -221,24 +258,37 @@ class _Flow:
         self.y += int(Inches(after))
 
     def image(self, path, caption=None):
-        """Embute imagem escalada à coluna; paginando. Retorna True se embutiu."""
+        """Print EMOLDURADO (exibit): moldura branca c/ borda fina ATRÁS da
+        imagem (desenhada antes → fica atrás) em vez de imagem solta "tímida" no
+        branco; legenda '◆ <rótulo limpo>' (sem nome de arquivo cru). Escala à
+        coluna e pagina. Retorna True se embutiu (alimenta o contador `rendered`
+        que decide a nota neutra — NÃO mudar o contrato booleano)."""
         sz = _img_size(path)
         if not sz or not path or not os.path.exists(path):
             return False
         iw, ih = sz
-        maxw, maxh = int(CW), int(Inches(4.6))
+        pad = int(Inches(0.08))
+        maxw, maxh = int(CW) - 2 * pad, int(Inches(4.3))
         scale = min(maxw / iw, maxh / ih)
         w, h = int(iw * scale), int(ih * scale)
-        self.ensure(h + int(Inches(0.1)))
-        left = int(ML) + (int(CW) - w) // 2
+        fw, fh = w + 2 * pad, h + 2 * pad
+        self.ensure(fh + int(Inches(0.1)))
+        fx = int(ML) + (int(CW) - fw) // 2
+        _rect(self.slide, Emu(fx), Emu(self.y), Emu(fw), Emu(fh),
+              T.SURFACE, line=T.BORDER)
         try:
-            self.slide.shapes.add_picture(path, Emu(left), Emu(self.y),
+            self.slide.shapes.add_picture(path, Emu(fx + pad), Emu(self.y + pad),
                                           width=Emu(w), height=Emu(h))
         except Exception:
             return False
-        self.y += h + int(Inches(0.08))
-        if caption:
-            self.para("▲ " + str(caption), size=10, color=T.MUTED, after=0.14)
+        self.y += fh + int(Inches(0.06))
+        lbl = _clean_ev_label(caption)
+        cap = "◆ " + (lbl or "Evidência visual")
+        ch = _text_h(cap, int(CW), 10)      # para() força esq. em 1 linha → _text
+        self.ensure(ch + int(Inches(0.06)))
+        _text(self.slide, ML, Emu(self.y), CW, Emu(ch), cap, size=10,
+              color=T.MUTED, align=PP_ALIGN.CENTER)
+        self.y += ch + int(Inches(0.14))
         return True
 
     def placeholder(self, text, tone=None):
@@ -250,6 +300,92 @@ class _Flow:
               Inches(0.5), text, size=11, bold=True, color=tone,
               anchor=MSO_ANCHOR.MIDDLE)
         self.y += int(Inches(0.62))
+
+    def panel_line(self, text, size=11, color=None, bold=False, font=None,
+                   lead=None):
+        """Uma linha do PAINEL CLARO de evidência: retângulo preenchido
+        (SURFACE_ALT) contendo o texto, com barra de acento azul à esquerda.
+        Linhas consecutivas ENCOSTAM (y += altura exata, EMU int) → o painel é a
+        união dos retângulos. Pagina por PALAVRA e nunca deixa uma linha maior que
+        o espaço restante (análogo do LayoutError do PDF — overflow silencioso).
+        `lead` = (texto, cor, bold?) opcional, run destacado só na 1ª linha
+        (ex. '$ ' verde) — espelha o DOCX."""
+        color = T.INK if color is None else color
+        font = font or T.FONT_BODY
+        inset_l = _PANEL_ACCENT_W + _PANEL_GAP
+        inner_w = int(CW) - inset_l - _PANEL_PAD_R   # largura ÚTIL do texto
+        cwf = (0.70 if font == T.FONT_MONO else 0.64) + (0.05 if bold else 0.0)
+        cpl = max(8, int((inner_w / EMU_IN) * 72 / (size * cwf)))
+        lh = int(size * _LINE_FACTOR / 72.0 * EMU_IN)
+        lead_txt = str(lead[0]) if lead else ""
+
+        def _nl(s):
+            return max(1, len(_wrap(s, cpl)))
+
+        def _emit(s, with_lead):
+            n = _nl((lead_txt + s) if with_lead else s)
+            h = n * lh + 2 * _PANEL_VPAD          # EMU int → linhas encostam exato
+            bg = self.slide.shapes.add_shape(
+                MSO_SHAPE.RECTANGLE, ML, Emu(self.y), CW, Emu(h))
+            bg.fill.solid()
+            bg.fill.fore_color.rgb = _rgb(T.SURFACE_ALT)
+            bg.line.fill.background()
+            bg.shadow.inherit = False
+            tf = bg.text_frame
+            tf.word_wrap = True
+            try:
+                tf.auto_size = MSO_AUTO_SIZE.NONE
+            except Exception:
+                pass
+            tf.margin_left = Emu(inset_l)        # texto passa do acento
+            tf.margin_right = Emu(_PANEL_PAD_R)
+            tf.margin_top = Emu(_PANEL_VPAD)
+            tf.margin_bottom = Emu(_PANEL_VPAD)
+            tf.vertical_anchor = MSO_ANCHOR.TOP
+            p = tf.paragraphs[0]
+            p.alignment = PP_ALIGN.LEFT
+            if with_lead and lead_txt:
+                lr = p.add_run()
+                lr.text = lead_txt
+                lr.font.size = Pt(size)
+                lr.font.bold = (lead[2] if len(lead) > 2 else True)
+                lr.font.name = font
+                lr.font.color.rgb = _rgb(lead[1])
+            r = p.add_run()
+            r.text = s
+            r.font.size = Pt(size)
+            r.font.bold = bold
+            r.font.name = font
+            r.font.color.rgb = _rgb(color)
+            ac = self.slide.shapes.add_shape(      # barra de acento (sobre a faixa
+                MSO_SHAPE.RECTANGLE, ML, Emu(self.y),   # esquerda, à esq. do texto)
+                Emu(_PANEL_ACCENT_W), Emu(h))
+            ac.fill.solid()
+            ac.fill.fore_color.rgb = _rgb(T.PRIMARY)
+            ac.line.fill.background()
+            ac.shadow.inherit = False
+            self.y += h
+
+        lead_used = False
+        for seg in str(text or "").split("\n"):
+            if not seg.strip():
+                continue
+            words = seg.split(" ")
+            idx = 0
+            while idx < len(words):
+                self.ensure(lh + 2 * _PANEL_VPAD)       # garante ≥1 linha na página
+                cap = max(1, (int(_CONTENT_BOTTOM) - self.y - 2 * _PANEL_VPAD) // lh)
+                wl = bool(lead) and not lead_used
+                take = idx + 1
+                while take < len(words):
+                    cand = " ".join(words[idx:take + 1])
+                    if _nl((lead_txt + cand) if wl else cand) > cap:
+                        break
+                    take += 1
+                _emit(" ".join(words[idx:take]), wl)
+                if wl:
+                    lead_used = True
+                idx = take
 
 
 def _footer(slide, dark=False):
@@ -776,7 +912,8 @@ def _finding_card(prs, sec):
         fl.heading("REPRODUÇÃO", size=11)
         _steps = f["reproductionSteps"]
         for i, s in enumerate(_steps[:6], 1):
-            fl.para(f"{i}. {s}", size=11, color=T.INK, indent=0.1, after=0.04)
+            fl.para(f"{i}. {_strip_step_num(s)}", size=11, color=T.INK,
+                    indent=0.1, after=0.04)
         if len(_steps) > 6:
             fl.para(
                 f"(+{len(_steps) - 6} passos — detalhe completo no relatório técnico DOCX/PDF)",
@@ -798,28 +935,33 @@ def _evidence_flow(fl, f):
              if e.get("snippet") or e.get("command") or e.get("resultSummary")]
     imgs = [e for e in ev if e.get("imagePath")]
     if chain:
-        fl.heading("CADEIA DE EVIDÊNCIA", size=11)
+        # PAINEL CLARO (espelha DOCX/PDF): cabeçalho + passos sobre fundo tingido
+        # com barra de acento azul, em vez de texto solto no branco. Rótulo sem
+        # nome de arquivo cru; '$' e '→ prova' destacados em verde.
+        fl.panel_line("CADEIA DE EVIDÊNCIA", size=11, color=T.PRIMARY, bold=True)
         for i, e in enumerate(chain[:6], 1):
             n = e.get("stepIndex") or i
             head = f"{n}."
             if e.get("toolName"):
                 head += f"  [{e['toolName']}]"
-            if e.get("label") and e.get("label") != e.get("toolName"):
-                head += f"  {e['label']}"
-            fl.para(head, size=11, bold=True, color=T.PRIMARY, after=0.02)
+            lbl = _clean_ev_label(e.get("label"), e.get("toolName"))
+            if lbl:
+                head += f"  {lbl}"
+            fl.panel_line(head, size=11, color=T.PRIMARY, bold=True)
             if e.get("command"):
-                fl.para("$ " + str(e["command"]), size=9, color=T.MUTED,
-                        font=T.FONT_MONO, indent=0.12, after=0.02)
+                fl.panel_line(str(e["command"]), size=9, color=T.INK,
+                              font=T.FONT_MONO, lead=("$ ", T.SUCCESS, True))
             if e.get("snippet"):
-                fl.para(str(e["snippet"]), size=9, color=T.MUTED,
-                        font=T.FONT_MONO, indent=0.12, after=0.02)
+                fl.panel_line(str(e["snippet"]), size=9, color=_EVL_OUT,
+                              font=T.FONT_MONO)
             if e.get("resultSummary"):
-                fl.para("→ prova: " + str(e["resultSummary"]), size=10,
-                        color=T.SUCCESS, indent=0.12, after=0.08)
-    if len(chain) > 6:
-        fl.para(
-            f"(+{len(chain) - 6} passos de evidência — cadeia completa no relatório técnico DOCX/PDF)",
-            size=10, color=T.MUTED, after=0.08)
+                fl.panel_line(str(e["resultSummary"]), size=10, color=T.INK,
+                              lead=("→ prova: ", T.SUCCESS, True))
+        if len(chain) > 6:
+            fl.panel_line(
+                f"(+{len(chain) - 6} passos de evidência — cadeia completa no "
+                "relatório técnico DOCX/PDF)", size=10, color=T.MUTED)
+        fl.space(int(Inches(0.16)))
     rendered = 0
     # Só anuncia imagem que REALMENTE existe no pacote (arquivo no disco). Chave
     # S3 não baixada / print ainda não enviado (relatório defasado) => cai fora
