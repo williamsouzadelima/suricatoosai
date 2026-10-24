@@ -402,55 +402,50 @@ def _attack_chain(ss, sec):
 def _roadmap(ss, sec):
     out = [Paragraph("Plano de Remediação por Fase", ss["H1"]),
            HRFlowable(width="18%", thickness=2, color=C(T.CORAL), spaceAfter=6)]
-    data = [[Paragraph('<font color="white"><b>Janela</b></font>', ss["Body2"]),
-             Paragraph('<font color="white"><b>Foco</b></font>', ss["Body2"]),
-             Paragraph('<font color="white"><b>Ações</b></font>', ss["Body2"])]]
-    for ph in (sec.get("phases") or [])[:4]:
-        acts = "<br/>".join("• " + _esc(a)
-                            for a in (ph.get("actions") or []))
-        data.append([Paragraph(f'<b>{_esc(ph.get("window", ""))}</b>', ss["Small"]),
-                     Paragraph(_esc(ph.get("label", "")), ss["Small"]),
-                     Paragraph(acts, ss["Small"])])
-    tbl = Table(data, colWidths=[26 * mm, 34 * mm, 114 * mm], repeatRows=1)
-    tbl.setStyle(_ts([
-        ("BACKGROUND", (0, 0), (-1, 0), C(T.PRIMARY)),
-        ("GRID", (0, 0), (-1, -1), 0.4, C(T.BORDER)),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-    ]))
-    out += [tbl, Spacer(1, 5 * mm)]
+    # FLUXO (não tabela): uma célula de tabela NÃO quebra entre páginas — uma ação
+    # de remediação multipasso longa deixava a linha maior que o frame e o
+    # reportlab lançava LayoutError ("Flowable too large"), derrubando o PDF
+    # inteiro. Cada fase vira cabeçalho + ações como Paragraphs, que quebram
+    # naturalmente entre páginas. Nada truncado, nada omitido, sem crash.
+    phstyle = ParagraphStyle("rmph", parent=ss["Body2"], textColor=C(T.PRIMARY),
+                             fontName=FONT_SANS_BOLD, spaceBefore=7, spaceAfter=2)
+    for ph in (sec.get("phases") or []):
+        window = _esc(ph.get("window", ""))
+        label = _esc(ph.get("label", ""))
+        head = window + ((" — " + label) if (window and label) else label)
+        out.append(Paragraph(f"<b>{head}</b>", phstyle))
+        acts = ph.get("actions") or []
+        if not acts:
+            out.append(Paragraph("—", ss["Small"]))
+        for a in acts:
+            out.append(Paragraph("▸ " + _esc(a), ss["Small"]))
+    out.append(Spacer(1, 5 * mm))
     return out
 
 
 def _cost_incident(ss, sec):
     out = [Paragraph("Custo da Remediação × Custo do Incidente", ss["H1"]),
            HRFlowable(width="18%", thickness=2, color=C(T.CORAL), spaceAfter=6)]
-    remlist = "<br/>".join("• " + _esc(r)
-                           for r in (sec.get("remediation") or []))
-    inc_parts = []
+    # FLUXO empilhado (não tabela de 2 colunas): uma célula não quebra entre
+    # páginas → lista longa estouraria o frame (LayoutError). Investimento e Risco
+    # viram seções com cabeçalho colorido + itens como Paragraphs que quebram.
+    hrem = ParagraphStyle("cirem", parent=ss["Body2"], textColor=C(T.SUCCESS),
+                          fontName=FONT_SANS_BOLD, spaceBefore=4, spaceAfter=2)
+    hinc = ParagraphStyle("ciinc", parent=ss["Body2"], textColor=C(T.DESTRUCTIVE),
+                          fontName=FONT_SANS_BOLD, spaceBefore=8, spaceAfter=2)
+    out.append(Paragraph("REMEDIAÇÃO — INVESTIMENTO", hrem))
+    for r in (sec.get("remediation") or []):
+        out.append(Paragraph("• " + _esc(r), ss["Small"]))
+    out.append(Paragraph("INCIDENTE NÃO REMEDIADO — RISCO", hinc))
     for it in (sec.get("incident") or []):
-        line = f'<b><font color="#{T.DESTRUCTIVE}">• {_esc(it.get("label", ""))}</font></b>'
+        out.append(Paragraph(
+            f'<b><font color="#{T.DESTRUCTIVE}">• {_esc(it.get("label", ""))}</font></b>',
+            ss["Small"]))
         if it.get("detail"):
-            line += f'<br/><font size="8" color="#{T.MUTED}">   {_esc(it["detail"])}</font>'
-        inc_parts.append(line)
-    inclist = "<br/>".join(inc_parts)
-    header = [Paragraph('<font color="white"><b>REMEDIAÇÃO — INVESTIMENTO</b></font>', ss["Body2"]),
-              Paragraph('<font color="white"><b>INCIDENTE NÃO REMEDIADO — RISCO</b></font>', ss["Body2"])]
-    body = [Paragraph(remlist, ss["Small"]), Paragraph(inclist, ss["Small"])]
-    tbl = Table([header, body], colWidths=[87 * mm, 87 * mm])
-    tbl.setStyle(_ts([
-        ("BACKGROUND", (0, 0), (0, 0), C(T.SUCCESS)),
-        ("BACKGROUND", (1, 0), (1, 0), C(T.DESTRUCTIVE)),
-        ("BOX", (0, 0), (-1, -1), 0.5, C(T.BORDER)),
-        ("INNERGRID", (0, 0), (-1, -1), 0.5, C(T.BORDER)),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-    ]))
-    out += [tbl, Spacer(1, 5 * mm)]
+            out.append(Paragraph(
+                f'<font size="8" color="#{T.MUTED}">   {_esc(it["detail"])}</font>',
+                ss["Small"]))
+    out.append(Spacer(1, 5 * mm))
     return out
 
 
