@@ -585,6 +585,7 @@ export const getReportForDownloadBackend = query({
     validateServiceKey(args.serviceKey);
     const r = await ctx.db.get(args.reportId);
     if (!r || r.user_id !== args.userId) return null;
+    const eng = await ctx.db.get(r.engagement_id);
     return {
       s3Key: r.s3_key ?? null,
       status: r.status,
@@ -594,6 +595,8 @@ export const getReportForDownloadBackend = query({
       title: r.title,
       clientId: r.client_id,
       engagementId: r.engagement_id,
+      engagementName: eng?.name ?? null,
+      generatedAt: r.generated_at ?? r.created_at,
       organizationId: r.organization_id ?? null,
     };
   },

@@ -161,6 +161,8 @@ export const getPortalReportForDownloadForBackend = query({
       title: v.string(),
       clientId: v.id("clients"),
       engagementId: v.id("engagements"),
+      engagementName: v.union(v.string(), v.null()),
+      generatedAt: v.number(),
       organizationId: v.union(v.string(), v.null()),
     }),
   ),
@@ -173,6 +175,9 @@ export const getPortalReportForDownloadForBackend = query({
     // Mesmo gate da lista, no ponto de download: um relatório oculto não é
     // baixável nem com o ID em mãos (a rota audita a negação como access.denied).
     if (r.client_visible === false) return null;
+    // Lápide (#1B soft-delete): relatório removido não é baixável pelo portal.
+    if (r.deleted_at !== undefined) return null;
+    const eng = await ctx.db.get(r.engagement_id);
     return {
       s3Key: r.s3_key ?? null,
       status: r.status,
@@ -182,6 +187,8 @@ export const getPortalReportForDownloadForBackend = query({
       title: r.title,
       clientId: r.client_id,
       engagementId: r.engagement_id,
+      engagementName: eng?.name ?? null,
+      generatedAt: r.generated_at ?? r.created_at,
       organizationId: r.organization_id ?? null,
     };
   },

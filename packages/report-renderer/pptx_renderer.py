@@ -396,8 +396,14 @@ def _footer(slide, dark=False):
     col = "8FA0BC" if dark else T.MUTED
     fy = SH - Inches(0.42)
     half = Emu(int(CW) // 2)
-    _text(slide, ML, fy, half, Inches(0.3),
-          m.get("classification", ""), size=8, color=col)
+    # Esquerda, 2 linhas: classificacao + engajamento/timestamp da exportacao.
+    _eng = _clip(m.get("engagement", ""), 28)
+    _stamp = T.brt_datetime(m.get("generatedAt", 0))
+    _left = m.get("classification", "")
+    if _eng or _stamp:
+        _left = _left + "\n" + ((_eng + " · " if _eng else "") +
+                                (("Gerado " + _stamp) if _stamp else ""))
+    _text(slide, ML, fy, half, Inches(0.3), _left, size=7, color=col)
     _text(slide, Emu(int(ML) + int(CW) // 2), fy, half, Inches(0.3),
           f"{m.get('docCode', '')} · {n:02d}", size=8, color=col,
           align=PP_ALIGN.RIGHT)
@@ -491,9 +497,12 @@ def _cover(prs, sec, meta):
                   font=T.FONT_DISPLAY)
             _text(slide, Emu(cx), Emu(cy + int(Inches(0.8))), Emu(tw), Inches(0.4),
                   str(s.get("label", "")), size=10, bold=True, color="8FA0BC")
-    # Rodape da capa.
+    # Rodape da capa: cliente · timestamp da exportacao · marca.
+    _cstamp = T.brt_datetime(meta.get('generatedAt', 0))
+    _cov_meta = ("Gerado " + _cstamp + " (BRT)") if _cstamp else \
+        _month_year(meta.get('generatedAt', 0))
     _text(slide, ML, Inches(10.4), CW, Inches(0.4),
-          f"{meta.get('client', '')}  ·  {_month_year(meta.get('generatedAt', 0))}  ·  {brand.get('name', '')}",
+          f"{meta.get('client', '')}  ·  {_cov_meta}  ·  {brand.get('name', '')}",
           size=12, color="C9D3E6")
     _STATE["page"] = 1
 

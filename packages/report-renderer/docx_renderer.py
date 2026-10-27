@@ -201,6 +201,15 @@ def _setup_footer(doc, meta):
     _run(p, "   ·   " + meta.get("docCode", "") + "   ·   pág. ", size=8,
          color=T.MUTED)
     _add_page_field(p)
+    # 2ª linha do rodapé (toda página): engajamento + timestamp da exportação.
+    eng = str(meta.get("engagement", "") or "").strip()
+    stamp = T.brt_datetime(meta.get("generatedAt", 0))
+    if eng or stamp:
+        p2 = sec.footer.add_paragraph()
+        line = eng
+        if stamp:
+            line = (eng + "   ·   " if eng else "") + "Gerado " + stamp + " (BRT)"
+        _run(p2, line, size=8, color=T.MUTED)
 
 
 def _stat_tiles(doc, stats):

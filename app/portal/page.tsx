@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StatusBadge, EmptyState, type Tone } from "@/app/admin/_ui";
+import { parseContentDispositionFilename } from "@/lib/reports/report-filename";
 
 interface ClientOpt {
   id: string;
@@ -252,7 +253,19 @@ export default function PortalPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${AUDIENCE[r.audience] ?? r.audience}_v${r.version}.${r.format}`;
+      // Nome do arquivo = fonte única no servidor (Content-Disposition com
+      // engajamento + timestamp da exportação). Fallback ruidoso se faltar.
+      const fromHeader = parseContentDispositionFilename(
+        res.headers.get("content-disposition"),
+      );
+      if (!fromHeader) {
+        console.warn(
+          "[portal download] Content-Disposition sem filename; usando fallback",
+        );
+      }
+      a.download =
+        fromHeader ??
+        `${AUDIENCE[r.audience] ?? r.audience}_v${r.version}.${r.format}`;
       document.body.appendChild(a);
       a.click();
       a.remove();

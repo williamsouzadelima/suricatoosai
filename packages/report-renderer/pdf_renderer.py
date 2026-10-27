@@ -218,6 +218,17 @@ def _cover_canvas_factory(meta, cover):
         canvas.drawString(18 * mm, 8 * mm, _clip(meta.get("classification", ""), 80))
         canvas.drawRightString(A4[0] - 18 * mm, 8 * mm,
                                f'{meta.get("docCode", "")} · {doc.page}')
+        # 2ª linha (centralizada, toda página interna): engajamento + timestamp.
+        _eng = str(meta.get("engagement", "") or "").strip()
+        _stamp = T.brt_datetime(meta.get("generatedAt", 0))
+        _fixed = ("Gerado " + _stamp + " (BRT)") if _stamp else ""
+        _sep = "  ·  " if (_eng and _fixed) else ""
+        _availw = A4[0] - 2 * 18 * mm - canvas.stringWidth(_sep + _fixed, FONT_SANS, 7)
+        while _eng and canvas.stringWidth(_eng, FONT_SANS, 7) > _availw:
+            _eng = _eng[:-1]
+        _foot2 = (_eng + _sep + _fixed) if _eng else _fixed
+        if _foot2:
+            canvas.drawCentredString(A4[0] / 2.0, 12 * mm, _foot2)
         canvas.restoreState()
     return draw
 
@@ -627,6 +638,11 @@ def render_pdf(model, out_path):
             S.append(Paragraph(
                 f'<b><font color="#FFFFFF">{esc(meta.get("classification",""))}   ·   {esc(meta.get("docCode",""))}</font></b>',
                 ss["Small"]))
+            _cstamp = T.brt_datetime(meta.get("generatedAt", 0))
+            if _cstamp:
+                S.append(Paragraph(
+                    f'<font color="#FFFFFF">Gerado {esc(_cstamp)} (BRT)</font>',
+                    ss["Small"]))
             S.append(Paragraph(
                 f'<font color="#FFFFFF"><b>{esc(meta.get("volume",""))}</b></font>',
                 ss["Small"]))
@@ -685,6 +701,11 @@ def render_pdf(model, out_path):
             S.append(Paragraph(
                 f'<b><font color="#{T.CORAL}">{esc(meta.get("classification", ""))}   ·   {esc(meta.get("docCode", ""))}</font></b>',
                 ss["Small"]))
+            _cstamp = T.brt_datetime(meta.get("generatedAt", 0))
+            if _cstamp:
+                S.append(Paragraph(
+                    f'<font color="#{_cmuted}">Gerado {esc(_cstamp)} (BRT)</font>',
+                    ss["Small"]))
             S.append(Paragraph(
                 f'<font color="#{_cmuted}"><b>{esc(meta.get("volume", ""))}</b></font>',
                 ss["Small"]))

@@ -5,6 +5,7 @@ import { getConvexClient } from "@/lib/db/convex-client";
 import { getS3Client } from "@/convex/s3Utils";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { buildReportFilename } from "@/lib/reports/report-filename";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -124,7 +125,13 @@ export async function GET(
     if (!body) {
       return NextResponse.json({ error: "Objeto vazio" }, { status: 502 });
     }
-    const filename = `${report.audience}_v${report.version}.${report.format}`;
+    const filename = buildReportFilename({
+      engagementName: report.engagementName ?? "Relatorio",
+      audience: report.audience,
+      version: report.version,
+      format: report.format,
+      generatedAt: report.generatedAt ?? Date.now(),
+    });
     return new Response(body.transformToWebStream(), {
       headers: {
         "Content-Type": MIME[report.format] ?? "application/octet-stream",

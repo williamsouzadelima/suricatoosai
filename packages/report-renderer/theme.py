@@ -8,6 +8,21 @@ embutida nos .ttf em fonts/ (ver FONT_* e font_path() abaixo).
 
 import os
 
+
+def brt_datetime(ms):
+    """Timestamp de exportacao em horario de Brasilia (UTC-3; sem DST desde 2019),
+    formato DD/MM/AAAA HH:MM. Usado no rodape/capa dos relatorios. '' se invalido."""
+    try:
+        import datetime
+        ms = int(ms)
+        if ms <= 0:
+            return ""
+        d = datetime.datetime.utcfromtimestamp(ms / 1000) - datetime.timedelta(hours=3)
+        return d.strftime("%d/%m/%Y %H:%M")
+    except Exception:
+        return ""
+
+
 PRIMARY = "2456E6"
 CORAL = "FF7678"
 INK = "0E1B2E"
