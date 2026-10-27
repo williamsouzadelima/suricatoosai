@@ -12,6 +12,7 @@ import {
   Loader2,
   Server,
   ListOrdered,
+  KeyRound,
 } from "lucide-react";
 import { HackerAISVG } from "@/components/icons/hackerai-svg";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StatusBadge, EmptyState, type Tone } from "@/app/admin/_ui";
 import { parseContentDispositionFilename } from "@/lib/reports/report-filename";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { MfaEnrollmentWidget } from "@/components/mfa/MfaEnrollmentWidget";
 
 interface ClientOpt {
   id: string;
@@ -277,6 +286,8 @@ export default function PortalPage() {
     }
   }, []);
 
+  const [securityOpen, setSecurityOpen] = useState(false);
+
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/[0.06] bg-gradient-to-r from-[#0f1f38] to-[#0b1626] px-4 py-3 text-[#c7d3e6] md:px-8">
@@ -284,13 +295,33 @@ export default function PortalPage() {
         <span className="hidden text-[13px] text-[#7d8ca8] sm:inline">
           Portal do Cliente
         </span>
+        <button
+          type="button"
+          onClick={() => setSecurityOpen(true)}
+          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.04] px-3 text-sm font-medium text-[#c7d3e6] transition-colors hover:bg-white/[0.08] hover:text-white"
+        >
+          <KeyRound className="h-4 w-4" /> Segurança
+        </button>
         <a
           href="/logout"
-          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.04] px-3 text-sm font-medium text-[#c7d3e6] transition-colors hover:bg-white/[0.08] hover:text-white"
+          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.04] px-3 text-sm font-medium text-[#c7d3e6] transition-colors hover:bg-white/[0.08] hover:text-white"
         >
           <LogOut className="h-4 w-4" /> Sair
         </a>
       </header>
+
+      <Dialog open={securityOpen} onOpenChange={setSecurityOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Segurança da conta</DialogTitle>
+            <DialogDescription>
+              Gerencie sua senha, autenticação multifator (MFA/TOTP) e sessões.
+              O MFA será exigido para baixar o pacote de evidências.
+            </DialogDescription>
+          </DialogHeader>
+          <MfaEnrollmentWidget />
+        </DialogContent>
+      </Dialog>
 
       <main className="mx-auto w-full max-w-4xl px-4 pb-14 pt-6 md:px-8">
         <div className="mb-5 flex items-start gap-4">

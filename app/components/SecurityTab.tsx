@@ -1,24 +1,13 @@
 "use client";
 
-import React, { useCallback } from "react";
-import { useAccessToken } from "@workos-inc/authkit-nextjs/components";
-import { UserSecurity } from "@workos-inc/widgets/user-security";
-import { WorkOsWidgets } from "@workos-inc/widgets/workos-widgets";
 import { LogOut, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
+import { MfaEnrollmentWidget } from "@/components/mfa/MfaEnrollmentWidget";
 
 const SecurityTab = () => {
   const t = useTranslations("settings");
-  const { getAccessToken } = useAccessToken();
-  const getWidgetAccessToken = useCallback(async () => {
-    const token = await getAccessToken();
-    if (!token) {
-      throw new Error(t("security.unableToLoad"));
-    }
-    return token;
-  }, [getAccessToken]);
 
   const handleLogout = async () => {
     try {
@@ -54,23 +43,7 @@ const SecurityTab = () => {
 
   return (
     <div className="space-y-6">
-      <div data-testid="workos-user-security">
-        <WorkOsWidgets
-          style={{ blockSize: "auto", minBlockSize: "auto" }}
-          theme={{
-            appearance: "dark",
-            // Brand accent (coral). "gray" made the widget's action buttons
-            // (e.g. "Set password") render with no contrast on the dark card,
-            // so they looked like empty gray boxes.
-            accentColor: "tomato",
-            grayColor: "slate",
-            hasBackground: false,
-            fontFamily: "var(--font-geist-sans)",
-          }}
-        >
-          <UserSecurity authToken={getWidgetAccessToken} />
-        </WorkOsWidgets>
-      </div>
+      <MfaEnrollmentWidget />
 
       <div
         data-testid="security-session-actions"
