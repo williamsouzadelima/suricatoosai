@@ -478,6 +478,92 @@ Reserve enough time and budget to integrate child results. Do not delegate when 
 </generic_delegation>`;
 
 // Core system prompt with optimized structure
+// Escopo autorizado do engajamento, injetado no contexto do agente. Shape
+// permissivo (kind/status como string) p/ aceitar direto o retorno da query
+// Convex getEngagementScopeForBackend.
+export type EngagementScopeContext = {
+  name: string;
+  scope?: Array<{
+    kind: string;
+    value: string;
+    in_scope: boolean;
+    note?: string;
+  }>;
+  starts_at?: number;
+  ends_at?: number;
+};
+
+// Janela em data absoluta UTC (YYYY-MM-DD). Fixa no run → segura p/ o
+// prompt-cache (nunca deriva de "agora").
+function formatScopeWindowDate(ts?: number): string | null {
+  if (typeof ts !== "number" || !Number.isFinite(ts)) return null;
+  return new Date(ts).toISOString().slice(0, 10);
+}
+
+/**
+ * Bloco "escopo autorizado" p/ o agente de pentest: alvos em escopo, exclusões
+ * explícitas e a janela de autorização. "" quando não há escopo definido
+ * (sem regressão de comportamento). Instrução dura: nada fora do escopo.
+ */
+export function getEngagementScopeSection(
+  engagementScope?: EngagementScopeContext | null,
+): string {
+  if (!engagementScope) return "";
+  const items = engagementScope.scope ?? [];
+  if (items.length === 0) return "";
+  const inScope = items.filter((s) => s.in_scope);
+  const outScope = items.filter((s) => !s.in_scope);
+  // Valores são texto livre do operador renderizado direto no system prompt:
+  // remove < > p/ ninguém fechar o bloco cedo (operador é confiável; defesa
+  // barata). Teto por lista p/ não estourar o orçamento de contexto.
+  const clean = (s: string) => s.replace(/[<>]/g, "");
+  const MAX_PER_LIST = 50;
+  const renderList = (
+    title: string,
+    list: Array<{ kind: string; value: string; note?: string }>,
+  ): string => {
+    const lines = list
+      .slice(0, MAX_PER_LIST)
+      .map(
+        (s) =>
+          `- [${clean(s.kind)}] ${clean(s.value)}${s.note ? ` — ${clean(s.note)}` : ""}`,
+      );
+    if (list.length > MAX_PER_LIST) {
+      lines.push(`- …and ${list.length - MAX_PER_LIST} more`);
+    }
+    return [title, ...lines].join("\n");
+  };
+
+  const parts: string[] = [
+    "<authorized_engagement_scope>",
+    "You are operating under an AUTHORIZED penetration-testing engagement. Act ONLY within the authorized scope below. Anything not listed as in-scope is out of scope: treat out-of-scope entries as explicitly forbidden — do not probe, scan, enumerate, exploit, or pivot to them. If asked to act outside this scope, refuse and explain it is outside the authorized engagement.",
+    `Engagement: ${clean(engagementScope.name)}`,
+  ];
+
+  const from = formatScopeWindowDate(engagementScope.starts_at);
+  const to = formatScopeWindowDate(engagementScope.ends_at);
+  if (from || to) {
+    parts.push(
+      `Authorization window (UTC): ${from ?? "open"} to ${to ?? "open"}. Do not act outside this window.`,
+    );
+  }
+
+  if (inScope.length > 0) {
+    parts.push(renderList("Authorized targets (IN SCOPE):", inScope));
+  } else {
+    parts.push(
+      "No targets are marked in-scope yet. Do not attack anything until the scope is confirmed with the operator.",
+    );
+  }
+
+  if (outScope.length > 0) {
+    parts.push(renderList("Explicitly OUT OF SCOPE (never touch):", outScope));
+  }
+
+  parts.push("</authorized_engagement_scope>");
+  return parts.join("\n");
+}
+
 export const systemPrompt = async (
   userId: string,
   mode: ChatMode,
@@ -488,6 +574,7 @@ export const systemPrompt = async (
   agentPermissionMode: AgentPermissionMode = "full_access",
   genericDelegationEnabled: boolean = false,
   cloudSandboxProvider?: CloudSandboxProvider,
+  engagementScope?: EngagementScopeContext | null,
 ): Promise<string> => {
   const shouldIncludeNotes =
     (subscription !== "free" || mode === "agent") &&
@@ -542,6 +629,13 @@ The current date is ${currentDateTime}.`;
   const securityExecutionEnvironment =
     mode === "ask" ? "ask" : sandboxContext ? "local-host" : "cloud";
   sections.push(getSecurityInstructions(securityExecutionEnvironment));
+
+  // Escopo autorizado do engajamento (alvos + exclusões + janela), logo após as
+  // instruções de segurança. Só fora do modo "ask" (em "ask" o agente não tem
+  // ferramentas/não ataca). "" quando não há escopo → filtrado em join.
+  if (mode !== "ask") {
+    sections.push(getEngagementScopeSection(engagementScope));
+  }
 
   sections.push(generateUserBio(userCustomization || null));
 

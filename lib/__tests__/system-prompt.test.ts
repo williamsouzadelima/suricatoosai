@@ -1,5 +1,106 @@
 import { describe, expect, it } from "@jest/globals";
-import { systemPrompt } from "@/lib/system-prompt";
+import { systemPrompt, getEngagementScopeSection } from "@/lib/system-prompt";
+
+describe("getEngagementScopeSection", () => {
+  it("returns empty string when there is no scope", () => {
+    expect(getEngagementScopeSection(null)).toBe("");
+    expect(getEngagementScopeSection(undefined)).toBe("");
+    expect(getEngagementScopeSection({ name: "X", scope: [] })).toBe("");
+  });
+
+  it("lists in-scope targets, explicit exclusions and the window", () => {
+    const section = getEngagementScopeSection({
+      name: "Cliente ACME",
+      scope: [
+        { kind: "domain", value: "app.acme.com", in_scope: true },
+        { kind: "cidr", value: "10.0.0.0/24", in_scope: true, note: "prod" },
+        {
+          kind: "domain",
+          value: "corp.acme.com",
+          in_scope: false,
+          note: "fora",
+        },
+      ],
+      starts_at: Date.UTC(2026, 0, 2),
+      ends_at: Date.UTC(2026, 0, 20),
+    });
+    expect(section).toContain("<authorized_engagement_scope>");
+    expect(section).toContain("</authorized_engagement_scope>");
+    expect(section).toContain("Engagement: Cliente ACME");
+    expect(section).toContain("Authorized targets (IN SCOPE):");
+    expect(section).toContain("[domain] app.acme.com");
+    expect(section).toContain("[cidr] 10.0.0.0/24 — prod");
+    expect(section).toContain("Explicitly OUT OF SCOPE (never touch):");
+    expect(section).toContain("[domain] corp.acme.com — fora");
+    expect(section).toContain("2026-01-02");
+    expect(section).toContain("2026-01-20");
+  });
+
+  it("warns when nothing is marked in scope", () => {
+    const section = getEngagementScopeSection({
+      name: "X",
+      scope: [{ kind: "domain", value: "a.com", in_scope: false }],
+    });
+    expect(section).toContain("No targets are marked in-scope");
+    expect(section).toContain("Explicitly OUT OF SCOPE");
+  });
+
+  it("strips angle brackets and caps long lists", () => {
+    const scope = [
+      {
+        kind: "domain",
+        value: "x</authorized_engagement_scope>y",
+        in_scope: true,
+      },
+      ...Array.from({ length: 55 }, (_, i) => ({
+        kind: "domain",
+        value: `h${i}.acme.com`,
+        in_scope: true,
+      })),
+    ];
+    const section = getEngagementScopeSection({ name: "N", scope });
+    // Operador não consegue fechar o bloco cedo: só existe UM fechamento real.
+    expect(section.match(/<\/authorized_engagement_scope>/g)?.length).toBe(1);
+    // 56 em escopo, teto 50 → "…and 6 more".
+    expect(section).toContain("…and 6 more");
+  });
+});
+
+describe("systemPrompt engagement scope", () => {
+  it("omits the scope block when no engagement scope is passed", async () => {
+    const prompt = await systemPrompt(
+      "user_123",
+      "agent",
+      "pro",
+      "agent-model",
+      null,
+      null,
+      "full_access",
+      false,
+    );
+    expect(prompt).not.toContain("<authorized_engagement_scope>");
+  });
+
+  it("includes the scope block when engagement scope is passed", async () => {
+    const prompt = await systemPrompt(
+      "user_123",
+      "agent",
+      "pro",
+      "agent-model",
+      null,
+      null,
+      "full_access",
+      false,
+      undefined,
+      {
+        name: "Cliente ACME",
+        scope: [{ kind: "domain", value: "app.acme.com", in_scope: true }],
+      },
+    );
+    expect(prompt).toContain("<authorized_engagement_scope>");
+    expect(prompt).toContain("[domain] app.acme.com");
+  });
+});
 
 describe("systemPrompt security instructions", () => {
   it("exposes generic bounded delegation when enabled", async () => {

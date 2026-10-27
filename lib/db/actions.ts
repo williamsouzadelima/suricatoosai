@@ -674,6 +674,24 @@ const getMessagesPageForBackendWithRetry = async ({
   }
 };
 
+/**
+ * Backend: escopo + janela de autorização de um engajamento (serviceKey).
+ * Usado pelo run do agente p/ injetar o escopo no system prompt. Falhas são
+ * não-fatais para o caller (o run segue sem o bloco de escopo).
+ */
+export async function getEngagementScopeForBackend({
+  userId,
+  engagementId,
+}: {
+  userId: string;
+  engagementId: string;
+}) {
+  return await getConvexClient().query(
+    api.engagements.getEngagementScopeForBackend,
+    { serviceKey, userId, engagementId },
+  );
+}
+
 export async function getChatById({ id }: { id: string }) {
   try {
     const queryArgs = {

@@ -103,6 +103,7 @@ import {
   persistAgentApprovalGrant,
   getMessagesByChatId,
   getChatById,
+  getEngagementScopeForBackend,
   getCurrentAgentEntitlementContext,
   prepareForNewStream,
   setConvexUrl,
@@ -2511,6 +2512,26 @@ export const agentLongTask = task({
         mode,
         sandboxPreference,
       });
+      // Escopo autorizado do engajamento (se o chat estiver vinculado) p/
+      // injetar no system prompt. Não-fatal, mas a falha é LOGADA: sem isso, o
+      // agente rodaria sem o bloco de escopo em silêncio — e o objetivo da
+      // feature é justamente confinar o agente ao escopo autorizado.
+      const boundEngagementId = chat?.engagement_id;
+      const engagementScopePromise = boundEngagementId
+        ? getEngagementScopeForBackend({
+            userId,
+            engagementId: boundEngagementId,
+          }).catch((error) => {
+            triggerLogger.warn("[agent-long] engagement scope fetch failed", {
+              event: "engagement_scope_fetch_failed",
+              user_id: userId,
+              chat_id: chatId,
+              engagement_id: boundEngagementId,
+              error: stringifyRedactedError(error),
+            });
+            return null;
+          })
+        : Promise.resolve(null);
       const truncatedMessages = fetched.truncatedMessages;
       const messagesForProcessing =
         localDesktopAttachmentsPrepared && messages.length > 0
@@ -2526,10 +2547,12 @@ export const agentLongTask = task({
         userCustomization,
         organizationId,
       });
-      const [projectContext, baseExtraUsageConfig] = await Promise.all([
-        projectContextPromise,
-        baseExtraUsageConfigPromise,
-      ]);
+      const [projectContext, baseExtraUsageConfig, engagementScopeContext] =
+        await Promise.all([
+          projectContextPromise,
+          baseExtraUsageConfigPromise,
+          engagementScopePromise,
+        ]);
       const extraUsageAvailable = canUseExtraUsage(baseExtraUsageConfig);
       selectedModelOverride =
         normalizeMaxModelForSubscription(selectedModelOverride, subscription, {
@@ -3463,6 +3486,7 @@ export const agentLongTask = task({
                 agentPermissionMode,
                 genericDelegationEnabled,
                 cloudSandboxProvider,
+                engagementScopeContext,
               ),
               injectNotesIntoMessages(finalMessages, noteInjectionOpts),
             ]);

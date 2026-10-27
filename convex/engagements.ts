@@ -84,6 +84,42 @@ export const getEngagement = query({
   },
 });
 
+/**
+ * Backend (serviceKey, sem ctx.auth): escopo + janela de autorização de um
+ * engajamento, p/ injetar no contexto do agente durante o run (agent-long).
+ * Posse checada explicitamente (eng.user_id === userId); projeção mínima;
+ * null se id inválido, inexistente ou de outro analista.
+ */
+export const getEngagementScopeForBackend = query({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    engagementId: v.string(),
+  },
+  returns: v.union(
+    v.object({
+      name: v.string(),
+      scope: v.optional(v.array(scopeItemArg)),
+      starts_at: v.optional(v.number()),
+      ends_at: v.optional(v.number()),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const id = ctx.db.normalizeId("engagements", args.engagementId);
+    if (!id) return null;
+    const eng = await ctx.db.get(id);
+    if (!eng || eng.user_id !== args.userId) return null;
+    return {
+      name: eng.name,
+      scope: eng.scope,
+      starts_at: eng.starts_at,
+      ends_at: eng.ends_at,
+    };
+  },
+});
+
 export const createEngagement = mutation({
   args: {
     clientId: v.id("clients"),
