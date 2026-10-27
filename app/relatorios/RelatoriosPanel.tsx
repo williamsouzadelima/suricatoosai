@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AppShell } from "@/components/internal/app-shell";
+import { EvidenceDownloadButton } from "@/components/mfa/EvidenceDownloadButton";
 import {
   SectionHeader,
   StatCard,
@@ -115,26 +116,35 @@ export function RelatoriosPanel({
               title="Engajamento"
               description="Escolha o engajamento para ver e gerar relatórios."
             />
-            <select
-              className="h-9 rounded-md border bg-background px-2 text-sm"
-              value={effectiveEngagementId ?? ""}
-              onChange={(e) =>
-                setSelectedEngagementId(
-                  (e.target.value || null) as Id<"engagements"> | null,
-                )
-              }
-            >
-              <option value="">Selecionar…</option>
-              {(engagements ?? []).map((e) => {
-                const client = clientNameById.get(e.client_id);
-                return (
-                  <option key={e._id} value={e._id}>
-                    {e.name}
-                    {client ? ` · ${client}` : ""}
-                  </option>
-                );
-              })}
-            </select>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+                value={effectiveEngagementId ?? ""}
+                onChange={(e) =>
+                  setSelectedEngagementId(
+                    (e.target.value || null) as Id<"engagements"> | null,
+                  )
+                }
+              >
+                <option value="">Selecionar…</option>
+                {(engagements ?? []).map((e) => {
+                  const client = clientNameById.get(e.client_id);
+                  return (
+                    <option key={e._id} value={e._id}>
+                      {e.name}
+                      {client ? ` · ${client}` : ""}
+                    </option>
+                  );
+                })}
+              </select>
+              {effectiveEngagementId && (
+                <EvidenceDownloadButton
+                  engagementId={effectiveEngagementId}
+                  apiBase="/api/evidence-bundle"
+                  enrollHref="/seguranca"
+                />
+              )}
+            </div>
           </div>
         </Card>
 

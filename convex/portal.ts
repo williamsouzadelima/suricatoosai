@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { validateServiceKey } from "./lib/utils";
+import { collectEvidencePage } from "./lib/evidenceBundle";
 import type { Id, Doc } from "./_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 
@@ -50,6 +51,47 @@ export const listPortalClientsForBackend = query({
     }
     out.sort((a, b) => a.name.localeCompare(b.name));
     return out;
+  },
+});
+
+/**
+ * Enumera TODA a evidência do engajamento p/ o bundle .tar.gz do CLIENTE —
+ * PARIDADE total com o operador: SEM filtro de status (inclui não-publicados E
+ * descartados; é um export bruto completo, decisão informada do dono). Autoriza
+ * por MEMBERSHIP: resolveMembership re-resolve o client do engagement (IDOR-proof)
+ * e exige membership ATIVA + portal_enabled.
+ */
+export const listAllEvidenceForEngagementPagePortalForBackend = query({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    engagementId: v.id("engagements"),
+    cursor: v.union(v.string(), v.null()),
+    numItems: v.number(),
+  },
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const eng = await ctx.db.get(args.engagementId);
+    if (!eng) {
+      return { denied: true, page: [], isDone: true, continueCursor: "" };
+    }
+    const access = await resolveMembership(ctx, args.userId, eng.client_id);
+    if (!access) {
+      return {
+        denied: true,
+        page: [],
+        isDone: true,
+        continueCursor: "",
+        engagementName: null,
+      };
+    }
+    const result = await collectEvidencePage(
+      ctx,
+      args.engagementId,
+      args.cursor,
+      args.numItems,
+    );
+    return { ...result, engagementName: eng.name };
   },
 });
 

@@ -3,6 +3,7 @@ import { v, ConvexError } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { validateServiceKey } from "./lib/utils";
+import { collectEvidencePage } from "./lib/evidenceBundle";
 import { requireOwnedDoc } from "./lib/tenantGuards";
 import { deleteOrphanedEvidenceFile } from "./fileStorage";
 
@@ -766,6 +767,43 @@ export const getEvidenceFileForBackend = query({
     if (!ev || ev.user_id !== args.userId) return null;
     if (!ev.s3_key) return null;
     return { s3Key: ev.s3_key, mediaType: ev.media_type ?? null };
+  },
+});
+
+/**
+ * Enumera TODA a evidência do engajamento (SEM filtro de status, SEM cap) p/ o
+ * bundle .tar.gz de download. Paginada — a ROTA faz o loop (uma query Convex não
+ * excede os limites de 16384 docs / 8MiB / 1s). serviceKey: a rota gateia por
+ * getInternalUser + POSSE (eng.user_id === userId); posse ausente devolve página
+ * terminal vazia com denied=true (a rota responde 404 na 1ª página).
+ */
+export const listAllEvidenceForEngagementPageForBackend = query({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    engagementId: v.id("engagements"),
+    cursor: v.union(v.string(), v.null()),
+    numItems: v.number(),
+  },
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const eng = await ctx.db.get(args.engagementId);
+    if (!eng || eng.user_id !== args.userId) {
+      return {
+        denied: true,
+        page: [],
+        isDone: true,
+        continueCursor: "",
+        engagementName: null,
+      };
+    }
+    const result = await collectEvidencePage(
+      ctx,
+      args.engagementId,
+      args.cursor,
+      args.numItems,
+    );
+    return { ...result, engagementName: eng.name };
   },
 });
 

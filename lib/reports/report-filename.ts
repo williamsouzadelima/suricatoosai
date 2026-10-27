@@ -54,6 +54,18 @@ export function buildReportFilename(args: {
   return `${parts.join("_")}.${args.format}`;
 }
 
+/** Nome do bundle de evidências: `Engajamento_evidencias_YYYY-MM-DD_HHmm.tar.gz`. */
+export function buildEvidenceBundleFilename(args: {
+  engagementName: string;
+  generatedAt: number;
+}): string {
+  const eng = sanitizeEngagementForFilename(args.engagementName);
+  const stamp = brtFilenameStamp(args.generatedAt);
+  const parts = [eng, "evidencias"];
+  if (stamp) parts.push(stamp);
+  return `${parts.join("_")}.tar.gz`;
+}
+
 /**
  * Extrai o filename de um header `Content-Disposition` (o portal usa o servidor
  * como fonte única da verdade). Retorna null se ausente/não parseável — o

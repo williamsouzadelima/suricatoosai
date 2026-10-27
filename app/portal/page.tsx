@@ -28,6 +28,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { MfaEnrollmentWidget } from "@/components/mfa/MfaEnrollmentWidget";
+import { EvidenceDownloadButton } from "@/components/mfa/EvidenceDownloadButton";
 
 interface ClientOpt {
   id: string;
@@ -418,6 +419,22 @@ export default function PortalPage() {
                             downloading={downloading}
                             onDownload={download}
                           />
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="min-w-0 text-sm">
+                              <div className="font-medium text-foreground">
+                                Evidências
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Pacote completo (.tar.gz) com todas as capturas
+                                deste engajamento.
+                              </div>
+                            </div>
+                            <EvidenceDownloadButton
+                              engagementId={e.id}
+                              apiBase="/api/portal/evidence-bundle"
+                              enrollContent={<MfaEnrollmentWidget />}
+                            />
+                          </div>
                         </div>
                       )}
                     </Card>
