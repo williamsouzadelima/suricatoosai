@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Header from "@/app/components/Header";
-import { HackerAISVG } from "@/components/icons/hackerai-svg";
+import { SuricatoosAISVG } from "@/components/icons/suricatoos-ai-svg";
 import { DownloadSection, useDetectedPlatform } from "./DownloadSection";
 import { downloadLinks } from "./constants";
 import { AppleIcon, WindowsIcon, LinuxIcon } from "./icons";
@@ -15,7 +15,7 @@ function AuthenticatedHeader() {
     <header className="w-full px-6 max-sm:px-4 flex-shrink-0">
       <div className="py-[10px] flex gap-10 items-center justify-between">
         <div className="flex items-center gap-2">
-          <HackerAISVG scale={0.18} />
+          <SuricatoosAISVG scale={0.18} />
         </div>
         <Button
           asChild

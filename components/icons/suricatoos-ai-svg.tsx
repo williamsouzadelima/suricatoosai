@@ -1,6 +1,6 @@
 import type { FC } from "react";
 
-interface HackerAISVGProps {
+interface SuricatoosAISVGProps {
   // Opcional: quando omitido, as letras herdam currentColor (= --foreground do
   // tema atual), adaptando ao claro/escuro. Passe explicitamente só p/ forçar.
   theme?: "dark" | "light";
@@ -8,8 +8,8 @@ interface HackerAISVGProps {
 }
 
 // Suricatoos wordmark (mascote coral #ff7678 + letras em currentColor).
-// Mantém o nome/props HackerAISVG para compatibilidade com os imports existentes.
-export const HackerAISVG: FC<HackerAISVGProps> = ({ theme, scale = 1 }) => {
+// Mantém o nome/props SuricatoosAISVG para compatibilidade com os imports existentes.
+export const SuricatoosAISVG: FC<SuricatoosAISVGProps> = ({ theme, scale = 1 }) => {
   const letterColor =
     theme === "dark"
       ? "#ffffff"

@@ -10,7 +10,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { HackerAISVG } from "@/components/icons/hackerai-svg";
+import { SuricatoosAISVG } from "@/components/icons/suricatoos-ai-svg";
 
 /**
  * Casca compartilhada dos painéis internos (/admin, /engagements): sidebar navy
@@ -131,7 +131,7 @@ export function AppShell({
       {/* Sidebar */}
       <aside className="internal-sidebar hidden flex-col gap-1 px-3.5 py-[18px] text-[#c7d3e6] md:flex">
         <div className="flex flex-col gap-1.5 px-2 pb-5 pt-2">
-          <HackerAISVG theme="dark" scale={0.135} />
+          <SuricatoosAISVG theme="dark" scale={0.135} />
           <span className="pl-0.5 text-[11px] font-medium tracking-wide text-[#7d8ca8]">
             Offensive Security
           </span>

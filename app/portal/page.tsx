@@ -14,7 +14,7 @@ import {
   ListOrdered,
   KeyRound,
 } from "lucide-react";
-import { HackerAISVG } from "@/components/icons/hackerai-svg";
+import { SuricatoosAISVG } from "@/components/icons/suricatoos-ai-svg";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -292,7 +292,7 @@ export default function PortalPage() {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/[0.06] bg-gradient-to-r from-[#0f1f38] to-[#0b1626] px-4 py-3 text-[#c7d3e6] md:px-8">
-        <HackerAISVG theme="dark" scale={0.12} />
+        <SuricatoosAISVG theme="dark" scale={0.12} />
         <span className="hidden text-[13px] text-[#7d8ca8] sm:inline">
           Portal do Cliente
         </span>

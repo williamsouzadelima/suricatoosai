@@ -15,7 +15,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { HackerAISVG } from "@/components/icons/hackerai-svg";
+import { SuricatoosAISVG } from "@/components/icons/suricatoos-ai-svg";
 import { useTranslations } from "next-intl";
 import { useGlobalState } from "../contexts/GlobalState";
 import { useChats } from "../hooks/useChats";
@@ -230,7 +230,7 @@ const SidebarHeaderContentImpl: FC<SidebarHeaderContentImplProps> = ({
               </span>
             </span>
           ) : (
-            <HackerAISVG scale={isMobileOverlay ? 0.11 : 0.1} />
+            <SuricatoosAISVG scale={isMobileOverlay ? 0.11 : 0.1} />
           )}
         </Link>
 

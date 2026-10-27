@@ -26,15 +26,15 @@ import {
 import { Plus } from "lucide-react";
 import TextareaAutosize from "react-textarea-autosize";
 
-interface CustomizeHackerAIDialogProps {
+interface CustomizeSuricatoosDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export const CustomizeHackerAIDialog = ({
+export const CustomizeSuricatoosDialog = ({
   open,
   onOpenChange,
-}: CustomizeHackerAIDialogProps) => {
+}: CustomizeSuricatoosDialogProps) => {
   const t = useTranslations("settingsAgents");
 
   const predefinedTraits = t.raw("customize.predefinedTraits") as string[];

@@ -5,7 +5,7 @@ const SURICATOOS_DESKTOP_USER_AGENT_TOKEN = "Suricatoos-Desktop";
 export const LEGACY_DESKTOP_AGENT_UPDATE_MESSAGE =
   "Agent mode now requires the latest Suricatoos Desktop app. Please update Suricatoos Desktop, then try again.";
 
-export function isHackerAIDesktopUserAgent(
+export function isSuricatoosDesktopUserAgent(
   userAgent: string | null | undefined = getBrowserUserAgent(),
 ): boolean {
   return userAgent?.includes(SURICATOOS_DESKTOP_USER_AGENT_TOKEN) ?? false;
@@ -20,7 +20,7 @@ export function isLegacyDesktopAgentClient({
   isTauri: boolean;
   userAgent?: string | null;
 }): boolean {
-  return mode === "agent" && isTauri && !isHackerAIDesktopUserAgent(userAgent);
+  return mode === "agent" && isTauri && !isSuricatoosDesktopUserAgent(userAgent);
 }
 
 export function shouldUseAgentLongForAgent({

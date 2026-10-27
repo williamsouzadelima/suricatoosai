@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Copy, Check, Loader2, X as XIcon } from "lucide-react";
 import { toast } from "sonner";
-import { HackerAISVG } from "@/components/icons/hackerai-svg";
+import { SuricatoosAISVG } from "@/components/icons/suricatoos-ai-svg";
 import { MessagePartHandler } from "@/app/components/MessagePartHandler";
 import { FilePartRenderer } from "@/app/components/FilePartRenderer";
 
@@ -329,7 +329,7 @@ export const ShareDialog = ({
 
                 {/* Floating Suricatoos Logo - bottom left corner */}
                 <div className="absolute bottom-4 right-4 z-10">
-                  <HackerAISVG scale={0.12} />
+                  <SuricatoosAISVG scale={0.12} />
                 </div>
               </div>
             </div>

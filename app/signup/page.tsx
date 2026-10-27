@@ -4,7 +4,7 @@ import { getConvexClient } from "@/lib/db/convex-client";
 import { ArrowRight, Gift } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
-import { HackerAISVG } from "@/components/icons/hackerai-svg";
+import { SuricatoosAISVG } from "@/components/icons/suricatoos-ai-svg";
 import {
   getReferralRewardConfig,
   isValidReferralCode,
@@ -132,7 +132,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
     <main className="bg-background text-foreground flex min-h-dvh items-center justify-center px-5 py-10">
       <div className="w-full max-w-xl">
         <div className="mb-14 flex justify-start">
-          <HackerAISVG scale={0.15} />
+          <SuricatoosAISVG scale={0.15} />
         </div>
 
         <h1 className="text-4xl font-semibold tracking-normal md:text-5xl">

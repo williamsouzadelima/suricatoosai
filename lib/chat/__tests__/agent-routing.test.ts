@@ -1,6 +1,6 @@
 import {
   isLegacyDesktopAgentClient,
-  isHackerAIDesktopUserAgent,
+  isSuricatoosDesktopUserAgent,
   shouldUseAgentLongForAgent,
 } from "../agent-routing";
 
@@ -9,8 +9,8 @@ const DESKTOP_UA =
 
 describe("agent routing", () => {
   test("detects the Suricatoos desktop user agent token", () => {
-    expect(isHackerAIDesktopUserAgent(DESKTOP_UA)).toBe(true);
-    expect(isHackerAIDesktopUserAgent("Mozilla/5.0 Safari/605.1.15")).toBe(
+    expect(isSuricatoosDesktopUserAgent(DESKTOP_UA)).toBe(true);
+    expect(isSuricatoosDesktopUserAgent("Mozilla/5.0 Safari/605.1.15")).toBe(
       false,
     );
   });

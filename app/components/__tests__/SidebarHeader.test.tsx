@@ -20,9 +20,9 @@ jest.mock("@/components/ui/tooltip", () => ({
     <div>{children}</div>
   ),
 }));
-jest.mock("@/components/icons/hackerai-svg", () => ({
-  HackerAISVG: ({ scale }: { scale?: number }) => (
-    <div data-testid="hackerai-svg" data-scale={scale} />
+jest.mock("@/components/icons/suricatoos-ai-svg", () => ({
+  SuricatoosAISVG: ({ scale }: { scale?: number }) => (
+    <div data-testid="suricatoos-ai-svg" data-scale={scale} />
   ),
 }));
 jest.mock("@/app/contexts/GlobalState", () => ({
@@ -64,7 +64,7 @@ describe("SidebarHeaderContent", () => {
       name: "Open sidebar",
     });
 
-    expect(screen.queryByTestId("hackerai-svg")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("suricatoos-ai-svg")).not.toBeInTheDocument();
     expect(expandButton.querySelector("svg")).toBeInTheDocument();
     expect(expandButton).toHaveClass("size-9");
     expect(expandButton.querySelector("svg")).toHaveClass("size-[18px]");
@@ -94,7 +94,7 @@ describe("SidebarHeaderContent", () => {
 
     const homeLink = screen.getByRole("link", { name: "Suricatoos home" });
 
-    expect(homeLink).toContainElement(screen.getByTestId("hackerai-svg"));
+    expect(homeLink).toContainElement(screen.getByTestId("suricatoos-ai-svg"));
     expect(screen.queryByText("Suricatoos")).not.toBeInTheDocument();
     expect(screen.queryByText("Free")).not.toBeInTheDocument();
   });
@@ -117,7 +117,7 @@ describe("SidebarHeaderContent", () => {
     expect(
       screen.getByRole("link", { name: `Suricatoos ${label} home` }),
     ).toBeInTheDocument();
-    expect(screen.queryByTestId("hackerai-svg")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("suricatoos-ai-svg")).not.toBeInTheDocument();
     expect(screen.getByText("Suricatoos")).toBeInTheDocument();
     expect(screen.getByText(label)).toBeInTheDocument();
   });
@@ -137,7 +137,7 @@ describe("SidebarHeaderContent", () => {
     const homeLink = screen.getByRole("link", {
       name: "Suricatoos Pro home",
     });
-    const logo = screen.getByTestId("hackerai-svg");
+    const logo = screen.getByTestId("suricatoos-ai-svg");
 
     expect(homeLink).toContainElement(logo);
     expect(logo).toHaveAttribute("data-scale", "0.11");
