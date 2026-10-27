@@ -45,6 +45,7 @@
   --color-destructive: var(--destructive);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-sev-high: var(--sev-high);
   --color-premium-bg: var(--premium-bg);
   --color-premium-text: var(--premium-text);
   --color-premium-hover: var(--premium-hover);
@@ -97,6 +98,9 @@
   --destructive: #da2c3c;
   --success: #12996b;
   --warning: #c9820b;
+  /* Severidade ALTA: laranja (sem token Tone próprio). De-hex do #e8590c antes
+     hardcoded em findings.tsx/portal. Mesmo valor nos dois temas (sem regressão). */
+  --sev-high: #e8590c;
   --border: #dbe3ef;
   --input: #cfd9e8;
   --ring: #2456e6;
@@ -157,6 +161,7 @@
   --destructive: #f0596a;
   --success: #2bb783;
   --warning: #e0a020;
+  --sev-high: #e8590c;
   --border: #21324b;
   --input: #2c4160;
   --ring: #3f6ef0;

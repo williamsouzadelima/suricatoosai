@@ -12,6 +12,8 @@ import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import {
   ListOrdered,
+  ListChecks,
+  Wrench,
   Paperclip,
   Server,
   Image as ImageIcon,
@@ -65,14 +67,14 @@ export const SEV_LABEL: Record<Severity, string> = {
 };
 export const SEV_STRIPE: Record<Severity, string> = {
   critical: "bg-destructive",
-  high: "bg-[#e8590c]",
+  high: "bg-sev-high",
   medium: "bg-warning",
   low: "bg-primary",
   info: "bg-muted-foreground",
 };
 export const SEV_PILL: Record<Severity, string> = {
   critical: "text-destructive bg-destructive/10 border-destructive/25",
-  high: "text-[#e8590c] bg-[#e8590c]/10 border-[#e8590c]/25",
+  high: "text-sev-high bg-sev-high/10 border-sev-high/25",
   medium: "text-warning bg-warning/10 border-warning/25",
   low: "text-primary bg-primary/10 border-primary/25",
   info: "text-muted-foreground bg-muted border-border",
@@ -207,20 +209,62 @@ export function FindingActions({
  * screenshots e a CADEIA DE EVIDÊNCIA como timeline (passo → ferramenta →
  * comando → prova). Lê a evidência reativamente e ordena pela cadeia.
  */
-export function FindingEvidence({
+// Campos de detalhe do achado consumidos pelas abas do slide-over (/achados).
+type FindingDetailFields = {
+  description?: string;
+  impact?: string;
+  remediation?: string;
+  narrative?: string;
+  weakness_class: string;
+  cvss_vector?: string;
+  cwe?: string;
+  reproduction_steps?: string[];
+};
+
+/**
+ * Aba "Visão geral": metadados (classe/CVSS/CWE) + narrativa/descrição/impacto.
+ * Só texto editorial e dados do próprio achado — a evidência vive na aba Trace.
+ */
+export function FindingOverviewBody({
+  finding,
+}: {
+  finding: FindingDetailFields;
+}) {
+  const hasText = finding.narrative || finding.description || finding.impact;
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        <MetaChip label="Classe" value={finding.weakness_class} />
+        <MetaChip label="CVSS" value={finding.cvss_vector} mono />
+        <MetaChip label="CWE" value={finding.cwe} mono />
+      </div>
+      {finding.narrative && (
+        <EvBlock label="Narrativa" text={finding.narrative} />
+      )}
+      {finding.description && (
+        <EvBlock label="Descrição" text={finding.description} />
+      )}
+      {finding.impact && <EvBlock label="Impacto" text={finding.impact} />}
+      {!hasText && (
+        <p className="text-sm text-muted-foreground">
+          Sem narrativa, descrição ou impacto registrados ainda.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Aba "Trace": como a vulnerabilidade foi descoberta/explorada. Cadeia de
+ * evidência (passo→ferramenta→comando→prova) + passos para reproduzir
+ * (reproduction_steps — antes descartado da UI) + evidência visual (screenshots).
+ */
+export function FindingTraceBody({
   findingId,
   finding,
 }: {
   findingId: Id<"findings">;
-  finding: {
-    description?: string;
-    impact?: string;
-    remediation?: string;
-    narrative?: string;
-    weakness_class: string;
-    cvss_vector?: string;
-    cwe?: string;
-  };
+  finding: Pick<FindingDetailFields, "reproduction_steps">;
 }) {
   const evidenceRaw = useQuery(api.findings.listEvidenceForFinding, {
     findingId,
@@ -247,8 +291,7 @@ export function FindingEvidence({
   );
   // Disponibilidade por imagem: cada <img> resolve ok|err (onLoad/onError). Um
   // screenshot cujo objeto no S3 expirou (purge de 24h) devolve 404/502 → é
-  // marcado "indisponível" EXPLICITAMENTE, em vez de sumir calado (o
-  // comportamento antigo era display:none, que escondia o buraco).
+  // marcado "indisponível" EXPLICITAMENTE, em vez de sumir calado.
   const [imgState, setImgState] = useState<Record<string, "ok" | "err">>({});
   const markImg = (id: Id<"evidence">, s: "ok" | "err") =>
     setImgState((m) => (m[id] === s ? m : { ...m, [id]: s }));
@@ -256,63 +299,14 @@ export function FindingEvidence({
   const errCount = imageEvidence.filter((e) => imgState[e._id] === "err").length;
   const allResolved = okCount + errCount === imageEvidence.length;
 
+  const steps = finding.reproduction_steps ?? [];
+  const nothing =
+    (evidence?.length ?? 0) === 0 &&
+    steps.length === 0 &&
+    imageEvidence.length === 0;
+
   return (
-    <div className="space-y-4 rounded-xl border bg-muted/40 p-4">
-      <div className="flex flex-wrap gap-2">
-        <MetaChip label="Classe" value={finding.weakness_class} />
-        <MetaChip label="CVSS" value={finding.cvss_vector} mono />
-        <MetaChip label="CWE" value={finding.cwe} mono />
-      </div>
-      {finding.narrative && (
-        <EvBlock label="Narrativa" text={finding.narrative} />
-      )}
-      {finding.description && (
-        <EvBlock label="Descrição" text={finding.description} />
-      )}
-      {finding.impact && <EvBlock label="Impacto" text={finding.impact} />}
-      {finding.remediation && (
-        <EvBlock label="Remediação" text={finding.remediation} />
-      )}
-
-      {imageEvidence.length > 0 && (
-        <div>
-          <SubHead
-            icon={ImageIcon}
-            label="Evidência visual"
-            n={imageEvidence.length}
-          />
-          <div className="-mt-1.5 mb-2.5 text-[11px]">
-            {!allResolved ? (
-              <span className="text-muted-foreground">
-                verificando disponibilidade…
-              </span>
-            ) : errCount === 0 ? (
-              <span className="font-medium text-success">
-                {okCount}{" "}
-                {okCount === 1
-                  ? "screenshot disponível"
-                  : "screenshots disponíveis"}
-              </span>
-            ) : (
-              <span className="font-medium text-warning">
-                {okCount} de {imageEvidence.length} disponíveis · {errCount}{" "}
-                indisponíve{errCount > 1 ? "is" : "l"} (expiraram — recapturar)
-              </span>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-            {imageEvidence.map((ev) => (
-              <EvidenceThumb
-                key={ev._id}
-                ev={ev}
-                state={imgState[ev._id]}
-                onState={markImg}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
+    <div className="space-y-5">
       <div>
         <SubHead
           icon={ListOrdered}
@@ -323,7 +317,9 @@ export function FindingEvidence({
           <div className="text-xs text-muted-foreground">Carregando…</div>
         ) : evidence.length === 0 ? (
           <Callout tone="warning">
-            Sem evidência — aprovar exige ao menos uma evidência.
+            Sem cadeia de evidência estruturada. Achados capturados só pela
+            ferramenta ao vivo podem não ter cadeia; aprovar exige ao menos uma
+            evidência.
           </Callout>
         ) : (
           <div className="relative pl-1">
@@ -382,6 +378,140 @@ export function FindingEvidence({
           </div>
         )}
       </div>
+
+      {steps.length > 0 && (
+        <div>
+          <SubHead
+            icon={ListChecks}
+            label="Passos para reproduzir"
+            n={steps.length}
+          />
+          <ol className="space-y-2">
+            {steps.map((s, i) => (
+              <li key={i} className="flex gap-3 text-[13px] leading-relaxed">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-bold text-primary">
+                  {i + 1}
+                </span>
+                <span className="text-foreground/85">{s}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {imageEvidence.length > 0 && (
+        <div>
+          <SubHead
+            icon={ImageIcon}
+            label="Evidência visual"
+            n={imageEvidence.length}
+          />
+          <div className="-mt-1.5 mb-2.5 text-[11px]">
+            {!allResolved ? (
+              <span className="text-muted-foreground">
+                verificando disponibilidade…
+              </span>
+            ) : errCount === 0 ? (
+              <span className="font-medium text-success">
+                {okCount}{" "}
+                {okCount === 1
+                  ? "screenshot disponível"
+                  : "screenshots disponíveis"}
+              </span>
+            ) : (
+              <span className="font-medium text-warning">
+                {okCount} de {imageEvidence.length} disponíveis · {errCount}{" "}
+                indisponíve{errCount > 1 ? "is" : "l"} (expiraram — recapturar)
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+            {imageEvidence.map((ev) => (
+              <EvidenceThumb
+                key={ev._id}
+                ev={ev}
+                state={imgState[ev._id]}
+                onState={markImg}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {nothing && evidence !== undefined && (
+        <p className="text-sm text-muted-foreground">
+          Sem trace ainda — nem cadeia de evidência, nem passos para reproduzir,
+          nem screenshots.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Aba "Correção": remediação estruturada (derivada do achado) + CWE. SEM
+ * percentuais fabricados — só o que existe no dado (remediation + cwe).
+ */
+export function FindingFixBody({
+  finding,
+}: {
+  finding: Pick<FindingDetailFields, "remediation" | "cwe">;
+}) {
+  if (!finding.remediation && !finding.cwe) {
+    return <Callout tone="warning">Sem remediação registrada ainda.</Callout>;
+  }
+  return (
+    <div className="rounded-xl border bg-card p-4 shadow-[var(--shadow-soft)]">
+      <div className="mb-3 flex items-center gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
+          <Wrench className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-foreground">
+            Remediação recomendada
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Derivada do conteúdo do achado
+            {finding.cwe ? ` · ${finding.cwe}` : ""}
+          </div>
+        </div>
+      </div>
+      {finding.remediation ? (
+        <p className="whitespace-pre-wrap break-words text-[13.5px] leading-relaxed text-foreground/80">
+          {finding.remediation}
+        </p>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Sem texto de remediação; referência de classe (CWE) abaixo.
+        </p>
+      )}
+      {finding.cwe && (
+        <div className="mt-3">
+          <span className="inline-block rounded-md border bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground">
+            {finding.cwe}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Corpo completo do achado (as 3 abas empilhadas). Mantido p/ retrocompat;
+ * o /achados consome as abas separadas (FindingOverviewBody/Trace/Fix).
+ */
+export function FindingEvidence({
+  findingId,
+  finding,
+}: {
+  findingId: Id<"findings">;
+  finding: FindingDetailFields;
+}) {
+  return (
+    <div className="space-y-4 rounded-xl border bg-muted/40 p-4">
+      <FindingOverviewBody finding={finding} />
+      <FindingFixBody finding={finding} />
+      <FindingTraceBody findingId={findingId} finding={finding} />
     </div>
   );
 }
