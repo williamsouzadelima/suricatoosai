@@ -21,9 +21,10 @@ import {
   Server,
   BarChart3,
   Pencil,
+  Target,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +66,63 @@ const ENG_STATUS_LABEL: Record<string, string> = {
   reporting: "Relatório",
   closed: "Fechado",
 };
+
+// ── Escopo do engajamento (alvos autorizados + janela) ──────────────────────
+// scopeItemArg (convex/engagements.ts): { kind, value, in_scope, note? }.
+type ScopeKind = "domain" | "ip" | "cidr" | "url" | "app" | "other";
+const SCOPE_KINDS: ScopeKind[] = ["domain", "ip", "cidr", "url", "app", "other"];
+const SCOPE_KIND_LABEL: Record<ScopeKind, string> = {
+  domain: "Domínio",
+  ip: "IP",
+  cidr: "CIDR",
+  url: "URL",
+  app: "App",
+  other: "Outro",
+};
+type ScopeRow = {
+  id: string;
+  kind: ScopeKind;
+  value: string;
+  in_scope: boolean;
+  note: string;
+};
+
+// starts_at/ends_at são ms epoch; o <input type="date"> trabalha em YYYY-MM-DD
+// no fuso LOCAL do operador. Começo do dia p/ início, fim do dia p/ término,
+// pra a janela de autorização incluir o dia final inteiro.
+function toDateInputValue(ts?: number): string {
+  if (typeof ts !== "number" || !Number.isFinite(ts)) return "";
+  const d = new Date(ts);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function dayStartMs(dateStr: string): number {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
+}
+function dayEndMs(dateStr: string): number {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d, 23, 59, 59, 999).getTime();
+}
+// Chave de "sujo": escopo normalizado (trim + sem linhas vazias) + janela + código.
+function scopeDraftKey(
+  rows: ScopeRow[],
+  code: string,
+  startsAt: string,
+  endsAt: string,
+): string {
+  const scope = rows
+    .map((r) => ({
+      kind: r.kind,
+      value: r.value.trim(),
+      in_scope: r.in_scope,
+      note: r.note.trim(),
+    }))
+    .filter((r) => r.value.length > 0);
+  return JSON.stringify({ scope, code: code.trim(), startsAt, endsAt });
+}
 
 export function EngagementsPanel({
   userEmail,
@@ -518,6 +576,10 @@ function EngagementDetail({
         </div>
       </Card>
 
+      {engagement && (
+        <ScopeEditor key={engagement._id} engagement={engagement} />
+      )}
+
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatCard
           label="Achados"
@@ -868,6 +930,248 @@ function EngagementDetail({
         </Card>
       </div>
     </>
+  );
+}
+
+// Editor de escopo + janela de autorização. Montado com key={engagement._id}
+// (remonta ao trocar de engajamento → re-semeia); estado semeado nos
+// inicializadores de useState (sem effects → sem set-state-in-effect).
+function ScopeEditor({ engagement }: { engagement: Doc<"engagements"> }) {
+  const updateEngagement = useMutation(api.engagements.updateEngagement);
+
+  const [rows, setRows] = useState<ScopeRow[]>(() =>
+    (engagement.scope ?? []).map((s) => ({
+      id: crypto.randomUUID(),
+      kind: s.kind,
+      value: s.value,
+      in_scope: s.in_scope,
+      note: s.note ?? "",
+    })),
+  );
+  const [code, setCode] = useState(() => engagement.code ?? "");
+  const [startsAt, setStartsAt] = useState(() =>
+    toDateInputValue(engagement.starts_at),
+  );
+  const [endsAt, setEndsAt] = useState(() =>
+    toDateInputValue(engagement.ends_at),
+  );
+  const [saving, setSaving] = useState(false);
+  // Snapshot inicial p/ detectar "sujo" — recomputado da mesma fonte que semeia.
+  const [initialSnap, setInitialSnap] = useState(() =>
+    scopeDraftKey(
+      (engagement.scope ?? []).map((s) => ({
+        id: "",
+        kind: s.kind,
+        value: s.value,
+        in_scope: s.in_scope,
+        note: s.note ?? "",
+      })),
+      engagement.code ?? "",
+      toDateInputValue(engagement.starts_at),
+      toDateInputValue(engagement.ends_at),
+    ),
+  );
+
+  const currentKey = useMemo(
+    () => scopeDraftKey(rows, code, startsAt, endsAt),
+    [rows, code, startsAt, endsAt],
+  );
+  const dirty = currentKey !== initialSnap;
+
+  const addRow = () =>
+    setRows((rs) => [
+      ...rs,
+      {
+        id: crypto.randomUUID(),
+        kind: "domain",
+        value: "",
+        in_scope: true,
+        note: "",
+      },
+    ]);
+  const patchRow = (id: string, patch: Partial<ScopeRow>) =>
+    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const removeRow = (id: string) =>
+    setRows((rs) => rs.filter((r) => r.id !== id));
+
+  const save = async () => {
+    const scope = rows
+      .map((r) => ({
+        kind: r.kind,
+        value: r.value.trim(),
+        in_scope: r.in_scope,
+        note: r.note.trim() || undefined,
+      }))
+      .filter((r) => r.value.length > 0);
+    const startsMs = startsAt ? dayStartMs(startsAt) : undefined;
+    const endsMs = endsAt ? dayEndMs(endsAt) : undefined;
+    if (startsMs !== undefined && endsMs !== undefined && endsMs < startsMs) {
+      toast.error("A data final da autorização é anterior à inicial.");
+      return;
+    }
+    setSaving(true);
+    try {
+      // Datas vazias passam undefined (no-op na mutation); limpar uma data já
+      // definida não é suportado nesta v1 (campo opcional não aceita null).
+      await updateEngagement({
+        engagementId: engagement._id,
+        scope,
+        code: code.trim(),
+        ...(startsMs !== undefined ? { startsAt: startsMs } : {}),
+        ...(endsMs !== undefined ? { endsAt: endsMs } : {}),
+      });
+      setInitialSnap(currentKey);
+      toast.success(
+        "Escopo salvo. O agente recebe estes alvos nas execuções vinculadas.",
+      );
+    } catch (e) {
+      toast.error("Falha ao salvar o escopo.");
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inScopeCount = rows.filter((r) => r.in_scope && r.value.trim()).length;
+  const outScopeCount = rows.filter(
+    (r) => !r.in_scope && r.value.trim(),
+  ).length;
+
+  return (
+    <Card className="gap-0 py-0">
+      <div className="flex items-center justify-between gap-3 border-b p-5">
+        <SectionHeader
+          icon={Target}
+          title="Escopo & autorização"
+          description="Alvos autorizados do engajamento. O agente de pentest recebe este escopo (e as exclusões) no contexto a cada execução vinculada."
+        />
+        <Button
+          size="sm"
+          onClick={() => void save()}
+          disabled={!dirty || saving}
+        >
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Salvar escopo
+        </Button>
+      </div>
+      <CardContent className="flex flex-col gap-4 p-5">
+        <div className="flex flex-col gap-2">
+          {rows.length === 0 ? (
+            <p className="rounded-lg border border-dashed bg-muted/20 px-3 py-4 text-center text-xs text-muted-foreground">
+              Nenhum alvo definido. Adicione domínios, IPs, faixas CIDR, URLs ou
+              apps — e marque o que está fora de escopo.
+            </p>
+          ) : (
+            rows.map((r) => (
+              <div
+                key={r.id}
+                className="flex flex-col gap-2 rounded-lg border bg-card p-2.5 sm:flex-row sm:items-center"
+              >
+                <select
+                  className="h-9 shrink-0 rounded-md border bg-background px-2 text-sm"
+                  value={r.kind}
+                  onChange={(e) =>
+                    patchRow(r.id, { kind: e.target.value as ScopeKind })
+                  }
+                >
+                  {SCOPE_KINDS.map((k) => (
+                    <option key={k} value={k}>
+                      {SCOPE_KIND_LABEL[k]}
+                    </option>
+                  ))}
+                </select>
+                <Input
+                  className="flex-1 font-mono text-sm"
+                  placeholder="alvo (ex.: app.cliente.com, 10.0.0.0/24)"
+                  value={r.value}
+                  onChange={(e) => patchRow(r.id, { value: e.target.value })}
+                />
+                <button
+                  type="button"
+                  onClick={() => patchRow(r.id, { in_scope: !r.in_scope })}
+                  className={cn(
+                    "inline-flex h-9 shrink-0 items-center justify-center rounded-md border px-2.5 text-xs font-semibold transition-colors",
+                    r.in_scope
+                      ? "border-success/30 bg-success/10 text-success"
+                      : "border-destructive/30 bg-destructive/10 text-destructive",
+                  )}
+                  title="Alternar em escopo / fora de escopo"
+                >
+                  {r.in_scope ? "Em escopo" : "Excluído"}
+                </button>
+                <Input
+                  className="text-sm sm:max-w-[12rem]"
+                  placeholder="nota (opcional)"
+                  value={r.note}
+                  onChange={(e) => patchRow(r.id, { note: e.target.value })}
+                />
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => removeRow(r.id)}
+                  title="Remover alvo"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-2">
+          <Button variant="outline" size="sm" onClick={addRow}>
+            <Plus className="h-4 w-4" /> Adicionar alvo
+          </Button>
+          {rows.length > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {inScopeCount} em escopo · {outScopeCount} excluído(s)
+            </span>
+          )}
+        </div>
+
+        <div className="grid gap-3 border-t pt-4 sm:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Código do engajamento
+            </label>
+            <Input
+              placeholder="ex.: PENTEST-2026-014"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Autorizado a partir de
+            </label>
+            <input
+              type="date"
+              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              value={startsAt}
+              max={endsAt || undefined}
+              onChange={(e) => setStartsAt(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Autorizado até
+            </label>
+            <input
+              type="date"
+              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              value={endsAt}
+              min={startsAt || undefined}
+              onChange={(e) => setEndsAt(e.target.value)}
+            />
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          A janela de autorização delimita quando o pentest pode rodar. A
+          recorrência (em breve) não dispara execuções após a data final.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
