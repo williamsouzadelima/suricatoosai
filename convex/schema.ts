@@ -242,6 +242,10 @@ export default defineSchema({
     project_id: v.optional(v.id("projects")),
     // Feature de evidências/relatórios: um chat pertence a ≤1 engajamento.
     engagement_id: v.optional(v.id("engagements")),
+    // Prompt pré-semeado (recorrência de reavaliação): o composer pré-preenche
+    // ao abrir o chat e limpa no envio. Setado pelo dispatcher; nunca dispara
+    // nada por si — o lançamento continua sendo o envio do operador.
+    pending_prompt: v.optional(v.string()),
     // Legacy field retained on historical rows. The local-provider feature
     // was removed and nothing reads or writes this anymore — kept in the
     // schema so old rows still pass validation.

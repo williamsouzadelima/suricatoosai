@@ -53,6 +53,7 @@ const UNAUTHENTICATED_PATHS = new Set([
   "/access/not-invited",
   "/unsubscribe",
   "/api/cron/dispatch-campaigns",
+  "/api/cron/dispatch-reassessments",
   "/privacy-policy",
   "/terms-of-service",
   "/trust",
