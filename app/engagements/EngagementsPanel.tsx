@@ -580,6 +580,10 @@ function EngagementDetail({
         <ScopeEditor key={engagement._id} engagement={engagement} />
       )}
 
+      {engagement && (
+        <ScheduleEditor key={engagement._id} engagement={engagement} />
+      )}
+
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatCard
           label="Achados"
@@ -1170,6 +1174,231 @@ function ScopeEditor({ engagement }: { engagement: Doc<"engagements"> }) {
           A janela de autorização delimita quando o pentest pode rodar. A
           recorrência (em breve) não dispara execuções após a data final.
         </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Recorrência (reavaliação agendada). Lê o agendamento ao vivo; o form usa
+// defaults (sem semear do query async → sem effects/lint). Pausar/retomar/remover
+// agem direto no agendamento existente.
+const SCHEDULE_STATUS_TONE: Record<string, Tone> = {
+  active: "success",
+  dispatching: "primary",
+  paused: "warning",
+};
+const SCHEDULE_STATUS_LABEL: Record<string, string> = {
+  active: "Ativa",
+  dispatching: "Processando",
+  paused: "Pausada",
+};
+const SCHEDULE_LAST_LABEL: Record<string, string> = {
+  ok: "rascunho criado",
+  failed: "falhou",
+  authorization_expired: "pausada: janela de autorização expirada",
+};
+
+function ScheduleEditor({ engagement }: { engagement: Doc<"engagements"> }) {
+  const schedule = useQuery(api.engagements.getScheduleForEngagement, {
+    engagementId: engagement._id,
+  });
+  const setSchedule = useMutation(api.engagements.setScheduleForEngagement);
+  const pauseSchedule = useMutation(api.engagements.pauseScheduleForEngagement);
+  const removeSchedule = useMutation(
+    api.engagements.removeScheduleForEngagement,
+  );
+
+  const [intervalDays, setIntervalDays] = useState("30");
+  const [firstRun, setFirstRun] = useState(() =>
+    toDateInputValue(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  );
+  const [busy, setBusy] = useState(false);
+  const exists = !!schedule;
+
+  const applySchedule = async () => {
+    const n = Number(intervalDays);
+    if (!Number.isFinite(n) || n < 1 || n > 365) {
+      toast.error("Intervalo deve ficar entre 1 e 365 dias.");
+      return;
+    }
+    if (!firstRun) {
+      toast.error("Escolha a data da próxima execução.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await setSchedule({
+        engagementId: engagement._id,
+        intervalDays: n,
+        nextRunAt: dayStartMs(firstRun),
+      });
+      toast.success(
+        exists ? "Agendamento atualizado." : "Recorrência ativada.",
+      );
+    } catch {
+      toast.error("Falha ao salvar o agendamento.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const togglePause = async (paused: boolean) => {
+    setBusy(true);
+    try {
+      await pauseSchedule({ engagementId: engagement._id, paused });
+      toast.success(paused ? "Recorrência pausada." : "Recorrência retomada.");
+    } catch {
+      toast.error("Falha ao alterar o agendamento.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!window.confirm("Remover a recorrência deste engajamento?")) return;
+    setBusy(true);
+    try {
+      await removeSchedule({ engagementId: engagement._id });
+      toast.success("Recorrência removida.");
+    } catch {
+      toast.error("Falha ao remover a recorrência.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card className="gap-0 py-0">
+      <div className="flex items-center justify-between gap-3 border-b p-5">
+        <SectionHeader
+          icon={RefreshCw}
+          title="Recorrência (reavaliação agendada)"
+          description="Agenda rascunhos de reavaliação no mesmo escopo. Cada ciclo cria um chat pronto para o operador lançar — nunca roda sozinho — e respeita a janela de autorização."
+        />
+        {schedule && (
+          <StatusBadge
+            tone={SCHEDULE_STATUS_TONE[schedule.status] ?? "neutral"}
+            label={SCHEDULE_STATUS_LABEL[schedule.status] ?? schedule.status}
+          />
+        )}
+      </div>
+      <CardContent className="flex flex-col gap-4 p-5">
+        {schedule === undefined ? (
+          <div className="text-sm text-muted-foreground">Carregando…</div>
+        ) : (
+          <>
+            {schedule && (
+              <div className="flex flex-col gap-1 rounded-lg border bg-card p-3 text-sm">
+                <div>
+                  A cada <strong>{schedule.interval_days}</strong> dia(s) ·
+                  próxima:{" "}
+                  <strong>{formatDateTime(schedule.next_run_at)}</strong>
+                </div>
+                {schedule.last_dispatched_at && (
+                  <div className="text-xs text-muted-foreground">
+                    Último rascunho: {formatDateTime(schedule.last_dispatched_at)}
+                    {schedule.last_chat_id && (
+                      <>
+                        {" · "}
+                        <a
+                          href={`/c/${schedule.last_chat_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          abrir chat
+                        </a>
+                      </>
+                    )}
+                    {schedule.last_status && (
+                      <>
+                        {" · "}
+                        {SCHEDULE_LAST_LABEL[schedule.last_status] ??
+                          schedule.last_status}
+                      </>
+                    )}
+                  </div>
+                )}
+                {schedule.last_error && (
+                  <div className="text-xs text-destructive">
+                    Erro: {schedule.last_error}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                  Intervalo (dias)
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={intervalDays}
+                  onChange={(e) => setIntervalDays(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                  {exists ? "Reagendar próxima para" : "Primeira execução"}
+                </label>
+                <input
+                  type="date"
+                  className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                  value={firstRun}
+                  onChange={(e) => setFirstRun(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" onClick={() => void applySchedule()} disabled={busy}>
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {exists ? "Atualizar agendamento" : "Ativar recorrência"}
+              </Button>
+              {schedule && schedule.status !== "paused" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void togglePause(true)}
+                  disabled={busy}
+                >
+                  Pausar
+                </Button>
+              )}
+              {schedule && schedule.status === "paused" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void togglePause(false)}
+                  disabled={busy}
+                >
+                  Retomar
+                </Button>
+              )}
+              {exists && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void handleRemove()}
+                  disabled={busy}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  Remover
+                </Button>
+              )}
+            </div>
+
+            {!engagement.ends_at && (
+              <p className="text-xs text-muted-foreground">
+                Defina a janela de autorização no bloco de escopo acima — sem
+                data final, a recorrência não tem limite de autorização.
+              </p>
+            )}
+          </>
+        )}
       </CardContent>
     </Card>
   );
