@@ -394,6 +394,30 @@ export const setReassessmentDraftFieldsForBackend = mutation({
   },
 });
 
+/**
+ * Limpa o pending_prompt do chat (AUTH, posse): o composer chama após
+ * pré-preencher, pra não re-oferecer o prompt num reload. Silencioso se não
+ * houver chat/acesso (nada a limpar).
+ */
+export const clearChatPendingPrompt = mutation({
+  args: { chatId: v.string() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({ code: "UNAUTHORIZED", message: "Unauthorized" });
+    }
+    const chat = await ctx.db
+      .query("chats")
+      .withIndex("by_chat_id", (q) => q.eq("id", args.chatId))
+      .first();
+    if (!chat || chat.user_id !== identity.subject) return null;
+    if (chat.pending_prompt !== undefined) {
+      await ctx.db.patch(chat._id, { pending_prompt: undefined });
+    }
+    return null;
+  },
+});
+
 export const createEngagement = mutation({
   args: {
     clientId: v.id("clients"),

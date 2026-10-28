@@ -30,7 +30,7 @@ import Footer from "./Footer";
 import { useMessageScroll } from "../hooks/useMessageScroll";
 import { useChatHandlers } from "../hooks/useChatHandlers";
 import { useGlobalState } from "../contexts/GlobalState";
-import { useComposerInput } from "../contexts/ComposerState";
+import { useComposerActions, useComposerInput } from "../contexts/ComposerState";
 import { useChatRoutePresentation } from "../contexts/ChatRoutePresentationContext";
 import {
   type ActiveAgentToolApprovalRequest,
@@ -508,6 +508,56 @@ function ForkAutoSendEffect({
     sessionStorage.removeItem("autoSendChatId");
     void onSubmit(new Event("submit") as unknown as React.FormEvent);
   }, [chatId, input, isExistingChat, messageCount, onSubmit, status]);
+
+  return null;
+}
+
+// Pré-preenche o composer com o `pending_prompt` semeado pelo dispatcher de
+// reavaliações agendadas, ao abrir um chat-rascunho vazio, e limpa o campo no
+// servidor. Espelha ForkAutoSendEffect: sibling que renderiza null + guard
+// one-shot via ref. Passive useEffect (roda DEPOIS do draft-seed layout effect
+// do ChatInputTextarea) → precedência: rascunho do operador > pending_prompt.
+function PendingPromptPrefillEffect({
+  chatId,
+  status,
+  isExistingChat,
+  messageCount,
+  pendingPrompt,
+}: {
+  chatId: string;
+  status: UseChatHelpers<ChatMessage>["status"];
+  isExistingChat: boolean;
+  messageCount: number;
+  pendingPrompt: string | undefined;
+}) {
+  const input = useComposerInput();
+  const { setInput } = useComposerActions();
+  const clearPendingPrompt = useMutation(api.engagements.clearChatPendingPrompt);
+  const firedRef = useRef(false);
+
+  useEffect(() => {
+    if (firedRef.current) return;
+    if (!pendingPrompt) return;
+    if (status !== "ready") return;
+    // Clear-on-fill: se já há rascunho do operador (input não-vazio), recua e
+    // NÃO limpa o servidor (o prompt é re-oferecido num próximo open).
+    if (input.trim()) return;
+    // Só num chat existente e ainda sem mensagens (o rascunho agendado).
+    if (!isExistingChat || messageCount !== 0) return;
+
+    firedRef.current = true;
+    setInput(pendingPrompt);
+    void clearPendingPrompt({ chatId });
+  }, [
+    chatId,
+    input,
+    isExistingChat,
+    messageCount,
+    pendingPrompt,
+    setInput,
+    clearPendingPrompt,
+    status,
+  ]);
 
   return null;
 }
@@ -2128,6 +2178,14 @@ export const Chat = ({ autoResume }: { autoResume: boolean }) => {
         isExistingChat={isExistingChat}
         messageCount={messages.length}
         onSubmit={handleSubmit}
+      />
+      <PendingPromptPrefillEffect
+        key={`pending-prompt-prefill:${chatId}`}
+        chatId={chatId}
+        status={status}
+        isExistingChat={isExistingChat}
+        messageCount={messages.length}
+        pendingPrompt={chatDataForCurrentChat?.pending_prompt}
       />
       <div className="flex min-h-0 flex-1 w-full flex-col bg-background overflow-hidden">
         <div className="flex min-h-0 flex-1 min-w-0 relative">
