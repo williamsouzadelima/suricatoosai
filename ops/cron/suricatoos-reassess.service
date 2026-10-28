@@ -1,0 +1,7 @@
+[Unit]
+Description=Suricatoos — dispatcher de reavaliacoes agendadas (recorrencia)
+After=network-online.target suricatoos-next.service
+
+[Service]
+Type=oneshot
+ExecStart=/root/suricatoos/ops/cron/dispatch-reassessments.sh
