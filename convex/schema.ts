@@ -921,6 +921,35 @@ export default defineSchema({
     failed: v.optional(v.number()),
   }).index("by_status_and_time", ["status", "scheduled_at"]),
 
+  // Reavaliações agendadas (recorrência de assessment). UMA linha por
+  // engajamento (patch-in-place, re-armada). O dispatcher (timer no Kali →
+  // /api/cron/dispatch-reassessments) reclama as "active" vencidas de forma
+  // atômica (active -> dispatching + claimed_at = lease), cria um RASCUNHO
+  // (chat vinculado + escopo semeado, não enviado) e re-arma (next_run_at +=
+  // intervalo). `claimed_at` é o lease: um dispatcher morto no meio deixa a
+  // linha em "dispatching"; o claim reaproveita leases vencidos (reaper).
+  scheduled_assessments: defineTable({
+    engagement_id: v.id("engagements"),
+    user_id: v.string(), // analista dono (cria o chat + lê o escopo)
+    interval_days: v.number(),
+    next_run_at: v.number(), // epoch ms (vencimento)
+    status: v.union(
+      v.literal("active"),
+      v.literal("dispatching"),
+      v.literal("paused"),
+    ),
+    claimed_at: v.optional(v.number()), // lease: setado ao reclamar
+    last_dispatched_at: v.optional(v.number()),
+    last_chat_id: v.optional(v.string()), // o rascunho do último ciclo
+    last_status: v.optional(v.string()), // "ok" | "failed" | "authorization_expired"
+    last_error: v.optional(v.string()),
+    created_by: v.optional(v.string()),
+    created_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_status_and_time", ["status", "next_run_at"])
+    .index("by_engagement", ["engagement_id"]),
+
   // Log de auditoria de ações do /admin (quem fez o quê).
   audit_log: defineTable({
     actor: v.string(),
