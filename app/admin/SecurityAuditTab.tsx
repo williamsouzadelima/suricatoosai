@@ -39,6 +39,13 @@ const EVENTS: { value: string; label: string; tone: Tone }[] = [
     label: "Evidência baixada",
     tone: "primary",
   },
+  { value: "mfa.challenge_issued", label: "MFA: desafio emitido", tone: "info" },
+  { value: "mfa.verify_succeeded", label: "MFA: verificado", tone: "success" },
+  {
+    value: "mfa.verify_failed",
+    label: "MFA: falha na verificação",
+    tone: "warning",
+  },
   { value: "artifact.url_issued", label: "URL emitida", tone: "warning" },
   { value: "membership.granted", label: "Acesso concedido", tone: "success" },
   { value: "membership.revoked", label: "Acesso revogado", tone: "warning" },
