@@ -29,7 +29,7 @@ const OPERATOR_MODEL_OPTIONS: ModelOption[] = [
   },
   {
     id: "model-suricatoos-cerberus",
-    label: "Suricatoos Local",
+    label: "Suricatoos",
     description: "Modelo local (em teste)",
     poweredBy: "Suricatoos · local",
   },

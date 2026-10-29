@@ -1141,7 +1141,7 @@ export const modelDisplayNames: Record<ModelName, string> &
   "model-glm-5.3-flash-pro": "Z.ai GLM 5.3 Flash",
   "model-deepseek-v4-flash-vision": "DeepSeek V4 Flash Vision",
   "model-kimi-k3": "Moonshot Kimi K3",
-  "model-suricatoos-cerberus": "Suricatoos Local",
+  "model-suricatoos-cerberus": "Suricatoos",
   "fallback-agent-model": "Auto, an intelligent model router built by Suricatoos",
   "fallback-ask-model": "Auto, an intelligent model router built by Suricatoos",
   "title-generator-model": "DeepSeek V4 Flash",
