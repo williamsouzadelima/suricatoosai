@@ -1086,7 +1086,7 @@ const buildProviderMap = (
 const baseProviders = {
   ...buildProviderMap(openrouter),
   // Modelo LOCAL Suricatoos (cerberus) -> endpoint 'auto' do router. Opcao de teste.
-  "model-suricatoos-cerberus": cerberus("auto"),
+  "model-suricatoos-cerberus": cerberus.chat("auto"),
 } as Record<string, any>;
 
 export type ModelName = keyof typeof baseProviders;
