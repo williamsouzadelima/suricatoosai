@@ -91,6 +91,7 @@ describe("ModelSelector tier ↔ provider drift", () => {
       "model-deepseek-v4.1-flash",
       "model-deepseek-v4-flash-0731",
       "model-kimi-k3",
+      "model-suricatoos-cerberus",
     ].sort();
     expect(ASK_MODEL_OPTIONS.map((o) => o.id).sort()).toEqual(expected);
     expect(AGENT_MODEL_OPTIONS.map((o) => o.id).sort()).toEqual(expected);
