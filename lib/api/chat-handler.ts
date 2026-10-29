@@ -941,7 +941,10 @@ export const createChatHandler = () => {
             const contextUsageOn = isContextUsageEnabled(subscription, mode);
             const ctxSystemTokens = contextUsageOn ? systemPromptTokens : 0;
             const ctxMaxTokens = contextUsageOn
-              ? getMaxTokensForSubscription(subscription, { mode })
+              ? getMaxTokensForSubscription(subscription, {
+                  mode,
+                  modelName: selectedModel,
+                })
               : 0;
             // finalMessages will be set in prepareStep if summarization is needed
             let finalMessages = processedMessages;

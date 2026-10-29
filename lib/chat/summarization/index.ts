@@ -795,8 +795,11 @@ export const checkAndSummarizeIfNeeded = async ({
   }
 
   // Check token threshold on full messages (including summary) to determine need
-  const effectiveMaxTokensOverride =
-    providerPromptPressure?.summarizationMaxTokensOverride ?? maxTokensOverride;
+  const effectiveMaxTokensOverride = Math.min(
+    providerPromptPressure?.summarizationMaxTokensOverride ??
+      Number.POSITIVE_INFINITY,
+    maxTokensOverride ?? Number.POSITIVE_INFINITY,
+  );
   const maxTokens = resolveSummarizationMaxTokens(
     subscription,
     effectiveMaxTokensOverride,
