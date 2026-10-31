@@ -42,6 +42,9 @@ export function getCostTier(modelId: string): CostTier {
     // Mais caro ($$$+): Kimi K3 ~$15.00.
     case "model-kimi-k3":
       return "very-high";
+    // LOCAL (cerberus): $0 pra nos; mostra como mais barato ($).
+    case "model-suricatoos-cerberus":
+      return "low";
     default:
       return "medium";
   }

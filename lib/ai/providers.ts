@@ -1,5 +1,6 @@
 import { customProvider } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createOpenAI } from "@ai-sdk/openai";
 import type { ChatMode, SelectedModel } from "@/types/chat";
 import { isOperatorModelSelection } from "@/types/chat";
 import { openrouterAttributionHeaders } from "@/lib/ai/openrouter-attribution";
@@ -978,6 +979,16 @@ const openrouter = createOpenRouter({
 
 type OpenRouterInstance = typeof openrouter;
 
+// Provider OpenAI-compatible para o LLM LOCAL do cerberus (endpoint 'auto' do
+// router, via tailnet). Adicionado como opcao de teste; NAO substitui o OpenRouter.
+const cerberus = createOpenAI({
+  baseURL:
+    process.env.CERBERUS_BASE_URL ??
+    "https://cerberus.tail893222.ts.net:8443/v1",
+  apiKey: process.env.CERBERUS_API_KEY ?? "",
+  name: "cerberus",
+});
+
 export const KIMI_K3_SLUG = "moonshotai/kimi-k3";
 export const GLM_5_2_SLUG = "z-ai/glm-5.2";
 export const GLM_5_3_SLUG = "z-ai/glm-5.3";
@@ -1072,7 +1083,11 @@ const buildProviderMap = (
     "auxiliary-vision-model": or(AUXILIARY_VISION_SLUG),
   }) as Record<string, any>;
 
-const baseProviders = buildProviderMap(openrouter);
+const baseProviders = {
+  ...buildProviderMap(openrouter),
+  // Modelo LOCAL Suricatoos (cerberus) -> endpoint 'auto' do router. Opcao de teste.
+  "model-suricatoos-cerberus": cerberus.chat("auto"),
+} as Record<string, any>;
 
 export type ModelName = keyof typeof baseProviders;
 
@@ -1126,6 +1141,7 @@ export const modelDisplayNames: Record<ModelName, string> &
   "model-glm-5.3-flash-pro": "Z.ai GLM 5.3 Flash",
   "model-deepseek-v4-flash-vision": "DeepSeek V4 Flash Vision",
   "model-kimi-k3": "Moonshot Kimi K3",
+  "model-suricatoos-cerberus": "Suricatoos",
   "fallback-agent-model": "Auto, an intelligent model router built by Suricatoos",
   "fallback-ask-model": "Auto, an intelligent model router built by Suricatoos",
   "title-generator-model": "DeepSeek V4 Flash",
