@@ -71,10 +71,6 @@ import {
   PDF_PARSER_RECOVERY_HEADER,
 } from "@/lib/ai/providers";
 import { MAX_OUTPUT_TOKENS } from "@/lib/ai/output-limits";
-import {
-  getModelContextWindow,
-  getModelMaxOutputTokens,
-} from "@/lib/ai/model-context-limits";
 import { ptySessionManager } from "@/lib/ai/tools/utils/pty-session-manager";
 import { getMaxTokensForSubscription } from "@/lib/token-utils";
 import {
@@ -869,10 +865,7 @@ export async function createAgentStream(
     assistantContentLoopAbortController.signal,
   ]);
   const summarizationThreshold = getSummarizationThresholdTokens(
-    Math.min(
-      getMaxTokensForSubscription(ctx.subscription, { mode: ctx.mode }),
-      getModelContextWindow(modelName) ?? Number.POSITIVE_INFINITY,
-    ),
+    getMaxTokensForSubscription(ctx.subscription, { mode: ctx.mode }),
   );
   let rollingContextCheckpoint: RollingModelContextCheckpoint | undefined;
   let compactionAttemptCount = 0;
@@ -997,10 +990,7 @@ export async function createAgentStream(
       : getActiveTools();
 
   const initialActiveTools = await getActiveTools();
-  const maxOutputTokens = Math.min(
-    MAX_OUTPUT_TOKENS,
-    getModelMaxOutputTokens(modelName) ?? Number.POSITIVE_INFINITY,
-  );
+  const maxOutputTokens = MAX_OUTPUT_TOKENS;
   let routeModelName = modelName;
   let streamHasImageViewResults =
     !ctx.auxiliaryVisionEnabled &&

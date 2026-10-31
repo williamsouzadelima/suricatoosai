@@ -50,8 +50,6 @@ export type SelectedModel =
   | "model-deepseek-v4.1-flash"
   | "model-deepseek-v4-flash-0731"
   | "model-kimi-k3"
-  // Modelo LOCAL do cerberus (endpoint 'auto' do router via tailnet). Em teste.
-  | "model-suricatoos-cerberus"
   // Modelos GRATUITOS (custo $0 no OpenRouter). Podem TREINAR com o prompt →
   // só servem chats SEM engajamento/cliente (portão em lib/chat/free-model-gate).
   // Nomes com sufixo "-free" de CUSTO — não confundir com "agent-model-free"
@@ -101,7 +99,6 @@ export const OPERATOR_MODEL_SELECTIONS = [
   "model-deepseek-v4.1-flash",
   "model-deepseek-v4-flash-0731",
   "model-kimi-k3",
-  "model-suricatoos-cerberus",
   ...FREE_MODEL_SELECTIONS,
 ] as const satisfies readonly SelectedModel[];
 

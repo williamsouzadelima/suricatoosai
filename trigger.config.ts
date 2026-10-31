@@ -59,8 +59,6 @@ export default defineConfig({
           "CONVEX_USER_RESEARCH_SERVICE_KEY",
           "OPENROUTER_API_KEY",
           "OPENAI_API_KEY",
-          "CERBERUS_BASE_URL",
-          "CERBERUS_API_KEY",
           "E2B_API_KEY",
           "E2B_TEMPLATE",
           "NEXT_PUBLIC_BASE_URL",

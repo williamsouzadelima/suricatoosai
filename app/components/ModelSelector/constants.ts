@@ -28,12 +28,6 @@ const OPERATOR_MODEL_OPTIONS: ModelOption[] = [
     poweredBy: "Z.ai · 1M contexto",
   },
   {
-    id: "model-suricatoos-cerberus",
-    label: "Suricatoos",
-    description: "Modelo local (em teste)",
-    poweredBy: "Suricatoos · local",
-  },
-  {
     id: "model-deepseek-v4-flash-0731",
     label: "DeepSeek V4 Flash",
     description: "Econômico para tarefas simples",

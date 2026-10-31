@@ -3496,10 +3496,7 @@ export const agentLongTask = task({
             const contextUsageOn = isContextUsageEnabled(subscription, mode);
             const ctxSystemTokens = contextUsageOn ? systemPromptTokens : 0;
             const ctxMaxTokens = contextUsageOn
-              ? getMaxTokensForSubscription(subscription, {
-                  mode,
-                  modelName: selectedModel,
-                })
+              ? getMaxTokensForSubscription(subscription, { mode })
               : 0;
             const initialCtxUsage = contextUsageOn
               ? computeContextUsage(
