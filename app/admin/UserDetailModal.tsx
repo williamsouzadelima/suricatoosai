@@ -2,10 +2,24 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { X, Ban, RotateCcw, ShieldOff, MailPlus, History } from "lucide-react";
+import {
+  X,
+  Ban,
+  RotateCcw,
+  ShieldOff,
+  MailPlus,
+  History,
+  AlertTriangle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { UserRow } from "./UsersTable";
-import { SectionHeader, StatusBadge, EmptyState, formatDateTime } from "./_ui";
+import {
+  SectionHeader,
+  StatusBadge,
+  EmptyState,
+  Callout,
+  formatDateTime,
+} from "./_ui";
 
 interface AuditEntry {
   actor: string;
@@ -36,20 +50,29 @@ export function UserDetailModal({
   onChanged: () => void;
 }) {
   const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [auditError, setAuditError] = useState(false);
+  const [auditLoaded, setAuditLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     fetch("/api/admin/audit", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((d) => {
         if (cancelled) return;
         const rel = ((d.items ?? []) as AuditEntry[]).filter(
           (e) => e.target === user.email || e.target === user.id,
         );
         setAudit(rel.slice(0, 25));
+        setAuditError(false);
+        setAuditLoaded(true);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setAuditError(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -231,7 +254,14 @@ export function UserDetailModal({
         {/* Audit */}
         <div className="space-y-3 border-t border-border p-5">
           <SectionHeader icon={History} title="Histórico deste usuário" />
-          {audit.length === 0 ? (
+          {auditError ? (
+            <Callout tone="warning" icon={AlertTriangle}>
+              Não consegui carregar o histórico deste usuário —{" "}
+              <strong>indisponível</strong>.
+            </Callout>
+          ) : !auditLoaded ? (
+            <p className="text-sm text-muted-foreground">Carregando…</p>
+          ) : audit.length === 0 ? (
             <EmptyState icon={History} title="Nenhuma ação registrada." />
           ) : (
             <ul className="space-y-1.5">

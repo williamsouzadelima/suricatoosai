@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ShieldAlert, Ban, Plus, Trash2, Save } from "lucide-react";
+import { ShieldAlert, Ban, Plus, Trash2, Save, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +42,10 @@ interface Settings {
 export function SecurityDefenseSection() {
   const [forbidden, setForbidden] = useState(false);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [settingsError, setSettingsError] = useState(false);
   const [blocks, setBlocks] = useState<Block[]>([]);
+  const [blocksError, setBlocksError] = useState(false);
+  const [blocksLoaded, setBlocksLoaded] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [newType, setNewType] = useState("ip");
   const [newValue, setNewValue] = useState("");
@@ -59,10 +62,33 @@ export function SecurityDefenseSection() {
         setForbidden(true);
         return;
       }
-      if (s.ok) setSettings((await s.json()).settings);
-      if (b.ok) setBlocks((await b.json()).items ?? []);
+      // Cada fetch marca o próprio erro — uma falha não contamina a outra.
+      if (s.ok) {
+        try {
+          setSettings((await s.json()).settings);
+          setSettingsError(false);
+        } catch {
+          setSettingsError(true);
+        }
+      } else {
+        setSettingsError(true);
+      }
+      if (b.ok) {
+        try {
+          setBlocks((await b.json()).items ?? []);
+          setBlocksError(false);
+          setBlocksLoaded(true);
+        } catch {
+          setBlocksError(true);
+        }
+      } else {
+        setBlocksError(true);
+      }
     } catch (e) {
+      // Promise.all rejeitou (rede): nenhuma resposta foi avaliada.
       console.error(e);
+      setSettingsError(true);
+      setBlocksError(true);
     }
   }, []);
 
@@ -169,7 +195,15 @@ export function SecurityDefenseSection() {
             </div>
           )}
         </div>
-        {!settings ? (
+        {settingsError ? (
+          <div className="p-5">
+            <Callout tone="warning" icon={AlertTriangle}>
+              Não consegui carregar a configuração de defesa —{" "}
+              <strong>indisponível</strong>. Recarregue a página para tentar de
+              novo.
+            </Callout>
+          </div>
+        ) : !settings ? (
           <div className="p-6 text-center text-sm text-muted-foreground">
             Carregando…
           </div>
@@ -341,7 +375,17 @@ export function SecurityDefenseSection() {
             </Button>
           </div>
 
-          {blocks.length === 0 ? (
+          {blocksError ? (
+            <Callout tone="warning" icon={AlertTriangle}>
+              Não consegui carregar os bloqueios —{" "}
+              <strong>indisponível, não vazio</strong>. Pode haver bloqueios
+              ativos; recarregue a página.
+            </Callout>
+          ) : !blocksLoaded ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              Carregando…
+            </div>
+          ) : blocks.length === 0 ? (
             <EmptyState icon={Ban} title="Nenhum bloqueio ativo." />
           ) : (
             <div className="overflow-hidden rounded-lg border">

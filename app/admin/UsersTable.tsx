@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Search, Ban, RotateCcw, Download, Users } from "lucide-react";
+import {
+  Search,
+  Ban,
+  RotateCcw,
+  Download,
+  Users,
+  AlertTriangle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -13,6 +20,7 @@ import {
   SectionHeader,
   StatusBadge,
   EmptyState,
+  Callout,
   formatDateTime,
   fmtNum,
   fmtDuration,
@@ -62,6 +70,7 @@ function avGrad(email: string): string {
 export function UsersTable() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selected, setSelected] = useState<UserRow | null>(null);
@@ -71,15 +80,16 @@ export function UsersTable() {
   const [now, setNow] = useState<number>(() => Date.now());
 
   const load = useCallback(async () => {
-    setLoading(true);
     try {
       const res = await fetch("/api/admin/users", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setUsers(data.users ?? []);
+      setLoadError(false);
     } catch (error) {
       toast.error("Falha ao carregar usuários.");
       console.error(error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -213,6 +223,14 @@ export function UsersTable() {
       {loading ? (
         <div className="p-8 text-center text-sm text-muted-foreground">
           Carregando…
+        </div>
+      ) : loadError ? (
+        <div className="p-5">
+          <Callout tone="warning" icon={AlertTriangle}>
+            Não consegui carregar os usuários —{" "}
+            <strong>indisponível, não zerado</strong>. Tento de novo
+            automaticamente em instantes.
+          </Callout>
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState icon={Users} title="Nenhum usuário." />

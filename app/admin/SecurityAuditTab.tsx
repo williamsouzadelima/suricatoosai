@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ShieldCheck, Download } from "lucide-react";
+import { ShieldCheck, Download, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   SectionHeader,
   StatusBadge,
   EmptyState,
+  Callout,
   formatDateTime,
   type Tone,
 } from "./_ui";
@@ -81,6 +82,7 @@ function outcomeTone(o: string): Tone {
 export function SecurityAuditTab() {
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [filter, setFilter] = useState<string>("all");
 
   const load = useCallback(async () => {
@@ -93,9 +95,11 @@ export function SecurityAuditTab() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setRows(data.rows ?? []);
+      setError(false);
     } catch (e) {
       toast.error("Falha ao carregar a auditoria de segurança.");
       console.error(e);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -173,6 +177,14 @@ export function SecurityAuditTab() {
       {loading ? (
         <div className="p-8 text-center text-sm text-muted-foreground">
           Carregando…
+        </div>
+      ) : error ? (
+        <div className="p-5">
+          <Callout tone="warning" icon={AlertTriangle}>
+            Não consegui carregar a auditoria de segurança —{" "}
+            <strong>indisponível, não vazia</strong>. Troque o filtro ou
+            recarregue a página para tentar de novo.
+          </Callout>
         </div>
       ) : rows.length === 0 ? (
         <EmptyState
