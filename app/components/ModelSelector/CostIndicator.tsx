@@ -3,6 +3,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useTranslations } from "next-intl";
 
 type CostTier = "free" | "low" | "medium" | "high" | "very-high";
 
@@ -81,23 +82,37 @@ const COST_CONFIG: Record<
 
 const MAX_DOLLARS = 3;
 
+// Chaves i18n dos rótulos de custo PAGOS (o "free" usa o label do COST_CONFIG,
+// que já está em pt-BR). Valores literais p/ o t() tipado aceitar.
+const COST_LABEL_KEY: Record<
+  Exclude<CostTier, "free">,
+  "costLow" | "costMedium" | "costHigh" | "costVeryHigh"
+> = {
+  low: "costLow",
+  medium: "costMedium",
+  high: "costHigh",
+  "very-high": "costVeryHigh",
+};
+
 export function CostIndicator({ modelId }: { modelId: string }) {
+  const t = useTranslations("modelSelector");
   const tier = getCostTier(modelId);
   const config = COST_CONFIG[tier];
+  const label = tier === "free" ? config.label : t(COST_LABEL_KEY[tier]);
 
   // Gratuito: em vez de cifrões apagados (que leriam como "custo baixo"),
   // um selo explícito — o ponto NÃO é só o preço, é a política de dados.
   const body =
     tier === "free" ? (
       <span
-        aria-label={`Cost: ${config.label}`}
+        aria-label={t("costAria", { label })}
         className={`inline-flex items-center rounded px-1 text-[10px] font-semibold uppercase tracking-wide cursor-default bg-sky-500/10 ${config.activeClass}`}
       >
         Grátis
       </span>
     ) : (
       <span
-        aria-label={`Cost: ${config.label}`}
+        aria-label={t("costAria", { label })}
         className="inline-flex items-center gap-0 font-semibold tracking-tight text-xs cursor-default"
       >
         {Array.from({ length: MAX_DOLLARS }, (_, i) => (
@@ -123,7 +138,7 @@ export function CostIndicator({ modelId }: { modelId: string }) {
     <Tooltip>
       <TooltipTrigger asChild>{body}</TooltipTrigger>
       <TooltipContent side="right" sideOffset={4} className="text-xs px-2 py-1">
-        {config.label}
+        {label}
       </TooltipContent>
     </Tooltip>
   );

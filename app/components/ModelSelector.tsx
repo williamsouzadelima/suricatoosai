@@ -51,6 +51,7 @@ import { useGlobalState } from "@/app/contexts/GlobalState";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { redirectToPricing } from "@/app/hooks/usePricingDialog";
 import { openSettingsDialog } from "@/lib/utils/settings-dialog";
+import { useTranslations } from "next-intl";
 
 import { CostIndicator } from "./ModelSelector/CostIndicator";
 import {
@@ -72,9 +73,6 @@ interface ModelSelectorProps {
   engagementBound?: boolean;
 }
 
-const AUTO_MODEL_DESCRIPTION =
-  "Balanced quality and speed, recommended for most tasks";
-
 const isMaxModel = (model: SelectedModel): boolean => model === "hackerai-max";
 
 const canUnlockMaxWithExtraUsage = (subscription: SubscriptionTier): boolean =>
@@ -92,28 +90,31 @@ const isModelLockedForSubscription = (
   subscription === "free" ||
   (isMaxModel(model) && !canUseMaxModel(subscription, { extraUsageAvailable }));
 
+type LockedCtaKey = "setUpExtraUsage" | "upgradeToUltra" | "upgradeYourPlan";
+
+// Branching em UM lugar: devolve a CHAVE i18n. O mapa en abaixo serve só ao
+// analytics (cta_text); o texto visível resolve via t(getLockedModelCtaKey(...)).
+const getLockedModelCtaKey = (
+  model: SelectedModel,
+  subscription: SubscriptionTier,
+): LockedCtaKey => {
+  if (isMaxModel(model) && canUnlockMaxWithExtraUsage(subscription)) {
+    return "setUpExtraUsage";
+  }
+  return isMaxModel(model) ? "upgradeToUltra" : "upgradeYourPlan";
+};
+
+const LOCKED_CTA_EN: Record<LockedCtaKey, string> = {
+  setUpExtraUsage: "Set up Extra Usage",
+  upgradeToUltra: "Upgrade to Ultra",
+  upgradeYourPlan: "Upgrade your plan",
+};
+
+// Mantido em inglês de propósito: alimenta o cta_text do analytics (evento estável).
 const getLockedModelCta = (
   model: SelectedModel,
   subscription: SubscriptionTier,
-): string => {
-  if (isMaxModel(model) && canUnlockMaxWithExtraUsage(subscription)) {
-    return "Set up Extra Usage";
-  }
-  return isMaxModel(model) ? "Upgrade to Ultra" : "Upgrade your plan";
-};
-
-const getLockedModelAnnouncement = (
-  model: SelectedModel,
-  subscription: SubscriptionTier,
-): string => {
-  if (isMaxModel(model) && canChoosePersonalMaxAccessPath(subscription)) {
-    return "Use Extra Usage or upgrade to Ultra for Max mode";
-  }
-
-  return `${getLockedModelCta(model, subscription)}${
-    isMaxModel(model) ? " for Max mode" : " to unlock"
-  }`;
-};
+): string => LOCKED_CTA_EN[getLockedModelCtaKey(model, subscription)];
 
 const openMaxUltraUpgrade = ({
   mobile,
@@ -161,7 +162,9 @@ const AutoOptionButton = ({
   isSelected: boolean;
   onSelect: () => void;
   mobile?: boolean;
-}) => (
+}) => {
+  const t = useTranslations("modelSelector");
+  return (
   <button
     type="button"
     onClick={onSelect}
@@ -181,12 +184,13 @@ const AutoOptionButton = ({
         Auto
       </span>
       <p className="text-xs text-muted-foreground leading-snug mt-0.5">
-        {AUTO_MODEL_DESCRIPTION}
+        {t("autoDescription")}
       </p>
     </div>
     {isSelected ? <Check className="h-3.5 w-3.5 shrink-0" /> : null}
   </button>
-);
+  );
+};
 
 const ModelOptionButton = ({
   option,
@@ -205,6 +209,7 @@ const ModelOptionButton = ({
   onSelect: (option: ModelOption) => void;
   mobile?: boolean;
 }) => {
+  const t = useTranslations("modelSelector");
   const button = (
     <button
       type="button"
@@ -214,12 +219,16 @@ const ModelOptionButton = ({
       aria-pressed={isSelected}
       aria-label={
         isPending
-          ? `${option.label}. Checking Extra Usage for Max mode.`
+          ? `${option.label}. ${t("checkingExtraUsage")}`
           : isLocked
-            ? `${option.label}. ${getLockedModelAnnouncement(
-                option.id,
-                subscription,
-              )}.`
+            ? `${option.label}. ${
+                isMaxModel(option.id) &&
+                canChoosePersonalMaxAccessPath(subscription)
+                  ? t("announceUseExtraUsageOrUltra")
+                  : `${t(getLockedModelCtaKey(option.id, subscription))} ${
+                      isMaxModel(option.id) ? t("forMaxMode") : t("toUnlock")
+                    }`
+              }.`
             : undefined
       }
       className={`group w-full flex items-center gap-2.5 px-2.5 rounded-lg text-left transition-colors select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
@@ -277,7 +286,7 @@ const ModelOptionButton = ({
         </p>
         {option.poweredBy && (
           <p className="text-xs text-muted-foreground">
-            Powered by {option.poweredBy}
+            {t("poweredBy")} {option.poweredBy}
           </p>
         )}
       </TooltipContent>
@@ -315,7 +324,9 @@ const ModelOptionList = ({
   onSelect: (option: ModelOption) => void;
   onClose: () => void;
   mobile?: boolean;
-}) => (
+}) => {
+  const t = useTranslations("modelSelector");
+  return (
   <div className="flex flex-col gap-px">
     {isFreeUser ? (
       <>
@@ -334,7 +345,7 @@ const ModelOptionList = ({
           className="flex items-center justify-between rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-2 transition-colors hover:bg-primary/20 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
           <span className="text-sm font-semibold text-foreground">
-            Get access to paid models
+            {t("getAccessPaidModels")}
           </span>
           <ChevronRight className="h-4 w-4 text-primary shrink-0" />
         </a>
@@ -412,7 +423,7 @@ const ModelOptionList = ({
             )}
             {option.poweredBy && (
               <p className="text-xs text-muted-foreground">
-                Powered by {option.poweredBy}
+                {t("poweredBy")} {option.poweredBy}
               </p>
             )}
             <p className="text-xs text-muted-foreground leading-relaxed pt-1">
@@ -435,9 +446,10 @@ const ModelOptionList = ({
                 className="text-foreground underline underline-offset-2 hover:text-foreground/80"
                 tabIndex={0}
               >
-                {getLockedModelCta(option.id, subscription)}
+                {t(getLockedModelCtaKey(option.id, subscription))}
               </a>
-              {isMaxModel(option.id) ? " for Max mode." : " to unlock."}
+              {" "}
+              {t(isMaxModel(option.id) ? "forMaxMode" : "toUnlock")}.
             </p>
           </TooltipContent>
         </Tooltip>
@@ -530,7 +542,8 @@ const ModelOptionList = ({
       </>
     )}
   </div>
-);
+  );
+};
 
 // ── Main component ─────────────────────────────────────────────────
 
@@ -543,6 +556,7 @@ export function ModelSelector({
   const [open, setOpen] = useState(false);
   const [maxAccessDialogOpen, setMaxAccessDialogOpen] = useState(false);
   const { subscription } = useGlobalState();
+  const t = useTranslations("modelSelector");
   const isMobile = Boolean(useIsMobile());
 
   const isFreeUser = subscription === "free";
@@ -597,7 +611,7 @@ export function ModelSelector({
   const triggerLabel = isFreeAgent
     ? "Auto"
     : isFreeUser
-      ? "Model"
+      ? t("triggerModel")
       : isAuto
         ? "Auto"
         : selected.label;
@@ -662,10 +676,9 @@ export function ModelSelector({
     <Dialog open={maxAccessDialogOpen} onOpenChange={setMaxAccessDialogOpen}>
       <DialogContent className="w-[calc(100%-2rem)] max-w-sm rounded-2xl p-5">
         <DialogHeader>
-          <DialogTitle>Unlock Suricatoos Max</DialogTitle>
+          <DialogTitle>{t("unlockMaxTitle")}</DialogTitle>
           <DialogDescription className="leading-relaxed">
-            On Pro and Pro+, use Extra Usage to pay for Max as you go, or
-            upgrade to Ultra to have Max included.
+            {t("unlockMaxDescription")}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2 pt-2">
@@ -676,7 +689,7 @@ export function ModelSelector({
               openSettingsDialog("Extra Usage");
             }}
           >
-            Use Extra Usage
+            {t("useExtraUsage")}
           </Button>
           <Button
             type="button"
@@ -689,7 +702,7 @@ export function ModelSelector({
               });
             }}
           >
-            Upgrade to Ultra
+            {t("upgradeToUltra")}
           </Button>
         </div>
       </DialogContent>
@@ -706,9 +719,9 @@ export function ModelSelector({
             className="rounded-t-2xl px-3 pb-8 pt-0 overscroll-contain"
           >
             <SheetHeader className="pb-1 pt-4">
-              <SheetTitle className="text-base">Select Model</SheetTitle>
+              <SheetTitle className="text-base">{t("selectModel")}</SheetTitle>
               <SheetDescription className="sr-only">
-                Choose a model
+                {t("chooseModel")}
               </SheetDescription>
             </SheetHeader>
             <ModelOptionList
