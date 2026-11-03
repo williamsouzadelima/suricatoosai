@@ -15,7 +15,49 @@
     "search": "Buscar",
     "toggleSidebar": "Alternar barra lateral",
     "upgradeToPro": "Mejorar a Pro",
-    "unlockFeatures": "Desbloquea más funciones"
+    "unlockFeatures": "Desbloquea más funciones",
+    "createProject": "Crear proyecto",
+    "collapseAll": "Contraer todo",
+    "collapseAllProjects": "Contraer todos los proyectos",
+    "loadingProjects": "Cargando proyectos",
+    "loadingMoreProjects": "Cargando más proyectos",
+    "showMoreProjects": "Mostrar más proyectos",
+    "pinned": "Fijados"
+  },
+  "composer": {
+    "doAnything": "Haz cualquier cosa",
+    "askLearnBrainstorm": "Pregunta, aprende, genera ideas"
+  },
+  "chatMode": {
+    "ask": "Preguntar",
+    "agent": "Agente",
+    "askDescription": "Haz tus preguntas de hacking",
+    "agentDescription": "Hackea, prueba, asegura cualquier cosa"
+  },
+  "agentPermission": {
+    "askApproval": "Pedir aprobación",
+    "askApprovalDescription": "Preguntar siempre antes de comandos y cambios de archivos.",
+    "approveForMe": "Aprobar por mí",
+    "approveForMeDescription": "Preguntar solo en acciones detectadas como potencialmente inseguras.",
+    "fullAccess": "Acceso total",
+    "fullAccessDescription": "Ejecutar comandos y editar archivos sin preguntar.",
+    "approvalHeading": "¿Cómo deben aprobarse las acciones de Suricatoos?"
+  },
+  "sandbox": {
+    "cloud": "Nube",
+    "local": "Local",
+    "localReconnecting": "Local reconectando",
+    "localUnavailable": "Local no disponible",
+    "localDisconnectedSwitchedCloud": "Sandbox local desconectado. Se cambió a Nube.",
+    "cloudRequiresPro": "El sandbox en la Nube requiere un plan Pro",
+    "cloudRequiresProDescription": "Usa un sandbox local o mejora a Pro para acceso a la Nube.",
+    "connectMyComputer": "Conectar mi computadora",
+    "myComputer": "Mi computadora",
+    "downloadDesktopDescription": "Descarga la app de escritorio para dar a Suricatoos acceso a tu computadora.",
+    "downloadForPlatform": "Descargar para {platform}",
+    "downloadDesktop": "Descargar escritorio",
+    "remoteControl": "Control remoto",
+    "addRemoteControl": "Añadir control remoto"
   },
   "landing": {
     "eyebrow": "Seguridad ofensiva, en guardia",

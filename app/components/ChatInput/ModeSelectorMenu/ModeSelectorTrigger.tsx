@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MessageSquare, Infinity, ChevronDown } from "lucide-react";
 import type { ChatMode } from "@/types/chat";
+import { useTranslations } from "next-intl";
 
 const FREE_MODE_VARIANT_CLASSES: Record<ChatMode, string> = {
   ask: "bg-muted hover:bg-muted/50",
@@ -28,6 +29,7 @@ export function ModeSelectorTrigger({
   chatMode,
   isPaid,
 }: ModeSelectorTriggerProps) {
+  const t = useTranslations("chatMode");
   const modeVariantClasses = isPaid
     ? PAID_MODE_VARIANT_CLASSES
     : FREE_MODE_VARIANT_CLASSES;
@@ -43,12 +45,12 @@ export function ModeSelectorTrigger({
         {chatMode === "agent" ? (
           <>
             <Infinity className="w-3 h-3 md:mr-1" />
-            <span className="hidden md:inline">Agent</span>
+            <span className="hidden md:inline">{t("agent")}</span>
           </>
         ) : (
           <>
             <MessageSquare className="w-3 h-3 md:mr-1" />
-            <span className="hidden md:inline">Ask</span>
+            <span className="hidden md:inline">{t("ask")}</span>
           </>
         )}
         <ChevronDown className="w-3 h-3 ml-1" />

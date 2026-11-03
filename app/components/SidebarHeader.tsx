@@ -100,7 +100,7 @@ const SidebarHeaderContentImpl: FC<SidebarHeaderContentImplProps> = ({
   const planLabel = isCheckingProPlan
     ? null
     : SIDEBAR_PLAN_LABELS[subscription];
-  const showPlanWordmark = Boolean(planLabel) && !isMobileOverlay;
+  const showPlanBadge = Boolean(planLabel) && !isMobileOverlay;
 
   // Add keyboard shortcut for search (Cmd/Ctrl + K)
   useEffect(() => {
@@ -219,13 +219,13 @@ const SidebarHeaderContentImpl: FC<SidebarHeaderContentImplProps> = ({
             planLabel ? `Suricatoos ${planLabel} home` : "Suricatoos home"
           }
           className={`flex h-9 items-center rounded-lg text-sidebar-foreground no-underline outline-none hover:bg-transparent hover:no-underline focus-visible:underline focus-visible:underline-offset-4 ${
-            showPlanWordmark ? "px-2.5" : "w-9 justify-center"
+            showPlanBadge ? "px-2.5" : "w-9 justify-center"
           }`}
         >
-          {showPlanWordmark ? (
-            <span className="flex min-w-0 items-baseline gap-1 whitespace-nowrap text-[18px] leading-6 font-semibold">
-              <span>Suricatoos</span>
-              <span className="font-medium text-sidebar-foreground/55">
+          {showPlanBadge ? (
+            <span className="flex items-center gap-1.5 whitespace-nowrap">
+              <SuricatoosAISVG scale={0.1} />
+              <span className="text-[13px] font-medium leading-none text-sidebar-foreground/55">
                 {planLabel}
               </span>
             </span>

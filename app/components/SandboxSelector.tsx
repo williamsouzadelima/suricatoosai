@@ -21,6 +21,7 @@ import { openSettingsDialog } from "@/lib/utils/settings-dialog";
 import { useTauri } from "@/app/hooks/useTauri";
 import { detectPlatform } from "@/app/download/DownloadSection";
 import { useGlobalState } from "@/app/contexts/GlobalState";
+import { useTranslations } from "next-intl";
 
 interface SandboxSelectorProps {
   value: string;
@@ -52,6 +53,7 @@ export function SandboxSelector({
     desktopBridgeStatus,
   } = useGlobalState();
   const isFreeUser = subscription === "free";
+  const t = useTranslations("sandbox");
 
   const detectedPlatform = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -60,16 +62,16 @@ export function SandboxSelector({
 
   const cloudOption: ConnectionOption = {
     id: "e2b",
-    label: "Cloud",
-    shortLabel: "Cloud",
+    label: t("cloud"),
+    shortLabel: t("cloud"),
     icon: Cloud,
   };
   const desktopLabel =
     isTauri && desktopBridgeStatus !== "connected"
       ? desktopBridgeStatus === "connecting"
-        ? "Local reconnecting"
-        : "Local unavailable"
-      : "Local";
+        ? t("localReconnecting")
+        : t("localUnavailable")
+      : t("local");
   const desktopConnection = connections?.find((conn) => conn.isDesktop);
   const desktopIsSelectable = !isTauri || desktopBridgeStatus === "connected";
   const desktopOptions: ConnectionOption[] = desktopConnection
@@ -191,12 +193,12 @@ export function SandboxSelector({
       // Only show toast for remote disconnects, not when Desktop is hidden
       const wasHiddenDesktop = value === "desktop";
       if (!wasHiddenDesktop) {
-        toast.info("Local sandbox disconnected. Switched to Cloud.", {
+        toast.info(t("localDisconnectedSwitchedCloud"), {
           duration: 5000,
         });
       }
     }
-  }, [connections, valueMatchesOption, value, onChange, isFreeUser]);
+  }, [connections, valueMatchesOption, value, onChange, isFreeUser, t]);
 
   // Keep free users on a usable local connection. A stale Desktop presence can
   // outlive the embedded bridge, so prefer a healthy remote runner while the
@@ -240,14 +242,14 @@ export function SandboxSelector({
           id: value,
           label:
             value === "desktop" && desktopBridgeStatus === "connecting"
-              ? "Local reconnecting"
-              : "Local unavailable",
+              ? t("localReconnecting")
+              : t("localUnavailable"),
           shortLabel:
             value === "desktop" && desktopBridgeStatus === "connecting"
-              ? "Local reconnecting"
+              ? t("localReconnecting")
               : value === "desktop" && desktopBridgeStatus === "connected"
-                ? "Local"
-                : "Local unavailable",
+                ? t("local")
+                : t("localUnavailable"),
           icon: value === "desktop" ? Monitor : Laptop,
         }
       : null;
@@ -293,9 +295,8 @@ export function SandboxSelector({
             key={cloudOption.id}
             onClick={() => {
               if (isFreeUser) {
-                toast.info("Cloud sandbox requires a Pro plan", {
-                  description:
-                    "Use a local sandbox or upgrade to Pro for cloud access.",
+                toast.info(t("cloudRequiresPro"), {
+                  description: t("cloudRequiresProDescription"),
                 });
                 return;
               }
@@ -366,7 +367,7 @@ export function SandboxSelector({
                   <Monitor className="h-4 w-4 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">
-                      Connect My Computer
+                      {t("connectMyComputer")}
                     </div>
                   </div>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -382,10 +383,9 @@ export function SandboxSelector({
                 <div className="flex items-center justify-center rounded-md border bg-gradient-to-b from-muted/50 to-muted py-5 mb-3">
                   <Monitor className="h-10 w-10 text-muted-foreground/70" />
                 </div>
-                <h4 className="text-sm font-semibold mb-1">My Computer</h4>
+                <h4 className="text-sm font-semibold mb-1">{t("myComputer")}</h4>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Download the desktop app to grant Suricatoos access to your
-                  computer.
+                  {t("downloadDesktopDescription")}
                 </p>
                 <Button asChild size="sm" className="w-full">
                   <a
@@ -396,8 +396,10 @@ export function SandboxSelector({
                     }
                   >
                     {detectedPlatform && detectedPlatform.platform !== "unknown"
-                      ? `Download for ${detectedPlatform.displayName}`
-                      : "Download desktop"}
+                      ? t("downloadForPlatform", {
+                          platform: detectedPlatform.displayName,
+                        })
+                      : t("downloadDesktop")}
                   </a>
                 </Button>
               </PopoverContent>
@@ -406,7 +408,7 @@ export function SandboxSelector({
 
           <div className="border-t mt-1 pt-1">
             <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-              Remote control
+              {t("remoteControl")}
             </div>
             {remoteOptions.map((option) => {
               const OptionIcon = option.icon;
@@ -443,7 +445,7 @@ export function SandboxSelector({
               className="w-full flex items-center gap-2.5 p-2 rounded-md text-left text-sm hover:bg-muted transition-colors"
             >
               <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <span className="flex-1">Add remote control</span>
+              <span className="flex-1">{t("addRemoteControl")}</span>
             </button>
           </div>
         </div>

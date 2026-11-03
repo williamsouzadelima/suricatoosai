@@ -18,6 +18,7 @@ import { useGlobalState } from "@/app/contexts/GlobalState";
 import { useAgentAutoReviewAvailability } from "@/app/contexts/AgentAutoReviewAvailabilityContext";
 import { captureAuthenticatedEvent } from "@/lib/analytics/client";
 import type { AgentPermissionMode } from "@/types";
+import { useTranslations } from "next-intl";
 
 type AgentPermissionSelectorProps = {
   size?: "sm" | "md";
@@ -32,35 +33,12 @@ type PermissionOption = {
   icon: typeof ShieldAlert;
 };
 
-const baseOptions: PermissionOption[] = [
-  {
-    id: "ask_approval",
-    label: "Ask for approval",
-    description: "Always ask before commands and file changes.",
-    shortLabel: "Ask for approval",
-    icon: Hand,
-  },
-  {
-    id: "auto_review",
-    label: "Approve for me",
-    description: "Only ask for actions detected as potentially unsafe.",
-    shortLabel: "Approve for me",
-    icon: ShieldCheck,
-  },
-  {
-    id: "full_access",
-    label: "Full access",
-    description: "Run commands and edit files without asking.",
-    shortLabel: "Full access",
-    icon: ShieldAlert,
-  },
-];
-
 export function AgentPermissionSelector({
   size = "sm",
   analyticsSurface,
 }: AgentPermissionSelectorProps) {
   const [open, setOpen] = useState(false);
+  const t = useTranslations("agentPermission");
   const { agentPermissionMode, setAgentPermissionMode } = useGlobalState();
   const { agentAutoReviewAvailable, resolveAgentAutoReviewAvailability } =
     useAgentAutoReviewAvailability();
@@ -82,12 +60,38 @@ export function AgentPermissionSelector({
     (agentAutoReviewAvailable === null &&
       agentPermissionMode === "auto_review");
 
+  const baseOptions: PermissionOption[] = useMemo(
+    () => [
+      {
+        id: "ask_approval",
+        label: t("askApproval"),
+        description: t("askApprovalDescription"),
+        shortLabel: t("askApproval"),
+        icon: Hand,
+      },
+      {
+        id: "auto_review",
+        label: t("approveForMe"),
+        description: t("approveForMeDescription"),
+        shortLabel: t("approveForMe"),
+        icon: ShieldCheck,
+      },
+      {
+        id: "full_access",
+        label: t("fullAccess"),
+        description: t("fullAccessDescription"),
+        shortLabel: t("fullAccess"),
+        icon: ShieldAlert,
+      },
+    ],
+    [t],
+  );
   const options = useMemo(
     () =>
       showAutoReview
         ? baseOptions
         : baseOptions.filter((option) => option.id !== "auto_review"),
-    [showAutoReview],
+    [showAutoReview, baseOptions],
   );
   const selectedOption =
     options.find((option) => option.id === agentPermissionMode) ?? options[0];
@@ -125,7 +129,7 @@ export function AgentPermissionSelector({
         align="start"
       >
         <div className="mb-2 text-sm text-muted-foreground">
-          How should Suricatoos actions be approved?
+          {t("approvalHeading")}
         </div>
         <div className="space-y-1">
           {options.map((option) => {

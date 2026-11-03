@@ -8,6 +8,7 @@ import {
   Plus,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import Loading from "@/components/ui/loading";
@@ -44,6 +45,7 @@ export function SidebarProjects({
   loadMore,
 }: SidebarProjectsProps) {
   const { desktopBridgeActive } = useGlobalState();
+  const t = useTranslations("sidebar");
   const moveChatToProject = useMoveChatToProject();
   const startNewChat = useStartNewChat();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -138,7 +140,7 @@ export function SidebarProjects({
     >
       {projects === undefined ? (
         isPinnedList ? null : (
-          <div className="px-2 py-0.5" aria-label="Loading projects">
+          <div className="px-2 py-0.5" aria-label={t("loadingProjects")}>
             <div className="h-9 animate-pulse rounded-[10px] bg-sidebar-accent/50" />
           </div>
         )
@@ -150,7 +152,7 @@ export function SidebarProjects({
             onClick={() => setIsCreateOpen(true)}
           >
             <FolderPlus className="size-[18px] shrink-0" aria-hidden="true" />
-            <span>New project</span>
+            <span>{t("newProject")}</span>
           </button>
         )
       ) : (
@@ -172,7 +174,7 @@ export function SidebarProjects({
             <div
               className="flex h-9 items-center justify-center"
               role="status"
-              aria-label="Loading more projects"
+              aria-label={t("loadingMoreProjects")}
             >
               <Loading size={5} />
             </div>
@@ -186,7 +188,7 @@ export function SidebarProjects({
               className="ms-7 h-9 self-start px-2 text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
               onClick={() => loadMore(10)}
             >
-              Show more projects
+              {t("showMoreProjects")}
             </Button>
           ) : null}
         </>
@@ -213,7 +215,7 @@ export function SidebarProjects({
             id="sidebar-projects-heading"
             className="min-w-0 truncate text-[13px] font-medium leading-[18px] tracking-[-0.091px] text-sidebar-foreground/50"
           >
-            Projects
+            {t("projects")}
           </span>
           <ChevronRight
             className={`size-3.5 shrink-0 text-sidebar-foreground/45 transition-[transform,opacity] ${
@@ -236,7 +238,7 @@ export function SidebarProjects({
                   size="icon"
                   className="size-8 rounded-lg text-sidebar-foreground/45 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                   onClick={collapseAllProjects}
-                  aria-label="Collapse all projects"
+                  aria-label={t("collapseAllProjects")}
                 >
                   <ListChevronsDownUp className="size-[18px]" />
                 </Button>
@@ -246,7 +248,7 @@ export function SidebarProjects({
                 sideOffset={8}
                 className="border-0 bg-black px-3 py-1.5 text-sm text-white shadow-md [&_svg]:bg-black [&_svg]:fill-black"
               >
-                Collapse all
+                {t("collapseAll")}
               </TooltipContent>
             </Tooltip>
           ) : null}
@@ -259,7 +261,7 @@ export function SidebarProjects({
                 size="icon"
                 className="size-8 rounded-lg text-sidebar-foreground/45 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 onClick={() => setIsCreateOpen(true)}
-                aria-label="Create project"
+                aria-label={t("createProject")}
               >
                 <Plus className="size-[18px]" />
               </Button>
@@ -269,7 +271,7 @@ export function SidebarProjects({
               sideOffset={8}
               className="border-0 bg-black px-3 py-1.5 text-sm text-white shadow-md [&_svg]:bg-black [&_svg]:fill-black"
             >
-              Create project
+              {t("createProject")}
             </TooltipContent>
           </Tooltip>
         </div>

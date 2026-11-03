@@ -117,8 +117,8 @@ describe("SidebarHeaderContent", () => {
     expect(
       screen.getByRole("link", { name: `Suricatoos ${label} home` }),
     ).toBeInTheDocument();
-    expect(screen.queryByTestId("suricatoos-ai-svg")).not.toBeInTheDocument();
-    expect(screen.getByText("Suricatoos")).toBeInTheDocument();
+    expect(screen.getByTestId("suricatoos-ai-svg")).toBeInTheDocument();
+    expect(screen.queryByText("Suricatoos")).not.toBeInTheDocument();
     expect(screen.getByText(label)).toBeInTheDocument();
   });
 

@@ -15,7 +15,49 @@
     "search": "Search",
     "toggleSidebar": "Toggle sidebar",
     "upgradeToPro": "Upgrade to Pro",
-    "unlockFeatures": "Unlock more features"
+    "unlockFeatures": "Unlock more features",
+    "createProject": "Create project",
+    "collapseAll": "Collapse all",
+    "collapseAllProjects": "Collapse all projects",
+    "loadingProjects": "Loading projects",
+    "loadingMoreProjects": "Loading more projects",
+    "showMoreProjects": "Show more projects",
+    "pinned": "Pinned"
+  },
+  "composer": {
+    "doAnything": "Do anything",
+    "askLearnBrainstorm": "Ask, learn, brainstorm"
+  },
+  "chatMode": {
+    "ask": "Ask",
+    "agent": "Agent",
+    "askDescription": "Ask your hacking questions",
+    "agentDescription": "Hack, test, secure anything"
+  },
+  "agentPermission": {
+    "askApproval": "Ask for approval",
+    "askApprovalDescription": "Always ask before commands and file changes.",
+    "approveForMe": "Approve for me",
+    "approveForMeDescription": "Only ask for actions detected as potentially unsafe.",
+    "fullAccess": "Full access",
+    "fullAccessDescription": "Run commands and edit files without asking.",
+    "approvalHeading": "How should Suricatoos actions be approved?"
+  },
+  "sandbox": {
+    "cloud": "Cloud",
+    "local": "Local",
+    "localReconnecting": "Local reconnecting",
+    "localUnavailable": "Local unavailable",
+    "localDisconnectedSwitchedCloud": "Local sandbox disconnected. Switched to Cloud.",
+    "cloudRequiresPro": "Cloud sandbox requires a Pro plan",
+    "cloudRequiresProDescription": "Use a local sandbox or upgrade to Pro for cloud access.",
+    "connectMyComputer": "Connect My Computer",
+    "myComputer": "My Computer",
+    "downloadDesktopDescription": "Download the desktop app to grant Suricatoos access to your computer.",
+    "downloadForPlatform": "Download for {platform}",
+    "downloadDesktop": "Download desktop",
+    "remoteControl": "Remote control",
+    "addRemoteControl": "Add remote control"
   },
   "landing": {
     "eyebrow": "Offensive security, on watch",

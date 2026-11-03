@@ -44,6 +44,7 @@ import {
 } from "@/lib/utils/client-storage";
 import SidebarHistory, { type SidebarPaginationStatus } from "./SidebarHistory";
 import { SidebarProjects } from "./SidebarProjects";
+import { useTranslations } from "next-intl";
 import {
   dispatchSidebarChatDrop,
   getSidebarChatDragData,
@@ -179,6 +180,7 @@ export function SidebarChatSections({
   );
   const [activeTask, setActiveTask] = useState<SidebarChatDragData>();
   const startNewChat = useStartNewChat();
+  const t = useTranslations("sidebar");
   const pinChat = usePinChat();
   const unpinChat = useUnpinChat();
   const pinnedChats = chats.filter((chat) => chat.pinned_at != null);
@@ -272,7 +274,7 @@ export function SidebarChatSections({
       >
         {hasPinnedItems || activeTask ? (
           <CollapsibleChatSection
-            title="Pinned"
+            title={t("pinned")}
             dropId={SIDEBAR_PINNED_DROP_ID}
             onDrop={handlePinnedDrop}
             open={isPinnedOpen}
@@ -305,7 +307,7 @@ export function SidebarChatSections({
         />
 
         <CollapsibleChatSection
-          title="Tasks"
+          title={t("tasks")}
           dropId={SIDEBAR_TASKS_DROP_ID}
           onDrop={handleTasksDrop}
           open={isTasksOpen}
