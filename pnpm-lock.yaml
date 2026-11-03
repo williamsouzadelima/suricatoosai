@@ -26,7 +26,7 @@ overrides:
   minimatch@>=3.0.0 <3.1.4: 3.1.4
   minimatch@>=9.0.0 <9.0.7: 9.0.7
   minimatch@>=10.0.0 <10.2.3: 10.2.3
-  systeminformation@<=5.31.6: 5.31.7
+  systeminformation@<5.33.16: 5.33.16
   cookie@<0.7.0: 0.7.0
   underscore@<=1.13.7: 1.13.8
   rollup@>=4.0.0 <4.59.0: 4.59.0
@@ -35,7 +35,7 @@ overrides:
   '@xmldom/xmldom': ^0.8.15
   protobufjs@<=7.6.4: 7.6.5
   flatted@<3.4.2: 3.4.2
-  follow-redirects@<1.16.1: 1.16.1
+  follow-redirects@<1.16.2: 1.16.2
   handlebars@<4.7.10: 4.7.10
   langsmith@<0.6.0: 0.6.3
   postcss@<8.5.23: 8.5.23
@@ -5615,8 +5615,8 @@ packages:
   flatted@3.4.2:
     resolution: {integrity: sha512-PjDse7RzhcPkIJwy5t7KPWQSZ9cAbzQXcafsetQoD7sOJRQlGikNbx7yZp2OotDnJyrDcbyRq3Ttb18iYOqkxA==}
 
-  follow-redirects@1.16.1:
-    resolution: {integrity: sha512-FNvFGzoMLWmE6Yj9spb/zjd7yiNCHiAW9/Tg9CXrQ8wuu32HtlJOwWO11OJafl5FfY3DxTdQ0vj42zU1kvv5jg==}
+  follow-redirects@1.16.2:
+    resolution: {integrity: sha512-/kVP2U8z596Ia0gwFrwyIeo74ta5aVmSeU1FfAUMAmcEP5EP7zydmag3SLiN64NaRKef3lxsq7i/g7ltJQDGow==}
     engines: {node: '>=4.0'}
     peerDependencies:
       debug: '*'
@@ -8057,9 +8057,9 @@ packages:
     resolution: {integrity: sha512-MeQTA1r0litLUf0Rp/iisCaL8761lKAZHaimlbGK4j0HysC4PLfqygQj9srcs0m2RdtDYnF8UuYyKpbjHYp7Jw==}
     engines: {node: ^14.18.0 || >=16.0.0}
 
-  systeminformation@5.31.7:
-    resolution: {integrity: sha512-/8NC53e5nP9nmhn42/ncdOkyJnOoue/Vy+tJOyUGd1Yv66G069wK4rrziwhrqDETgk78CudTQupw5z19S5uoZw==}
-    engines: {node: '>=8.0.0'}
+  systeminformation@5.33.16:
+    resolution: {integrity: sha512-R+Lh69IJXfJj6bfyH1In5cIR9FTr4hBS39YvlZHZjsK1p9cuELPq7hplZZIb56ZESMMb+DzdKqqE6Iomi01Mvg==}
+    engines: {node: '>=10.0.0'}
     os: [darwin, linux, win32, freebsd, openbsd, netbsd, sunos, android]
     hasBin: true
 
@@ -10346,7 +10346,7 @@ snapshots:
   '@opentelemetry/host-metrics@0.38.3(@opentelemetry/api@1.9.1)':
     dependencies:
       '@opentelemetry/api': 1.9.1
-      systeminformation: 5.31.7
+      systeminformation: 5.33.16
 
   '@opentelemetry/instrumentation@0.218.0(@opentelemetry/api@1.9.1)(supports-color@10.2.2)':
     dependencies:
@@ -12438,7 +12438,7 @@ snapshots:
 
   axios@1.20.0(debug@4.4.3):
     dependencies:
-      follow-redirects: 1.16.1(debug@4.4.3)
+      follow-redirects: 1.16.2(debug@4.4.3)
       form-data: 4.0.6
       https-proxy-agent: 5.0.1
       proxy-from-env: 2.1.0
@@ -13691,7 +13691,7 @@ snapshots:
 
   flatted@3.4.2: {}
 
-  follow-redirects@1.16.1(debug@4.4.3):
+  follow-redirects@1.16.2(debug@4.4.3):
     optionalDependencies:
       debug: 4.4.3(supports-color@10.2.2)
 
@@ -14126,7 +14126,7 @@ snapshots:
       isstream: 0.1.2
       jsonwebtoken: 9.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.20.0)
+      retry-axios: 2.6.0(axios@1.20.0(debug@4.4.3))
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -16346,7 +16346,7 @@ snapshots:
 
   resumable-stream@2.2.12: {}
 
-  retry-axios@2.6.0(axios@1.20.0):
+  retry-axios@2.6.0(axios@1.20.0(debug@4.4.3)):
     dependencies:
       axios: 1.20.0(debug@4.4.3)
 
@@ -16825,7 +16825,7 @@ snapshots:
     dependencies:
       '@pkgr/core': 0.2.9
 
-  systeminformation@5.31.7: {}
+  systeminformation@5.33.16: {}
 
   tailwind-merge@3.6.0: {}
 
