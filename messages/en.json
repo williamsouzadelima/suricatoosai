@@ -1,4 +1,12 @@
 {
+  "errorPages": {
+    "notFoundTitle": "Page not found",
+    "notFoundDescription": "The page you're looking for doesn't exist or has moved.",
+    "backHome": "Back to home",
+    "errorTitle": "Something went wrong",
+    "errorDescription": "An unexpected error occurred while loading this part of the app.",
+    "tryAgain": "Try again"
+  },
   "header": {
     "signIn": "Sign in",
     "getStarted": "Get started",

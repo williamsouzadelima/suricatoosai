@@ -1,4 +1,12 @@
 {
+  "errorPages": {
+    "notFoundTitle": "Página no encontrada",
+    "notFoundDescription": "La página que buscas no existe o fue movida.",
+    "backHome": "Volver al inicio",
+    "errorTitle": "Algo salió mal",
+    "errorDescription": "Ocurrió un error inesperado al cargar esta parte de la app.",
+    "tryAgain": "Intentar de nuevo"
+  },
   "header": {
     "signIn": "Iniciar sesión",
     "getStarted": "Comenzar",
