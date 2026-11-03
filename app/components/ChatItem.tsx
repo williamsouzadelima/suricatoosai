@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -127,6 +128,7 @@ const ChatItem: React.FC<ChatItemProps> = ({
   const taskTitle = formatTaskTitle(title);
   const router = useRouter();
   const pathname = usePathname();
+  const tToast = useTranslations("toasts");
   const [isHovered, setIsHovered] = useState(false);
   const [isFocusedWithin, setIsFocusedWithin] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -371,7 +373,7 @@ const ChatItem: React.FC<ChatItemProps> = ({
       await pinChat({ chatId: id });
     } catch (error) {
       console.error("Failed to pin chat:", error);
-      toast.error("Failed to pin task");
+      toast.error(tToast("failedPinTask"));
     }
   };
 
@@ -383,7 +385,7 @@ const ChatItem: React.FC<ChatItemProps> = ({
       await unpinChat({ chatId: id });
     } catch (error) {
       console.error("Failed to unpin chat:", error);
-      toast.error("Failed to unpin task");
+      toast.error(tToast("failedUnpinTask"));
     }
   };
 

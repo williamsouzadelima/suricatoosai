@@ -112,7 +112,11 @@
     "couldNotReconnectDesc": "Your draft is still saved. Please try again.",
     "pastedTooLong": "Pasted text is too long to show in the text field",
     "pastedTooLongDesc": "Edit it below 25,000 characters and try again.",
-    "failedSendApproval": "Failed to send approval response."
+    "failedSendApproval": "Failed to send approval response.",
+    "anErrorOccurred": "An error occurred.",
+    "messageNoLongerBranch": "That message is no longer available to branch.",
+    "failedBranchTask": "Failed to branch task. Please try again.",
+    "failedEditMessage": "Failed to edit message. Please try again."
   },
   "landing": {
     "eyebrow": "Offensive security, on watch",

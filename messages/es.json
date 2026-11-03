@@ -112,7 +112,11 @@
     "couldNotReconnectDesc": "Tu borrador sigue guardado. Inténtalo de nuevo.",
     "pastedTooLong": "El texto pegado es demasiado largo para mostrarlo en el campo",
     "pastedTooLongDesc": "Edítalo por debajo de 25.000 caracteres e inténtalo de nuevo.",
-    "failedSendApproval": "No se pudo enviar la respuesta de aprobación."
+    "failedSendApproval": "No se pudo enviar la respuesta de aprobación.",
+    "anErrorOccurred": "Ocurrió un error.",
+    "messageNoLongerBranch": "Ese mensaje ya no está disponible para ramificar.",
+    "failedBranchTask": "No se pudo ramificar la tarea. Inténtalo de nuevo.",
+    "failedEditMessage": "No se pudo editar el mensaje. Inténtalo de nuevo."
   },
   "landing": {
     "eyebrow": "Seguridad ofensiva, en guardia",

@@ -112,7 +112,11 @@
     "couldNotReconnectDesc": "Seu rascunho continua salvo. Tente novamente.",
     "pastedTooLong": "O texto colado é longo demais para mostrar no campo",
     "pastedTooLongDesc": "Edite abaixo de 25.000 caracteres e tente novamente.",
-    "failedSendApproval": "Falha ao enviar a resposta de aprovação."
+    "failedSendApproval": "Falha ao enviar a resposta de aprovação.",
+    "anErrorOccurred": "Ocorreu um erro.",
+    "messageNoLongerBranch": "Essa mensagem não está mais disponível para ramificar.",
+    "failedBranchTask": "Falha ao ramificar a tarefa. Tente novamente.",
+    "failedEditMessage": "Falha ao editar a mensagem. Tente novamente."
   },
   "landing": {
     "eyebrow": "Segurança ofensiva, de vigília",

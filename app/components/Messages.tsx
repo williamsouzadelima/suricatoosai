@@ -34,6 +34,7 @@ import type { ChatStatus, ChatMessage } from "@/types";
 import type { FileDetails } from "@/types/file";
 import type { RetryOptions } from "../hooks/useChatHandlers";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import DotsSpinner from "@/components/ui/dots-spinner";
 import { hasTextContent } from "@/lib/utils/message-utils";
 import { useDataStreamState } from "./DataStreamProvider";
@@ -306,6 +307,7 @@ export const Messages = ({
   contentInsetEndAdjustment = 0,
 }: MessagesProps) => {
   const { isAutoResuming } = useDataStreamState();
+  const tToast = useTranslations("toasts");
   // Prefetch and cache image URLs for better performance
   const { getCachedUrl, setCachedUrl } = useFileUrlCache(messages);
 
@@ -501,13 +503,13 @@ export const Messages = ({
           await onEditMessage(editingMessageId, newContent, remainingFileIds);
         } catch (error) {
           console.error("Failed to edit message:", error);
-          toast.error("Failed to edit message. Please try again.");
+          toast.error(tToast("failedEditMessage"));
         } finally {
           setEditingMessageId(null);
         }
       }
     },
-    [editingMessageId, lastUserMessageId, onEditMessage],
+    [editingMessageId, lastUserMessageId, onEditMessage, tToast],
   );
 
   const handleCancelEdit = useCallback(() => {
@@ -551,11 +553,11 @@ export const Messages = ({
           await onBranchMessage(messageId);
         } catch (error) {
           console.error("Failed to branch message:", error);
-          toast.error("Failed to branch task. Please try again.");
+          toast.error(tToast("failedBranchTask"));
         }
       }
     },
-    [onBranchMessage],
+    [onBranchMessage, tToast],
   );
 
   const [timelineInstance, setTimelineInstance] =

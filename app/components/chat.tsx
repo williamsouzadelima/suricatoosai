@@ -75,6 +75,7 @@ import {
 import { getAgentLongMessageProgressFingerprint } from "@/lib/chat/agent-long-message-progress";
 import { hasVisibleAssistantContent } from "@/lib/chat/abort-persistence";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import {
   addAuthenticatedExceptionStep,
   getPostHogRequestHeaders,
@@ -567,6 +568,7 @@ export const Chat = ({ autoResume }: { autoResume: boolean }) => {
   const routeChatId = params?.id as string | undefined;
   const router = useRouter();
   const isMobile = useIsMobile();
+  const tToast = useTranslations("toasts");
   const computerSidebarOverlay = useComputerSidebarOverlay();
   const computerDialogRef = useRef<HTMLDivElement>(null);
   const computerDialogPreviousFocusRef = useRef<HTMLElement | null>(null);
@@ -1215,7 +1217,7 @@ export const Chat = ({ autoResume }: { autoResume: boolean }) => {
         }
       } else if (isMobile && displayError.name !== "AbortError") {
         toast.error(
-          formatTaskUiCopy(displayError.message || "An error occurred."),
+          formatTaskUiCopy(displayError.message || tToast("anErrorOccurred")),
         );
       }
     },
@@ -2087,17 +2089,17 @@ export const Chat = ({ autoResume }: { autoResume: boolean }) => {
       try {
         const newChatId = await branchChatMutation({ messageId });
         if (!newChatId) {
-          toast.error("That message is no longer available to branch.");
+          toast.error(tToast("messageNoLongerBranch"));
           return;
         }
         initializeChat(newChatId);
         router.push(`/c/${newChatId}`);
       } catch (error) {
         console.error("Failed to branch chat:", error);
-        toast.error("Failed to branch task. Please try again.");
+        toast.error(tToast("failedBranchTask"));
       }
     },
-    [branchChatMutation, initializeChat, router],
+    [branchChatMutation, initializeChat, router, tToast],
   );
 
   const isRouteTransitioning =
