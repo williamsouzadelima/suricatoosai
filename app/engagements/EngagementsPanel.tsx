@@ -1013,10 +1013,23 @@ function ScopeEditor({ engagement }: { engagement: Doc<"engagements"> }) {
       toast.error("A data final da autorização é anterior à inicial.");
       return;
     }
+    // Limpar uma data JÁ definida não é suportado (o campo opcional da mutation
+    // não aceita null → a limpeza vira no-op). Antes isto mostrava "Escopo
+    // salvo." mesmo assim — mentira perigosa numa janela de autorização de
+    // pentest, pois o ends_at antigo (portão duro da recorrência) continuava
+    // valendo. Bloqueia honestamente, sem perder as edições de escopo em tela.
+    const clearingStart = !startsAt && engagement.starts_at != null;
+    const clearingEnd = !endsAt && engagement.ends_at != null;
+    if (clearingStart || clearingEnd) {
+      toast.error(
+        "Limpar uma data de autorização já definida não é suportado nesta versão — a janela antiga continuaria valendo. Restaure a data (ou defina uma nova) e salve de novo; o resto do escopo é salvo junto.",
+      );
+      return;
+    }
     setSaving(true);
     try {
-      // Datas vazias passam undefined (no-op na mutation); limpar uma data já
-      // definida não é suportado nesta v1 (campo opcional não aceita null).
+      // Datas vazias passam undefined (no-op na mutation). Limpar uma data já
+      // definida é bloqueado acima (não suportado nesta v1).
       await updateEngagement({
         engagementId: engagement._id,
         scope,

@@ -2,10 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Cpu, RefreshCw, Square } from "lucide-react";
+import { Cpu, RefreshCw, Square, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { SectionHeader, StatCard, EmptyState, fmtDuration } from "./_ui";
+import {
+  SectionHeader,
+  StatCard,
+  EmptyState,
+  Callout,
+  fmtDuration,
+} from "./_ui";
 
 interface Run {
   userId: string;
@@ -21,18 +27,24 @@ export function LiveRunsPanel() {
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
   const [killing, setKilling] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (manual = false) => {
+    if (manual) setIsRefreshing(true);
     try {
       const res = await fetch("/api/admin/live-runs", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const d = await res.json();
       setRuns(d.runs ?? []);
       setNow(Date.now());
+      setError(false);
     } catch (e) {
       console.error(e);
+      setError(true);
     } finally {
       setLoading(false);
+      if (manual) setIsRefreshing(false);
     }
   }, []);
 
@@ -81,10 +93,14 @@ export function LiveRunsPanel() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => void load()}
-          disabled={loading}
+          onClick={() => void load(true)}
+          disabled={loading || isRefreshing}
         >
-          <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+          <RefreshCw
+            className={
+              loading || isRefreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"
+            }
+          />
           Atualizar
         </Button>
       </div>
@@ -92,15 +108,21 @@ export function LiveRunsPanel() {
         <div className="grid grid-cols-1 gap-3 sm:max-w-xs">
           <StatCard
             icon={Cpu}
-            tone={runs.length > 0 ? "primary" : "neutral"}
+            tone={!error && runs.length > 0 ? "primary" : "neutral"}
             label="Rodando agora"
-            value={loading ? 0 : runs.length}
+            value={error ? "—" : loading ? 0 : runs.length}
             sub="runs de agente ativos"
             loading={loading}
           />
         </div>
 
-        {!loading && runs.length === 0 ? (
+        {error ? (
+          <Callout tone="warning" icon={AlertTriangle}>
+            Não consegui carregar os runs ao vivo —{" "}
+            <strong>indisponível, não zerado</strong>. Toque em “Atualizar” para
+            tentar de novo.
+          </Callout>
+        ) : !loading && runs.length === 0 ? (
           <EmptyState icon={Cpu} title="Nenhum run em execução." />
         ) : (
           <div className="overflow-hidden rounded-lg border">

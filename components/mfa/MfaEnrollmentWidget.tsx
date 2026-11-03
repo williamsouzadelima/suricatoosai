@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { useAccessToken } from "@workos-inc/authkit-nextjs/components";
 import { UserSecurity } from "@workos-inc/widgets/user-security";
 import { WorkOsWidgets } from "@workos-inc/widgets/workos-widgets";
+import { useTranslations } from "next-intl";
 
 /**
  * Widget de segurança da conta do WorkOS (senha, MFA/TOTP, sessões). FONTE ÚNICA
@@ -13,13 +14,14 @@ import { WorkOsWidgets } from "@workos-inc/widgets/workos-widgets";
  */
 export function MfaEnrollmentWidget() {
   const { getAccessToken } = useAccessToken();
+  const t = useTranslations("settings");
   const getWidgetAccessToken = useCallback(async () => {
     const token = await getAccessToken();
     if (!token) {
-      throw new Error("Não foi possível carregar a segurança da conta.");
+      throw new Error(t("security.unableToLoad"));
     }
     return token;
-  }, [getAccessToken]);
+  }, [getAccessToken, t]);
 
   return (
     <div data-testid="workos-user-security">

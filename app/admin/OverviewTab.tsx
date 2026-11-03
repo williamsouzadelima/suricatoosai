@@ -13,6 +13,7 @@ import {
   Cpu,
   LineChart,
   Zap,
+  AlertTriangle,
   MailPlus as InviteIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import {
   StatCard,
   SectionHeader,
   MiniBarChart,
+  Callout,
   formatDateTime,
   fmtNum,
 } from "./_ui";
@@ -75,6 +77,8 @@ export function OverviewTab({
 }) {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [overviewError, setOverviewError] = useState(false);
+  const [usageError, setUsageError] = useState(false);
   const [usage, setUsage] = useState<{
     requests: number;
     tokens: number;
@@ -88,8 +92,10 @@ export function OverviewTab({
       const res = await fetch("/api/admin/overview", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData(await res.json());
+      setOverviewError(false);
     } catch (error) {
       console.error(error);
+      setOverviewError(true);
     } finally {
       setLoading(false);
     }
@@ -117,8 +123,10 @@ export function OverviewTab({
         { requests: 0, tokens: 0, cost: 0 },
       );
       setUsage({ ...agg, loading: false });
+      setUsageError(false);
     } catch {
       setUsage((u) => ({ ...u, loading: false }));
+      setUsageError(true);
     }
   }, []);
 
@@ -132,8 +140,18 @@ export function OverviewTab({
       ? `${Math.round((data.users.active / data.users.total) * 100)}% do total`
       : undefined;
 
+  const dv = (v: React.ReactNode) => (overviewError ? "—" : v);
+  const uv = (v: React.ReactNode) => (usageError ? "—" : v);
+
   return (
     <div className="space-y-6">
+      {(overviewError || usageError) && (
+        <Callout tone="warning" icon={AlertTriangle}>
+          Não consegui carregar alguns dados do painel agora — os números
+          afetados aparecem como <strong>“—” (indisponível, não zerado)</strong>.
+          Atualize em instantes.
+        </Callout>
+      )}
       {/* Presença ao vivo */}
       <OnlineUsersPanel />
 
@@ -150,7 +168,7 @@ export function OverviewTab({
           <StatCard
             icon={UserCheck}
             label="Com acesso"
-            value={data?.users.active ?? 0}
+            value={dv(data?.users.active ?? 0)}
             sub={activePct}
             tone="success"
             loading={loading}
@@ -158,7 +176,7 @@ export function OverviewTab({
           <StatCard
             icon={MailPlus}
             label="Convidados"
-            value={data?.users.invited ?? 0}
+            value={dv(data?.users.invited ?? 0)}
             sub="aguardando 1º acesso"
             tone="warning"
             loading={loading}
@@ -166,7 +184,7 @@ export function OverviewTab({
           <StatCard
             icon={TrendingUp}
             label="Novos (7d)"
-            value={data?.users.new7d ?? 0}
+            value={dv(data?.users.new7d ?? 0)}
             sub={loading ? undefined : `${data?.users.new30d ?? 0} em 30 dias`}
             tone="primary"
             loading={loading}
@@ -174,7 +192,7 @@ export function OverviewTab({
           <StatCard
             icon={Users}
             label="Total"
-            value={data?.users.total ?? 0}
+            value={dv(data?.users.total ?? 0)}
             sub={loading ? undefined : `${data?.users.revoked ?? 0} revogados`}
             tone="neutral"
             loading={loading}
@@ -208,21 +226,21 @@ export function OverviewTab({
           <StatCard
             icon={Activity}
             label="Requests"
-            value={usage.loading ? 0 : fmtNum(usage.requests)}
+            value={uv(usage.loading ? 0 : fmtNum(usage.requests))}
             tone="primary"
             loading={usage.loading}
           />
           <StatCard
             icon={Cpu}
             label="Tokens"
-            value={usage.loading ? 0 : fmtNum(usage.tokens)}
+            value={uv(usage.loading ? 0 : fmtNum(usage.tokens))}
             tone="neutral"
             loading={usage.loading}
           />
           <StatCard
             icon={Coins}
             label="Custo"
-            value={usage.loading ? 0 : `$${usage.cost.toFixed(2)}`}
+            value={uv(usage.loading ? 0 : `$${usage.cost.toFixed(2)}`)}
             tone="success"
             loading={usage.loading}
           />
@@ -236,21 +254,21 @@ export function OverviewTab({
           <StatCard
             icon={Megaphone}
             label="Avisos ativos"
-            value={data?.announcementsActive ?? 0}
+            value={dv(data?.announcementsActive ?? 0)}
             tone="primary"
             loading={loading}
           />
           <StatCard
             icon={Send}
             label="E-mails (30d)"
-            value={loading ? 0 : fmtNum(data?.campaigns.sent30d ?? 0)}
+            value={dv(loading ? 0 : fmtNum(data?.campaigns.sent30d ?? 0))}
             tone="success"
             loading={loading}
           />
           <StatCard
             icon={Send}
             label="Campanhas"
-            value={data?.campaigns.count ?? 0}
+            value={dv(data?.campaigns.count ?? 0)}
             tone="neutral"
             loading={loading}
           />

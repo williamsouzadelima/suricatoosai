@@ -1,11 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Radio, Users, RefreshCw } from "lucide-react";
+import { Radio, Users, RefreshCw, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { SectionHeader, StatCard, EmptyState, fmtDuration } from "./_ui";
+import {
+  SectionHeader,
+  StatCard,
+  EmptyState,
+  Callout,
+  fmtDuration,
+} from "./_ui";
 
 interface PresenceUser {
   userId: string;
@@ -30,17 +36,23 @@ export function OnlineUsersPanel() {
   const [data, setData] = useState<Presence | null>(null);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
+  const [error, setError] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (manual = false) => {
+    if (manual) setIsRefreshing(true);
     try {
       const res = await fetch("/api/admin/presence", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData(await res.json());
       setNow(Date.now());
+      setError(false);
     } catch (e) {
       console.error(e);
+      setError(true);
     } finally {
       setLoading(false);
+      if (manual) setIsRefreshing(false);
     }
   }, []);
 
@@ -63,10 +75,14 @@ export function OnlineUsersPanel() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => void load()}
-          disabled={loading}
+          onClick={() => void load(true)}
+          disabled={loading || isRefreshing}
         >
-          <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+          <RefreshCw
+            className={
+              loading || isRefreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"
+            }
+          />
           Atualizar
         </Button>
       </div>
@@ -75,23 +91,29 @@ export function OnlineUsersPanel() {
         <div className="grid grid-cols-2 gap-3">
           <StatCard
             icon={Radio}
-            tone={data && data.online > 0 ? "success" : "neutral"}
+            tone={!error && data && data.online > 0 ? "success" : "neutral"}
             label="Online agora"
-            value={loading ? 0 : (data?.online ?? 0)}
+            value={error ? "—" : loading ? 0 : (data?.online ?? 0)}
             sub="visto há < 2 min"
             loading={loading}
           />
           <StatCard
             icon={Users}
-            tone={data && data.idle > 0 ? "warning" : "neutral"}
+            tone={!error && data && data.idle > 0 ? "warning" : "neutral"}
             label="Ausentes"
-            value={loading ? 0 : (data?.idle ?? 0)}
+            value={error ? "—" : loading ? 0 : (data?.idle ?? 0)}
             sub="visto há < 12 min"
             loading={loading}
           />
         </div>
 
-        {!loading && users.length === 0 ? (
+        {error ? (
+          <Callout tone="warning" icon={AlertTriangle}>
+            Não consegui carregar a presença —{" "}
+            <strong>indisponível, não zerado</strong>. Toque em “Atualizar” para
+            tentar de novo.
+          </Callout>
+        ) : !loading && users.length === 0 ? (
           <EmptyState
             icon={Radio}
             title="Ninguém online agora."
