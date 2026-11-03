@@ -72,3 +72,55 @@ jobs:
 
           # Report-only: sempre sai 0 para nunca bloquear o pipeline.
           exit 0
+
+  cargo-audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust stable
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        with:
+          toolchain: stable
+          cache: false
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Auditar dependências Rust (report-only)
+        shell: bash
+        run: |
+          set +e
+          {
+            echo "## Auditoria de dependências Rust (cargo audit)"
+            echo ""
+            echo "Lockfile: packages/desktop/src-tauri/Cargo.lock (app desktop Tauri)."
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # cargo audit lê o Cargo.lock e consulta a base de advisories do
+          # RustSec (buscada em tempo de execução). O passo de auditoria NÃO
+          # compila o projeto: nenhum build-script/proc-macro das dependências
+          # do app desktop roda aqui (a etapa anterior compila apenas a própria
+          # ferramenta cargo-audit, fixada via --locked ao Cargo.lock dela).
+          cargo audit --color never --file packages/desktop/src-tauri/Cargo.lock 2>&1 | tee audit-cargo.txt
+          audit_code=${PIPESTATUS[0]}
+          {
+            echo '```'
+            cat audit-cargo.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$audit_code" -ne 0 ]; then
+            echo "> ⚠️ cargo audit encontrou vulnerabilidades nas dependências Rust do desktop. Report-only: NÃO bloqueia o merge. Trate via PR (bump do crate ou do tauri-plugin que o puxa)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "> ✅ Nenhuma vulnerabilidade conhecida nas dependências Rust do desktop." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # Report-only: sempre sai 0 para nunca bloquear o pipeline.
+          exit 0
