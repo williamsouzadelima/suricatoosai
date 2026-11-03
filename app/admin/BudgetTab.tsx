@@ -232,7 +232,7 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
 
         <CardContent className="space-y-5 p-5">
           <Callout>
-            Threshold sobre o <strong>custo real</strong> (OpenRouter). Padrão
+            Limite sobre o <strong>custo real</strong> (OpenRouter). Padrão
             de fábrica: desligado. Com <strong>bloqueio</strong> ligado, um novo
             run é <strong>recusado</strong> quando o custo real já acumulado (da
             task ou do usuário no período) passou do teto —{" "}

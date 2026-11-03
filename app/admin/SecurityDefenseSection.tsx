@@ -152,7 +152,7 @@ export function SecurityDefenseSection() {
             <div className="flex items-center gap-2">
               <StatusBadge
                 tone={settings.kill_switch ? "neutral" : "success"}
-                label={settings.kill_switch ? "kill-switch ON" : "ativo"}
+                label={settings.kill_switch ? "kill-switch ligado" : "ativo"}
               />
               <StatusBadge
                 tone={

@@ -152,7 +152,7 @@ export function UserDetailModal({
 
         {/* Fields */}
         <div className="grid grid-cols-2 gap-4 p-5">
-          <Field label="Requests" value={user.requests + (user.capped ? "+" : "")} />
+          <Field label="Requisições" value={user.requests + (user.capped ? "+" : "")} />
           <Field
             label="Tokens"
             value={(user.inputTokens + user.outputTokens).toLocaleString("pt-BR")}

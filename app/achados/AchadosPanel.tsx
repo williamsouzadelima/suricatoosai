@@ -420,7 +420,7 @@ function FindingsTable({
       <table className="w-full min-w-[760px] border-collapse">
         <thead>
           <tr className="border-b bg-muted/40">
-            {["Issue", "Severidade", "Asset", "Categoria", "Descoberto", "Status"].map(
+            {["Problema", "Severidade", "Alvo", "Categoria", "Descoberto", "Status"].map(
               (h) => (
                 <th
                   key={h}

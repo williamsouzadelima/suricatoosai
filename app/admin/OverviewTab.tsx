@@ -225,7 +225,7 @@ export function OverviewTab({
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <StatCard
             icon={Activity}
-            label="Requests"
+            label="Requisições"
             value={uv(usage.loading ? 0 : fmtNum(usage.requests))}
             tone="primary"
             loading={usage.loading}

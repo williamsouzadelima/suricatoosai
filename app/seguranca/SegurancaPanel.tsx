@@ -127,7 +127,7 @@ function ConnectedDevices() {
         <SectionHeader
           icon={Server}
           title="Dispositivos & agentes conectados"
-          description="App desktop e conectores Remote Control (token único por conta)."
+          description="App desktop e conectores de Controle remoto (token único por conta)."
           count={connections?.length}
         />
         <Button
@@ -155,7 +155,7 @@ function ConnectedDevices() {
         <EmptyState
           icon={Server}
           title="Nenhum dispositivo conectado."
-          description="Conecte o app desktop ou um agente Remote Control em Configurações → Controle remoto."
+          description="Conecte o app desktop ou um agente de Controle remoto em Configurações → Controle remoto."
         />
       ) : (
         <div className="divide-y">
@@ -174,7 +174,7 @@ function ConnectedDevices() {
                   {conn.osInfo?.hostname || conn.name}
                 </div>
                 <div className="truncate text-xs text-muted-foreground">
-                  {conn.isDesktop ? "App desktop" : "Conector Remote Control"}
+                  {conn.isDesktop ? "App desktop" : "Conector de Controle remoto"}
                   {conn.osInfo
                     ? ` · ${conn.osInfo.platform} ${conn.osInfo.arch}`
                     : ""}

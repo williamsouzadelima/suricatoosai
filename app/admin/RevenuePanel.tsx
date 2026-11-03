@@ -125,7 +125,7 @@ function RevCostChart({
       </div>
       <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
         <span>{first && bucketLabel(first.t, bucketDays)}</span>
-        <span className="tabular-nums">pico {fmtUSD(max)} / bucket</span>
+        <span className="tabular-nums">pico {fmtUSD(max)} / faixa</span>
         <span>{last && bucketLabel(last.t, bucketDays)}</span>
       </div>
     </div>

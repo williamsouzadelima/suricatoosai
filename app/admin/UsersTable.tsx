@@ -173,7 +173,7 @@ export function UsersTable() {
         { key: "nome", label: "Nome" },
         { key: "status", label: "Status" },
         { key: "suspenso", label: "Suspenso" },
-        { key: "requests", label: "Requests" },
+        { key: "requests", label: "Requisições" },
         { key: "tokens_entrada", label: "Tokens entrada" },
         { key: "tokens_saida", label: "Tokens saida" },
         { key: "custo_usd", label: "Custo USD" },

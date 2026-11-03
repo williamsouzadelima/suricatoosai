@@ -356,7 +356,7 @@ export function CostAnalyticsPanel() {
           <StatCard
             icon={Zap}
             tone="primary"
-            label="Requests"
+            label="Requisições"
             value={loading ? 0 : fmtNum(data?.totals.requests ?? 0)}
             sub={selectedClientName}
             loading={loading}

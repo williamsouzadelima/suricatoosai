@@ -161,7 +161,7 @@ export function AppShell({
           </div>
           <div className="min-w-0 leading-tight">
             <div className="truncate text-[12.5px] font-semibold text-[#e6edf8]">
-              {userEmail ?? "Staff"}
+              {userEmail ?? "Equipe"}
             </div>
             <div className="text-[11px] text-[#7d8ca8]">
               {userRole ?? "interno"}

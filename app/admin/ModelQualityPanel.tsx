@@ -309,7 +309,7 @@ export function ModelQualityPanel() {
         <SectionHeader
           icon={Gauge}
           title="Comparar modelos — decisão + qualidade real (eval-gate)"
-          description="Recomendação por tier com significância + medição por modelo SERVIDO (custo, achados, tool-sucesso, latência). Read-only."
+          description="Recomendação por tier com significância + medição por modelo SERVIDO (custo, achados, tool-sucesso, latência). Somente leitura."
         />
         <div className="flex flex-wrap items-center gap-3">
           <div className="inline-flex rounded-lg border bg-muted/40 p-0.5">
@@ -421,7 +421,7 @@ export function ModelQualityPanel() {
                   <th className="px-2 py-2 text-right font-medium">
                     Latência p50/p95
                   </th>
-                  <th className="px-2 py-2 pl-3 font-medium">Finish</th>
+                  <th className="px-2 py-2 pl-3 font-medium">Término</th>
                 </tr>
               </thead>
               <tbody>
