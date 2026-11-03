@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { useAction, useQuery } from "convex/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,7 +49,12 @@ interface MessageErrorStateProps {
   mode?: ChatMode;
 }
 
-const formatCountdown = (ms: number): string => {
+type Translator = (
+  key: string,
+  values?: Record<string, string | number>,
+) => string;
+
+const formatCountdown = (t: Translator, ms: number): string => {
   if (ms <= 0) return "";
   const totalSeconds = Math.floor(ms / 1000);
   const days = Math.floor(totalSeconds / 86400);
@@ -56,10 +62,10 @@ const formatCountdown = (ms: number): string => {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  if (minutes > 0) return `${minutes}m`;
-  return `${seconds}s`;
+  if (days > 0) return t("countdownDaysHours", { days, hours });
+  if (hours > 0) return t("countdownHoursMinutes", { hours, minutes });
+  if (minutes > 0) return t("countdownMinutes", { minutes });
+  return t("countdownSeconds", { seconds });
 };
 
 const getCurrentReturnPath = (): string => {
@@ -77,6 +83,8 @@ export const MessageErrorState = ({
   mode,
 }: MessageErrorStateProps) => {
   const { subscription, initializeNewChat } = useGlobalState();
+  const t = useTranslations("messageError");
+  const tMode = useTranslations("chatMode");
   const structuredStreamError = useMemo(
     () => deserializeChatSDKErrorFromStream(error),
     [error],
@@ -129,7 +137,7 @@ export const MessageErrorState = ({
           ? displayError.cause
           : displayError.message;
       }
-      return displayError.message || "An error occurred.";
+      return displayError.message || t("genericError");
     })(),
   );
   const isProviderContentBlocked =
@@ -150,8 +158,8 @@ export const MessageErrorState = ({
   const upgradeCtaText =
     subscription === "free" &&
     (limitType === "daily_requests" || limitType === "free_monthly")
-      ? "Keep going"
-      : "Upgrade Plan";
+      ? t("keepGoing")
+      : t("upgradePlan");
   const isSuspensionError = metadata?.suspensionCategory !== undefined;
   const paidDailyFreeAllowance =
     metadata?.paidDailyFreeAllowance &&
@@ -167,6 +175,24 @@ export const MessageErrorState = ({
     typeof paidDailyFreeAllowance?.costRemainingDollars === "number"
       ? paidDailyFreeAllowance.costRemainingDollars
       : undefined;
+  // Display label for the paid-allowance CTA (localized); the analytics event
+  // keeps sending the English `paidDailyFreeAllowanceCtaText` (lib) above.
+  const paidAllowanceDisplayCta =
+    mode === "agent"
+      ? t("useFreeAgentToday")
+      : mode === "ask"
+        ? t("useFreeAskToday")
+        : t("useFreeAllowanceToday");
+  const paidAllowanceAmount =
+    allowanceCostRemaining !== undefined
+      ? t("allowanceUpTo", { amount: allowanceCostRemaining.toFixed(2) })
+      : t("allowanceSome");
+  const paidAllowanceModeLabel =
+    mode === "agent"
+      ? tMode("agent")
+      : mode === "ask"
+        ? tMode("ask")
+        : t("theCurrentMode");
   const shouldFocusPaidAllowanceActions =
     canUsePaidDailyFreeAllowance &&
     extraUsageCta?.analyticsText === "Add Credits";
@@ -176,11 +202,20 @@ export const MessageErrorState = ({
   const showUpgrade = canUpgrade && !shouldFocusPaidAllowanceActions;
   const isDirectAddCredits = extraUsageCta?.analyticsText === "Add Credits";
   const isPaymentRecovery = capReason === "auto_reload_failed";
+  const extraUsageCtaLabel = extraUsageCta
+    ? extraUsageCta.analyticsText === "Increase Limit"
+      ? t("ctaIncreaseLimit")
+      : extraUsageCta.analyticsText === "Open Team Usage"
+        ? t("ctaTeamUsage")
+        : extraUsageCta.analyticsText === "Update Payment"
+          ? t("ctaUpdatePayment")
+          : extraUsageCta.label
+    : undefined;
   const extraUsageCtaText = isDirectAddCredits
-    ? "Add $15 and continue"
+    ? t("addCreditsAndContinue")
     : isPaymentRecovery
-      ? "Update card and retry"
-      : extraUsageCta?.label;
+      ? t("updateCardAndRetry")
+      : extraUsageCtaLabel;
   const recommendedPurchaseAmountDollars =
     getRecommendedExtraUsagePurchaseAmount(
       getApproximateWeeklyExtraUsageSpend(
@@ -220,7 +255,7 @@ export const MessageErrorState = ({
       });
 
       if (!result.url) {
-        toast.error(result.error || "Failed to create checkout session");
+        toast.error(result.error || t("failedCheckout"));
         return;
       }
 
@@ -238,7 +273,7 @@ export const MessageErrorState = ({
       window.location.href = result.url;
     } catch (error) {
       console.error("Failed to purchase credits:", error);
-      toast.error("Failed to purchase credits");
+      toast.error(t("failedPurchaseCredits"));
     } finally {
       setIsPurchasing(false);
     }
@@ -255,14 +290,14 @@ export const MessageErrorState = ({
       });
 
       if (!result.url) {
-        toast.error(result.error || "Failed to open billing portal");
+        toast.error(result.error || t("failedBillingPortal"));
         return;
       }
 
       window.location.href = result.url;
     } catch (error) {
       console.error("Failed to update payment method:", error);
-      toast.error("Failed to open billing portal");
+      toast.error(t("failedBillingPortal"));
     } finally {
       setIsUpdatingPayment(false);
     }
@@ -365,7 +400,7 @@ export const MessageErrorState = ({
           <>
             <p>{errorMessage}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Retrying with the same conversation usually fails again.
+              {t("retrySameFails")}
             </p>
           </>
         ) : (
@@ -373,23 +408,15 @@ export const MessageErrorState = ({
         )}
         {isRateLimitError && timeRemaining > 0 && (
           <p className="text-xs text-muted-foreground mt-1">
-            Resets in {formatCountdown(timeRemaining)}
+            {t("resetsIn", { countdown: formatCountdown(t, timeRemaining) })}
           </p>
         )}
         {canUsePaidDailyFreeAllowance && (
           <p className="text-xs text-muted-foreground mt-2">
-            Your paid-plan limit is used up, but you still have
-            {allowanceCostRemaining !== undefined
-              ? ` up to $${allowanceCostRemaining.toFixed(2)}`
-              : " some"}{" "}
-            of free usage today. Continue this request in{" "}
-            {mode === "agent"
-              ? "Agent"
-              : mode === "ask"
-                ? "Ask"
-                : "the current"}{" "}
-            mode with our low-cost model. The daily allowance resets at midnight
-            UTC.
+            {t("paidAllowanceParagraph", {
+              allowance: paidAllowanceAmount,
+              mode: paidAllowanceModeLabel,
+            })}
           </p>
         )}
       </div>
@@ -404,8 +431,10 @@ export const MessageErrorState = ({
                 disabled={timeRemaining > 0 && !isPaidUser}
               >
                 {timeRemaining > 0 && !isPaidUser
-                  ? `Try again in ${formatCountdown(timeRemaining)}`
-                  : "Try Again"}
+                  ? t("tryAgainIn", {
+                      countdown: formatCountdown(t, timeRemaining),
+                    })
+                  : t("tryAgain")}
               </Button>
             )}
             {showRateLimitUsage && (
@@ -414,7 +443,7 @@ export const MessageErrorState = ({
                 size="sm"
                 onClick={() => openSettingsDialog("Usage")}
               >
-                View Usage
+                {t("viewUsage")}
               </Button>
             )}
             {extraUsageCta && (
@@ -439,7 +468,7 @@ export const MessageErrorState = ({
                   }
                 }}
               >
-                {isUpdatingPayment ? "Opening billing..." : extraUsageCtaText}
+                {isUpdatingPayment ? t("openingBilling") : extraUsageCtaText}
               </Button>
             )}
             {canUsePaidDailyFreeAllowance && (
@@ -463,7 +492,7 @@ export const MessageErrorState = ({
                   });
                 }}
               >
-                {paidDailyFreeAllowanceCtaText}
+                {paidAllowanceDisplayCta}
               </Button>
             )}
             {showUpgrade && (
@@ -491,7 +520,7 @@ export const MessageErrorState = ({
           </>
         ) : isProviderContentBlocked ? (
           <Button variant="outline" size="sm" onClick={initializeNewChat}>
-            New Task
+            {t("newTask")}
           </Button>
         ) : (
           <>
@@ -507,13 +536,13 @@ export const MessageErrorState = ({
                   )
                 }
               >
-                Contact Support
+                {t("contactSupport")}
               </Button>
             ) : (
               <>
                 {canReconnect && (
                   <Button variant="default" size="sm" onClick={onReconnect}>
-                    Reconnect
+                    {t("reconnect")}
                   </Button>
                 )}
                 <Button
@@ -521,7 +550,7 @@ export const MessageErrorState = ({
                   size="sm"
                   onClick={() => onRetry()}
                 >
-                  Retry
+                  {t("retry")}
                 </Button>
               </>
             )}
@@ -534,8 +563,8 @@ export const MessageErrorState = ({
         onPurchase={handlePurchaseCredits}
         isLoading={isPurchasing}
         recommendedAmountDollars={recommendedPurchaseAmountDollars}
-        title="Add credits and continue"
-        description="Choose how much extra usage to add. Your stopped task will retry after payment succeeds."
+        title={t("buyDialogTitle")}
+        description={t("buyDialogDescription")}
       />
     </div>
   );

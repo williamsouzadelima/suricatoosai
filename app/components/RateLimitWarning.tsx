@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { redirectToPricing } from "../hooks/usePricingDialog";
@@ -16,6 +17,11 @@ import {
   captureAddCreditCtaImpression,
   captureUpgradeCtaImpression,
 } from "@/lib/analytics/client";
+
+type Translator = (
+  key: string,
+  values?: Record<string, string | number>,
+) => string;
 
 // Discriminated union for warning data
 export type RateLimitWarningData =
@@ -72,12 +78,12 @@ interface RateLimitWarningProps {
   onDismiss: () => void;
 }
 
-const formatTimeUntil = (resetTime: Date): string => {
+const formatTimeUntil = (t: Translator, resetTime: Date): string => {
   const now = new Date();
   const timeDiff = resetTime.getTime() - now.getTime();
 
   if (timeDiff <= 0) {
-    return "now";
+    return t("timeNow");
   }
 
   const daysUntil = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
@@ -87,76 +93,97 @@ const formatTimeUntil = (resetTime: Date): string => {
   const minutesUntil = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
 
   if (daysUntil === 0 && hoursUntil === 0 && minutesUntil === 0) {
-    return "in less than a minute";
+    return t("timeLessThanMinute");
   }
   if (daysUntil >= 1 && hoursUntil === 0) {
-    return `in ${daysUntil} ${daysUntil === 1 ? "day" : "days"}`;
+    return t("timeInDays", { days: daysUntil });
   }
   if (daysUntil >= 1) {
-    return `in ${daysUntil}d ${hoursUntil}h`;
+    return t("timeInDaysHours", { days: daysUntil, hours: hoursUntil });
   }
   if (hoursUntil === 0) {
-    return `in ${minutesUntil} ${minutesUntil === 1 ? "minute" : "minutes"}`;
+    return t("timeInMinutes", { minutes: minutesUntil });
   }
   if (minutesUntil === 0) {
-    return `in ${hoursUntil} ${hoursUntil === 1 ? "hour" : "hours"}`;
+    return t("timeInHours", { hours: hoursUntil });
   }
-  return `in ${hoursUntil}h ${minutesUntil}m`;
+  return t("timeInHoursMinutes", { hours: hoursUntil, minutes: minutesUntil });
 };
 
-const getMessage = (data: RateLimitWarningData, timeString: string): string => {
+const getMessage = (
+  t: Translator,
+  tMode: Translator,
+  data: RateLimitWarningData,
+  timeString: string,
+): string => {
   if (data.warningType === "sliding-window") {
     if (data.remaining === 0) {
       return data.mode === "agent"
-        ? "You've used today's free Agent requests. Upgrade to keep running Agent today, or wait for the reset at midnight UTC."
-        : "You've used all your daily free requests. Upgrade to keep going today, or wait for the reset at midnight UTC.";
+        ? t("slidingAgentExhausted")
+        : t("slidingExhausted");
     }
 
-    return `You have ${data.remaining} daily ${data.remaining === 1 ? "request" : "requests"} remaining today.`;
+    return t("slidingRemaining", { count: data.remaining });
   }
 
   if (data.warningType === "extra-usage-active") {
-    return `You're now using extra usage credits. Your monthly limit resets ${timeString}.`;
+    return t("extraUsageActive", { time: timeString });
   }
 
   if (data.warningType === "paid-daily-free-allowance") {
-    return `Your paid-plan limit is used up, so this ${data.mode === "agent" ? "Agent" : "Ask"} response is using today's free $${data.costLimitDollars.toFixed(2)} allowance with our low-cost model. It resets ${timeString} and the response will stop if the allowance runs out.`;
+    return t("paidAllowance", {
+      mode: tMode(data.mode === "agent" ? "agent" : "ask"),
+      amount: data.costLimitDollars.toFixed(2),
+      time: timeString,
+    });
   }
 
   if (data.warningType === "agent-run-spend-cap") {
-    return `This Pro Agent run paused after using $${data.runCostDollars.toFixed(2)} of the $${data.runCapDollars.toFixed(2)} legacy per-run safety cap. Continue to keep working.`;
+    return t("agentRunSpendCap", {
+      runCost: data.runCostDollars.toFixed(2),
+      runCap: data.runCapDollars.toFixed(2),
+    });
   }
 
   // Token bucket warning — show dollar amounts when available
   if (data.remainingPercent === 0) {
     if (data.cutOff) {
       if (data.subscription === "free") {
-        return `You've reached your free monthly usage limit and this response was cut off. Upgrade for higher limits. Resets ${timeString}.`;
+        return t("cutOffFree", { time: timeString });
       }
       if (data.capReason === "extra_usage_cap") {
-        return `You've reached your extra usage spending limit and this response was cut off. Increase your limit to continue. Resets ${timeString}.`;
+        return t("cutOffExtraUsageCap", { time: timeString });
       }
       if (data.capReason === "paid_daily_free_allowance_cut_off") {
-        return `Today's free Ask allowance was used up and this response was cut off. Add credits to continue. Resets ${timeString}.`;
+        return t("cutOffPaidAllowance", { time: timeString });
       }
-      return `You've reached your monthly limit and this response was cut off. Add credits or upgrade to continue. Resets ${timeString}.`;
+      return t("cutOffDefault", { time: timeString });
     }
     if (data.subscription === "free") {
-      return `You've reached your free monthly usage limit. Upgrade for higher limits. Resets ${timeString}.`;
+      return t("freeMonthlyExhausted", { time: timeString });
     }
 
-    return `You've reached your monthly usage limit. It resets ${timeString}.`;
+    return t("monthlyExhausted", { time: timeString });
   }
 
   const usedPercent = 100 - data.remainingPercent;
   if (data.usedDollars !== undefined && data.limitDollars !== undefined) {
-    return `You've used $${data.usedDollars.toFixed(2)} of $${data.limitDollars.toFixed(2)} (${usedPercent}%). Resets ${timeString}.`;
+    return t("usedDollars", {
+      used: data.usedDollars.toFixed(2),
+      limit: data.limitDollars.toFixed(2),
+      percent: usedPercent,
+      time: timeString,
+    });
   }
 
-  return `You have ${data.remainingPercent}% of your monthly usage remaining. It resets ${timeString}.`;
+  return t("percentRemaining", {
+    percent: data.remainingPercent,
+    time: timeString,
+  });
 };
 
 const getUpgradeCtaText = (
+  t: Translator,
   data: RateLimitWarningData,
   limitType: string,
 ): string => {
@@ -164,10 +191,10 @@ const getUpgradeCtaText = (
     data.subscription === "free" &&
     (limitType === "daily_requests" || limitType === "free_monthly")
   ) {
-    return "Keep going";
+    return t("keepGoing");
   }
 
-  return "Upgrade plan";
+  return t("upgradePlan");
 };
 
 const WARNING_STYLES = "bg-input-chat border-black/8 dark:border-border";
@@ -176,10 +203,12 @@ export const RateLimitWarning = ({
   data,
   onDismiss,
 }: RateLimitWarningProps) => {
+  const t = useTranslations("rateLimit");
+  const tMode = useTranslations("chatMode");
   const capturedUpgradeImpressionRef = useRef(false);
   const capturedAddCreditImpressionRef = useRef(false);
-  const timeString = formatTimeUntil(data.resetTime);
-  const message = getMessage(data, timeString);
+  const timeString = formatTimeUntil(t, data.resetTime);
+  const message = getMessage(t, tMode, data, timeString);
   const capReason =
     data.warningType === "sliding-window" ||
     data.warningType === "agent-run-spend-cap" ||
@@ -218,7 +247,7 @@ export const RateLimitWarning = ({
     data.warningType === "token-bucket" && data.remainingPercent === 0
       ? "hit"
       : "warning";
-  const upgradeCtaText = getUpgradeCtaText(data, limitType);
+  const upgradeCtaText = getUpgradeCtaText(t, data, limitType);
 
   useEffect(() => {
     if (!showUpgrade || capturedUpgradeImpressionRef.current) return;
@@ -294,7 +323,7 @@ export const RateLimitWarning = ({
             variant="outline"
             className="h-7 px-3 text-xs font-medium border-black/8 dark:border-border"
           >
-            View Usage
+            {t("viewUsage")}
           </Button>
         )}
         {showUpgrade && (
@@ -320,7 +349,7 @@ export const RateLimitWarning = ({
       <button
         onClick={onDismiss}
         className="flex-shrink-0 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-        aria-label="Dismiss warning"
+        aria-label={t("dismiss")}
       >
         <X className="h-5 w-5" />
       </button>
