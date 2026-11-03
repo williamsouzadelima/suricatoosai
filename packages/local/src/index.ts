@@ -51,7 +51,7 @@ const IDLE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 // Agent version — KEEP IN SYNC with packages/local/package.json "version".
 // Reported to the server so the Remote Control UI can flag "update available".
-const AGENT_VERSION = "0.1.5";
+const AGENT_VERSION = "0.1.6";
 
 // How often the agent polls the server for a pending update (Update button).
 const UPDATE_POLL_INTERVAL_MS = 20 * 1000; // 20s
@@ -1353,7 +1353,21 @@ export class LocalSandboxClient {
         );
         return;
       }
-      await rm(pkgDir, { recursive: true, force: true });
+      // Remove the whole npx cache entry (.../_npx/<hash>), not only our
+      // package dir. Deleting just the package dir leaves a half-populated
+      // cache that the next `npx` reuses WITHOUT re-linking the bin, serving a
+      // non-executable file ("Permission denied"). pkgDir is
+      // .../_npx/<hash>/node_modules/@suricatoos/local, so the entry is 3 up.
+      const npxEntryDir = path.resolve(pkgDir, "..", "..", "..");
+      // Guard the 3-levels-up (which assumes the scoped @suricatoos/local
+      // depth): only wipe the whole entry when it really is a .../_npx/<hash>
+      // dir. Otherwise fall back to just our package dir, so force:true can
+      // never delete an unintended directory.
+      if (path.basename(path.dirname(npxEntryDir)) === "_npx") {
+        await rm(npxEntryDir, { recursive: true, force: true });
+      } else {
+        await rm(pkgDir, { recursive: true, force: true });
+      }
       console.log(chalk.gray("🧽 Removed the agent's npx cache from disk."));
     } catch (error) {
       console.log(
