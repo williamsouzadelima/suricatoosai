@@ -9,6 +9,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 import {
   type ActiveAgentToolApprovalRequest,
@@ -104,6 +105,7 @@ export function AgentApprovalPrompt({
 }: AgentApprovalPromptProps) {
   const { session, sendToolApproval, toolApprovalSendStates } =
     useAgentApproval();
+  const tToast = useTranslations("toasts");
   const sendState = toolApprovalSendStates[request.approvalId] ?? "idle";
   const isSending = sendState === "sending";
   const isApproved = sendState === "approved";
@@ -144,7 +146,7 @@ export function AgentApprovalPrompt({
         toast.error(
           error instanceof Error
             ? error.message
-            : "Failed to send approval response.",
+            : tToast("failedSendApproval"),
         );
       }
     },
@@ -154,6 +156,7 @@ export function AgentApprovalPrompt({
       request.toolCallId,
       sendToolApproval,
       targetGrant,
+      tToast,
     ],
   );
 
@@ -169,10 +172,10 @@ export function AgentApprovalPrompt({
       toast.error(
         error instanceof Error
           ? error.message
-          : "Failed to send approval response.",
+          : tToast("failedSendApproval"),
       );
     }
-  }, [canSubmit, request.approvalId, request.toolCallId, sendToolApproval]);
+  }, [canSubmit, request.approvalId, request.toolCallId, sendToolApproval, tToast]);
 
   const allowLabel = isApproved
     ? "Approved"

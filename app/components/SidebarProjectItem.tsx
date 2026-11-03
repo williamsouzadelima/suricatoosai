@@ -15,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,6 +66,7 @@ export function SidebarProjectItem({
   const [isPinning, setIsPinning] = useState(false);
   const pinProject = usePinProject();
   const unpinProject = useUnpinProject();
+  const tToast = useTranslations("toasts");
   const dropData: SidebarChatDropData = {
     type: "sidebar-chat-drop",
     onDrop: (chat: SidebarChatDragData) =>
@@ -88,8 +90,8 @@ export function SidebarProjectItem({
       console.error("Failed to update project pin:", error);
       toast.error(
         project.pinned_at !== undefined
-          ? "Failed to unpin project"
-          : "Failed to pin project",
+          ? tToast("failedUnpinProject")
+          : tToast("failedPinProject"),
       );
     } finally {
       setIsPinning(false);

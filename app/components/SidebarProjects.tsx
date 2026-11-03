@@ -46,6 +46,7 @@ export function SidebarProjects({
 }: SidebarProjectsProps) {
   const { desktopBridgeActive } = useGlobalState();
   const t = useTranslations("sidebar");
+  const tToast = useTranslations("toasts");
   const moveChatToProject = useMoveChatToProject();
   const startNewChat = useStartNewChat();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -73,8 +74,8 @@ export function SidebarProjects({
 
   const handleNewThread = (project: Doc<"projects">) => {
     if (project.folder_path && !desktopBridgeActive) {
-      toast.error("Connect Suricatoos Desktop", {
-        description: `“${project.name}” is linked to a local folder. Open Suricatoos Desktop and wait for it to connect before starting a task.`,
+      toast.error(tToast("connectDesktopTitle"), {
+        description: tToast("connectDesktopDesc", { name: project.name }),
       });
       return;
     }
@@ -97,9 +98,9 @@ export function SidebarProjects({
         projectId: project._id,
       });
       if (moved) {
-        toast.success(`Task moved into ${project.name}.`, {
+        toast.success(tToast("taskMovedInto", { name: project.name }), {
           action: {
-            label: "Undo",
+            label: tToast("undo"),
             onClick: () => {
               void moveChatToProject({
                 chatId,
@@ -108,26 +109,26 @@ export function SidebarProjects({
                   : null,
               }).catch((error) => {
                 console.error("Failed to undo task move:", error);
-                toast.error("Failed to undo move", {
+                toast.error(tToast("failedUndoMove"), {
                   description:
                     error instanceof Error
                       ? formatTaskUiCopy(error.message)
-                      : "Please try again.",
+                      : tToast("pleaseTryAgain"),
                 });
               });
             },
           },
         });
       } else {
-        toast.info(`Already in ${project.name}`);
+        toast.info(tToast("alreadyIn", { name: project.name }));
       }
     } catch (error) {
       console.error("Failed to move chat to project:", error);
-      toast.error("Failed to move task", {
+      toast.error(tToast("failedMoveTask"), {
         description:
           error instanceof Error
             ? formatTaskUiCopy(error.message)
-            : "Please try again.",
+            : tToast("pleaseTryAgain"),
       });
     }
   };

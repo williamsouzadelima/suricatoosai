@@ -181,6 +181,7 @@ export function SidebarChatSections({
   const [activeTask, setActiveTask] = useState<SidebarChatDragData>();
   const startNewChat = useStartNewChat();
   const t = useTranslations("sidebar");
+  const tToast = useTranslations("toasts");
   const pinChat = usePinChat();
   const unpinChat = useUnpinChat();
   const pinnedChats = chats.filter((chat) => chat.pinned_at != null);
@@ -212,10 +213,10 @@ export function SidebarChatSections({
 
     try {
       await pinChat({ chatId: chat.chatId });
-      toast.success("Task pinned");
+      toast.success(tToast("taskPinned"));
     } catch (error) {
       console.error("Failed to pin dropped task:", error);
-      toast.error("Failed to pin task");
+      toast.error(tToast("failedPinTask"));
     }
   };
 
@@ -224,10 +225,10 @@ export function SidebarChatSections({
 
     try {
       await unpinChat({ chatId: chat.chatId });
-      toast.success("Task unpinned");
+      toast.success(tToast("taskUnpinned"));
     } catch (error) {
       console.error("Failed to unpin dropped task:", error);
-      toast.error("Failed to unpin task");
+      toast.error(tToast("failedUnpinTask"));
     }
   };
 

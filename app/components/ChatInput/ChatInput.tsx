@@ -26,6 +26,7 @@ import {
 } from "../RateLimitWarning";
 import { isAgentMode } from "@/lib/utils/mode-helpers";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { NULL_THREAD_DRAFT_ID } from "@/lib/utils/client-storage";
 import { SandboxSelector } from "../SandboxSelector";
 import { AgentPermissionSelector } from "../AgentPermissionSelector";
@@ -272,6 +273,7 @@ export const ChatInput = ({
     defaultLocalSandboxPreference,
   } = useGlobalState();
   const input = useComposerInput();
+  const tToast = useTranslations("toasts");
   const { setInput } = useComposerActions();
   const isOnline = useOnlineStatus();
   const isOffline = offlineProtection && !isOnline;
@@ -659,12 +661,12 @@ export const ChatInput = ({
           const selectedDesktop = sandboxPreference === "desktop";
           toast.info(
             selectedDesktop
-              ? "Desktop sandbox disconnected."
-              : "Local sandbox disconnected.",
+              ? tToast("desktopSandboxDisconnected")
+              : tToast("localSandboxDisconnected"),
             {
               description: selectedDesktop
-                ? "Reconnect the Desktop sandbox to keep using Agent."
-                : "Reconnect the selected local runner to keep using Agent.",
+                ? tToast("reconnectDesktopSandbox")
+                : tToast("reconnectLocalRunner"),
               duration: 5000,
             },
           );
@@ -674,8 +676,8 @@ export const ChatInput = ({
 
       setChatMode("ask");
       if (wasConnected) {
-        toast.info("Local sandbox disconnected. Switched to Ask mode.", {
-          description: "Reconnect your sandbox to use Agent mode.",
+        toast.info(tToast("localSandboxDisconnectedSwitchedAsk"), {
+          description: tToast("reconnectSandboxAgentMode"),
           duration: 5000,
         });
       }
@@ -686,6 +688,7 @@ export const ChatInput = ({
     isFreeAgent,
     sandboxPreference,
     setChatMode,
+    tToast,
   ]);
 
   useEffect(() => {
@@ -753,15 +756,15 @@ export const ChatInput = ({
     try {
       const reconnected = await reconnectOnlineStatus();
       if (!reconnected) {
-        toast.info("Still offline", {
-          description: "Check your connection, then try reconnecting again.",
+        toast.info(tToast("stillOffline"), {
+          description: tToast("stillOfflineDesc"),
         });
         return;
       }
       await onReconnect?.();
     } catch {
-      toast.error("Could not reconnect the chat", {
-        description: "Your draft is still saved. Please try again.",
+      toast.error(tToast("couldNotReconnect"), {
+        description: tToast("couldNotReconnectDesc"),
       });
     } finally {
       setIsReconnecting(false);
@@ -773,8 +776,8 @@ export const ChatInput = ({
     content: string,
   ) => {
     if (content.length > PASTED_TEXT_INLINE_RESTORE_MAX_CHARS) {
-      toast.error("Pasted text is too long to show in the text field", {
-        description: "Edit it below 25,000 characters and try again.",
+      toast.error(tToast("pastedTooLong"), {
+        description: tToast("pastedTooLongDesc"),
       });
       return;
     }
