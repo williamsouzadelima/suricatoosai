@@ -45,7 +45,7 @@ export class FileAttachment {
   async removeFile(fileName: string): Promise<void> {
     const removeButton = this.page
       .locator(`[data-file-name="${fileName}"]`)
-      .locator('button[aria-label*="Remove"]')
+      .locator('[data-testid="remove-file"]')
       .or(
         this.page.locator(`text="${fileName}"`).locator("..").locator("button"),
       );
@@ -55,9 +55,7 @@ export class FileAttachment {
   }
 
   async removeAllFiles(): Promise<void> {
-    const removeButtons = this.page.locator(
-      'button[aria-label*="Remove file"]',
-    );
+    const removeButtons = this.page.locator('[data-testid="remove-file"]');
     const count = await removeButtons.count();
 
     for (let i = count - 1; i >= 0; i--) {

@@ -36,6 +36,23 @@
     "doAnything": "Haz cualquier cosa",
     "askLearnBrainstorm": "Pregunta, aprende, genera ideas"
   },
+  "attachments": {
+    "unavailableOnDevice": "No disponible en este dispositivo",
+    "uploadFailed": "Error al subir",
+    "unavailableInMode": "No disponible en {mode}",
+    "showInTextField": "Mostrar en el campo de texto",
+    "clickToEdit": "Haz clic para editar",
+    "textWithSize": "Texto · {size}",
+    "localFile": "Archivo local",
+    "document": "Documento",
+    "fileWithSize": "{label} • {size}",
+    "savingChanges": "Guardando cambios...",
+    "uploadFailedRetry": "Error al subir. Edita el texto para reintentar.",
+    "changesSaveAutomatically": "Los cambios se guardan automáticamente mientras editas",
+    "viewFile": "Ver {name}",
+    "removeFile": "Eliminar archivo",
+    "closeTextEditor": "Cerrar el editor de texto pegado"
+  },
   "chatMode": {
     "ask": "Preguntar",
     "agent": "Agente",

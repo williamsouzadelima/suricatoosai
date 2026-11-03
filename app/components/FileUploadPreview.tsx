@@ -30,6 +30,7 @@ import {
   LocalDesktopFile,
 } from "@/types/file";
 import { PASTED_TEXT_INLINE_RESTORE_MAX_CHARS } from "@/lib/utils/pasted-text-attachments";
+import { useTranslations } from "next-intl";
 
 const isBrowserFile = (file: File | LocalDesktopFile): file is File =>
   typeof globalThis.File !== "undefined" && file instanceof globalThis.File;
@@ -42,6 +43,8 @@ export const FileUploadPreview = ({
   onShowGeneratedTextInField,
   generatedTextAttachmentsAvailable = true,
 }: FileUploadPreviewProps) => {
+  const t = useTranslations("attachments");
+  const tMode = useTranslations("chatMode");
   const [filePreviews, setFilePreviews] = useState<FilePreview[]>([]);
   const [selectedImage, setSelectedImage] = useState<{
     src: string;
@@ -398,13 +401,13 @@ export const FileUploadPreview = ({
                             }`}
                           >
                             {isUnavailableGeneratedText ? (
-                              "Unavailable on this device"
+                              t("unavailableOnDevice")
                             ) : filePreview.error ? (
-                              "Upload failed"
+                              t("uploadFailed")
                             ) : !generatedTextAttachmentsAvailable ? (
                               <>
                                 <span className="shrink-0">
-                                  Unavailable in Ask
+                                  {t("unavailableInMode", { mode: tMode("ask") })}
                                 </span>
                                 {canShowGeneratedTextInField && (
                                   <>
@@ -420,7 +423,7 @@ export const FileUploadPreview = ({
                                       }
                                     >
                                       <span className="truncate">
-                                        Show in text field
+                                        {t("showInTextField")}
                                       </span>
                                       <ChevronRight className="size-3.5 shrink-0" />
                                     </button>
@@ -439,15 +442,15 @@ export const FileUploadPreview = ({
                                 }
                               >
                                 <span className="truncate">
-                                  Show in text field
+                                  {t("showInTextField")}
                                 </span>
                                 <ChevronRight className="size-3.5 shrink-0" />
                               </button>
                             ) : canEditGeneratedText ? (
-                              "Click to edit"
+                              t("clickToEdit")
                             ) : (
                               <>
-                                Text · {formatFileSize(filePreview.file.size)}
+                                {t("textWithSize", { size: formatFileSize(filePreview.file.size) })}
                               </>
                             )}
                           </div>
@@ -460,7 +463,7 @@ export const FileUploadPreview = ({
                                 <X className="h-5 w-5 text-white" />
                               </div>
                               <span className="text-xs font-semibold text-red-600 dark:text-red-400 text-center">
-                                Upload failed
+                                {t("uploadFailed")}
                               </span>
                             </div>
                           </div>
@@ -475,7 +478,7 @@ export const FileUploadPreview = ({
                                   {filePreview.file.name}
                                 </div>
                                 <div className="text-red-600 dark:text-red-400 font-medium text-xs">
-                                  Upload failed
+                                  {t("uploadFailed")}
                                 </div>
                               </div>
                             </div>
@@ -516,7 +519,7 @@ export const FileUploadPreview = ({
                             )
                           }
                           className="w-80 p-2 text-left transition-colors hover:bg-accent"
-                          aria-label={`View ${filePreview.file.name}`}
+                          aria-label={t("viewFile", { name: filePreview.file.name })}
                         >
                           <div className="flex flex-row items-center gap-2">
                             <div
@@ -546,8 +549,14 @@ export const FileUploadPreview = ({
                                 }`}
                               >
                                 {filePreview.error
-                                  ? "Upload failed"
-                                  : `${uploadedFile?.storage === "local-desktop" ? "Local file" : "Document"} • ${formatFileSize(filePreview.file.size)}`}
+                                  ? t("uploadFailed")
+                                  : t("fileWithSize", {
+                                      label:
+                                        uploadedFile?.storage === "local-desktop"
+                                          ? t("localFile")
+                                          : t("document"),
+                                      size: formatFileSize(filePreview.file.size),
+                                    })}
                               </div>
                             </div>
                           </div>
@@ -563,7 +572,7 @@ export const FileUploadPreview = ({
                       variant="secondary"
                       size="sm"
                       className="transition-colors flex h-6 w-6 items-center justify-center rounded-full border-[rgba(0,0,0,0.1)] bg-black text-white dark:border-[rgba(255,255,255,0.1)] dark:bg-white dark:text-black p-0"
-                      aria-label="Remove file"
+                      aria-label={t("removeFile")}
                       data-testid="remove-file"
                     >
                       <X className="h-3 w-3" />
@@ -606,10 +615,10 @@ export const FileUploadPreview = ({
                 </DialogTitle>
                 <DialogDescription className="truncate text-xs">
                   {hasPendingTextSave || activeTextFile?.uploading
-                    ? "Saving changes..."
+                    ? t("savingChanges")
                     : activeTextFile?.error
-                      ? "Upload failed. Edit the text to retry."
-                      : "Changes save automatically as you edit"}
+                      ? t("uploadFailedRetry")
+                      : t("changesSaveAutomatically")}
                 </DialogDescription>
               </div>
             </div>
@@ -637,7 +646,7 @@ export const FileUploadPreview = ({
                       }
                     }}
                   >
-                    Show in text field
+                    {t("showInTextField")}
                     <ChevronRight className="size-3.5" />
                   </Button>
                 )}
@@ -647,7 +656,7 @@ export const FileUploadPreview = ({
                   variant="ghost"
                   size="icon"
                   className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-white/10 hover:text-foreground"
-                  aria-label="Close pasted text editor"
+                  aria-label={t("closeTextEditor")}
                 >
                   <X className="size-4" />
                 </Button>

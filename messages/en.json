@@ -36,6 +36,23 @@
     "doAnything": "Do anything",
     "askLearnBrainstorm": "Ask, learn, brainstorm"
   },
+  "attachments": {
+    "unavailableOnDevice": "Unavailable on this device",
+    "uploadFailed": "Upload failed",
+    "unavailableInMode": "Unavailable in {mode}",
+    "showInTextField": "Show in text field",
+    "clickToEdit": "Click to edit",
+    "textWithSize": "Text · {size}",
+    "localFile": "Local file",
+    "document": "Document",
+    "fileWithSize": "{label} • {size}",
+    "savingChanges": "Saving changes...",
+    "uploadFailedRetry": "Upload failed. Edit the text to retry.",
+    "changesSaveAutomatically": "Changes save automatically as you edit",
+    "viewFile": "View {name}",
+    "removeFile": "Remove file",
+    "closeTextEditor": "Close pasted text editor"
+  },
   "chatMode": {
     "ask": "Ask",
     "agent": "Agent",
