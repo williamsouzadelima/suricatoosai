@@ -505,6 +505,34 @@ describe("RemoteControlTab", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("defaults the connect command to install-as-service and toggles to quick", () => {
+    render(<RemoteControlTab />);
+
+    // Service mode is the default: the command carries the `install` subcommand.
+    expect(screen.getByText(/install --token <token>/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Quick" }));
+
+    // Quick mode drops `install` back to the plain foreground run. (Regex, since
+    // a dev convex-url flag may trail the command in the test env.)
+    expect(screen.getByText(/@latest --token <token>/)).toBeInTheDocument();
+    expect(screen.queryByText(/install --token/)).not.toBeInTheDocument();
+  });
+
+  it("copies the install-as-service command with the token by default", async () => {
+    render(<RemoteControlTab />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Copy connect command" }),
+    );
+
+    await waitFor(() => {
+      expect(mockWriteText).toHaveBeenCalledWith(
+        expect.stringContaining("install --token test-token"),
+      );
+    });
+  });
+
   it("falls back to writeText when clipboard.write is unavailable at runtime", async () => {
     const mockWrite = jest.fn<(items: unknown[]) => Promise<void>>();
     mockWrite.mockRejectedValue(new DOMException("Not allowed"));

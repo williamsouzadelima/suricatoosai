@@ -169,6 +169,12 @@ const RemoteControlTab = () => {
   // restart themselves. We surface a "restart on the machine" hint for these.
   const [restartHintIds, setRestartHintIds] = useState<Set<string>>(new Set());
   const [showDismissed, setShowDismissed] = useState(false);
+  // How the copied connect command should run the agent: as a supervised
+  // systemd service (recommended — survives reboot, self-updates) or a quick
+  // foreground run.
+  const [connectMode, setConnectMode] = useState<"service" | "quick">(
+    "service",
+  );
   const copiedResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -241,6 +247,12 @@ const RemoteControlTab = () => {
 
   const activeConnections = connections ?? [];
 
+  // Service mode inserts the `install` subcommand (sets up the systemd service);
+  // quick mode is the plain foreground run. Same token either way.
+  const connectSubcommand = connectMode === "service" ? " install" : "";
+  const buildConnectCommand = (tokenValue: string) =>
+    `${runCommand}${connectSubcommand} --token ${tokenValue}${convexUrlFlag}`;
+
   const handleCopyConnectCommand = async () => {
     setIsPreparingCommand(true);
 
@@ -254,7 +266,7 @@ const RemoteControlTab = () => {
           setToken(commandToken);
         }
 
-        return `${runCommand} --token ${commandToken}${convexUrlFlag}`;
+        return buildConnectCommand(commandToken);
       })();
 
       let copied = false;
@@ -690,11 +702,35 @@ const RemoteControlTab = () => {
               ? t("remoteControl.connectAnotherMachineHeading")
               : t("remoteControl.quickStart")}
           </h4>
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="sm"
+              variant={connectMode === "service" ? "default" : "outline"}
+              className="h-7 px-2.5 text-xs"
+              onClick={() => {
+                setConnectMode("service");
+                setIsCommandCopied(false);
+              }}
+            >
+              {t("remoteControl.connectModeService")}
+            </Button>
+            <Button
+              size="sm"
+              variant={connectMode === "quick" ? "default" : "outline"}
+              className="h-7 px-2.5 text-xs"
+              onClick={() => {
+                setConnectMode("quick");
+                setIsCommandCopied(false);
+              }}
+            >
+              {t("remoteControl.connectModeQuick")}
+            </Button>
+          </div>
           <div className="overflow-hidden rounded-lg border bg-muted/30">
             <div className="flex items-center gap-2 p-2">
               <Terminal className="ml-1 h-4 w-4 shrink-0 text-muted-foreground" />
               <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap py-2 font-mono text-xs text-foreground">
-                {`${runCommand} --token <token>${convexUrlFlag}`}
+                {buildConnectCommand("<token>")}
               </code>
               <Button
                 size="sm"
@@ -728,7 +764,9 @@ const RemoteControlTab = () => {
             <p className="border-t px-3 py-2 text-xs text-muted-foreground">
               {isPreparingCommand
                 ? t("remoteControl.preparingCommand")
-                : t("remoteControl.secureTokenIncluded")}
+                : connectMode === "service"
+                  ? t("remoteControl.serviceModeNote")
+                  : t("remoteControl.secureTokenIncluded")}
             </p>
           </div>
           <div className="flex items-center justify-between gap-3">
