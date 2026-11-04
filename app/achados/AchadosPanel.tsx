@@ -44,6 +44,10 @@ import {
   type Severity,
   type FindingStatus,
 } from "@/components/internal/findings";
+import {
+  SeverityBadge,
+  FindingStatusBadge,
+} from "@/components/internal/finding-badges";
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -621,15 +625,8 @@ function FindingSheetInner({ finding }: { finding: Doc<"findings"> }) {
               {finding.finding_id}
             </span>
           )}
-          <span
-            className={cn(
-              "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
-              SEV_PILL[severity],
-            )}
-          >
-            {SEV_LABEL[severity]}
-          </span>
-          <StatusBadge tone={STATUS_TONE[status]} label={STATUS_LABEL[status]} />
+          <SeverityBadge severity={severity} hint />
+          <FindingStatusBadge status={status} hint />
           {rs && RETEST_BADGE[rs] && (
             <StatusBadge
               tone={RETEST_BADGE[rs].tone}

@@ -24,10 +24,16 @@ import {
   SEV_PILL,
   SEV_STRIPE,
   SEV_ORDER,
+  SEV_GLOSSARY,
   RETEST_BADGE,
   asSeverity,
   sevLabel,
 } from "@/components/internal/severity";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { parseContentDispositionFilename } from "@/lib/reports/report-filename";
 import {
   Dialog,
@@ -488,15 +494,21 @@ function PortalFindingsSection({
         <>
           <div className="mb-3 flex flex-wrap gap-2">
             {SEV_ORDER.filter((s) => (sevCounts[s] ?? 0) > 0).map((s) => (
-              <span
-                key={s}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold",
-                  SEV_PILL[s],
-                )}
-              >
-                {sevCounts[s]} {SEV_LABEL[s]}
-              </span>
+              <Tooltip key={s}>
+                <TooltipTrigger asChild>
+                  <span
+                    className={cn(
+                      "inline-flex cursor-help items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+                      SEV_PILL[s],
+                    )}
+                  >
+                    {sevCounts[s]} {SEV_LABEL[s]}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[260px] font-normal text-left">
+                  {SEV_GLOSSARY[s]}
+                </TooltipContent>
+              </Tooltip>
             ))}
           </div>
           <div className="space-y-2">
