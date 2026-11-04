@@ -460,6 +460,15 @@ describe("RemoteControlTab", () => {
     });
     expect(restartButton).toBeInTheDocument();
     expect(restartButton).toBeEnabled();
+
+    // Clicking the hint is informational — it must NOT re-trigger the update
+    // (that re-run looped: hint → "Updating…" → hint).
+    fireEvent.click(restartButton);
+    expect(mockRequestAgentUpdate).toHaveBeenCalledTimes(1);
+    expect(toast.info).toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Restart on the machine" }),
+    ).toBeInTheDocument();
   });
 
   it("clears a stale restart hint once the connector updates and returns", async () => {

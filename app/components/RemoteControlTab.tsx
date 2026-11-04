@@ -532,7 +532,20 @@ const RemoteControlTab = () => {
                     }
                     size="sm"
                     className="h-7 shrink-0 gap-1 px-2 text-xs"
-                    onClick={() => handleUpdateAgent(conn.connectionId)}
+                    onClick={() => {
+                      // Restart-hint state is informational: the panel cannot
+                      // restart an unsupervised connector, so re-running the
+                      // update here only loops (hint → "updating" → hint). Show
+                      // how to finish on the machine instead of re-triggering.
+                      if (
+                        !updatingIds.has(conn.connectionId) &&
+                        restartHintIds.has(conn.connectionId)
+                      ) {
+                        toast.info(t("remoteControl.restartNeededHint"));
+                        return;
+                      }
+                      handleUpdateAgent(conn.connectionId);
+                    }}
                     disabled={updatingIds.has(conn.connectionId)}
                     title={
                       !updatingIds.has(conn.connectionId) &&

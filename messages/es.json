@@ -850,7 +850,7 @@
       "updateStarted": "Actualización iniciada — el agente se actualizará y reiniciará en breve.",
       "failedUpdate": "No se pudo iniciar la actualización",
       "restartNeeded": "Reiniciar en la máquina",
-      "restartNeededHint": "La nueva versión se instaló en la máquina, pero este conector se ejecuta sin supervisor y no puede reiniciarse solo. Reinícialo allí (Ctrl+C y vuelve a ejecutarlo) para aplicar. Con systemd es automático."
+      "restartNeededHint": "La nueva versión ya está instalada en la máquina, pero este conector se ejecuta sin supervisor y no se reinicia solo desde aquí. En la máquina, reinícialo (Ctrl+C y vuelve a ejecutarlo) — o ejecuta suricatoos-local install para convertirlo en un servicio que se actualiza solo."
     },
     "team": {
       "failedFetchData": "No se pudieron obtener los datos del equipo",

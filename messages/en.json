@@ -850,7 +850,7 @@
       "updateStarted": "Update started — the agent will update and restart shortly.",
       "failedUpdate": "Failed to start the update",
       "restartNeeded": "Restart on the machine",
-      "restartNeededHint": "The new version was installed on the machine, but this connector runs without a supervisor, so it can't restart itself. Restart it there (Ctrl+C, then run it again) to apply. Under systemd it's automatic."
+      "restartNeededHint": "The new version is installed on the machine, but this connector runs without a supervisor, so it can't restart itself from here. On the machine, restart it (Ctrl+C, then run it again) — or run suricatoos-local install to make it a self-updating service."
     },
     "team": {
       "failedFetchData": "Failed to fetch team data",
