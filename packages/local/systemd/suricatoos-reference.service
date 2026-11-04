@@ -1,0 +1,27 @@
+# Reference copy of the unit that install.sh generates. install.sh is the
+# supported path — it fills in the real node/bin paths for your box. To use this
+# by hand: replace <NODE_DIR> and <BIN> with the output of
+#   dirname "$(command -v node)"      # -> <NODE_DIR>
+#   command -v suricatoos-local        # -> <BIN>
+# create /etc/suricatoos/connector.env (chmod 600) containing
+#   SURICATOOS_TOKEN=hsb_your_token
+# then: sudo cp this -> /etc/systemd/system/suricatoos-connector.service
+#       sudo systemctl daemon-reload && sudo systemctl enable --now suricatoos-connector
+
+[Unit]
+Description=Suricatoos Remote Control connector (@suricatoos/local)
+Documentation=https://help.suricatoos.com/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=PATH=<NODE_DIR>:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+EnvironmentFile=/etc/suricatoos/connector.env
+ExecStart=<BIN> --token ${SURICATOOS_TOKEN}
+# on-failure: self-update exits 1 (relaunch); revocation exits 0 (stays stopped).
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

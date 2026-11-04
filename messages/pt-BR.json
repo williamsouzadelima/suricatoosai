@@ -845,7 +845,9 @@
       "updating": "Atualizando…",
       "updateAvailable": "Atualização disponível",
       "updateStarted": "Atualização iniciada — o agente vai atualizar e reiniciar em instantes.",
-      "failedUpdate": "Falha ao iniciar a atualização"
+      "failedUpdate": "Falha ao iniciar a atualização",
+      "restartNeeded": "Reiniciar na máquina",
+      "restartNeededHint": "A nova versão foi instalada na máquina, mas este connector roda sem supervisor e não consegue se reiniciar sozinho. Reinicie-o lá (Ctrl+C e rode de novo) para aplicar. Sob systemd isso é automático."
     },
     "team": {
       "failedFetchData": "Falha ao buscar os dados da equipe",

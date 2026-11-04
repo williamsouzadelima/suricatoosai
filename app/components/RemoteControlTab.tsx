@@ -164,6 +164,10 @@ const RemoteControlTab = () => {
   const [isCommandCopied, setIsCommandCopied] = useState(false);
   const [showConnectSetup, setShowConnectSetup] = useState(false);
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
+  // Connectors that requested an update but are still outdated after the poll
+  // window — i.e. unsupervised agents that installed the new version but can't
+  // restart themselves. We surface a "restart on the machine" hint for these.
+  const [restartHintIds, setRestartHintIds] = useState<Set<string>>(new Set());
   const [showDismissed, setShowDismissed] = useState(false);
   const copiedResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -383,6 +387,27 @@ const RemoteControlTab = () => {
     }
   };
 
+  // When a connector reconnects on the new version (updateAvailable flips
+  // false) or drops off the list, clear its spinner / restart hint reactively.
+  useEffect(() => {
+    const stillOutdated = new Set(
+      (connections ?? [])
+        .filter((c) => c.updateAvailable)
+        .map((c) => c.connectionId),
+    );
+    const prune = (prev: Set<string>) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (stillOutdated.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    };
+    setUpdatingIds(prune);
+    setRestartHintIds(prune);
+  }, [connections]);
+
   const clearUpdating = (connectionId: string) =>
     setUpdatingIds((prev) => {
       const next = new Set(prev);
@@ -401,11 +426,16 @@ const RemoteControlTab = () => {
       clearUpdating(connectionId);
       return;
     }
-    // Fallback: the agent picks up the request on its next poll, updates, and
-    // reconnects on the new version (updateAvailable flips false, hiding the
-    // button reactively). Clear the local spinner after ~90s in case it never
-    // comes back.
-    setTimeout(() => clearUpdating(connectionId), 90_000);
+    // The agent picks up the request on its next poll, updates, and reconnects
+    // on the new version (updateAvailable flips false → the prune effect clears
+    // this reactively). If after ~90s it's still outdated, the connector is
+    // unsupervised: it installed the new version but can't restart itself, so we
+    // swap the spinner for a "restart on the machine" hint instead of silently
+    // reverting to the Update button (which looked like the update did nothing).
+    setTimeout(() => {
+      clearUpdating(connectionId);
+      setRestartHintIds((prev) => new Set(prev).add(connectionId));
+    }, 90_000);
   };
 
   return (
@@ -482,21 +512,35 @@ const RemoteControlTab = () => {
                 </span>
                 {!conn.isDesktop && conn.updateAvailable ? (
                   <Button
-                    variant="default"
+                    variant={
+                      !updatingIds.has(conn.connectionId) &&
+                      restartHintIds.has(conn.connectionId)
+                        ? "outline"
+                        : "default"
+                    }
                     size="sm"
                     className="h-7 shrink-0 gap-1 px-2 text-xs"
                     onClick={() => handleUpdateAgent(conn.connectionId)}
                     disabled={updatingIds.has(conn.connectionId)}
-                    title={t("remoteControl.updateAvailable")}
+                    title={
+                      !updatingIds.has(conn.connectionId) &&
+                      restartHintIds.has(conn.connectionId)
+                        ? t("remoteControl.restartNeededHint")
+                        : t("remoteControl.updateAvailable")
+                    }
                   >
                     {updatingIds.has(conn.connectionId) ? (
                       <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                    ) : restartHintIds.has(conn.connectionId) ? (
+                      <RefreshCw className="h-3.5 w-3.5" />
                     ) : (
                       <ArrowUpCircle className="h-3.5 w-3.5" />
                     )}
                     {updatingIds.has(conn.connectionId)
                       ? t("remoteControl.updating")
-                      : t("remoteControl.update")}
+                      : restartHintIds.has(conn.connectionId)
+                        ? t("remoteControl.restartNeeded")
+                        : t("remoteControl.update")}
                   </Button>
                 ) : null}
                 {!conn.isDesktop ? (

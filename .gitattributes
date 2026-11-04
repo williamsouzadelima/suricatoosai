@@ -1,3 +1,6 @@
 ops/monitoring/*.sh text eol=lf
 ops/monitoring/*.service text eol=lf
 ops/monitoring/*.timer text eol=lf
+
+packages/local/systemd/*.sh text eol=lf
+packages/local/systemd/*.service text eol=lf

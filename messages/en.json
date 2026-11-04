@@ -845,7 +845,9 @@
       "updating": "Updating…",
       "updateAvailable": "Update available",
       "updateStarted": "Update started — the agent will update and restart shortly.",
-      "failedUpdate": "Failed to start the update"
+      "failedUpdate": "Failed to start the update",
+      "restartNeeded": "Restart on the machine",
+      "restartNeededHint": "The new version was installed on the machine, but this connector runs without a supervisor, so it can't restart itself. Restart it there (Ctrl+C, then run it again) to apply. Under systemd it's automatic."
     },
     "team": {
       "failedFetchData": "Failed to fetch team data",

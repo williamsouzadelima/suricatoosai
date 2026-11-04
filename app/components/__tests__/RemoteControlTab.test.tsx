@@ -1,6 +1,13 @@
 import "@testing-library/jest-dom";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, it, expect, jest, beforeEach } from "@jest/globals";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  describe,
+  it,
+  expect,
+  jest,
+  beforeEach,
+  afterEach,
+} from "@jest/globals";
 
 type MockConnection = {
   connectionId: string;
@@ -13,6 +20,8 @@ type MockConnection = {
   };
   lastSeen: number;
   isDesktop: boolean;
+  updateAvailable?: boolean;
+  clientVersion?: string;
 };
 
 let mockConnections: MockConnection[] | undefined;
@@ -25,6 +34,7 @@ const mockGetToken = jest.fn<() => Promise<{ token: string }>>();
 const mockRegenerateToken = jest.fn<() => Promise<{ token: string }>>();
 const mockRevokeConnection = jest.fn<() => Promise<{ success: boolean }>>();
 const mockUnrevokeConnection = jest.fn<() => Promise<{ success: boolean }>>();
+const mockRequestAgentUpdate = jest.fn<() => Promise<{ success: boolean }>>();
 let mockRevokedConnectors: { connectionName: string; revokedAt: number }[] = [];
 const mockWriteText = jest.fn<(text: string) => Promise<void>>();
 const mockSetChatMode = jest.fn((mode: "ask" | "agent") => {
@@ -47,6 +57,7 @@ jest.mock("@/convex/_generated/api", () => ({
       revokeConnection: "revokeConnection",
       unrevokeConnection: "unrevokeConnection",
       listRevokedConnectors: "listRevokedConnectors",
+      requestAgentUpdate: "requestAgentUpdate",
     },
   },
 }));
@@ -57,6 +68,7 @@ jest.mock("convex/react", () => ({
     if (mutation === "regenerateToken") return mockRegenerateToken;
     if (mutation === "revokeConnection") return mockRevokeConnection;
     if (mutation === "unrevokeConnection") return mockUnrevokeConnection;
+    if (mutation === "requestAgentUpdate") return mockRequestAgentUpdate;
     return jest.fn();
   }),
   useQuery: jest.fn(() => mockRevokedConnectors),
@@ -126,12 +138,17 @@ describe("RemoteControlTab", () => {
     mockRegenerateToken.mockResolvedValue({ token: "regenerated-token" });
     mockRevokeConnection.mockResolvedValue({ success: true });
     mockUnrevokeConnection.mockResolvedValue({ success: true });
+    mockRequestAgentUpdate.mockResolvedValue({ success: true });
     mockRevokedConnectors = [];
     mockWriteText.mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: { writeText: mockWriteText },
     });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it("revokes a remote connector when its revoke button is clicked", async () => {
@@ -409,6 +426,83 @@ describe("RemoteControlTab", () => {
     });
     expect(mockWriteText).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a restart hint when an updated connector stays outdated", async () => {
+    jest.useFakeTimers();
+    mockConnections = [
+      { ...remoteConnection, updateAvailable: true, clientVersion: "0.1.5" },
+    ];
+
+    render(<RemoteControlTab />);
+
+    const updateButton = screen.getByRole("button", { name: "Update" });
+    await act(async () => {
+      fireEvent.click(updateButton);
+    });
+
+    // While the agent is updating, the button is a disabled spinner — not the
+    // plain "Update" affordance.
+    expect(screen.getByRole("button", { name: /Updating/ })).toBeDisabled();
+    expect(mockRequestAgentUpdate).toHaveBeenCalledWith({
+      connectionId: "conn-remote-1",
+    });
+
+    // After the ~90s poll window with the connector still outdated (unsupervised:
+    // it installed the new version but can't restart itself), the button stops
+    // lying and tells the user to restart it on the machine.
+    act(() => {
+      jest.advanceTimersByTime(90_000);
+    });
+
+    const restartButton = screen.getByRole("button", {
+      name: "Restart on the machine",
+    });
+    expect(restartButton).toBeInTheDocument();
+    expect(restartButton).toBeEnabled();
+  });
+
+  it("clears a stale restart hint once the connector updates and returns", async () => {
+    jest.useFakeTimers();
+    const outdated: MockConnection = {
+      ...remoteConnection,
+      updateAvailable: true,
+      clientVersion: "0.1.5",
+    };
+    mockConnections = [outdated];
+
+    const { rerender } = render(<RemoteControlTab />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Update" }));
+    });
+    act(() => {
+      jest.advanceTimersByTime(90_000);
+    });
+    expect(
+      screen.getByRole("button", { name: "Restart on the machine" }),
+    ).toBeInTheDocument();
+
+    // Connector restarts on the machine and reconnects on the new version:
+    // updateAvailable flips false → the action disappears and the hint is pruned.
+    mockConnections = [
+      { ...outdated, updateAvailable: false, clientVersion: "0.1.6" },
+    ];
+    rerender(<RemoteControlTab />);
+    expect(
+      screen.queryByRole("button", { name: "Restart on the machine" }),
+    ).not.toBeInTheDocument();
+
+    // A later release makes it outdated again: it must offer a fresh "Update",
+    // not resurrect the stale restart hint.
+    mockConnections = [
+      { ...outdated, updateAvailable: true, clientVersion: "0.1.6" },
+    ];
+    rerender(<RemoteControlTab />);
+    expect(screen.getByRole("button", { name: "Update" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Restart on the machine" }),
+    ).not.toBeInTheDocument();
   });
 
   it("falls back to writeText when clipboard.write is unavailable at runtime", async () => {
