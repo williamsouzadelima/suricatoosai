@@ -166,7 +166,11 @@ export function UsersTable() {
   // Ordenação client-side sobre a lista JÁ completa (/api/admin/users enumera
   // todos os usuários; `capped` é teto do CONTADOR por linha, não da lista).
   type SortKey = "user" | "activity" | "reqs" | "tokens" | "cost";
-  const { sort, toggle } = useSortable<SortKey>();
+  // Default = a MESMA ordem que o servidor já manda (atividade desc), para a
+  // seta do cabeçalho "Últ. atividade" dizer a verdade em vez de exibir o
+  // ícone neutro sobre dados já ordenados. Ordem idêntica: sort estável sobre a
+  // lista já ordenada pelo servidor preserva o desempate por e-mail nos empates.
+  const { sort, toggle } = useSortable<SortKey>({ key: "activity", dir: "desc" });
   const sorted = useMemo(
     () =>
       sortRows<UserRow, SortKey>(filtered, sort, {
