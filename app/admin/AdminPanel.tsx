@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   Users,
@@ -169,7 +170,20 @@ export function AdminPanel({
   const [inviting, setInviting] = useState(false);
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState(false);
-  const [tab, setTab] = useState<Tab>("overview");
+  // Deep-linkable, F5-surviving tab in the URL (?tab=): browser back/forward now
+  // moves between tabs instead of leaving /admin, and a refresh no longer resets
+  // to "overview". Derived from the URL (not useState) so it stays reactive.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const tab: Tab = ALL_NAV.some((n) => n.id === tabParam)
+    ? (tabParam as Tab)
+    : "overview";
+  const setTab = (id: Tab) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", id);
+    router.push(`?${params.toString()}`, { scroll: false });
+  };
 
   const load = useCallback(async () => {
     try {
