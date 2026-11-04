@@ -7,6 +7,49 @@
     "errorDescription": "An unexpected error occurred while loading this part of the app.",
     "tryAgain": "Try again"
   },
+  "authError": {
+    "codeLabel": "Error code: {code}",
+    "tryAgain": "Try again",
+    "goHome": "Go home",
+    "retrying": "Retrying…",
+    "retryingIn": "Retrying in {seconds}s — tap to cancel",
+    "default": {
+      "title": "Authentication error",
+      "description": "An unexpected error occurred during sign in. Please try again."
+    },
+    "400": {
+      "title": "Invalid request",
+      "description": "This sign-in link is invalid or has expired. Go back and sign in again."
+    },
+    "401": {
+      "title": "Session expired",
+      "description": "Your session has expired or the login link is no longer valid. Please sign in again."
+    },
+    "403": {
+      "title": "Access denied",
+      "description": "You don't have permission to access this resource. Please sign in with a different account."
+    },
+    "429": {
+      "title": "Too many requests",
+      "description": "Too many login attempts. Please wait a moment before trying again."
+    },
+    "500": {
+      "title": "Authentication failed",
+      "description": "Something went wrong during sign in. This can happen when multiple browser tabs try to authenticate at the same time."
+    },
+    "502": {
+      "title": "Service unavailable",
+      "description": "Our authentication service is temporarily unavailable. Please try again in a few minutes."
+    },
+    "503": {
+      "title": "Service unavailable",
+      "description": "Our authentication service is temporarily unavailable. Please try again in a few minutes."
+    },
+    "504": {
+      "title": "Request timed out",
+      "description": "The authentication request timed out. Please check your connection and try again."
+    }
+  },
   "header": {
     "signIn": "Sign in",
     "getStarted": "Get started",

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 
 const STORAGE_KEY = "auth_retry_state";
@@ -54,6 +56,7 @@ interface AutoRetryButtonProps {
 }
 
 export function AutoRetryButton({ loginUrl }: AutoRetryButtonProps) {
+  const t = useTranslations("authError");
   const [countdown, setCountdown] = useState<number | null>(null);
   const [cancelled, setCancelled] = useState(false);
 
@@ -88,10 +91,10 @@ export function AutoRetryButton({ loginUrl }: AutoRetryButtonProps) {
   if (cancelled) {
     return (
       <Button asChild className="flex-1 min-w-0">
-        <a href={loginUrl}>
+        <Link href={loginUrl}>
           <RefreshCw className="h-4 w-4" />
-          Try Again
-        </a>
+          {t("tryAgain")}
+        </Link>
       </Button>
     );
   }
@@ -100,15 +103,19 @@ export function AutoRetryButton({ loginUrl }: AutoRetryButtonProps) {
     return (
       <Button className="flex-1 min-w-0" disabled>
         <RefreshCw className="h-4 w-4 animate-spin" />
-        Retrying...
+        {t("retrying")}
       </Button>
     );
   }
 
   return (
-    <Button className="flex-1 min-w-0" onClick={() => setCancelled(true)}>
+    <Button
+      className="flex-1 min-w-0"
+      onClick={() => setCancelled(true)}
+      aria-live="polite"
+    >
       <RefreshCw className="h-4 w-4 animate-spin" />
-      Retrying in {countdown}s...
+      {t("retryingIn", { seconds: countdown })}
     </Button>
   );
 }

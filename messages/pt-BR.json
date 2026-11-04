@@ -7,6 +7,49 @@
     "errorDescription": "Ocorreu um erro inesperado ao carregar esta parte do app.",
     "tryAgain": "Tentar novamente"
   },
+  "authError": {
+    "codeLabel": "Código do erro: {code}",
+    "tryAgain": "Tentar de novo",
+    "goHome": "Ir para o início",
+    "retrying": "Tentando de novo…",
+    "retryingIn": "Tentando de novo em {seconds}s — toque para cancelar",
+    "default": {
+      "title": "Erro de autenticação",
+      "description": "Ocorreu um erro inesperado durante o login. Tente de novo."
+    },
+    "400": {
+      "title": "Requisição inválida",
+      "description": "Este link de login é inválido ou expirou. Volte e faça login de novo."
+    },
+    "401": {
+      "title": "Sessão expirada",
+      "description": "Sua sessão expirou ou o link de login não é mais válido. Faça login de novo."
+    },
+    "403": {
+      "title": "Acesso negado",
+      "description": "Você não tem permissão para acessar este recurso. Entre com outra conta."
+    },
+    "429": {
+      "title": "Requisições demais",
+      "description": "Tentativas de login em excesso. Espere um momento antes de tentar de novo."
+    },
+    "500": {
+      "title": "Falha na autenticação",
+      "description": "Algo deu errado no login. Isso pode acontecer quando várias abas do navegador tentam autenticar ao mesmo tempo."
+    },
+    "502": {
+      "title": "Serviço indisponível",
+      "description": "Nosso serviço de autenticação está temporariamente indisponível. Tente de novo em alguns minutos."
+    },
+    "503": {
+      "title": "Serviço indisponível",
+      "description": "Nosso serviço de autenticação está temporariamente indisponível. Tente de novo em alguns minutos."
+    },
+    "504": {
+      "title": "Tempo esgotado",
+      "description": "A requisição de autenticação expirou. Verifique sua conexão e tente de novo."
+    }
+  },
   "header": {
     "signIn": "Entrar",
     "getStarted": "Começar",

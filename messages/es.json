@@ -7,6 +7,49 @@
     "errorDescription": "Ocurrió un error inesperado al cargar esta parte de la app.",
     "tryAgain": "Intentar de nuevo"
   },
+  "authError": {
+    "codeLabel": "Código de error: {code}",
+    "tryAgain": "Reintentar",
+    "goHome": "Ir al inicio",
+    "retrying": "Reintentando…",
+    "retryingIn": "Reintentando en {seconds}s — toca para cancelar",
+    "default": {
+      "title": "Error de autenticación",
+      "description": "Ocurrió un error inesperado durante el inicio de sesión. Inténtalo de nuevo."
+    },
+    "400": {
+      "title": "Solicitud inválida",
+      "description": "Este enlace de inicio de sesión no es válido o expiró. Vuelve e inicia sesión de nuevo."
+    },
+    "401": {
+      "title": "Sesión expirada",
+      "description": "Tu sesión expiró o el enlace de inicio de sesión ya no es válido. Inicia sesión de nuevo."
+    },
+    "403": {
+      "title": "Acceso denegado",
+      "description": "No tienes permiso para acceder a este recurso. Inicia sesión con otra cuenta."
+    },
+    "429": {
+      "title": "Demasiadas solicitudes",
+      "description": "Demasiados intentos de inicio de sesión. Espera un momento antes de volver a intentarlo."
+    },
+    "500": {
+      "title": "Falló la autenticación",
+      "description": "Algo salió mal durante el inicio de sesión. Puede pasar cuando varias pestañas del navegador intentan autenticarse a la vez."
+    },
+    "502": {
+      "title": "Servicio no disponible",
+      "description": "Nuestro servicio de autenticación no está disponible temporalmente. Inténtalo de nuevo en unos minutos."
+    },
+    "503": {
+      "title": "Servicio no disponible",
+      "description": "Nuestro servicio de autenticación no está disponible temporalmente. Inténtalo de nuevo en unos minutos."
+    },
+    "504": {
+      "title": "Tiempo de espera agotado",
+      "description": "La solicitud de autenticación expiró. Verifica tu conexión e inténtalo de nuevo."
+    }
+  },
   "header": {
     "signIn": "Iniciar sesión",
     "getStarted": "Comenzar",
