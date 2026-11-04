@@ -22,6 +22,7 @@ import {
   EmptyState,
   formatDateTime,
   fmtNum,
+  fmtUSD,
 } from "./_ui";
 
 const PERIODS: { key: Period; label: string }[] = [
@@ -107,11 +108,6 @@ interface Analytics {
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
-
-function fmtUSD(n: number): string {
-  if (!Number.isFinite(n)) return "$0";
-  return `$${n >= 1 ? n.toFixed(2) : n.toFixed(4)}`;
-}
 
 function cleanModel(m: string): string {
   return m

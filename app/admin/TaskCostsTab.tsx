@@ -29,6 +29,7 @@ import {
   formatDateTime,
   fmtNum,
   fmtDuration,
+  fmtUSD,
   type Tone,
 } from "./_ui";
 import { toCsv, downloadCsv, csvName } from "@/lib/utils/csv";
@@ -102,7 +103,7 @@ interface Detail {
 }
 
 // Sub-cent costs must not round to $0.00 — always show 4 decimals.
-const money = (n: number) => `$${(n ?? 0).toFixed(4)}`;
+const money = fmtUSD;
 
 const REAL_COST_HINT =
   "Sem custo real: execuções anteriores a 09/09/2026, quando o custo real do OpenRouter passou a ser capturado. Só o valor Registrado existe para esta linha.";

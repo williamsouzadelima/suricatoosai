@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Banknote, Coins, PiggyBank, Percent, LineChart } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { StatCard, SectionHeader, Callout, fmtNum } from "./_ui";
+import { StatCard, SectionHeader, Callout, fmtNum, fmtUSD } from "./_ui";
 
 const PERIODS: { key: Period; label: string }[] = [
   { key: "7d", label: "7d" },
@@ -42,13 +42,6 @@ interface Revenue {
   series: RevSeries[];
   capped: boolean;
   dayRows: number;
-}
-
-function fmtUSD(n: number): string {
-  if (!Number.isFinite(n)) return "$0";
-  const abs = Math.abs(n);
-  const s = `$${abs >= 1 ? abs.toFixed(2) : abs.toFixed(4)}`;
-  return n < 0 ? `-${s}` : s;
 }
 
 function bucketLabel(t: number, bucketDays: number): string {
@@ -109,10 +102,12 @@ function RevCostChart({
                 }}
               />
               <span className="pointer-events-none absolute -top-14 left-1/2 z-10 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground shadow group-hover:block">
-                <span className="text-success">R {fmtUSD(s.revenue)}</span>
+                <span className="text-success">
+                  Receita {fmtUSD(s.revenue)}
+                </span>
                 <br />
                 <span className="text-popover-foreground">
-                  C {fmtUSD(s.cost)}
+                  Custo {fmtUSD(s.cost)}
                 </span>
                 <br />
                 <span className="text-muted-foreground">

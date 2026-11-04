@@ -54,6 +54,7 @@ export function formatDateTime(ms?: number | null): string {
   return new Date(ms).toLocaleString("pt-BR", {
     day: "2-digit",
     month: "short",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -64,6 +65,18 @@ export function fmtNum(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return String(n);
+}
+
+/**
+ * USD único do painel. Precisão honesta: 2 casas a partir de $1 (limpo nos
+ * agregados), 4 casas abaixo de $1 (não esconde custo sub-cent como "$0.00");
+ * trata negativo. Para CSV/exportação use a precisão crua, não esta formatação.
+ */
+export function fmtUSD(n: number): string {
+  if (!Number.isFinite(n)) return "$0";
+  const abs = Math.abs(n);
+  const s = `$${abs >= 1 ? abs.toFixed(2) : abs.toFixed(4)}`;
+  return n < 0 ? `-${s}` : s;
 }
 
 /** Duração humana compacta a partir de ms. <1s / 45s / 3min 20s / 2h 5min / 1d 3h. */
