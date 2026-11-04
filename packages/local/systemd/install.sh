@@ -29,8 +29,18 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # 1) Install / update the connector globally (public package; no npm auth needed).
+#    node-pty is an OPTIONAL dep: it enables interactive PTY shells; the agent runs
+#    fine without it (non-interactive commands still work). Newer npm (>=11) blocks
+#    a dependency's install scripts behind an allowlist, which stops node-pty's
+#    native build — so pass --allow-scripts=node-pty when this npm understands it.
+#    Older npm (scripts run by default) never sees the flag and is unaffected.
 echo "==> Installing @suricatoos/local@latest globally…"
-npm install -g @suricatoos/local@latest
+NPM_MAJOR="$(npm -v 2>/dev/null | cut -d. -f1 || true)"
+NPM_ALLOW=()
+if [ "${NPM_MAJOR:-0}" -ge 11 ] 2>/dev/null; then
+  NPM_ALLOW=(--allow-scripts=node-pty)
+fi
+npm install -g @suricatoos/local@latest "${NPM_ALLOW[@]}"
 
 BIN="$(command -v suricatoos-local || true)"
 if [ -z "${BIN}" ]; then
