@@ -1,74 +1,15 @@
 import * as React from "react";
 import Link from "next/link";
-import {
-  ShieldAlert,
-  Search,
-  FileText,
-  LayoutDashboard,
-  ShieldCheck,
-  ArrowLeft,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowLeft, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SuricatoosAISVG } from "@/components/icons/suricatoos-ai-svg";
+import { MobileNav } from "./MobileNav";
+import { NAV, type ActiveKey, type NavEntry } from "./app-nav";
 
 /**
  * Casca compartilhada dos painéis internos (/admin, /engagements): sidebar navy
  * premium + top bar + cabeçalho de página. Fonte única do visual "nível agência".
  */
-
-type ActiveKey =
-  "engagements" | "achados" | "relatorios" | "admin" | "seguranca";
-
-type NavEntry = {
-  key: ActiveKey;
-  href: string;
-  label: string;
-  icon: LucideIcon;
-};
-
-const NAV: { group: string; items: NavEntry[] }[] = [
-  {
-    group: "Operação",
-    items: [
-      {
-        key: "engagements",
-        href: "/engagements",
-        label: "Engajamentos",
-        icon: ShieldAlert,
-      },
-      {
-        key: "achados",
-        href: "/achados",
-        label: "Achados",
-        icon: Search,
-      },
-      {
-        key: "relatorios",
-        href: "/relatorios",
-        label: "Relatórios",
-        icon: FileText,
-      },
-    ],
-  },
-  {
-    group: "Administração",
-    items: [
-      {
-        key: "admin",
-        href: "/admin",
-        label: "Painel admin",
-        icon: LayoutDashboard,
-      },
-      {
-        key: "seguranca",
-        href: "/seguranca",
-        label: "Segurança",
-        icon: ShieldCheck,
-      },
-    ],
-  },
-];
 
 function NavLink({ item, active }: { item: NavEntry; active: boolean }) {
   const Icon = item.icon;
@@ -173,6 +114,7 @@ export function AppShell({
       {/* Main */}
       <main className="min-w-0 overflow-auto">
         <div className="internal-topbar sticky top-0 z-10 flex items-center gap-3.5 border-b border-border px-4 py-3.5 md:px-7">
+          <MobileNav active={active} />
           <div className="flex min-w-0 items-center gap-1.5 truncate text-[13px] text-muted-foreground">
             <span className="hidden sm:inline">Suricatoos</span>
             {crumbs.map((c, i) => (
