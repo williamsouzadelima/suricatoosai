@@ -6,7 +6,7 @@ import { SignJWT } from "jose";
 
 // Latest agent (@suricatoos/local) version — bump on each agent release so the
 // Remote Control UI flags older connectors and requestAgentUpdate targets it.
-const LATEST_AGENT_VERSION = "0.1.6";
+const LATEST_AGENT_VERSION = "0.1.7";
 
 function parseVersion(v: string): number[] | null {
   const parts = v.split(".").map((p) => Number.parseInt(p, 10));
@@ -992,6 +992,68 @@ export const revokeConnection = mutation({
     }
 
     return { success: true };
+  },
+});
+
+/**
+ * Revoke THIS connector from the machine itself (token-authenticated) — used by
+ * `suricatoos-local uninstall`, which holds the per-user token and the
+ * connector's own name but has no WorkOS session. Mirrors revokeConnection:
+ * records a revocation keyed on the name (blocks reconnect until "Allow again"
+ * in the panel) and disconnects any live connection with that name. The per-user
+ * token stays valid for the user's other machines.
+ */
+export const revokeByToken = mutation({
+  args: { token: v.string(), connectionName: v.string() },
+  returns: v.object({
+    success: v.boolean(),
+    matchedConnections: v.number(),
+  }),
+  handler: async (ctx, { token, connectionName }) => {
+    const auth = await validateToken(ctx.db, token);
+    if (!auth.valid) {
+      return { success: false, matchedConnections: 0 };
+    }
+    const userId = auth.userId;
+
+    const existing = await ctx.db
+      .query("local_sandbox_revoked_connectors")
+      .withIndex("by_user_and_name", (q) =>
+        q.eq("user_id", userId).eq("connection_name", connectionName),
+      )
+      .first();
+    if (!existing) {
+      await ctx.db.insert("local_sandbox_revoked_connectors", {
+        user_id: userId,
+        connection_name: connectionName,
+        revoked_at: Date.now(),
+      });
+    } else if (existing.dismissed_at !== undefined) {
+      // Was revoked-then-dismissed; revoking again brings it back to the visible
+      // revoked list and refreshes the timestamp (matches revokeConnection).
+      await ctx.db.patch(existing._id, {
+        dismissed_at: undefined,
+        revoked_at: Date.now(),
+      });
+    }
+
+    // Disconnect (and count) any live connection with this name, so the caller
+    // can tell whether it actually hit the connector the user meant — a bare
+    // "revoked" would otherwise lie on a name mismatch.
+    let matchedConnections = 0;
+    const connected = await collectConnectedLocalConnections(ctx.db, userId);
+    for (const connection of connected) {
+      if (connection.connection_name === connectionName) {
+        matchedConnections += 1;
+        await ctx.db.patch(connection._id, {
+          status: "disconnected",
+          disconnected_at: Date.now(),
+          disconnect_reason: "user_revoked",
+        });
+      }
+    }
+
+    return { success: true, matchedConnections };
   },
 });
 

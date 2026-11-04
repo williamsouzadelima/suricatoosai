@@ -18,7 +18,8 @@ import WebSocket from "ws";
 import { spawn, ChildProcess } from "child_process";
 import os from "os";
 import path from "node:path";
-import { rm } from "node:fs/promises";
+import { rm, writeFile, mkdir, chmod } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
 import {
   truncateOutput,
   MAX_OUTPUT_SIZE,
@@ -37,6 +38,17 @@ import {
 } from "./command-cancellation";
 import { CentrifugoPublishQueue } from "./centrifugo-transport";
 import { buildCentrifugoTransportConfig } from "./centrifugo-endpoints";
+import {
+  parseCliCommand,
+  parseNpmMajor,
+  npmInstallGlobalArgs,
+  buildUnitFile,
+  buildEnvFileContent,
+  SERVICE_NAME,
+  ENV_DIR,
+  ENV_FILE,
+  UNIT_PATH,
+} from "./service-install";
 
 const DEFAULT_SHELL = getDefaultShell(os.platform());
 
@@ -51,7 +63,7 @@ const IDLE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 // Agent version — KEEP IN SYNC with packages/local/package.json "version".
 // Reported to the server so the Remote Control UI can flag "update available".
-const AGENT_VERSION = "0.1.6";
+const AGENT_VERSION = "0.1.7";
 
 // How often the agent polls the server for a pending update (Update button).
 const UPDATE_POLL_INTERVAL_MS = 20 * 1000; // 20s
@@ -66,6 +78,7 @@ const api = {
     disconnect: "localSandbox:disconnect" as const,
     refreshCentrifugoToken: "localSandbox:refreshCentrifugoToken" as const,
     pollAgentUpdate: "localSandbox:pollAgentUpdate" as const,
+    revokeByToken: "localSandbox:revokeByToken" as const,
   },
 };
 
@@ -1250,8 +1263,9 @@ export class LocalSandboxClient {
         : "@suricatoos/local@latest";
     console.log(chalk.cyan(`⬇️  Updating agent to ${spec} ...`));
 
+    const npmMajor = await getNpmMajor();
     const installed = await new Promise<boolean>((resolve) => {
-      const child = spawn("npm", ["install", "-g", spec], {
+      const child = spawn("npm", npmInstallGlobalArgs(spec, npmMajor), {
         stdio: "inherit",
         shell: process.platform === "win32",
       });
@@ -1450,22 +1464,253 @@ const getArg = (flag: string): string | undefined => {
   return index >= 0 ? args[index + 1] : undefined;
 };
 
-const hasFlag = (flag: string): boolean => {
-  return args.includes(flag);
-};
+async function getNpmMajor(): Promise<number> {
+  return new Promise<number>((resolve) => {
+    try {
+      const child = spawn("npm", ["-v"], {
+        shell: process.platform === "win32",
+      });
+      let out = "";
+      child.stdout?.on("data", (chunk: Buffer) => {
+        out += chunk.toString();
+      });
+      child.on("error", () => resolve(0));
+      child.on("exit", () => resolve(parseNpmMajor(out)));
+    } catch {
+      resolve(0);
+    }
+  });
+}
+
+function runChild(cmd: string, cmdArgs: string[]): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const child = spawn(cmd, cmdArgs, {
+      stdio: "inherit",
+      shell: process.platform === "win32",
+    });
+    child.on("error", () => resolve(false));
+    child.on("exit", (code) => resolve(code === 0));
+  });
+}
+
+function readTokenFromEnvFile(): string | undefined {
+  try {
+    const content = readFileSync(ENV_FILE, "utf8");
+    const match = /^SURICATOOS_TOKEN=(.*)$/m.exec(content);
+    return match ? match[1].trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function assertLinuxRoot(action: string): void {
+  if (process.platform !== "linux") {
+    console.error(
+      chalk.red(`\`${action}\` sets up a systemd service and is Linux-only.`),
+    );
+    console.error(
+      chalk.yellow(
+        "On macOS use the Suricatoos Desktop app; elsewhere run `suricatoos-local --token <token>` (foreground).",
+      ),
+    );
+    process.exit(1);
+  }
+  if (typeof process.getuid === "function" && process.getuid() !== 0) {
+    console.error(chalk.red(`\`${action}\` must run as root (use sudo).`));
+    process.exit(1);
+  }
+}
+
+// `suricatoos-local install [--token <token>] [--name <name>]`
+// Install the connector globally and run it as a systemd service, so it stays
+// up across logout/reboot and self-applies updates. Idempotent.
+async function runInstall(): Promise<void> {
+  assertLinuxRoot("install");
+
+  const token = getArg("--token");
+  if (!token && !existsSync(ENV_FILE)) {
+    console.error(
+      chalk.red("❌ No token. Run: suricatoos-local install --token <token>"),
+    );
+    process.exit(1);
+  }
+
+  const spec = "@suricatoos/local@latest";
+  const npmMajor = await getNpmMajor();
+  console.log(chalk.cyan(`⬇️  Installing ${spec} globally…`));
+  if (!(await runChild("npm", npmInstallGlobalArgs(spec, npmMajor)))) {
+    console.error(chalk.red("npm install failed; aborting."));
+    process.exit(1);
+  }
+
+  const nodeDir = path.dirname(process.execPath);
+  const binPath = path.join(nodeDir, "suricatoos-local");
+  if (!existsSync(binPath)) {
+    console.error(
+      chalk.red(`suricatoos-local not found at ${binPath} after install.`),
+    );
+    process.exit(1);
+  }
+
+  await mkdir(ENV_DIR, { recursive: true });
+  await chmod(ENV_DIR, 0o700);
+  if (token) {
+    await writeFile(ENV_FILE, buildEnvFileContent(token), { mode: 0o600 });
+    await chmod(ENV_FILE, 0o600);
+    console.log(chalk.gray(`Wrote token to ${ENV_FILE} (chmod 600).`));
+  } else {
+    console.log(chalk.gray(`Keeping existing ${ENV_FILE}.`));
+  }
+
+  await writeFile(UNIT_PATH, buildUnitFile({ binPath, nodeDir }), {
+    mode: 0o644,
+  });
+  await chmod(UNIT_PATH, 0o644);
+  console.log(chalk.gray(`Wrote ${UNIT_PATH}.`));
+
+  await runChild("systemctl", ["daemon-reload"]);
+  if (!(await runChild("systemctl", ["enable", "--now", SERVICE_NAME]))) {
+    console.error(chalk.red(`systemctl enable --now ${SERVICE_NAME} failed.`));
+    process.exit(1);
+  }
+
+  console.log(chalk.green(`\n✓ Installed and started ${SERVICE_NAME}.`));
+  console.log(
+    chalk.cyan(
+      "It runs in the background, restarts on boot, and self-applies updates.",
+    ),
+  );
+  console.log(chalk.gray(`  Logs:   journalctl -u ${SERVICE_NAME} -f`));
+  console.log(chalk.gray(`  Status: systemctl status ${SERVICE_NAME}`));
+  console.log(chalk.gray(`  Remove: suricatoos-local uninstall`));
+  process.exit(0);
+}
+
+// `suricatoos-local uninstall [--name <name>]`
+// Stop + remove the service, revoke this connector in the panel (so it leaves
+// the list), and remove the global package.
+async function runUninstall(): Promise<void> {
+  assertLinuxRoot("uninstall");
+
+  // Revoke server-side FIRST, while the service is still connected, so the
+  // mutation can confirm it hit a LIVE connection with this name (otherwise a
+  // name mismatch would record a revocation for a nonexistent name and we'd
+  // falsely report success). The token is read from the env file, never logged.
+  // Best-effort: if revokeByToken isn't deployed yet or the call fails, we fall
+  // through and report honestly below.
+  const token = readTokenFromEnvFile();
+  const connectionName = getArg("--name") || os.hostname();
+  let revokeMatched: number | null = null;
+  if (token) {
+    try {
+      const convexUrl = getArg("--convex-url") || PRODUCTION_CONVEX_URL;
+      const convex = new ConvexHttpClient(convexUrl);
+      const result = (await convex.mutation(
+        api.localSandbox.revokeByToken as never,
+        { token, connectionName } as never,
+      )) as { success: boolean; matchedConnections: number };
+      revokeMatched = result?.success ? (result.matchedConnections ?? 0) : 0;
+    } catch (error) {
+      console.warn(
+        chalk.yellow(
+          `⚠️  Could not reach the panel to revoke (${
+            error instanceof Error ? error.message : String(error)
+          }).`,
+        ),
+      );
+    }
+  }
+
+  console.log(chalk.cyan(`Stopping ${SERVICE_NAME}…`));
+  await runChild("systemctl", ["disable", "--now", SERVICE_NAME]);
+
+  try {
+    await rm(UNIT_PATH, { force: true });
+    await runChild("systemctl", ["daemon-reload"]);
+    await rm(ENV_DIR, { recursive: true, force: true });
+    console.log(chalk.gray("Removed the service unit and token file."));
+  } catch (error) {
+    console.warn(
+      chalk.yellow(
+        `⚠️  Cleanup incomplete: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      ),
+    );
+  }
+
+  await runChild("npm", ["rm", "-g", "@suricatoos/local"]);
+
+  console.log(chalk.green(`\n✓ Removed ${SERVICE_NAME} from this machine.`));
+  if (revokeMatched === null) {
+    console.log(
+      chalk.yellow(
+        `⚠️  Did not revoke in the panel${
+          token ? "" : " (no local token found)"
+        }. If "${connectionName}" still shows in Remote Control, revoke it there.`,
+      ),
+    );
+  } else if (revokeMatched > 0) {
+    console.log(
+      chalk.gray(
+        `Revoked "${connectionName}" in the panel (Allow it again there to re-add).`,
+      ),
+    );
+  } else {
+    console.log(
+      chalk.yellow(
+        `No live connector named "${connectionName}" was found. A revocation was recorded for that name; if a different name still shows in Remote Control, revoke it there.`,
+      ),
+    );
+  }
+  process.exit(0);
+}
 
 export function main(): void {
+  const command = parseCliCommand(args);
+
+  if (command === "install") {
+    void runInstall().catch((error: unknown) => {
+      console.error(
+        chalk.red("Install failed:"),
+        error instanceof Error ? error.message : String(error),
+      );
+      process.exit(1);
+    });
+    return;
+  }
+
+  if (command === "uninstall") {
+    void runUninstall().catch((error: unknown) => {
+      console.error(
+        chalk.red("Uninstall failed:"),
+        error instanceof Error ? error.message : String(error),
+      );
+      process.exit(1);
+    });
+    return;
+  }
+
   // Show help
-  if (hasFlag("--help") || hasFlag("-h")) {
+  if (command === "help") {
     console.log(`
 ${chalk.bold("Suricatoos Local Sandbox Client")}
 
 ${chalk.yellow("Usage:")}
-  npx @suricatoos/local --token TOKEN [options]
+  npx @suricatoos/local --token TOKEN [options]   Run in the foreground
+  suricatoos-local install --token TOKEN          Install as a service (root, Linux)
+  suricatoos-local uninstall                      Remove the service + revoke
+
+${chalk.yellow("Commands:")}
+  (default)           Run the connector in the foreground until revoked
+  install             Set up a systemd service (root): survives reboot and
+                      self-applies updates; builds node-pty even on npm>=11
+  uninstall           Stop + remove the service, revoke this connector in the
+                      panel, and remove the global package
 
 ${chalk.yellow("Options:")}
-  --token TOKEN       Authentication token from Settings (required)
-  --name NAME         Optional connection name fallback (default: hostname)
+  --token TOKEN       Authentication token from Settings (required to run/install)
+  --name NAME         Connection name fallback (default: hostname)
   --idle-timeout MIN  Auto-terminate after MIN minutes with no commands
                       (default: disabled — stays active until revoked)
   --convex-url URL    Override Convex backend URL (for development)
@@ -1473,8 +1718,8 @@ ${chalk.yellow("Options:")}
 
 ${chalk.yellow("Examples:")}
   npx @suricatoos/local --token hsb_abc123
-  npx @suricatoos/local --token hsb_abc123 --name "Work PC"
-  npx @suricatoos/local --token hsb_abc123 --idle-timeout 60
+  sudo suricatoos-local install --token hsb_abc123
+  sudo suricatoos-local uninstall
 
 ${chalk.red("⚠️  Security Warning:")}
   Commands run directly on your OS without any isolation.
