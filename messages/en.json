@@ -50,6 +50,21 @@
       "description": "The authentication request timed out. Please check your connection and try again."
     }
   },
+  "footer": {
+    "prefix": "By messaging Suricatoos, you agree to our ",
+    "terms": "Terms",
+    "and": " and have read our ",
+    "privacy": "Privacy Policy",
+    "trust": "Security & Trust"
+  },
+  "share": {
+    "invalidTitle": "Invalid share link",
+    "invalidDescription": "This share link appears to be malformed. Please check the URL and try again.",
+    "loading": "Loading shared task…",
+    "notFoundTitle": "Task not found",
+    "notFoundDescription": "This shared task doesn't exist or is no longer available. It may have been unshared by the owner.",
+    "goHome": "Go to Suricatoos"
+  },
   "header": {
     "signIn": "Sign in",
     "getStarted": "Get started",

@@ -3,6 +3,7 @@
 import { Authenticated, Unauthenticated } from "convex/react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import Header from "@/app/components/Header";
 import { SuricatoosAISVG } from "@/components/icons/suricatoos-ai-svg";
@@ -11,6 +12,7 @@ import { downloadLinks } from "./constants";
 import { AppleIcon, WindowsIcon, LinuxIcon } from "./icons";
 
 function AuthenticatedHeader() {
+  const t = useTranslations("header");
   return (
     <header className="w-full px-6 max-sm:px-4 flex-shrink-0">
       <div className="py-[10px] flex gap-10 items-center justify-between">
@@ -25,7 +27,7 @@ function AuthenticatedHeader() {
         >
           <Link href="/">
             <ArrowLeft className="h-4 w-4 mr-1.5" />
-            Back to Task
+            {t("backToTask")}
           </Link>
         </Button>
       </div>

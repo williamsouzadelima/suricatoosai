@@ -19,6 +19,10 @@ import { useRouter } from "next/navigation";
 import { ChatInput } from "@/app/components/ChatInput";
 import { upsertDraft } from "@/lib/utils/client-storage";
 import { formatTaskTitle } from "@/app/utils/task-ui-copy";
+import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Button } from "@/components/ui/button";
+import { SuricatoosAISVG } from "@/components/icons/suricatoos-ai-svg";
 
 // Desktop wrapper component that connects ComputerSidebarBase to SharedChatContext
 function SharedComputerSidebarDesktop({
@@ -96,12 +100,37 @@ type SharedSnapshot = {
   messages: SharedMessage[] | undefined;
 };
 
+function ShareErrorState({
+  title,
+  description,
+  homeLabel,
+}: {
+  title: string;
+  description: string;
+  homeLabel: string;
+}) {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="flex flex-col items-center gap-4 max-w-md text-center p-6">
+        <SuricatoosAISVG scale={0.16} />
+        <AlertCircle className="h-12 w-12 text-muted-foreground" />
+        <h1 className="text-2xl font-semibold">{title}</h1>
+        <p className="text-sm text-muted-foreground">{description}</p>
+        <Button asChild variant="outline" className="mt-2">
+          <Link href="/">{homeLabel}</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function SharedChatView({ shareId }: SharedChatViewProps) {
   const isMobile = useIsMobile();
   const { user, loading: authLoading } = useAuth();
   const { chatSidebarOpen, setChatSidebarOpen } = useGlobalState();
   const input = useComposerInput();
   const router = useRouter();
+  const t = useTranslations("share");
   const convex = useConvex();
   const forkSharedChatMutation = useMutation(api.sharedChats.forkSharedChat);
   const [isForking, setIsForking] = useState(false);
@@ -196,16 +225,11 @@ export function SharedChatView({ shareId }: SharedChatViewProps) {
   // Invalid UUID format - show not found immediately
   if (!isValidUUID) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-4 max-w-md text-center p-6">
-          <AlertCircle className="h-12 w-12 text-muted-foreground" />
-          <h1 className="text-2xl font-semibold">Invalid share link</h1>
-          <p className="text-sm text-muted-foreground">
-            This share link appears to be malformed. Please check the URL and
-            try again.
-          </p>
-        </div>
-      </div>
+      <ShareErrorState
+        title={t("invalidTitle")}
+        description={t("invalidDescription")}
+        homeLabel={t("goHome")}
+      />
     );
   }
 
@@ -215,9 +239,7 @@ export function SharedChatView({ shareId }: SharedChatViewProps) {
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            Loading shared task...
-          </p>
+          <p className="text-sm text-muted-foreground">{t("loading")}</p>
         </div>
       </div>
     );
@@ -226,16 +248,11 @@ export function SharedChatView({ shareId }: SharedChatViewProps) {
   // Chat not found or not shared
   if (chat === null) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-4 max-w-md text-center p-6">
-          <AlertCircle className="h-12 w-12 text-muted-foreground" />
-          <h1 className="text-2xl font-semibold">Task not found</h1>
-          <p className="text-sm text-muted-foreground">
-            This shared task doesn&apos;t exist or is no longer available. It
-            may have been unshared by the owner.
-          </p>
-        </div>
-      </div>
+      <ShareErrorState
+        title={t("notFoundTitle")}
+        description={t("notFoundDescription")}
+        homeLabel={t("goHome")}
+      />
     );
   }
 

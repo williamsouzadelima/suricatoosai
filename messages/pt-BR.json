@@ -50,6 +50,21 @@
       "description": "A requisição de autenticação expirou. Verifique sua conexão e tente de novo."
     }
   },
+  "footer": {
+    "prefix": "Ao enviar mensagens para a Suricatoos, você concorda com os nossos ",
+    "terms": "Termos",
+    "and": " e declara ter lido nossa ",
+    "privacy": "Política de Privacidade",
+    "trust": "Segurança e Confiança"
+  },
+  "share": {
+    "invalidTitle": "Link de compartilhamento inválido",
+    "invalidDescription": "Este link de compartilhamento parece malformado. Verifique a URL e tente de novo.",
+    "loading": "Carregando tarefa compartilhada…",
+    "notFoundTitle": "Tarefa não encontrada",
+    "notFoundDescription": "Esta tarefa compartilhada não existe ou não está mais disponível. O dono pode ter deixado de compartilhá-la.",
+    "goHome": "Ir para o Suricatoos"
+  },
   "header": {
     "signIn": "Entrar",
     "getStarted": "Começar",
