@@ -63,7 +63,7 @@ const IDLE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 // Agent version — KEEP IN SYNC with packages/local/package.json "version".
 // Reported to the server so the Remote Control UI can flag "update available".
-const AGENT_VERSION = "0.1.7";
+const AGENT_VERSION = "0.1.8";
 
 // How often the agent polls the server for a pending update (Update button).
 const UPDATE_POLL_INTERVAL_MS = 20 * 1000; // 20s
@@ -1521,6 +1521,46 @@ function assertLinuxRoot(action: string): void {
   }
 }
 
+// Resolve the global `suricatoos-local` bin. npm's global-prefix bin dir is NOT
+// always the node dir: with nvm it is, but with a system/apt node (Debian/Kali)
+// node is /usr/bin/node while global bins land in /usr/local/bin. Ask the shell
+// (command -v) first, then `npm prefix -g`/bin, then the node dir as a fallback.
+async function resolveGlobalBinPath(
+  name: string,
+  nodeDir: string,
+): Promise<string | undefined> {
+  const capture = (cmd: string, cmdArgs: string[]): Promise<string> =>
+    new Promise((resolve) => {
+      try {
+        const child = spawn(cmd, cmdArgs, {
+          shell: process.platform === "win32",
+        });
+        let out = "";
+        child.stdout?.on("data", (chunk: Buffer) => {
+          out += chunk.toString();
+        });
+        child.on("error", () => resolve(""));
+        child.on("exit", () => resolve(out.trim()));
+      } catch {
+        resolve("");
+      }
+    });
+
+  const viaPath = await capture("sh", ["-c", `command -v ${name} || true`]);
+  if (viaPath && existsSync(viaPath)) return viaPath;
+
+  const prefix = await capture("npm", ["prefix", "-g"]);
+  if (prefix) {
+    const candidate = path.join(prefix, "bin", name);
+    if (existsSync(candidate)) return candidate;
+  }
+
+  const inNodeDir = path.join(nodeDir, name);
+  if (existsSync(inNodeDir)) return inNodeDir;
+
+  return undefined;
+}
+
 // `suricatoos-local install [--token <token>] [--name <name>]`
 // Install the connector globally and run it as a systemd service, so it stays
 // up across logout/reboot and self-applies updates. Idempotent.
@@ -1544,10 +1584,12 @@ async function runInstall(): Promise<void> {
   }
 
   const nodeDir = path.dirname(process.execPath);
-  const binPath = path.join(nodeDir, "suricatoos-local");
-  if (!existsSync(binPath)) {
+  const binPath = await resolveGlobalBinPath("suricatoos-local", nodeDir);
+  if (!binPath) {
     console.error(
-      chalk.red(`suricatoos-local not found at ${binPath} after install.`),
+      chalk.red(
+        "suricatoos-local not found on PATH after install (checked command -v, npm prefix -g, node dir).",
+      ),
     );
     process.exit(1);
   }
