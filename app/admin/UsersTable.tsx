@@ -25,6 +25,9 @@ import {
   formatDateTime,
   fmtNum,
   fmtDuration,
+  useSortable,
+  sortRows,
+  SortableTh,
 } from "./_ui";
 
 export interface UserRow {
@@ -160,6 +163,22 @@ export function UsersTable() {
     );
   }, [users, query]);
 
+  // Ordenação client-side sobre a lista JÁ completa (/api/admin/users enumera
+  // todos os usuários; `capped` é teto do CONTADOR por linha, não da lista).
+  type SortKey = "user" | "activity" | "reqs" | "tokens" | "cost";
+  const { sort, toggle } = useSortable<SortKey>();
+  const sorted = useMemo(
+    () =>
+      sortRows<UserRow, SortKey>(filtered, sort, {
+        user: (u) => u.email,
+        activity: (u) => u.lastActivityAt,
+        reqs: (u) => u.requests,
+        tokens: (u) => u.inputTokens + u.outputTokens,
+        cost: (u) => u.costDollars,
+      }),
+    [filtered, sort],
+  );
+
   const exportCsv = useCallback(() => {
     const rows = filtered.map((u) => ({
       email: u.email,
@@ -238,16 +257,44 @@ export function UsersTable() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                <th className="px-5 py-2.5 font-semibold">Usuário</th>
-                <th className="px-5 py-2.5 font-semibold">Últ. atividade</th>
-                <th className="px-5 py-2.5 text-right font-semibold">Reqs</th>
-                <th className="px-5 py-2.5 text-right font-semibold">Tokens</th>
-                <th className="px-5 py-2.5 text-right font-semibold">Custo</th>
+                <SortableTh
+                  label="Usuário"
+                  sortKey="user"
+                  sort={sort}
+                  onSort={toggle}
+                />
+                <SortableTh
+                  label="Últ. atividade"
+                  sortKey="activity"
+                  sort={sort}
+                  onSort={toggle}
+                />
+                <SortableTh
+                  label="Reqs"
+                  sortKey="reqs"
+                  sort={sort}
+                  onSort={toggle}
+                  numeric
+                />
+                <SortableTh
+                  label="Tokens"
+                  sortKey="tokens"
+                  sort={sort}
+                  onSort={toggle}
+                  numeric
+                />
+                <SortableTh
+                  label="Custo"
+                  sortKey="cost"
+                  sort={sort}
+                  onSort={toggle}
+                  numeric
+                />
                 <th className="px-5 py-2.5 text-right font-semibold">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((u) => (
+              {sorted.map((u) => (
                 <tr
                   key={u.id}
                   onClick={() => setSelected(u)}

@@ -3,6 +3,7 @@
 // Regra de ouro do design system: ZERO hex hardcoded, só tokens semânticos.
 import * as React from "react";
 import type { LucideIcon } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -317,5 +318,110 @@ export function MiniBarChart({
         </span>
       </div>
     </div>
+  );
+}
+
+// ── Tabelas ordenáveis (client-side) ───────────────────────────────────────
+// Ordena linhas JÁ carregadas no cliente. Honesto SÓ quando a lista no cliente
+// é o conjunto COMPLETO (não uma página/top-N do servidor); senão o topo
+// parece um ranking global que não é. Começa sem ordenação (sort.key = null →
+// preserva exatamente a ordem que o servidor mandou).
+
+export type SortDir = "asc" | "desc";
+export interface SortState<K extends string> {
+  key: K | null;
+  dir: SortDir;
+}
+
+export function useSortable<K extends string>(
+  initial: SortState<K> = { key: null, dir: "desc" },
+) {
+  const [sort, setSort] = React.useState<SortState<K>>(initial);
+  const toggle = React.useCallback((key: K, firstDir: SortDir = "desc") => {
+    setSort((s) =>
+      s.key === key
+        ? { key, dir: s.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: firstDir },
+    );
+  }, []);
+  return { sort, toggle, setSort };
+}
+
+/**
+ * Aplica a ordenação a uma CÓPIA das linhas. Nulos/indefinidos sempre por
+ * último (independe da direção). Números comparam numericamente; o resto via
+ * localeCompare pt-BR.
+ */
+export function sortRows<T, K extends string>(
+  rows: readonly T[],
+  sort: SortState<K>,
+  accessors: Record<K, (row: T) => string | number | null | undefined>,
+): T[] {
+  if (!sort.key) return rows.slice();
+  const get = accessors[sort.key];
+  const mul = sort.dir === "asc" ? 1 : -1;
+  return rows.slice().sort((a, b) => {
+    const av = get(a);
+    const bv = get(b);
+    const an = av == null;
+    const bn = bv == null;
+    if (an && bn) return 0;
+    if (an) return 1;
+    if (bn) return -1;
+    if (typeof av === "number" && typeof bv === "number") return (av - bv) * mul;
+    return String(av).localeCompare(String(bv), "pt-BR") * mul;
+  });
+}
+
+/**
+ * Cabeçalho <th> clicável que ordena. Use só em tabela client-side cujo
+ * conjunto exibido é COMPLETO. Primeiro clique: desc em colunas numéricas
+ * (maior primeiro), asc em texto; cliques seguintes alternam.
+ */
+export function SortableTh<K extends string>({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  numeric = false,
+  className,
+}: {
+  label: string;
+  sortKey: K;
+  sort: SortState<K>;
+  onSort: (key: K, firstDir?: SortDir) => void;
+  numeric?: boolean;
+  className?: string;
+}) {
+  const active = sort.key === sortKey;
+  const Icon = !active ? ChevronsUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <th
+      className={cn(
+        "px-5 py-2.5 font-semibold",
+        numeric && "text-right",
+        className,
+      )}
+      aria-sort={
+        active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"
+      }
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey, numeric ? "desc" : "asc")}
+        className={cn(
+          "group -mx-1 inline-flex items-center gap-1 rounded px-1 transition-colors hover:text-foreground",
+          active && "text-foreground",
+        )}
+      >
+        <span>{label}</span>
+        <Icon
+          className={cn(
+            "h-3 w-3 shrink-0 transition-opacity",
+            active ? "opacity-100" : "opacity-40 group-hover:opacity-70",
+          )}
+        />
+      </button>
+    </th>
   );
 }
