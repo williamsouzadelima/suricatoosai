@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { toastError } from "@/lib/toast";
 import {
   Search,
   Ban,
@@ -141,9 +142,7 @@ export function UsersTable() {
         );
         await load();
       } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Falha na operação.",
-        );
+        toastError(error, "Falha na operação.");
       } finally {
         setBusyId(null);
       }

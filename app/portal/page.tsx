@@ -19,6 +19,15 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StatusBadge, EmptyState, type Tone } from "@/app/admin/_ui";
+import {
+  SEV_LABEL,
+  SEV_PILL,
+  SEV_STRIPE,
+  SEV_ORDER,
+  RETEST_BADGE,
+  asSeverity,
+  sevLabel,
+} from "@/components/internal/severity";
 import { parseContentDispositionFilename } from "@/lib/reports/report-filename";
 import {
   Dialog,
@@ -97,33 +106,9 @@ const ENG_TONE: Record<string, Tone> = {
   reporting: "primary",
   closed: "neutral",
 };
-const SEV_LABEL: Record<string, string> = {
-  critical: "Crítico",
-  high: "Alto",
-  medium: "Médio",
-  low: "Baixo",
-  info: "Info",
-};
-const SEV_PILL: Record<string, string> = {
-  critical: "text-destructive bg-destructive/10 border-destructive/25",
-  high: "text-[#e8590c] bg-[#e8590c]/10 border-[#e8590c]/25",
-  medium: "text-warning bg-warning/10 border-warning/25",
-  low: "text-primary bg-primary/10 border-primary/25",
-  info: "text-muted-foreground bg-muted border-border",
-};
-const SEV_STRIPE: Record<string, string> = {
-  critical: "bg-destructive",
-  high: "bg-[#e8590c]",
-  medium: "bg-warning",
-  low: "bg-primary",
-  info: "bg-muted-foreground",
-};
-const SEV_ORDER = ["critical", "high", "medium", "low", "info"];
-const RETEST: Record<string, { label: string; tone: Tone }> = {
-  fixed: { label: "Corrigido", tone: "success" },
-  still_vulnerable: { label: "Ainda vulnerável", tone: "destructive" },
-  pending: { label: "Retest pendente", tone: "warning" },
-};
+// SEV_LABEL / SEV_PILL / SEV_STRIPE / SEV_ORDER / RETEST_BADGE vêm de
+// @/components/internal/severity (fonte única). Antes eram recriados aqui com
+// #e8590c cravado, divergindo do token --sev-high do design system.
 
 function fmtDate(ms: number): string {
   return new Date(ms).toLocaleDateString("pt-BR", {
@@ -542,13 +527,13 @@ function PortalFindingItem({
   evidence: Evidence[] | undefined;
   onToggle: () => void;
 }) {
-  const retest = f.retestStatus ? RETEST[f.retestStatus] : undefined;
+  const retest = f.retestStatus ? RETEST_BADGE[f.retestStatus] : undefined;
   return (
     <div className="relative overflow-hidden rounded-xl border bg-card shadow-[var(--shadow-soft)]">
       <span
         className={cn(
           "absolute inset-y-3 left-0 w-1 rounded-r-full",
-          SEV_STRIPE[f.severity] ?? "bg-muted-foreground",
+          SEV_STRIPE[asSeverity(f.severity)],
         )}
       />
       <button
@@ -563,11 +548,10 @@ function PortalFindingItem({
         <span
           className={cn(
             "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
-            SEV_PILL[f.severity] ??
-              "border-border bg-muted text-muted-foreground",
+            SEV_PILL[asSeverity(f.severity)],
           )}
         >
-          {SEV_LABEL[f.severity] ?? f.severity}
+          {sevLabel(f.severity)}
         </span>
         {f.ref && (
           <span className="shrink-0 font-mono text-[11.5px] text-muted-foreground">

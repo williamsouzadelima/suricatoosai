@@ -10,6 +10,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
+import { toastError, toastOk } from "@/lib/toast";
 import {
   ListOrdered,
   ListChecks,
@@ -24,60 +25,35 @@ import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Callout, StatusBadge, type Tone } from "@/app/admin/_ui";
+import { Callout, StatusBadge } from "@/app/admin/_ui";
 
 // ── Tipos + constantes de apresentação ─────────────────────────────────────
 
-export type Severity = "info" | "low" | "medium" | "high" | "critical";
-export type FindingStatus =
-  "draft" | "in_review" | "approved" | "published" | "dismissed";
-
-export const SEVERITY_TONE: Record<Severity, Tone> = {
-  critical: "destructive",
-  high: "destructive",
-  medium: "warning",
-  low: "primary",
-  info: "neutral",
-};
-export const STATUS_TONE: Record<FindingStatus, Tone> = {
-  draft: "neutral",
-  in_review: "warning",
-  approved: "success",
-  published: "brand",
-  dismissed: "destructive",
-};
-export const STATUS_LABEL: Record<FindingStatus, string> = {
-  draft: "Rascunho",
-  in_review: "Em revisão",
-  approved: "Aprovado",
-  published: "Publicado",
-  dismissed: "Descartado",
-};
-export const RETEST_BADGE: Record<string, { tone: Tone; label: string }> = {
-  fixed: { tone: "success", label: "Corrigido" },
-  still_vulnerable: { tone: "destructive", label: "Ainda vulnerável" },
-  pending: { tone: "warning", label: "Retest pendente" },
-};
-export const SEV_LABEL: Record<Severity, string> = {
-  critical: "Crítico",
-  high: "Alto",
-  medium: "Médio",
-  low: "Baixo",
-  info: "Info",
-};
-export const SEV_STRIPE: Record<Severity, string> = {
-  critical: "bg-destructive",
-  high: "bg-sev-high",
-  medium: "bg-warning",
-  low: "bg-primary",
-  info: "bg-muted-foreground",
-};
-export const SEV_PILL: Record<Severity, string> = {
-  critical: "text-destructive bg-destructive/10 border-destructive/25",
-  high: "text-sev-high bg-sev-high/10 border-sev-high/25",
-  medium: "text-warning bg-warning/10 border-warning/25",
-  low: "text-primary bg-primary/10 border-primary/25",
-  info: "text-muted-foreground bg-muted border-border",
+// Os tipos + mapas de apresentação agora vivem em ./severity — módulo PURO
+// (sem "use client"/convex) para que o PORTAL do cliente reuse os MESMOS tokens
+// em vez de recriar os mapas (era lá que o #e8590c cravado divergia do token
+// --sev-high). Reexportados aqui para não quebrar os importadores que puxam
+// daqui (EngagementsPanel, AchadosPanel). Fonte da verdade: ./severity.ts.
+import {
+  type Severity,
+  type FindingStatus,
+  SEVERITY_TONE,
+  STATUS_TONE,
+  STATUS_LABEL,
+  RETEST_BADGE,
+  SEV_LABEL,
+  SEV_STRIPE,
+  SEV_PILL,
+} from "./severity";
+export type { Severity, FindingStatus };
+export {
+  SEVERITY_TONE,
+  STATUS_TONE,
+  STATUS_LABEL,
+  RETEST_BADGE,
+  SEV_LABEL,
+  SEV_STRIPE,
+  SEV_PILL,
 };
 
 // ── Ações de curadoria (identity-only; o agente não tem estas mutations) ────
@@ -105,11 +81,9 @@ export function FindingActions({
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     try {
       await fn();
-      toast.success(ok);
+      toastOk(ok);
     } catch (e) {
-      const msg = e instanceof Error && e.message ? e.message : "Ação falhou.";
-      toast.error(msg);
-      console.error(e);
+      toastError(e, "Ação falhou.");
     }
   };
 
@@ -679,12 +653,9 @@ export function FindingsBoard({
     const run = async (fn: () => Promise<unknown>, ok: string) => {
       try {
         await fn();
-        toast.success(ok);
+        toastOk(ok);
       } catch (e) {
-        const msg =
-          e instanceof Error && e.message ? e.message : "Ação falhou.";
-        toast.error(msg);
-        console.error(e);
+        toastError(e, "Ação falhou.");
       }
     };
     if (target === "in_review") {
