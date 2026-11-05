@@ -7,7 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
-import { SectionHeader, Callout, EmptyState, formatDateTime } from "./_ui";
+import {
+  SectionHeader,
+  Callout,
+  EmptyState,
+  formatDateTime,
+  useSortable,
+  sortRows,
+  SortableTh,
+} from "./_ui";
 
 interface Settings {
   enabled: boolean;
@@ -55,6 +63,16 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
   const [updatedAt, setUpdatedAt] = useState<number | undefined>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Sort client-side sobre a lista COMPLETA de overrides (listOverrides traz
+  // todos; conjunto pequeno). Sem ordem default (config sem ordem inerente →
+  // cabeçalhos neutros até clicar, que é honesto).
+  type OvSortKey = "user" | "taskCap" | "userCap";
+  const { sort, toggle } = useSortable<OvSortKey>();
+  const sortedOverrides = sortRows(overrides, sort, {
+    user: (o) => o.email ?? o.user_id,
+    taskCap: (o) => o.per_task_cap_dollars ?? null,
+    userCap: (o) => o.per_user_cap_dollars ?? null,
+  });
 
   // Novo override
   const [ovUserId, setOvUserId] = useState("");
@@ -412,19 +430,35 @@ export function BudgetTab({ adminEmail }: { adminEmail: string }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                  <th className="px-5 py-2 font-medium">Usuário</th>
-                  <th className="px-5 py-2 text-right font-medium">
-                    Teto task
-                  </th>
-                  <th className="px-5 py-2 text-right font-medium">
-                    Teto usuário
-                  </th>
+                  <SortableTh
+                    label="Usuário"
+                    sortKey="user"
+                    sort={sort}
+                    onSort={toggle}
+                    className="px-5 py-2 font-medium"
+                  />
+                  <SortableTh
+                    label="Teto task"
+                    sortKey="taskCap"
+                    sort={sort}
+                    onSort={toggle}
+                    numeric
+                    className="px-5 py-2 font-medium"
+                  />
+                  <SortableTh
+                    label="Teto usuário"
+                    sortKey="userCap"
+                    sort={sort}
+                    onSort={toggle}
+                    numeric
+                    className="px-5 py-2 font-medium"
+                  />
                   <th className="px-5 py-2 font-medium">Isento</th>
                   <th className="px-5 py-2"></th>
                 </tr>
               </thead>
               <tbody>
-                {overrides.map((o) => (
+                {sortedOverrides.map((o) => (
                   <tr key={o.user_id} className="border-b last:border-0">
                     <td className="px-5 py-2">
                       <div className="font-medium">{o.email ?? o.user_id}</div>
