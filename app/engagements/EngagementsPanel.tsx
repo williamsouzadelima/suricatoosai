@@ -475,6 +475,16 @@ function EngagementDetail({
   };
 
   const handleApproveAll = async () => {
+    // Aprovar em massa publica os achados no relatório VISÍVEL AO CLIENTE —
+    // ação de alto impacto, tem de confirmar (antes não confirmava, enquanto o
+    // "Limpar todos" destrutivo confirmava: gating invertido).
+    if (
+      !window.confirm(
+        "Aprovar TODOS os achados com evidência? Achados aprovados entram no relatório visível ao cliente.",
+      )
+    ) {
+      return;
+    }
     setApprovingAll(true);
     try {
       const res = await approveAll({ engagementId });
