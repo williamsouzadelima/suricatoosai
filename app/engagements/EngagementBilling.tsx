@@ -23,7 +23,6 @@ import {
   StatusBadge,
   type Tone,
 } from "@/app/admin/_ui";
-import { PortalAccessCard } from "./PortalAccessCard";
 
 const STATUS: Record<string, { tone: Tone; label: string }> = {
   draft: { tone: "neutral", label: "Rascunho" },
@@ -388,13 +387,6 @@ export function EngagementBilling({
           )}
         </CardContent>
       </Card>
-      {billing?.clientId && (
-        <PortalAccessCard
-          clientId={billing.clientId}
-          clientName={billing.clientName}
-          portalEnabled={billing.portalEnabled}
-        />
-      )}
     </div>
   );
 }

@@ -2,11 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ShieldCheck, UserPlus, Trash2 } from "lucide-react";
+import { ShieldCheck, UserPlus, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { SectionHeader, StatusBadge, formatDateTime } from "@/app/admin/_ui";
+import {
+  SectionHeader,
+  StatusBadge,
+  Callout,
+  formatDateTime,
+} from "@/app/admin/_ui";
 
 interface Member {
   userId: string;
@@ -127,7 +132,21 @@ export function PortalAccessCard({
     }
   };
 
-  if (forbidden) return null;
+  if (forbidden) {
+    // Defesa-em-profundidade: a aba "Acesso do cliente" já é superadmin-only,
+    // mas se mesmo assim a rota responder 403, mostra o motivo em vez de um
+    // painel em branco (a mesma falha "erro vira vazio" que o portal corrigiu).
+    return (
+      <Card className="gap-0 py-0">
+        <CardContent className="p-5">
+          <Callout tone="warning" icon={AlertTriangle}>
+            Você não tem permissão para gerenciar o acesso ao portal deste
+            cliente — apenas superadmins. Fale com um administrador se precisar.
+          </Callout>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="gap-0 py-0">

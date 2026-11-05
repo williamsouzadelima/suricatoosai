@@ -269,6 +269,74 @@ export function EmptyState({
   );
 }
 
+/** Item de uma aba na TabBar. */
+export interface TabItem<T extends string = string> {
+  id: T;
+  label: string;
+  icon?: LucideIcon;
+  /** Contador opcional (ex.: nº de achados). Omitido quando null/undefined. */
+  badge?: number | string;
+}
+
+/** Barra de abas em pílulas (flex-wrap — quebra em linha em vez de rolar).
+ *  CONTROLADA: o estado (ex.: ?tab= na URL) é de quem usa. 100% tokenizada
+ *  (pílula ativa = bg-primary), sem hex — segue a regra de ouro do topo. */
+export function TabBar<T extends string>({
+  tabs,
+  active,
+  onChange,
+  className,
+}: {
+  tabs: ReadonlyArray<TabItem<T>>;
+  active: T;
+  onChange: (id: T) => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn("-mx-1 px-1 pb-1", className)}>
+      <div
+        role="tablist"
+        className="flex flex-wrap gap-1 rounded-xl border bg-card p-1.5 shadow-[var(--shadow-soft)]"
+      >
+        {tabs.map((item) => {
+          const Icon = item.icon;
+          const isActive = active === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => onChange(item.id)}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-2 text-[13px] font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                isActive
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {Icon && <Icon className="h-4 w-4" />}
+              {item.label}
+              {item.badge != null && (
+                <span
+                  className={cn(
+                    "ml-0.5 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums",
+                    isActive
+                      ? "bg-primary-foreground/20 text-primary-foreground"
+                      : "bg-muted text-muted-foreground",
+                  )}
+                >
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /** Barra semanal leve (sem lib). Zeros viram coluna-fantasma → lê como gráfico. */
 export function MiniBarChart({
   data,
@@ -368,7 +436,8 @@ export function sortRows<T, K extends string>(
     if (an && bn) return 0;
     if (an) return 1;
     if (bn) return -1;
-    if (typeof av === "number" && typeof bv === "number") return (av - bv) * mul;
+    if (typeof av === "number" && typeof bv === "number")
+      return (av - bv) * mul;
     return String(av).localeCompare(String(bv), "pt-BR") * mul;
   });
 }
@@ -394,7 +463,11 @@ export function SortableTh<K extends string>({
   className?: string;
 }) {
   const active = sort.key === sortKey;
-  const Icon = !active ? ChevronsUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
+  const Icon = !active
+    ? ChevronsUpDown
+    : sort.dir === "asc"
+      ? ArrowUp
+      : ArrowDown;
   return (
     <th
       className={cn(

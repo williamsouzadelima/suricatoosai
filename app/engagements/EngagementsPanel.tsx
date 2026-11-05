@@ -23,6 +23,9 @@ import {
   BarChart3,
   Pencil,
   Target,
+  LayoutDashboard,
+  ShieldCheck,
+  Receipt,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
@@ -36,11 +39,14 @@ import {
   StatusBadge,
   EmptyState,
   Callout,
+  TabBar,
   formatDateTime,
   type Tone,
+  type TabItem,
 } from "@/app/admin/_ui";
 import { ReportBrandCard } from "./ReportBrandCard";
 import { EngagementBilling } from "./EngagementBilling";
+import { PortalAccessCard } from "./PortalAccessCard";
 import { AppShell } from "@/components/internal/app-shell";
 import {
   FindingsBoard,
@@ -68,10 +74,52 @@ const ENG_STATUS_LABEL: Record<string, string> = {
   closed: "Fechado",
 };
 
+// ── Abas do detalhe do engajamento ──────────────────────────────────────────
+// Quebra o antigo monólito (~10 cards num scroll só) em abas. A aba vive na URL
+// (?tab=) → deep-link, F5 e o Voltar do navegador preservam. "Acesso do cliente"
+// é superadmin-only (a rota /api/admin/portal-access exige superadmin): some da
+// barra para os demais, e um ?tab=acesso forjado cai na "Visão geral".
+export type EngTab =
+  | "visao"
+  | "achados"
+  | "evidencia"
+  | "escopo"
+  | "relatorios"
+  | "acesso"
+  | "faturamento";
+
+const ENG_TABS: (TabItem<EngTab> & { superadmin?: boolean })[] = [
+  { id: "visao", label: "Visão geral", icon: LayoutDashboard },
+  { id: "achados", label: "Achados", icon: ShieldAlert },
+  { id: "evidencia", label: "Evidência & chats", icon: Radio },
+  { id: "escopo", label: "Escopo & janela", icon: Target },
+  { id: "relatorios", label: "Relatórios", icon: FileText },
+  {
+    id: "acesso",
+    label: "Acesso do cliente",
+    icon: ShieldCheck,
+    superadmin: true,
+  },
+  { id: "faturamento", label: "Faturamento", icon: Receipt },
+];
+
+function visibleEngTabs(
+  isSuperadmin?: boolean,
+): (TabItem<EngTab> & { superadmin?: boolean })[] {
+  return ENG_TABS.filter((t) => !t.superadmin || isSuperadmin);
+}
+
 // ── Escopo do engajamento (alvos autorizados + janela) ──────────────────────
 // scopeItemArg (convex/engagements.ts): { kind, value, in_scope, note? }.
 type ScopeKind = "domain" | "ip" | "cidr" | "url" | "app" | "other";
-const SCOPE_KINDS: ScopeKind[] = ["domain", "ip", "cidr", "url", "app", "other"];
+const SCOPE_KINDS: ScopeKind[] = [
+  "domain",
+  "ip",
+  "cidr",
+  "url",
+  "app",
+  "other",
+];
 const SCOPE_KIND_LABEL: Record<ScopeKind, string> = {
   domain: "Domínio",
   ip: "IP",
@@ -152,9 +200,26 @@ export function EngagementsPanel({
     setSelectedEngagementId(next);
     const params = new URLSearchParams(searchParams.toString());
     if (next) params.set("e", next);
-    else params.delete("e");
+    else {
+      params.delete("e");
+      params.delete("tab"); // sem engajamento não há aba — não deixa ?tab= órfão
+    }
     const qs = params.toString();
     router.push(qs ? `?${qs}` : "/engagements", { scroll: false });
+  };
+  // Aba do detalhe na URL (?tab=), validada contra as abas VISÍVEIS a este papel
+  // → um ?tab=acesso forjado por não-superadmin cai na "Visão geral". setDetailTab
+  // preserva o ?e= (mesmo URLSearchParams) e selectEngagement preserva o ?tab=.
+  // Derivada da URL (não useState) → reativa e sobrevive ao F5, como no admin.
+  const detailTabs = visibleEngTabs(isSuperadmin);
+  const tabParam = searchParams.get("tab");
+  const detailTab: EngTab = detailTabs.some((t) => t.id === tabParam)
+    ? (tabParam as EngTab)
+    : "visao";
+  const setDetailTab = (id: EngTab) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", id);
+    router.push(`?${params.toString()}`, { scroll: false });
   };
   const [newClientName, setNewClientName] = useState("");
   const [newEngName, setNewEngName] = useState("");
@@ -305,9 +370,7 @@ export function EngagementsPanel({
                 return (
                   <button
                     key={e._id}
-                    onClick={() =>
-                      selectEngagement(active ? null : e._id)
-                    }
+                    onClick={() => selectEngagement(active ? null : e._id)}
                     className={cn(
                       "group rounded-xl border bg-card p-4 text-left shadow-[var(--shadow-soft)] transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)]",
                       active &&
@@ -337,7 +400,12 @@ export function EngagementsPanel({
         </Card>
 
         {selectedEngagementId && (
-          <EngagementDetail engagementId={selectedEngagementId} />
+          <EngagementDetail
+            engagementId={selectedEngagementId}
+            tab={detailTab}
+            setTab={setDetailTab}
+            isSuperadmin={isSuperadmin}
+          />
         )}
       </div>
     </AppShell>
@@ -346,8 +414,14 @@ export function EngagementsPanel({
 
 function EngagementDetail({
   engagementId,
+  tab,
+  setTab,
+  isSuperadmin,
 }: {
   engagementId: Id<"engagements">;
+  tab: EngTab;
+  setTab: (id: EngTab) => void;
+  isSuperadmin?: boolean;
 }) {
   const findings = useQuery(api.findings.listFindingsForEngagement, {
     engagementId,
@@ -363,6 +437,12 @@ function EngagementDetail({
     {},
   );
   const engagement = useQuery(api.engagements.getEngagement, { engagementId });
+  // Mesma query que o EngagementBilling assina → o Convex deduplica (1 só
+  // subscription). Dá clientId/clientName/portalEnabled p/ a aba "Acesso do
+  // cliente" sem precisar passar pelo billing.
+  const billing = useQuery(api.engagements.getEngagementBilling, {
+    engagementId,
+  });
   const updateEngagement = useMutation(api.engagements.updateEngagement);
 
   const [editingName, setEditingName] = useState(false);
@@ -550,6 +630,13 @@ function EngagementDetail({
     return c;
   }, [findings]);
 
+  // Badge de contagem só na aba "Achados", e só quando há achados (evita "0").
+  const engTabs = visibleEngTabs(isSuperadmin).map((t) =>
+    t.id === "achados" && findings && findings.length > 0
+      ? { ...t, badge: findings.length }
+      : t,
+  );
+
   return (
     <>
       {/* Cabeçalho do engajamento: nome editável (espelha na task 1:1) */}
@@ -607,362 +694,417 @@ function EngagementDetail({
         </div>
       </Card>
 
-      {engagement && (
-        <ScopeEditor key={engagement._id} engagement={engagement} />
-      )}
+      <TabBar tabs={engTabs} active={tab} onChange={setTab} />
 
-      {engagement && (
-        <ScheduleEditor key={engagement._id} engagement={engagement} />
-      )}
-
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard
-          label="Achados"
-          value={String(counts.total)}
-          icon={ShieldAlert}
-          tone="primary"
-          sub={`${counts.approved + counts.published} curados`}
-        />
-        <StatCard
-          label="Críticos"
-          value={String(counts.sev.critical)}
-          icon={ShieldAlert}
-          tone="destructive"
-          sub={`${counts.sev.high} altos`}
-        />
-        <StatCard
-          label="Maior CVSS"
-          value={counts.maxCvss > 0 ? counts.maxCvss.toFixed(1) : "—"}
-          icon={Sparkles}
-          tone="warning"
-        />
-        <StatCard
-          label="Rascunho / revisão"
-          value={String(counts.draft + counts.review)}
-          icon={RefreshCw}
-          tone="warning"
-          sub="aguardando curadoria"
-        />
+      {/* Escopo & janela de autorização */}
+      <div className={cn(tab !== "escopo" && "hidden")}>
+        <div className="flex flex-col gap-5">
+          {engagement && (
+            <ScopeEditor key={engagement._id} engagement={engagement} />
+          )}
+          {engagement && (
+            <ScheduleEditor key={engagement._id} engagement={engagement} />
+          )}
+        </div>
       </div>
 
-      {counts.total > 0 && (
-        <Card className="gap-0 py-0">
-          <div className="p-5 pb-3">
-            <SectionHeader
-              icon={BarChart3}
-              title="Distribuição por severidade"
-              count={counts.total}
+      {/* Visão geral: indicadores + distribuição por severidade */}
+      <div className={cn(tab !== "visao" && "hidden")}>
+        <div className="flex flex-col gap-5">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <StatCard
+              label="Achados"
+              value={String(counts.total)}
+              icon={ShieldAlert}
+              tone="primary"
+              sub={`${counts.approved + counts.published} curados`}
+            />
+            <StatCard
+              label="Críticos"
+              value={String(counts.sev.critical)}
+              icon={ShieldAlert}
+              tone="destructive"
+              sub={`${counts.sev.high} altos`}
+            />
+            <StatCard
+              label="Maior CVSS"
+              value={counts.maxCvss > 0 ? counts.maxCvss.toFixed(1) : "—"}
+              icon={Sparkles}
+              tone="warning"
+            />
+            <StatCard
+              label="Rascunho / revisão"
+              value={String(counts.draft + counts.review)}
+              icon={RefreshCw}
+              tone="warning"
+              sub="aguardando curadoria"
             />
           </div>
-          <div className="space-y-2.5 px-5 pb-5">
-            {(["critical", "high", "medium", "low", "info"] as Severity[]).map(
-              (s) => {
-                const n = counts.sev[s];
-                const max = Math.max(1, ...Object.values(counts.sev));
-                return (
-                  <div key={s} className="flex items-center gap-3">
-                    <span
-                      className={cn(
-                        "inline-flex w-[74px] shrink-0 justify-center rounded-full border px-2 py-0.5 text-xs font-semibold",
-                        SEV_PILL[s],
-                      )}
-                    >
-                      {SEV_LABEL[s]}
-                    </span>
-                    <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={cn("h-full rounded-full", SEV_STRIPE[s])}
-                        style={{
-                          width: `${n > 0 ? Math.max(4, (n / max) * 100) : 0}%`,
-                        }}
-                      />
-                    </div>
-                    <span className="w-6 shrink-0 text-right font-mono text-sm font-semibold tabular-nums">
-                      {n}
-                    </span>
-                  </div>
-                );
-              },
-            )}
-          </div>
-        </Card>
-      )}
 
-      {/* Achados */}
-      <Card className="gap-0 py-0">
-        <div className="flex items-center justify-between gap-2 border-b p-5">
-          <SectionHeader title="Quadro de achados" count={findings?.length} />
-          <div className="flex items-center gap-2">
-            {counts.draft + counts.review > 0 && (
-              <Button
-                size="sm"
-                onClick={() => void handleApproveAll()}
-                disabled={approvingAll}
-                title="Aprovar todos os achados com evidência (para entrarem no relatório)"
-              >
-                {approvingAll ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ShieldAlert className="h-4 w-4" />
-                )}
-                Aprovar todos
-              </Button>
-            )}
-            {(findings?.length ?? 0) > 0 && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => void handleClearFindings()}
-                disabled={clearing}
-                title="Apagar todos os achados e evidências deste engajamento"
-                className="text-muted-foreground hover:text-destructive"
-              >
-                {clearing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4" />
-                )}
-                Limpar achados
-              </Button>
-            )}
-          </div>
-        </div>
-        {findings === undefined ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            Carregando…
-          </div>
-        ) : findings.length === 0 ? (
-          <EmptyState
-            icon={ShieldAlert}
-            title="Sem achados neste engajamento."
-            description="Achados capturados pelo agente (capture_finding) aparecem aqui em rascunho."
-          />
-        ) : (
-          <div className="p-4">
-            <FindingsBoard findings={findings} engagementId={engagementId} />
-          </div>
-        )}
-      </Card>
-
-      {/* Importar bundle de evidências */}
-      <Card className="gap-0 py-0">
-        <div className="flex flex-col gap-2 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <Upload className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-            <div>
-              <div className="text-sm font-medium">
-                Importar bundle de evidências
+          {counts.total > 0 && (
+            <Card className="gap-0 py-0">
+              <div className="p-5 pb-3">
+                <SectionHeader
+                  icon={BarChart3}
+                  title="Distribuição por severidade"
+                  count={counts.total}
+                />
               </div>
-              <div className="text-xs text-muted-foreground">
-                Suba o .tar.gz/.zip da task (scripts, saídas, screenshots, .md).
-                A IA usa o relatório .md como fonte e anexa os artefatos reais
-                na cadeia de cada achado.
+              <div className="space-y-2.5 px-5 pb-5">
+                {(
+                  ["critical", "high", "medium", "low", "info"] as Severity[]
+                ).map((s) => {
+                  const n = counts.sev[s];
+                  const max = Math.max(1, ...Object.values(counts.sev));
+                  return (
+                    <div key={s} className="flex items-center gap-3">
+                      <span
+                        className={cn(
+                          "inline-flex w-[74px] shrink-0 justify-center rounded-full border px-2 py-0.5 text-xs font-semibold",
+                          SEV_PILL[s],
+                        )}
+                      >
+                        {SEV_LABEL[s]}
+                      </span>
+                      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={cn("h-full rounded-full", SEV_STRIPE[s])}
+                          style={{
+                            width: `${n > 0 ? Math.max(4, (n / max) * 100) : 0}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="w-6 shrink-0 text-right font-mono text-sm font-semibold tabular-nums">
+                        {n}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {/* Achados: quadro + ingestão de evidências */}
+      <div className={cn(tab !== "achados" && "hidden")}>
+        <div className="flex flex-col gap-5">
+          {/* Achados */}
+          <Card className="gap-0 py-0">
+            <div className="flex items-center justify-between gap-2 border-b p-5">
+              <SectionHeader
+                title="Quadro de achados"
+                count={findings?.length}
+              />
+              <div className="flex items-center gap-2">
+                {counts.draft + counts.review > 0 && (
+                  <Button
+                    size="sm"
+                    onClick={() => void handleApproveAll()}
+                    disabled={approvingAll}
+                    title="Aprovar todos os achados com evidência (para entrarem no relatório)"
+                  >
+                    {approvingAll ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ShieldAlert className="h-4 w-4" />
+                    )}
+                    Aprovar todos
+                  </Button>
+                )}
+                {(findings?.length ?? 0) > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleClearFindings()}
+                    disabled={clearing}
+                    title="Apagar todos os achados e evidências deste engajamento"
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    {clearing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    Limpar achados
+                  </Button>
+                )}
               </div>
             </div>
-          </div>
-          <label
-            className={`inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm font-medium ${
-              ingestingBundle
-                ? "pointer-events-none opacity-60"
-                : "hover:bg-muted/40"
-            }`}
-          >
-            {ingestingBundle ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+            {findings === undefined ? (
+              <div className="p-6 text-center text-sm text-muted-foreground">
+                Carregando…
+              </div>
+            ) : findings.length === 0 ? (
+              <EmptyState
+                icon={ShieldAlert}
+                title="Sem achados neste engajamento."
+                description="Achados capturados pelo agente (capture_finding) aparecem aqui em rascunho."
+              />
             ) : (
-              <Upload className="h-4 w-4" />
+              <div className="p-4">
+                <FindingsBoard
+                  findings={findings}
+                  engagementId={engagementId}
+                />
+              </div>
             )}
-            {ingestingBundle ? "Enviando…" : "Escolher bundle"}
-            <input
-              type="file"
-              accept=".tar.gz,.tgz,.zip,application/gzip,application/zip,application/x-gzip"
-              className="hidden"
-              disabled={ingestingBundle}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void ingestBundle(file);
-                e.target.value = "";
-              }}
-            />
-          </label>
+          </Card>
+
+          {/* Importar bundle de evidências */}
+          <Card className="gap-0 py-0">
+            <div className="flex flex-col gap-2 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <Upload className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <div>
+                  <div className="text-sm font-medium">
+                    Importar bundle de evidências
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Suba o .tar.gz/.zip da task (scripts, saídas, screenshots,
+                    .md). A IA usa o relatório .md como fonte e anexa os
+                    artefatos reais na cadeia de cada achado.
+                  </div>
+                </div>
+              </div>
+              <label
+                className={`inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm font-medium ${
+                  ingestingBundle
+                    ? "pointer-events-none opacity-60"
+                    : "hover:bg-muted/40"
+                }`}
+              >
+                {ingestingBundle ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                {ingestingBundle ? "Enviando…" : "Escolher bundle"}
+                <input
+                  type="file"
+                  accept=".tar.gz,.tgz,.zip,application/gzip,application/zip,application/x-gzip"
+                  className="hidden"
+                  disabled={ingestingBundle}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void ingestBundle(file);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+          </Card>
         </div>
-      </Card>
+      </div>
 
       {/* Relatórios */}
-      <ReportsSummary engagementId={engagementId} />
+      <div className={cn(tab !== "relatorios" && "hidden")}>
+        <ReportsSummary engagementId={engagementId} />
+      </div>
+
+      {/* Acesso do cliente ao portal (superadmin — a rota é superadmin-only) */}
+      {isSuperadmin && (
+        <div className={cn(tab !== "acesso" && "hidden")}>
+          {billing === undefined ? (
+            <Card className="gap-0 py-0">
+              <div className="p-6 text-center text-sm text-muted-foreground">
+                Carregando…
+              </div>
+            </Card>
+          ) : billing?.clientId ? (
+            <PortalAccessCard
+              clientId={billing.clientId}
+              clientName={billing.clientName}
+              portalEnabled={billing.portalEnabled}
+            />
+          ) : (
+            <Card className="gap-0 py-0">
+              <EmptyState
+                icon={ShieldCheck}
+                title="Engajamento sem cliente vinculado."
+                description="Vincule um cliente ao engajamento para liberar o acesso do cliente ao portal."
+              />
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Faturamento (scaffold de monetização) */}
-      <EngagementBilling engagementId={engagementId} />
+      <div className={cn(tab !== "faturamento" && "hidden")}>
+        <EngagementBilling engagementId={engagementId} />
+      </div>
 
       {/* Evidência ao vivo + chats */}
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card className="gap-0 py-0">
-          <div className="flex items-center gap-2 border-b p-5">
-            <Radio className="h-4 w-4 text-success" />
-            <SectionHeader
-              title="Evidência ao vivo"
-              count={liveEvidence?.length}
-            />
-          </div>
-          {liveEvidence === undefined ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">
-              Carregando…
+      <div className={cn(tab !== "evidencia" && "hidden")}>
+        <div className="grid gap-5 lg:grid-cols-2">
+          <Card className="gap-0 py-0">
+            <div className="flex items-center gap-2 border-b p-5">
+              <Radio className="h-4 w-4 text-success" />
+              <SectionHeader
+                title="Evidência ao vivo"
+                count={liveEvidence?.length}
+              />
             </div>
-          ) : liveEvidence.length === 0 ? (
-            <EmptyState icon={Radio} title="Sem evidência ainda." />
-          ) : (
-            <div className="max-h-[26rem] space-y-3 overflow-y-auto p-4">
-              {liveEvidence.map((ev) => {
-                const tool = (ev as { tool_name?: string }).tool_name;
-                return (
-                  <div
-                    key={ev._id}
-                    className="rounded-xl border bg-card p-3 shadow-[var(--shadow-soft)]"
-                  >
-                    <div className="flex items-center gap-2">
-                      {tool && (
-                        <span className="rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-primary">
-                          {tool}
-                        </span>
-                      )}
-                      <span className="truncate text-xs text-muted-foreground">
-                        {ev.source_type}
-                        {ev.label ? ` · ${ev.label}` : ""}
-                      </span>
-                      <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
-                        {formatDateTime(ev.captured_at)}
-                      </span>
-                    </div>
-                    {ev.snippet && (
-                      <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#0e1b2e] px-3 py-2 font-mono text-[11px] leading-relaxed text-[#d5e0f2]">
-                        {ev.snippet}
-                      </pre>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-
-        <Card className="gap-0 py-0">
-          <div className="flex items-center gap-2 border-b p-5">
-            <MessagesSquare className="h-4 w-4 text-muted-foreground" />
-            <SectionHeader title="Chats anexados" count={chats?.length} />
-          </div>
-
-          {/* Captura retroativa: escolher uma task concluída → anexa + IA extrai achados */}
-          <div className="flex flex-wrap items-end gap-2 border-b p-4">
-            <div className="min-w-0 flex-1">
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                Capturar achados de uma task concluída (IA)
-              </label>
-              <select
-                className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-                value={pickChatId}
-                onChange={(e) => setPickChatId(e.target.value)}
-              >
-                <option value="">Escolher task (chat)…</option>
-                {(recentChats ?? [])
-                  .filter((c) => !c.engagementId)
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.title}
-                      {c.active ? " (ativo)" : ""}
-                    </option>
-                  ))}
-              </select>
-            </div>
-            <Button
-              onClick={() => void captureFromChat(pickChatId)}
-              disabled={!pickChatId || capturingChatId === pickChatId}
-            >
-              {pickChatId && capturingChatId === pickChatId ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4" />
-              )}
-              Capturar (IA)
-            </Button>
-          </div>
-
-          {chats === undefined ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">
-              Carregando…
-            </div>
-          ) : chats.length === 0 ? (
-            <EmptyState
-              icon={MessagesSquare}
-              title="Nenhum chat anexado."
-              description="Escolha uma task concluída acima para anexar e extrair os achados por IA — ou o agente anexa o chat automaticamente ao capturar um achado ao vivo."
-            />
-          ) : (
-            <div className="divide-y">
-              {chats.map((c) => {
-                const expanded = expandedChatId === c.id;
-                return (
-                  <div key={c.id} className="px-4 py-2.5 text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <button
-                        onClick={() =>
-                          setExpandedChatId(expanded ? null : c.id)
-                        }
-                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                        title="Ver a transcrição da task"
-                      >
-                        {expanded ? (
-                          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            {liveEvidence === undefined ? (
+              <div className="p-6 text-center text-sm text-muted-foreground">
+                Carregando…
+              </div>
+            ) : liveEvidence.length === 0 ? (
+              <EmptyState icon={Radio} title="Sem evidência ainda." />
+            ) : (
+              <div className="max-h-[26rem] space-y-3 overflow-y-auto p-4">
+                {liveEvidence.map((ev) => {
+                  const tool = (ev as { tool_name?: string }).tool_name;
+                  return (
+                    <div
+                      key={ev._id}
+                      className="rounded-xl border bg-card p-3 shadow-[var(--shadow-soft)]"
+                    >
+                      <div className="flex items-center gap-2">
+                        {tool && (
+                          <span className="rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-primary">
+                            {tool}
+                          </span>
                         )}
-                        <span className="min-w-0 flex-1 truncate">
-                          {c.title}
+                        <span className="truncate text-xs text-muted-foreground">
+                          {ev.source_type}
+                          {ev.label ? ` · ${ev.label}` : ""}
                         </span>
-                      </button>
-                      {c.active_trigger_run_id ? (
-                        <span className="flex items-center gap-1 text-xs text-success">
-                          <Radio className="h-3 w-3" /> ativo
+                        <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
+                          {formatDateTime(ev.captured_at)}
                         </span>
-                      ) : (
-                        <span className="hidden text-xs text-muted-foreground sm:inline">
-                          {formatDateTime(c.update_time)}
-                        </span>
-                      )}
-                      <a
-                        href={`/c/${c.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex h-8 items-center gap-1 rounded-md border px-2 text-xs text-muted-foreground hover:bg-muted/40"
-                        title="Abrir a task completa"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" /> Abrir
-                      </a>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void captureFromChat(c.id)}
-                        disabled={capturingChatId === c.id}
-                        title="Extrair achados desta task por IA"
-                      >
-                        {capturingChatId === c.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Sparkles className="h-3.5 w-3.5" />
-                        )}
-                        Capturar
-                      </Button>
-                    </div>
-                    {expanded && (
-                      <div className="mt-2">
-                        <ChatTranscriptView chatId={c.id} />
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                      {ev.snippet && (
+                        <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#0e1b2e] px-3 py-2 font-mono text-[11px] leading-relaxed text-[#d5e0f2]">
+                          {ev.snippet}
+                        </pre>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+
+          <Card className="gap-0 py-0">
+            <div className="flex items-center gap-2 border-b p-5">
+              <MessagesSquare className="h-4 w-4 text-muted-foreground" />
+              <SectionHeader title="Chats anexados" count={chats?.length} />
             </div>
-          )}
-        </Card>
+
+            {/* Captura retroativa: escolher uma task concluída → anexa + IA extrai achados */}
+            <div className="flex flex-wrap items-end gap-2 border-b p-4">
+              <div className="min-w-0 flex-1">
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                  Capturar achados de uma task concluída (IA)
+                </label>
+                <select
+                  className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                  value={pickChatId}
+                  onChange={(e) => setPickChatId(e.target.value)}
+                >
+                  <option value="">Escolher task (chat)…</option>
+                  {(recentChats ?? [])
+                    .filter((c) => !c.engagementId)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.title}
+                        {c.active ? " (ativo)" : ""}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <Button
+                onClick={() => void captureFromChat(pickChatId)}
+                disabled={!pickChatId || capturingChatId === pickChatId}
+              >
+                {pickChatId && capturingChatId === pickChatId ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Capturar (IA)
+              </Button>
+            </div>
+
+            {chats === undefined ? (
+              <div className="p-6 text-center text-sm text-muted-foreground">
+                Carregando…
+              </div>
+            ) : chats.length === 0 ? (
+              <EmptyState
+                icon={MessagesSquare}
+                title="Nenhum chat anexado."
+                description="Escolha uma task concluída acima para anexar e extrair os achados por IA — ou o agente anexa o chat automaticamente ao capturar um achado ao vivo."
+              />
+            ) : (
+              <div className="divide-y">
+                {chats.map((c) => {
+                  const expanded = expandedChatId === c.id;
+                  return (
+                    <div key={c.id} className="px-4 py-2.5 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <button
+                          onClick={() =>
+                            setExpandedChatId(expanded ? null : c.id)
+                          }
+                          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                          title="Ver a transcrição da task"
+                        >
+                          {expanded ? (
+                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          )}
+                          <span className="min-w-0 flex-1 truncate">
+                            {c.title}
+                          </span>
+                        </button>
+                        {c.active_trigger_run_id ? (
+                          <span className="flex items-center gap-1 text-xs text-success">
+                            <Radio className="h-3 w-3" /> ativo
+                          </span>
+                        ) : (
+                          <span className="hidden text-xs text-muted-foreground sm:inline">
+                            {formatDateTime(c.update_time)}
+                          </span>
+                        )}
+                        <a
+                          href={`/c/${c.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex h-8 items-center gap-1 rounded-md border px-2 text-xs text-muted-foreground hover:bg-muted/40"
+                          title="Abrir a task completa"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" /> Abrir
+                        </a>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void captureFromChat(c.id)}
+                          disabled={capturingChatId === c.id}
+                          title="Extrair achados desta task por IA"
+                        >
+                          {capturingChatId === c.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3.5 w-3.5" />
+                          )}
+                          Capturar
+                        </Button>
+                      </div>
+                      {expanded && (
+                        <div className="mt-2">
+                          <ChatTranscriptView chatId={c.id} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        </div>
       </div>
     </>
   );
@@ -1340,7 +1482,8 @@ function ScheduleEditor({ engagement }: { engagement: Doc<"engagements"> }) {
                 </div>
                 {schedule.last_dispatched_at && (
                   <div className="text-xs text-muted-foreground">
-                    Último rascunho: {formatDateTime(schedule.last_dispatched_at)}
+                    Último rascunho:{" "}
+                    {formatDateTime(schedule.last_dispatched_at)}
                     {schedule.last_chat_id && (
                       <>
                         {" · "}
@@ -1398,7 +1541,11 @@ function ScheduleEditor({ engagement }: { engagement: Doc<"engagements"> }) {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" onClick={() => void applySchedule()} disabled={busy}>
+              <Button
+                size="sm"
+                onClick={() => void applySchedule()}
+                disabled={busy}
+              >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 {exists ? "Atualizar agendamento" : "Ativar recorrência"}
               </Button>
