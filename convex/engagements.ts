@@ -49,10 +49,16 @@ async function assertOwnedEngagement(
 }
 
 export const listEngagements = query({
-  args: { clientId: v.optional(v.id("clients")) },
+  args: {
+    clientId: v.optional(v.id("clients")),
+    includeArchived: v.optional(v.boolean()),
+  },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
+    // Lápides de exclusão definitiva nunca aparecem; arquivados só sob pedido.
+    const visible = (e: { archived_at?: number; hard_deleted_at?: number }) =>
+      !e.hard_deleted_at && (args.includeArchived || !e.archived_at);
     if (args.clientId) {
       const rows = await ctx.db
         .query("engagements")
@@ -61,15 +67,16 @@ export const listEngagements = query({
         )
         .order("desc")
         .collect();
-      return rows.filter((e) => e.user_id === identity.subject);
+      return rows.filter((e) => e.user_id === identity.subject && visible(e));
     }
-    return await ctx.db
+    const rows = await ctx.db
       .query("engagements")
       .withIndex("by_user_and_updated", (q) =>
         q.eq("user_id", identity.subject),
       )
       .order("desc")
       .collect();
+    return rows.filter(visible);
   },
 });
 
@@ -512,6 +519,37 @@ export const updateEngagement = mutation({
     if (renamedTo !== null) {
       await syncChatTitleFromEngagement(ctx, args.engagementId, renamedTo);
     }
+    return null;
+  },
+});
+
+export const archiveEngagement = mutation({
+  args: { engagementId: v.id("engagements") },
+  handler: async (ctx, args) => {
+    await assertOwnedEngagement(ctx, args.engagementId);
+    await ctx.db.patch(args.engagementId, {
+      archived_at: Date.now(),
+      updated_at: Date.now(),
+    });
+    return null;
+  },
+});
+
+export const restoreEngagement = mutation({
+  args: { engagementId: v.id("engagements") },
+  handler: async (ctx, args) => {
+    const { engagement } = await assertOwnedEngagement(ctx, args.engagementId);
+    if (engagement.hard_deleted_at) {
+      throw new ConvexError({
+        code: "INVALID",
+        message:
+          "Engajamento excluído definitivamente não pode ser restaurado",
+      });
+    }
+    await ctx.db.patch(args.engagementId, {
+      archived_at: undefined,
+      updated_at: Date.now(),
+    });
     return null;
   },
 });

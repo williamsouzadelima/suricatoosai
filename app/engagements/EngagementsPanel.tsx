@@ -27,6 +27,8 @@ import {
   ShieldCheck,
   Receipt,
   Image as ImageIcon,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
@@ -57,6 +59,12 @@ import {
   SEV_STRIPE,
   type Severity,
 } from "@/components/internal/findings";
+
+// archived_at/hard_deleted_at são campos novos do engajamento (soft-delete). Lê
+// de forma tolerante ao tipo gerado do Convex: o codegen roda no HOST no deploy,
+// então localmente o Doc ainda não tem o campo (o valor existe em runtime).
+const archivedAt = (e?: { archived_at?: number } | null) =>
+  e?.archived_at ?? null;
 
 // Galeria de prints (screenshots) do engajamento. Reusa EvidenceThumb (a mesma
 // peça de /achados: abre em tamanho real, trata indisponível, sinaliza captura
@@ -229,7 +237,11 @@ export function EngagementsPanel({
   initialEngagementId?: string;
 }) {
   const clients = useQuery(api.clients.listClients);
-  const engagements = useQuery(api.engagements.listEngagements, {});
+  const [showArchived, setShowArchived] = useState(false);
+  const engagements = useQuery(
+    api.engagements.listEngagements,
+    showArchived ? { includeArchived: true } : {},
+  );
 
   const [selectedEngagementId, setSelectedEngagementId] =
     useState<Id<"engagements"> | null>(
@@ -390,11 +402,24 @@ export function EngagementsPanel({
 
         {/* Lista de engajamentos */}
         <Card className="gap-0 py-0">
-          <div className="border-b p-5">
+          <div className="flex items-center justify-between gap-3 border-b p-5">
             <SectionHeader
               title="Selecionar engajamento"
               count={engagements?.length}
             />
+            <button
+              type="button"
+              onClick={() => setShowArchived((v) => !v)}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                showArchived
+                  ? "border-primary/30 bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted/40",
+              )}
+            >
+              <Archive className="h-3.5 w-3.5" />
+              {showArchived ? "Ocultar arquivados" : "Mostrar arquivados"}
+            </button>
           </div>
           {engagements === undefined ? (
             <div className="p-6 text-center text-sm text-muted-foreground">
@@ -419,16 +444,24 @@ export function EngagementsPanel({
                       "group rounded-xl border bg-card p-4 text-left shadow-[var(--shadow-soft)] transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)]",
                       active &&
                         "border-primary ring-1 ring-primary shadow-[var(--shadow-card)]",
+                      archivedAt(e) != null && "opacity-70",
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 font-medium leading-snug">
                         {e.name}
                       </div>
-                      <StatusBadge
-                        tone={ENG_STATUS_TONE[st] ?? "neutral"}
-                        label={ENG_STATUS_LABEL[st] ?? st}
-                      />
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <StatusBadge
+                          tone={ENG_STATUS_TONE[st] ?? "neutral"}
+                          label={ENG_STATUS_LABEL[st] ?? st}
+                        />
+                        {archivedAt(e) != null && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            <Archive className="h-3 w-3" /> Arquivado
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Server className="h-3.5 w-3.5 shrink-0" />
@@ -488,9 +521,34 @@ function EngagementDetail({
     engagementId,
   });
   const updateEngagement = useMutation(api.engagements.updateEngagement);
+  const archiveEngagement = useMutation(api.engagements.archiveEngagement);
+  const restoreEngagement = useMutation(api.engagements.restoreEngagement);
 
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
+
+  const toggleArchive = async () => {
+    if (!engagement) return;
+    const isArch = archivedAt(engagement) != null;
+    if (
+      !isArch &&
+      !window.confirm(
+        "Arquivar este engajamento? Ele sai das listas e do portal, mas os dados ficam intactos e você pode restaurar depois.",
+      )
+    )
+      return;
+    try {
+      if (isArch) {
+        await restoreEngagement({ engagementId });
+        toast.success("Engajamento restaurado.");
+      } else {
+        await archiveEngagement({ engagementId });
+        toast.success("Engajamento arquivado.");
+      }
+    } catch {
+      toast.error(isArch ? "Falha ao restaurar." : "Falha ao arquivar.");
+    }
+  };
 
   // Rename manual do engajamento → reflete no título da task vinculada (1:1).
   const saveName = async () => {
@@ -713,26 +771,50 @@ function EngagementDetail({
           ) : (
             <>
               <div className="min-w-0">
-                <div className="truncate text-lg font-semibold">
-                  {engagement?.name ?? "—"}
+                <div className="flex items-center gap-2 text-lg font-semibold">
+                  <span className="truncate">{engagement?.name ?? "—"}</span>
+                  {archivedAt(engagement) != null && (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      <Archive className="h-3 w-3" /> Arquivado
+                    </span>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   Renomear reflete no título da task vinculada (quando há só
                   uma).
                 </div>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="shrink-0 gap-1.5"
-                disabled={!engagement}
-                onClick={() => {
-                  setNameDraft(engagement?.name ?? "");
-                  setEditingName(true);
-                }}
-              >
-                <Pencil className="h-3.5 w-3.5" /> Renomear
-              </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  disabled={!engagement}
+                  onClick={() => {
+                    setNameDraft(engagement?.name ?? "");
+                    setEditingName(true);
+                  }}
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Renomear
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  disabled={!engagement}
+                  onClick={() => void toggleArchive()}
+                >
+                  {archivedAt(engagement) != null ? (
+                    <>
+                      <ArchiveRestore className="h-3.5 w-3.5" /> Restaurar
+                    </>
+                  ) : (
+                    <>
+                      <Archive className="h-3.5 w-3.5" /> Arquivar
+                    </>
+                  )}
+                </Button>
+              </div>
             </>
           )}
         </div>

@@ -1848,6 +1848,14 @@ export default defineSchema({
     // engajamento. Falsy = nome auto-derivado, segue o título da task (1:1).
     // Ver convex/lib/engagementNameSync.ts.
     name_locked: v.optional(v.boolean()),
+    // Arquivamento reversível (soft-delete): some das listas e do portal, dados
+    // intactos, dá para restaurar. Espelha o precedente reports.deleted_at.
+    archived_at: v.optional(v.number()),
+    // Exclusão definitiva (irreversível): os dados técnicos (achados, evidências,
+    // prints no S3, relatórios, recorrência, orçamento) são apagados e a retenção
+    // encerra; a LINHA sobrevive como lápide p/ preservar as faturas (FK
+    // obrigatória engagement_id em engagement_invoices). Ver hardDeleteEngagement.
+    hard_deleted_at: v.optional(v.number()),
   })
     .index("by_user_and_updated", ["user_id", "updated_at"])
     .index("by_client_and_updated", ["client_id", "updated_at"])
