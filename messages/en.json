@@ -78,7 +78,20 @@
     "appImageX64": "x64 (.AppImage)",
     "appImageArm64": "ARM64 (.AppImage)",
     "detectedCta": "Download for {platform}",
-    "cantDetect": "Can't detect your OS? Choose from the options below."
+    "cantDetect": "Can't detect your OS? Choose from the options below.",
+    "installed": "Suricatoos is installed",
+    "installedBody": "You're already running Suricatoos as an installed app.",
+    "mobileHeading": "Install Mobile App",
+    "mobileBody": "Install Suricatoos on your {platform} device",
+    "installedBanner": "Installed! Open Suricatoos from your home screen.",
+    "installCta": "Install Suricatoos",
+    "orManually": "Or install manually",
+    "iosStep1": "Tap the <b>Share</b> button (the square with an arrow pointing up). You may need to tap the three dots (⋯) menu first to reveal it.",
+    "iosStep2": "Scroll down and tap <b>Add to Home Screen</b>.",
+    "iosStep3": "Tap <b>Add</b> in the top right corner.",
+    "androidStep1": "Tap the <b>menu</b> button (three dots in the top right)",
+    "androidStep2": "Tap <b>Install app</b> or <b>Add to Home screen</b>",
+    "androidStep3": "Tap <b>Install</b> to confirm"
   },
   "header": {
     "signIn": "Sign in",

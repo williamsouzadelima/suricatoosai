@@ -78,7 +78,20 @@
     "appImageX64": "x64 (.AppImage)",
     "appImageArm64": "ARM64 (.AppImage)",
     "detectedCta": "Baixar para {platform}",
-    "cantDetect": "Não detectou seu sistema? Escolha uma das opções abaixo."
+    "cantDetect": "Não detectou seu sistema? Escolha uma das opções abaixo.",
+    "installed": "O Suricatoos está instalado",
+    "installedBody": "Você já está usando o Suricatoos como app instalado.",
+    "mobileHeading": "Instalar o app mobile",
+    "mobileBody": "Instale o Suricatoos no seu dispositivo {platform}",
+    "installedBanner": "Instalado! Abra o Suricatoos pela sua tela inicial.",
+    "installCta": "Instalar o Suricatoos",
+    "orManually": "Ou instale manualmente",
+    "iosStep1": "Toque no botão <b>Compartilhar</b> (o quadrado com uma seta para cima). Pode ser preciso tocar antes no menu de três pontos (⋯) para revelá-lo.",
+    "iosStep2": "Role para baixo e toque em <b>Adicionar à Tela de Início</b>.",
+    "iosStep3": "Toque em <b>Adicionar</b> no canto superior direito.",
+    "androidStep1": "Toque no botão de <b>menu</b> (três pontos no canto superior direito)",
+    "androidStep2": "Toque em <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>",
+    "androidStep3": "Toque em <b>Instalar</b> para confirmar"
   },
   "header": {
     "signIn": "Entrar",

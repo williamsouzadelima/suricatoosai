@@ -172,6 +172,7 @@ function MobileInstallCard({ detected }: { detected: DetectedPlatform }) {
     useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const isStandalone = useIsStandalone();
+  const t = useTranslations("downloadPage");
 
   useEffect(() => {
     if (detected.platform !== "android") return;
@@ -215,10 +216,10 @@ function MobileInstallCard({ detected }: { detected: DetectedPlatform }) {
       <div className="rounded-md border bg-card p-8 text-center shadow-lg">
         <MobilePlatformIcon platform={detected.platform} />
         <h2 className="mt-4 text-2xl font-semibold text-card-foreground">
-          Suricatoos is installed
+          {t("installed")}
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          You&apos;re already running Suricatoos as an installed app.
+          {t("installedBody")}
         </p>
       </div>
     );
@@ -229,16 +230,16 @@ function MobileInstallCard({ detected }: { detected: DetectedPlatform }) {
       <div className="mb-6 text-center">
         <MobilePlatformIcon platform={detected.platform} />
         <h2 className="mt-4 text-2xl font-semibold text-card-foreground">
-          Install Mobile App
+          {t("mobileHeading")}
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Install Suricatoos on your {detected.displayName} device
+          {t("mobileBody", { platform: detected.displayName })}
         </p>
       </div>
 
       {installed && (
         <div className="mb-4 rounded-md border border-green-500/30 bg-green-500/10 p-4 text-center text-sm text-green-600 dark:text-green-400">
-          Installed! Open Suricatoos from your home screen.
+          {t("installedBanner")}
         </div>
       )}
 
@@ -250,11 +251,11 @@ function MobileInstallCard({ detected }: { detected: DetectedPlatform }) {
             onClick={handleInstallClick}
           >
             <DownloadIcon />
-            Install Suricatoos
+            {t("installCta")}
           </Button>
           <div className="mb-4 flex items-center gap-3 text-xs text-muted-foreground">
             <div className="h-px flex-1 bg-border" />
-            <span>Or install manually</span>
+            <span>{t("orManually")}</span>
             <div className="h-px flex-1 bg-border" />
           </div>
         </>
@@ -266,42 +267,21 @@ function MobileInstallCard({ detected }: { detected: DetectedPlatform }) {
 }
 
 function InstallInstructions({ platform }: { platform: Platform }) {
-  if (platform === "ios") {
-    return (
-      <StepsList
-        steps={[
-          <>
-            Tap the <strong>Share</strong> button (the square with an arrow
-            pointing up). You may need to tap the three dots (⋯) menu first to
-            reveal it.
-          </>,
-          <>
-            Scroll down and tap <strong>Add to Home Screen</strong>.
-          </>,
-          <>
-            Tap <strong>Add</strong> in the top right corner.
-          </>,
-        ]}
-      />
-    );
-  }
-
-  return (
-    <StepsList
-      steps={[
-        <>
-          Tap the <strong>menu</strong> button (three dots in the top right)
-        </>,
-        <>
-          Tap <strong>Install app</strong> or{" "}
-          <strong>Add to Home screen</strong>
-        </>,
-        <>
-          Tap <strong>Install</strong> to confirm
-        </>,
-      ]}
-    />
-  );
+  const t = useTranslations("downloadPage");
+  const b = (chunks: React.ReactNode) => <strong>{chunks}</strong>;
+  const steps =
+    platform === "ios"
+      ? [
+          t.rich("iosStep1", { b }),
+          t.rich("iosStep2", { b }),
+          t.rich("iosStep3", { b }),
+        ]
+      : [
+          t.rich("androidStep1", { b }),
+          t.rich("androidStep2", { b }),
+          t.rich("androidStep3", { b }),
+        ];
+  return <StepsList steps={steps} />;
 }
 
 function StepsList({ steps }: { steps: React.ReactNode[] }) {
