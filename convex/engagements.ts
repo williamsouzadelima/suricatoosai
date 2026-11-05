@@ -472,7 +472,11 @@ export const updateEngagement = mutation({
     code: v.optional(v.string()),
     status: v.optional(engagementStatusValidator),
     scope: v.optional(v.array(scopeItemArg)),
-    startsAt: v.optional(v.number()),
+    // startsAt aceita null = limpar a data inicial (o dispatcher da recorrência
+    // NÃO gateia em starts_at, então zerar é seguro). endsAt segue só número:
+    // é o portão duro da recorrência (ver dispatch-reassessments) e não pode ser
+    // removido por aqui.
+    startsAt: v.optional(v.union(v.number(), v.null())),
     endsAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -498,7 +502,10 @@ export const updateEngagement = mutation({
     if (args.code !== undefined) patch.code = args.code.trim() || undefined;
     if (args.status !== undefined) patch.status = args.status;
     if (args.scope !== undefined) patch.scope = args.scope;
-    if (args.startsAt !== undefined) patch.starts_at = args.startsAt;
+    // null → patch com undefined REMOVE o campo (mesmo mecanismo de
+    // dismissFinding/reopenFinding). Omitido (undefined) = não mexe.
+    if (args.startsAt !== undefined)
+      patch.starts_at = args.startsAt ?? undefined;
     if (args.endsAt !== undefined) patch.ends_at = args.endsAt;
     await ctx.db.patch(args.engagementId, patch);
     // Rename manual do engajamento → reflete no título da task vinculada (1:1).

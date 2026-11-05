@@ -1186,28 +1186,32 @@ function ScopeEditor({ engagement }: { engagement: Doc<"engagements"> }) {
       toast.error("A data final da autorização é anterior à inicial.");
       return;
     }
-    // Limpar uma data JÁ definida não é suportado (o campo opcional da mutation
-    // não aceita null → a limpeza vira no-op). Antes isto mostrava "Escopo
-    // salvo." mesmo assim — mentira perigosa numa janela de autorização de
-    // pentest, pois o ends_at antigo (portão duro da recorrência) continuava
-    // valendo. Bloqueia honestamente, sem perder as edições de escopo em tela.
+    // Limpar a data INICIAL (starts_at) é suportado: o dispatcher da recorrência
+    // NÃO gateia nela → manda null explícito p/ a mutation zerar o campo. Limpar
+    // a data FINAL (ends_at) continua BLOQUEADO: é o portão duro da recorrência
+    // (dispatch-reassessments pausa quando now > ends_at), e removê-la deixaria o
+    // pentest autorizado sem data-limite. Bloqueia sem perder o escopo em tela.
     const clearingStart = !startsAt && engagement.starts_at != null;
     const clearingEnd = !endsAt && engagement.ends_at != null;
-    if (clearingStart || clearingEnd) {
+    if (clearingEnd) {
       toast.error(
-        "Limpar uma data de autorização já definida não é suportado nesta versão — a janela antiga continuaria valendo. Restaure a data (ou defina uma nova) e salve de novo; o resto do escopo é salvo junto.",
+        "Limpar a data final de autorização não é suportado — ela é o limite que impede a recorrência de rodar fora da janela autorizada. Defina uma nova data final (ou estenda) e salve; o resto do escopo é salvo junto.",
       );
       return;
     }
     setSaving(true);
     try {
-      // Datas vazias passam undefined (no-op na mutation). Limpar uma data já
-      // definida é bloqueado acima (não suportado nesta v1).
+      // starts_at: número define, null limpa (clearingStart), omitido = inalterado.
+      // ends_at: número define, omitido = inalterado (limpar é bloqueado acima).
       await updateEngagement({
         engagementId: engagement._id,
         scope,
         code: code.trim(),
-        ...(startsMs !== undefined ? { startsAt: startsMs } : {}),
+        ...(startsMs !== undefined
+          ? { startsAt: startsMs }
+          : clearingStart
+            ? { startsAt: null }
+            : {}),
         ...(endsMs !== undefined ? { endsAt: endsMs } : {}),
       });
       setInitialSnap(currentKey);
