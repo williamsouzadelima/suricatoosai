@@ -34,19 +34,19 @@ export function MobileNav({ active }: { active: ActiveKey }) {
       </SheetTrigger>
       <SheetContent
         side="left"
-        className="internal-sidebar w-[264px] gap-0 border-r-0 p-0 text-[#c7d3e6]"
+        className="internal-sidebar w-[264px] gap-0 border-r-0 p-0 text-chrome-fg"
       >
         <SheetHeader className="gap-1.5 px-4 pb-1 pt-4">
           <SuricatoosAISVG theme="dark" scale={0.135} />
           <SheetTitle className="sr-only">Navegação</SheetTitle>
-          <span className="pl-0.5 text-[11px] font-medium tracking-wide text-[#7d8ca8]">
+          <span className="pl-0.5 text-[11px] font-medium tracking-wide text-chrome-fg-dim">
             Offensive Security
           </span>
         </SheetHeader>
         <nav className="flex flex-col gap-1 overflow-y-auto px-3.5 pb-5">
           {NAV.map((g) => (
             <div key={g.group}>
-              <div className="px-2.5 pb-1.5 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-[#5f7291]">
+              <div className="px-2.5 pb-1.5 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-chrome-fg-faint">
                 {g.group}
               </div>
               {g.items.map((it) => {
@@ -60,7 +60,7 @@ export function MobileNav({ active }: { active: ActiveKey }) {
                         "flex items-center gap-2.5 rounded-[10px] px-2.5 py-2.5 text-[13.5px] font-medium transition-colors",
                         isActive
                           ? "bg-primary/20 text-white shadow-[inset_0_0_0_1px_rgba(93,132,240,0.28)]"
-                          : "text-[#aebbd2] hover:bg-white/5 hover:text-[#e6edf8]",
+                          : "text-chrome-fg-muted hover:bg-white/5 hover:text-chrome-active-fg",
                       )}
                     >
                       <Icon className="h-[17px] w-[17px] shrink-0 opacity-90" />
@@ -74,7 +74,7 @@ export function MobileNav({ active }: { active: ActiveKey }) {
           <SheetClose asChild>
             <Link
               href="/"
-              className="mt-2 flex items-center gap-2.5 rounded-[10px] px-2.5 py-2.5 text-[13px] font-medium text-[#8595b0] transition-colors hover:bg-white/5 hover:text-[#e6edf8]"
+              className="mt-2 flex items-center gap-2.5 rounded-[10px] px-2.5 py-2.5 text-[13px] font-medium text-chrome-fg-dim transition-colors hover:bg-white/5 hover:text-chrome-active-fg"
             >
               <ArrowLeft className="h-4 w-4" /> Voltar ao app
             </Link>

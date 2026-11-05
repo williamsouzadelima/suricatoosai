@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { SuricatoosAISVG } from "@/components/icons/suricatoos-ai-svg";
 import { MobileNav } from "./MobileNav";
 import { NAV, type ActiveKey, type NavEntry } from "./app-nav";
+import { ThemeToggle } from "./ThemeToggle";
 
 /**
  * Casca compartilhada dos painéis internos (/admin, /engagements): sidebar navy
@@ -20,7 +21,7 @@ function NavLink({ item, active }: { item: NavEntry; active: boolean }) {
         "relative flex items-center gap-2.5 rounded-[10px] px-2.5 py-2.5 text-[13.5px] font-medium transition-colors",
         active
           ? "bg-gradient-to-r from-primary/25 to-primary/[0.06] text-white shadow-[inset_0_0_0_1px_rgba(93,132,240,0.28)]"
-          : "text-[#aebbd2] hover:bg-white/5 hover:text-[#e6edf8]",
+          : "text-chrome-fg-muted hover:bg-white/5 hover:text-chrome-active-fg",
       )}
     >
       {active && (
@@ -70,17 +71,17 @@ export function AppShell({
   return (
     <div className="grid h-screen grid-cols-1 bg-background md:grid-cols-[248px_1fr]">
       {/* Sidebar */}
-      <aside className="internal-sidebar hidden flex-col gap-1 px-3.5 py-[18px] text-[#c7d3e6] md:flex">
+      <aside className="internal-sidebar hidden flex-col gap-1 px-3.5 py-[18px] text-chrome-fg md:flex">
         <div className="flex flex-col gap-1.5 px-2 pb-5 pt-2">
           <SuricatoosAISVG theme="dark" scale={0.135} />
-          <span className="pl-0.5 text-[11px] font-medium tracking-wide text-[#7d8ca8]">
+          <span className="pl-0.5 text-[11px] font-medium tracking-wide text-chrome-fg-dim">
             Offensive Security
           </span>
         </div>
 
         {NAV.map((g) => (
           <div key={g.group}>
-            <div className="px-2.5 pb-1.5 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-[#5f7291]">
+            <div className="px-2.5 pb-1.5 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-chrome-fg-faint">
               {g.group}
             </div>
             {g.items.map((it) => (
@@ -91,20 +92,20 @@ export function AppShell({
 
         <Link
           href="/"
-          className="mt-2 flex items-center gap-2.5 rounded-[10px] px-2.5 py-2.5 text-[13px] font-medium text-[#8595b0] transition-colors hover:bg-white/5 hover:text-[#e6edf8]"
+          className="mt-2 flex items-center gap-2.5 rounded-[10px] px-2.5 py-2.5 text-[13px] font-medium text-chrome-fg-dim transition-colors hover:bg-white/5 hover:text-chrome-active-fg"
         >
           <ArrowLeft className="h-4 w-4" /> Voltar ao app
         </Link>
 
         <div className="mt-auto flex items-center gap-2.5 rounded-[10px] border border-white/[0.06] bg-white/[0.04] p-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#3f6ef0] to-brand text-[11px] font-bold text-white">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-chrome-accent to-brand text-[11px] font-bold text-white">
             {initials(userEmail)}
           </div>
           <div className="min-w-0 leading-tight">
-            <div className="truncate text-[12.5px] font-semibold text-[#e6edf8]">
+            <div className="truncate text-[12.5px] font-semibold text-chrome-active-fg">
               {userEmail ?? "Equipe"}
             </div>
-            <div className="text-[11px] text-[#7d8ca8]">
+            <div className="text-[11px] text-chrome-fg-dim">
               {userRole ?? "interno"}
             </div>
           </div>
@@ -131,15 +132,16 @@ export function AppShell({
               </React.Fragment>
             ))}
           </div>
-          {topbarRight && (
-            <div className="ml-auto flex items-center gap-2">{topbarRight}</div>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            {topbarRight}
+            <ThemeToggle />
+          </div>
         </div>
 
         <div className="mx-auto w-full max-w-[1180px] px-4 pb-14 pt-6 md:px-7">
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start">
             <div className="flex items-start gap-4">
-              <div className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[13px] bg-gradient-to-br from-primary/15 to-[#3f6ef0]/[0.08] text-primary shadow-[inset_0_0_0_1px_rgba(36,86,230,0.14)]">
+              <div className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[13px] bg-gradient-to-br from-primary/15 to-primary/[0.08] text-primary shadow-[inset_0_0_0_1px_rgba(36,86,230,0.14)]">
                 <Icon className="h-[22px] w-[22px]" />
               </div>
               <div className="min-w-0">

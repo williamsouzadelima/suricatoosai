@@ -165,7 +165,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={`${geistSans.variable} ${geistMono.variable} ${archivo.variable} dark h-full`}
+      className={`${geistSans.variable} ${geistMono.variable} ${archivo.variable} h-full`}
       suppressHydrationWarning
     >
       <head>
