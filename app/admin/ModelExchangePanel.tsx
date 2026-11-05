@@ -17,7 +17,15 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { SectionHeader, Callout, EmptyState, formatDateTime } from "./_ui";
+import {
+  SectionHeader,
+  Callout,
+  EmptyState,
+  formatDateTime,
+  useSortable,
+  sortRows,
+  SortableTh,
+} from "./_ui";
 import {
   blendedIndex,
   isEligible,
@@ -133,14 +141,23 @@ export function ModelExchangePanel() {
   }, [data, market, usage, weight]);
 
   // Linhas ordenadas por índice combinado (desc).
+  type SortKey = "model" | "priceIn" | "priceOut" | "index";
+  const { sort, toggle } = useSortable<SortKey>({ key: "index", dir: "desc" });
   const rows = useMemo(() => {
     const list = (data?.candidates ?? []).map((c) => ({
       ...c,
       index: c.market ? blendedIndex(c.market, 0.5, weight) : null,
       eligible: isEligible(c.market ?? undefined),
     }));
-    return list.sort((a, b) => (b.index ?? -1) - (a.index ?? -1));
-  }, [data, weight]);
+    // Sort client-side sobre o catálogo COMPLETO de candidatos (honesto).
+    // Default = índice combinado desc (mesmo critério de antes); nulos por último.
+    return sortRows(list, sort, {
+      model: (c) => c.label,
+      priceIn: (c) => c.market?.priceIn ?? null,
+      priceOut: (c) => c.market?.priceOut ?? null,
+      index: (c) => c.index,
+    });
+  }, [data, weight, sort]);
 
   const grok46 = data?.candidates.find((c) => c.slug === "x-ai/grok-4.6");
   const grok47 = data?.candidates.find((c) => c.slug === "x-ai/grok-4.7");
@@ -293,9 +310,29 @@ export function ModelExchangePanel() {
               <table className="w-full min-w-[860px] text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs text-muted-foreground">
-                    <th className="py-2 pr-3 font-medium">Modelo</th>
-                    <th className="px-2 py-2 text-right font-medium">$in/M</th>
-                    <th className="px-2 py-2 text-right font-medium">$out/M</th>
+                    <SortableTh
+                      label="Modelo"
+                      sortKey="model"
+                      sort={sort}
+                      onSort={toggle}
+                      className="py-2 pr-3 font-medium"
+                    />
+                    <SortableTh
+                      label="$in/M"
+                      sortKey="priceIn"
+                      sort={sort}
+                      onSort={toggle}
+                      numeric
+                      className="px-2 py-2 font-medium"
+                    />
+                    <SortableTh
+                      label="$out/M"
+                      sortKey="priceOut"
+                      sort={sort}
+                      onSort={toggle}
+                      numeric
+                      className="px-2 py-2 font-medium"
+                    />
                     <th className="px-2 py-2 text-right font-medium">Contexto</th>
                     <th className="px-2 py-2 text-center font-medium">Tools</th>
                     <th className="px-2 py-2 text-right font-medium">Uptime</th>
@@ -303,7 +340,14 @@ export function ModelExchangePanel() {
                     <th className="px-2 py-2 text-right font-medium">
                       Nosso uso
                     </th>
-                    <th className="px-2 py-2 text-right font-medium">Índice</th>
+                    <SortableTh
+                      label="Índice"
+                      sortKey="index"
+                      sort={sort}
+                      onSort={toggle}
+                      numeric
+                      className="px-2 py-2 font-medium"
+                    />
                   </tr>
                 </thead>
                 <tbody>

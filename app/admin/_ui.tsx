@@ -398,9 +398,8 @@ export function SortableTh<K extends string>({
   return (
     <th
       className={cn(
-        "px-5 py-2.5 font-semibold",
+        className ?? "px-5 py-2.5 font-semibold",
         numeric && "text-right",
-        className,
       )}
       aria-sort={
         active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"
