@@ -10,26 +10,19 @@ export const metadata = {
 // Nunca cacheia: reflete achados/evidência ao vivo e é gated por staff interno.
 export const dynamic = "force-dynamic";
 
-export default async function AchadosPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ e?: string; f?: string }>;
-}) {
+export default async function AchadosPage() {
   const staff = await getInternalUser();
   if (!staff) {
     // Não é staff interno (owner/analyst) ou não está logado: esconde tudo.
     redirect("/");
   }
-  // Deep-link lido no servidor → vira estado inicial do painel (sem setState em
-  // effect, sem mismatch de hidratação).
-  const { e, f } = await searchParams;
+  // A seleção (?e=) e o achado aberto (?f=) são lidos no cliente via
+  // useSearchParams (rota force-dynamic → sem Suspense, sem mismatch).
   return (
     <AchadosPanel
       userEmail={staff.user.email ?? undefined}
       userRole={staff.role}
       isSuperadmin={isSuperadmin(staff.user.email ?? "")}
-      initialEngagementId={e}
-      initialFindingId={f}
     />
   );
 }

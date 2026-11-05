@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Search,
   ShieldAlert,
@@ -61,33 +62,58 @@ export function AchadosPanel({
   userEmail,
   userRole,
   isSuperadmin,
-  initialEngagementId,
-  initialFindingId,
 }: {
   userEmail?: string;
   userRole?: string;
   isSuperadmin?: boolean;
-  initialEngagementId?: string;
-  initialFindingId?: string;
 }) {
   const clients = useQuery(api.clients.listClients);
   const engagements = useQuery(api.engagements.listEngagements, {});
 
-  // Estado inicial vem do servidor (searchParams) → sem setState em effect e
-  // sem mismatch de hidratação. ?e=&f= abre direto um achado (deep-link).
-  const [selectedEngagementId, setSelectedEngagementId] =
-    useState<Id<"engagements"> | null>(
-      initialEngagementId ? (initialEngagementId as Id<"engagements">) : null,
-    );
-  const [openFindingId, setOpenFindingId] = useState<Id<"findings"> | null>(
-    initialFindingId ? (initialFindingId as Id<"findings">) : null,
-  );
+  // Seleção e achado aberto vivem na URL (?e=&f=), derivados via useSearchParams
+  // → reativos ao Voltar/Avançar do navegador. NÃO auto-seleciona o 1º
+  // engajamento: nada carrega até o operador escolher (evita curar o cliente
+  // errado). /achados é force-dynamic → useSearchParams sem Suspense é ok.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const selectedEngagementId = (searchParams.get("e") ||
+    null) as Id<"engagements"> | null;
+  const openFindingId = (searchParams.get("f") ||
+    null) as Id<"findings"> | null;
 
-  // Engajamento efetivo: o escolhido, ou o 1º da lista como default — derivado,
-  // nunca via setState em effect.
-  const effectiveEngagementId: Id<"engagements"> | null =
-    selectedEngagementId ??
-    (engagements && engagements.length > 0 ? engagements[0]._id : null);
+  const buildUrl = useCallback(
+    (e: Id<"engagements"> | null, f: Id<"findings"> | null) => {
+      const p = new URLSearchParams();
+      if (e) p.set("e", e);
+      if (f) p.set("f", f);
+      const qs = p.toString();
+      return qs ? `/achados?${qs}` : "/achados";
+    },
+    [],
+  );
+  // Ações do usuário empilham no histórico (push) → Voltar desfaz sem sair da
+  // rota: fecha o slide-over, depois deseleciona. Trocar de engajamento fecha o
+  // achado aberto (o f sai junto).
+  const selectEngagement = useCallback(
+    (id: Id<"engagements"> | null) => {
+      router.push(buildUrl(id, null), { scroll: false });
+    },
+    [router, buildUrl],
+  );
+  const openFinding = useCallback(
+    (id: Id<"findings">) => {
+      router.push(buildUrl(selectedEngagementId, id), { scroll: false });
+    },
+    [router, buildUrl, selectedEngagementId],
+  );
+  const closeFinding = useCallback(() => {
+    router.push(buildUrl(selectedEngagementId, null), { scroll: false });
+  }, [router, buildUrl, selectedEngagementId]);
+  // Limpar um ?f= obsoleto é CORREÇÃO, não navegação → replace (não empilha
+  // histórico, senão Voltar "reabre" um achado que nem existe mais).
+  const clearStaleFinding = useCallback(() => {
+    router.replace(buildUrl(selectedEngagementId, null), { scroll: false });
+  }, [router, buildUrl, selectedEngagementId]);
 
   const clientNameById = useMemo(() => {
     const m = new Map<string, string>();
@@ -97,19 +123,9 @@ export function AchadosPanel({
 
   const selectedEngagement = useMemo(
     () =>
-      (engagements ?? []).find((e) => e._id === effectiveEngagementId) ?? null,
-    [engagements, effectiveEngagementId],
+      (engagements ?? []).find((e) => e._id === selectedEngagementId) ?? null,
+    [engagements, selectedEngagementId],
   );
-
-  // URL compartilhável sem recarregar (replaceState não é setState → ok aqui).
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const p = new URLSearchParams();
-    if (effectiveEngagementId) p.set("e", effectiveEngagementId);
-    if (openFindingId) p.set("f", openFindingId);
-    const qs = p.toString();
-    window.history.replaceState(null, "", qs ? `/achados?${qs}` : "/achados");
-  }, [effectiveEngagementId, openFindingId]);
 
   const crumbs = ["Achados", selectedEngagement?.name].filter(
     Boolean,
@@ -136,13 +152,12 @@ export function AchadosPanel({
             />
             <select
               className="h-9 rounded-md border bg-background px-2 text-sm"
-              value={effectiveEngagementId ?? ""}
-              onChange={(e) => {
-                setSelectedEngagementId(
+              value={selectedEngagementId ?? ""}
+              onChange={(e) =>
+                selectEngagement(
                   (e.target.value || null) as Id<"engagements"> | null,
-                );
-                setOpenFindingId(null);
-              }}
+                )
+              }
             >
               <option value="">Selecionar…</option>
               {(engagements ?? []).map((e) => {
@@ -162,17 +177,25 @@ export function AchadosPanel({
           <div className="p-6 text-center text-sm text-muted-foreground">
             Carregando…
           </div>
-        ) : !effectiveEngagementId ? (
+        ) : engagements.length === 0 ? (
           <EmptyState
             icon={Search}
             title="Nenhum engajamento ainda."
             description="Crie um cliente e um engajamento na seção Engajamentos para começar a curar achados."
           />
+        ) : !selectedEngagementId ? (
+          <EmptyState
+            icon={Search}
+            title="Selecione um engajamento."
+            description="Escolha um engajamento acima para ver seus achados. Nada é carregado até você escolher — evita curar o cliente errado."
+          />
         ) : (
           <AchadosForEngagement
-            engagementId={effectiveEngagementId}
+            engagementId={selectedEngagementId}
             openFindingId={openFindingId}
-            setOpenFindingId={setOpenFindingId}
+            onOpenFinding={openFinding}
+            onCloseFinding={closeFinding}
+            onClearStale={clearStaleFinding}
           />
         )}
       </div>
@@ -223,11 +246,15 @@ const CHIP_DEFS: {
 function AchadosForEngagement({
   engagementId,
   openFindingId,
-  setOpenFindingId,
+  onOpenFinding,
+  onCloseFinding,
+  onClearStale,
 }: {
   engagementId: Id<"engagements">;
   openFindingId: Id<"findings"> | null;
-  setOpenFindingId: (id: Id<"findings"> | null) => void;
+  onOpenFinding: (id: Id<"findings">) => void;
+  onCloseFinding: () => void;
+  onClearStale: () => void;
 }) {
   const findings = useQuery(api.findings.listFindingsForEngagement, {
     engagementId,
@@ -307,9 +334,9 @@ function AchadosForEngagement({
   // slide-over concordarem, em vez de ficar um ?f= pendurado sem efeito.
   useEffect(() => {
     if (findings !== undefined && openFindingId && !openFinding) {
-      setOpenFindingId(null);
+      onClearStale();
     }
-  }, [findings, openFindingId, openFinding, setOpenFindingId]);
+  }, [findings, openFindingId, openFinding, onClearStale]);
 
   return (
     <>
@@ -400,15 +427,12 @@ function AchadosForEngagement({
           <FindingsTable
             findings={filtered}
             imageCounts={imageCounts}
-            onOpen={setOpenFindingId}
+            onOpen={onOpenFinding}
           />
         )}
       </Card>
 
-      <FindingSheet
-        finding={openFinding}
-        onClose={() => setOpenFindingId(null)}
-      />
+      <FindingSheet finding={openFinding} onClose={onCloseFinding} />
     </>
   );
 }
@@ -427,16 +451,21 @@ function FindingsTable({
       <table className="w-full min-w-[760px] border-collapse">
         <thead>
           <tr className="border-b bg-muted/40">
-            {["Problema", "Severidade", "Alvo", "Categoria", "Descoberto", "Status"].map(
-              (h) => (
-                <th
-                  key={h}
-                  className="whitespace-nowrap px-3.5 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground"
-                >
-                  {h}
-                </th>
-              ),
-            )}
+            {[
+              "Problema",
+              "Severidade",
+              "Alvo",
+              "Categoria",
+              "Descoberto",
+              "Status",
+            ].map((h) => (
+              <th
+                key={h}
+                className="whitespace-nowrap px-3.5 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground"
+              >
+                {h}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -537,7 +566,10 @@ function FindingTableRow({
       </td>
       <td className="px-3.5 py-3">
         <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge tone={STATUS_TONE[status]} label={STATUS_LABEL[status]} />
+          <StatusBadge
+            tone={STATUS_TONE[status]}
+            label={STATUS_LABEL[status]}
+          />
           {rs && RETEST_BADGE[rs] && (
             <StatusBadge
               tone={RETEST_BADGE[rs].tone}

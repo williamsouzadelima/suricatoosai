@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   FileText,
@@ -52,24 +53,29 @@ export function RelatoriosPanel({
   userEmail,
   userRole,
   isSuperadmin,
-  initialEngagementId,
 }: {
   userEmail?: string;
   userRole?: string;
   isSuperadmin?: boolean;
-  initialEngagementId?: string;
 }) {
   const clients = useQuery(api.clients.listClients);
   const engagements = useQuery(api.engagements.listEngagements, {});
 
-  const [selectedEngagementId, setSelectedEngagementId] =
-    useState<Id<"engagements"> | null>(
-      initialEngagementId ? (initialEngagementId as Id<"engagements">) : null,
-    );
-
-  const effectiveEngagementId: Id<"engagements"> | null =
-    selectedEngagementId ??
-    (engagements && engagements.length > 0 ? engagements[0]._id : null);
+  // Seleção vive na URL (?e=), derivada via useSearchParams → reativa ao Voltar.
+  // NÃO auto-seleciona o 1º engajamento: nada carrega até o operador escolher
+  // (evita gerar/baixar relatório do cliente errado). force-dynamic → sem Suspense.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const selectedEngagementId = (searchParams.get("e") ||
+    null) as Id<"engagements"> | null;
+  const selectEngagement = useCallback(
+    (id: Id<"engagements"> | null) => {
+      router.push(id ? `/relatorios?e=${id}` : "/relatorios", {
+        scroll: false,
+      });
+    },
+    [router],
+  );
 
   const clientNameById = useMemo(() => {
     const m = new Map<string, string>();
@@ -79,22 +85,9 @@ export function RelatoriosPanel({
 
   const selectedEngagement = useMemo(
     () =>
-      (engagements ?? []).find((e) => e._id === effectiveEngagementId) ?? null,
-    [engagements, effectiveEngagementId],
+      (engagements ?? []).find((e) => e._id === selectedEngagementId) ?? null,
+    [engagements, selectedEngagementId],
   );
-
-  // URL compartilhável sem recarregar (replaceState não é setState → ok aqui).
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const p = new URLSearchParams();
-    if (effectiveEngagementId) p.set("e", effectiveEngagementId);
-    const qs = p.toString();
-    window.history.replaceState(
-      null,
-      "",
-      qs ? `/relatorios?${qs}` : "/relatorios",
-    );
-  }, [effectiveEngagementId]);
 
   const crumbs = ["Relatórios", selectedEngagement?.name].filter(
     Boolean,
@@ -122,9 +115,9 @@ export function RelatoriosPanel({
             <div className="flex flex-wrap items-center gap-2">
               <select
                 className="h-9 rounded-md border bg-background px-2 text-sm"
-                value={effectiveEngagementId ?? ""}
+                value={selectedEngagementId ?? ""}
                 onChange={(e) =>
-                  setSelectedEngagementId(
+                  selectEngagement(
                     (e.target.value || null) as Id<"engagements"> | null,
                   )
                 }
@@ -140,9 +133,9 @@ export function RelatoriosPanel({
                   );
                 })}
               </select>
-              {effectiveEngagementId && (
+              {selectedEngagementId && (
                 <EvidenceDownloadButton
-                  engagementId={effectiveEngagementId}
+                  engagementId={selectedEngagementId}
                   apiBase="/api/evidence-bundle"
                   enrollHref="/seguranca"
                 />
@@ -155,14 +148,20 @@ export function RelatoriosPanel({
           <div className="p-6 text-center text-sm text-muted-foreground">
             Carregando…
           </div>
-        ) : !effectiveEngagementId ? (
+        ) : engagements.length === 0 ? (
           <EmptyState
             icon={FileText}
             title="Nenhum engajamento ainda."
             description="Crie um cliente e um engajamento na seção Engajamentos para gerar relatórios."
           />
+        ) : !selectedEngagementId ? (
+          <EmptyState
+            icon={FileText}
+            title="Selecione um engajamento."
+            description="Escolha um engajamento acima para ver e gerar relatórios. Nada é carregado até você escolher — evita agir no cliente errado."
+          />
         ) : (
-          <RelatoriosForEngagement engagementId={effectiveEngagementId} />
+          <RelatoriosForEngagement engagementId={selectedEngagementId} />
         )}
       </div>
     </AppShell>

@@ -10,23 +10,18 @@ export const metadata = {
 // Nunca cacheia: reflete o status de geração ao vivo e é gated por staff interno.
 export const dynamic = "force-dynamic";
 
-export default async function RelatoriosPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ e?: string }>;
-}) {
+export default async function RelatoriosPage() {
   const staff = await getInternalUser();
   if (!staff) {
     // Não é staff interno (owner/analyst) ou não está logado: esconde tudo.
     redirect("/");
   }
-  const { e } = await searchParams;
+  // A seleção (?e=) é lida no cliente via useSearchParams (force-dynamic).
   return (
     <RelatoriosPanel
       userEmail={staff.user.email ?? undefined}
       userRole={staff.role}
       isSuperadmin={isSuperadmin(staff.user.email ?? "")}
-      initialEngagementId={e}
     />
   );
 }
