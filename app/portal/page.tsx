@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   ChevronDown,
   ChevronRight,
+  AlertTriangle,
   Download,
   FileText,
   ShieldCheck,
@@ -18,7 +19,7 @@ import { SuricatoosAISVG } from "@/components/icons/suricatoos-ai-svg";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { StatusBadge, EmptyState, type Tone } from "@/app/admin/_ui";
+import { StatusBadge, EmptyState, Callout, type Tone } from "@/app/admin/_ui";
 import {
   SEV_LABEL,
   SEV_PILL,
@@ -124,20 +125,35 @@ function fmtDate(ms: number): string {
   });
 }
 
+/** 401 numa ação deliberada do usuário: avisa e manda ao login (em vez de
+ *  arrancar a página em silêncio no meio do clique). */
+function redirectToLogin() {
+  toast.error("Sessão expirada — faça login novamente.");
+  window.location.href = "/login";
+}
+
 export default function PortalPage() {
   const [clients, setClients] = useState<ClientOpt[] | null>(null);
+  // Distingue "não consegui carregar" de "vazio": sem isso, um 500/503 do
+  // backend vira mentira ("Nenhum acesso/achado") na tela do cliente pagante.
+  const [clientsErr, setClientsErr] = useState(false);
   const [clientId, setClientId] = useState<string | null>(null);
-  const [engagements, setEngagements] = useState<Engagement[]>([]);
+  // null = carregando; [] = carregou e está vazio (estados distintos no render).
+  const [engagements, setEngagements] = useState<Engagement[] | null>(null);
+  const [engagementsErr, setEngagementsErr] = useState(false);
   const [openEng, setOpenEng] = useState<string | null>(null);
   const [reportsByEng, setReportsByEng] = useState<Record<string, Report[]>>(
     {},
   );
+  const [reportsErr, setReportsErr] = useState<Record<string, boolean>>({});
   const [findingsByEng, setFindingsByEng] = useState<Record<string, Finding[]>>(
     {},
   );
+  const [findingsErr, setFindingsErr] = useState<Record<string, boolean>>({});
   const [evidenceByFinding, setEvidenceByFinding] = useState<
     Record<string, Evidence[]>
   >({});
+  const [evidenceErr, setEvidenceErr] = useState<Record<string, boolean>>({});
   const [openFinding, setOpenFinding] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
 
@@ -149,11 +165,15 @@ export default function PortalPage() {
           window.location.href = "/login";
           return;
         }
+        if (!res.ok) throw new Error(`clients ${res.status}`);
         const d = await res.json();
         const list: ClientOpt[] = d.clients ?? [];
         setClients(list);
         if (list.length > 0) setClientId(list[0].id);
       } catch {
+        // Não é "sem acesso": é falha de carga. Sai do "carregando" (deixa de
+        // ser null) e o render mostra o aviso de erro, não o estado vazio.
+        setClientsErr(true);
         setClients([]);
       }
     })();
@@ -161,7 +181,8 @@ export default function PortalPage() {
 
   useEffect(() => {
     if (!clientId) return;
-    setEngagements([]);
+    setEngagements(null);
+    setEngagementsErr(false);
     setOpenEng(null);
     (async () => {
       try {
@@ -169,9 +190,15 @@ export default function PortalPage() {
           `/api/portal/engagements?clientId=${encodeURIComponent(clientId)}`,
           { cache: "no-store" },
         );
+        if (res.status === 401) {
+          window.location.href = "/login";
+          return;
+        }
+        if (!res.ok) throw new Error(`engagements ${res.status}`);
         const d = await res.json();
         setEngagements(d.engagements ?? []);
       } catch {
+        setEngagementsErr(true);
         setEngagements([]);
       }
     })();
@@ -185,27 +212,41 @@ export default function PortalPage() {
       }
       setOpenEng(id);
       if (!reportsByEng[id]) {
+        setReportsErr((m) => ({ ...m, [id]: false }));
         try {
           const res = await fetch(
             `/api/portal/reports?engagementId=${encodeURIComponent(id)}`,
             { cache: "no-store" },
           );
+          if (res.status === 401) {
+            redirectToLogin();
+            return;
+          }
+          if (!res.ok) throw new Error(`reports ${res.status}`);
           const d = await res.json();
           setReportsByEng((m) => ({ ...m, [id]: d.reports ?? [] }));
         } catch {
-          setReportsByEng((m) => ({ ...m, [id]: [] }));
+          // NÃO grava [] no mapa: o guard !reportsByEng[id] precisa continuar
+          // "não carregado" p/ permitir nova tentativa ao recolher/reexpandir.
+          setReportsErr((m) => ({ ...m, [id]: true }));
         }
       }
       if (!findingsByEng[id]) {
+        setFindingsErr((m) => ({ ...m, [id]: false }));
         try {
           const res = await fetch(
             `/api/portal/findings?engagementId=${encodeURIComponent(id)}`,
             { cache: "no-store" },
           );
+          if (res.status === 401) {
+            redirectToLogin();
+            return;
+          }
+          if (!res.ok) throw new Error(`findings ${res.status}`);
           const d = await res.json();
           setFindingsByEng((m) => ({ ...m, [id]: d.findings ?? [] }));
         } catch {
-          setFindingsByEng((m) => ({ ...m, [id]: [] }));
+          setFindingsErr((m) => ({ ...m, [id]: true }));
         }
       }
     },
@@ -220,15 +261,21 @@ export default function PortalPage() {
       }
       setOpenFinding(id);
       if (!evidenceByFinding[id]) {
+        setEvidenceErr((m) => ({ ...m, [id]: false }));
         try {
           const res = await fetch(
             `/api/portal/findings/${encodeURIComponent(id)}/evidence`,
             { cache: "no-store" },
           );
+          if (res.status === 401) {
+            redirectToLogin();
+            return;
+          }
+          if (!res.ok) throw new Error(`evidence ${res.status}`);
           const d = await res.json();
           setEvidenceByFinding((m) => ({ ...m, [id]: d.evidence ?? [] }));
         } catch {
-          setEvidenceByFinding((m) => ({ ...m, [id]: [] }));
+          setEvidenceErr((m) => ({ ...m, [id]: true }));
         }
       }
     },
@@ -335,6 +382,14 @@ export default function PortalPage() {
           <div className="py-16 text-center text-sm text-muted-foreground">
             Carregando…
           </div>
+        ) : clientsErr ? (
+          <div className="py-10">
+            <Callout tone="destructive" icon={AlertTriangle}>
+              Não foi possível carregar seus acessos — o serviço está
+              indisponível no momento, não é ausência de acesso. Atualize a
+              página em instantes.
+            </Callout>
+          </div>
         ) : clients.length === 0 ? (
           <EmptyState
             icon={ShieldCheck}
@@ -362,7 +417,16 @@ export default function PortalPage() {
               </div>
             )}
 
-            {engagements.length === 0 ? (
+            {engagementsErr ? (
+              <Callout tone="destructive" icon={AlertTriangle}>
+                Não foi possível carregar seus engajamentos — serviço
+                indisponível, não vazio. Atualize a página em instantes.
+              </Callout>
+            ) : engagements === null ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                Carregando…
+              </div>
+            ) : engagements.length === 0 ? (
               <EmptyState
                 icon={FileText}
                 title="Nenhum engajamento disponível."
@@ -401,12 +465,15 @@ export default function PortalPage() {
                         <div className="space-y-6 border-t p-4 md:p-5">
                           <PortalFindingsSection
                             findings={findings}
+                            error={findingsErr[e.id]}
                             openFinding={openFinding}
                             evidenceByFinding={evidenceByFinding}
+                            evidenceErr={evidenceErr}
                             onToggleFinding={toggleFinding}
                           />
                           <PortalReportsSection
                             reports={reports}
+                            error={reportsErr[e.id]}
                             downloading={downloading}
                             onDownload={download}
                           />
@@ -464,13 +531,17 @@ function SectionTitle({
 
 function PortalFindingsSection({
   findings,
+  error,
   openFinding,
   evidenceByFinding,
+  evidenceErr,
   onToggleFinding,
 }: {
   findings: Finding[] | undefined;
+  error?: boolean;
   openFinding: string | null;
   evidenceByFinding: Record<string, Evidence[]>;
+  evidenceErr: Record<string, boolean>;
   onToggleFinding: (id: string) => void;
 }) {
   const sevCounts: Record<string, number> = {};
@@ -484,7 +555,12 @@ function PortalFindingsSection({
         title="Achados publicados"
         count={findings?.length}
       />
-      {findings === undefined ? (
+      {error ? (
+        <Callout tone="destructive" icon={AlertTriangle}>
+          Não foi possível carregar os achados — serviço indisponível, não
+          significa que nada foi encontrado. Recolha e abra de novo para tentar.
+        </Callout>
+      ) : findings === undefined ? (
         <p className="py-2 text-sm text-muted-foreground">Carregando…</p>
       ) : findings.length === 0 ? (
         <p className="py-2 text-sm text-muted-foreground">
@@ -518,6 +594,7 @@ function PortalFindingsSection({
                 finding={f}
                 open={openFinding === f.id}
                 evidence={evidenceByFinding[f.id]}
+                evidenceError={evidenceErr[f.id]}
                 onToggle={() => void onToggleFinding(f.id)}
               />
             ))}
@@ -532,11 +609,13 @@ function PortalFindingItem({
   finding: f,
   open,
   evidence,
+  evidenceError,
   onToggle,
 }: {
   finding: Finding;
   open: boolean;
   evidence: Evidence[] | undefined;
+  evidenceError?: boolean;
   onToggle: () => void;
 }) {
   const retest = f.retestStatus ? RETEST_BADGE[f.retestStatus] : undefined;
@@ -596,7 +675,7 @@ function PortalFindingItem({
           {f.remediation && (
             <PortalBlock label="Remediação" text={f.remediation} />
           )}
-          <PortalEvidence evidence={evidence} />
+          <PortalEvidence evidence={evidence} error={evidenceError} />
         </div>
       )}
     </div>
@@ -616,7 +695,13 @@ function PortalBlock({ label, text }: { label: string; text: string }) {
   );
 }
 
-function PortalEvidence({ evidence }: { evidence: Evidence[] | undefined }) {
+function PortalEvidence({
+  evidence,
+  error,
+}: {
+  evidence: Evidence[] | undefined;
+  error?: boolean;
+}) {
   const ordered = (evidence ?? [])
     .slice()
     .sort(
@@ -631,7 +716,12 @@ function PortalEvidence({ evidence }: { evidence: Evidence[] | undefined }) {
         title="Cadeia de evidência"
         count={evidence?.length ?? 0}
       />
-      {evidence === undefined ? (
+      {error ? (
+        <Callout tone="destructive" icon={AlertTriangle}>
+          Não foi possível carregar a cadeia de evidência — serviço
+          indisponível, não ausência de evidência.
+        </Callout>
+      ) : evidence === undefined ? (
         <p className="text-xs text-muted-foreground">Carregando…</p>
       ) : ordered.length === 0 ? (
         <p className="text-xs text-muted-foreground">Sem evidência anexada.</p>
@@ -687,10 +777,12 @@ function PortalEvidence({ evidence }: { evidence: Evidence[] | undefined }) {
 
 function PortalReportsSection({
   reports,
+  error,
   downloading,
   onDownload,
 }: {
   reports: Report[] | undefined;
+  error?: boolean;
   downloading: string | null;
   onDownload: (r: Report) => void;
 }) {
@@ -701,7 +793,12 @@ function PortalReportsSection({
         title="Relatórios"
         count={reports?.length}
       />
-      {reports === undefined ? (
+      {error ? (
+        <Callout tone="destructive" icon={AlertTriangle}>
+          Não foi possível carregar os relatórios — serviço indisponível, não
+          vazio. Recolha e abra de novo para tentar.
+        </Callout>
+      ) : reports === undefined ? (
         <p className="py-2 text-sm text-muted-foreground">Carregando…</p>
       ) : reports.length === 0 ? (
         <p className="py-2 text-sm text-muted-foreground">
