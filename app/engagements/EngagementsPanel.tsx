@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import {
@@ -128,16 +129,33 @@ export function EngagementsPanel({
   userEmail,
   userRole,
   isSuperadmin,
+  initialEngagementId,
 }: {
   userEmail?: string;
   userRole?: string;
   isSuperadmin?: boolean;
+  initialEngagementId?: string;
 }) {
   const clients = useQuery(api.clients.listClients);
   const engagements = useQuery(api.engagements.listEngagements, {});
 
   const [selectedEngagementId, setSelectedEngagementId] =
-    useState<Id<"engagements"> | null>(null);
+    useState<Id<"engagements"> | null>(
+      initialEngagementId ? (initialEngagementId as Id<"engagements">) : null,
+    );
+  // Seleção de engajamento vive na URL (?e=): persiste no F5, é compartilhável e
+  // o Voltar do navegador desfaz (pushState — mesmo padrão das abas do admin).
+  // /engagements é force-dynamic → useSearchParams sem Suspense é ok.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const selectEngagement = (next: Id<"engagements"> | null) => {
+    setSelectedEngagementId(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next) params.set("e", next);
+    else params.delete("e");
+    const qs = params.toString();
+    router.push(qs ? `?${qs}` : "/engagements", { scroll: false });
+  };
   const [newClientName, setNewClientName] = useState("");
   const [newEngName, setNewEngName] = useState("");
   const [newEngClientId, setNewEngClientId] = useState<Id<"clients"> | "">("");
@@ -288,7 +306,7 @@ export function EngagementsPanel({
                   <button
                     key={e._id}
                     onClick={() =>
-                      setSelectedEngagementId(active ? null : e._id)
+                      selectEngagement(active ? null : e._id)
                     }
                     className={cn(
                       "group rounded-xl border bg-card p-4 text-left shadow-[var(--shadow-soft)] transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)]",
