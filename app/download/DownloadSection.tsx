@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 import { useIsStandalone } from "@/hooks/use-is-standalone";
 import { downloadLinks } from "./constants";
 import {
@@ -125,6 +126,7 @@ export function useDetectedPlatform(): DetectedPlatform | null {
 
 export function DownloadSection() {
   const detected = useDetectedPlatform();
+  const t = useTranslations("downloadPage");
 
   if (!detected) {
     return (
@@ -147,13 +149,13 @@ export function DownloadSection() {
       <Button asChild size="lg" className="mb-4 text-lg">
         <a href={detected.downloadUrl}>
           <DownloadIcon />
-          Download for {detected.displayName}
+          {t("detectedCta", { platform: detected.displayName })}
         </a>
       </Button>
 
       {detected.platform === "unknown" && (
         <p className="mt-4 text-sm text-muted-foreground">
-          Can&apos;t detect your OS? Choose from the options below.
+          {t("cantDetect")}
         </p>
       )}
     </div>

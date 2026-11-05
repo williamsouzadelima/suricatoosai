@@ -65,6 +65,21 @@
     "notFoundDescription": "Esta tarea compartida no existe o ya no está disponible. El propietario puede haber dejado de compartirla.",
     "goHome": "Ir a Suricatoos"
   },
+  "downloadPage": {
+    "titleInstall": "Instalar Suricatoos",
+    "titleDownload": "Descargar Suricatoos",
+    "subtitleMobile": "Agrega la app a tu pantalla de inicio",
+    "subtitleDesktop": "Obtén la app de escritorio para la mejor experiencia",
+    "desktopHeading": "Descargas de escritorio",
+    "macosSubtitle": "Universal (Intel y Apple Silicon)",
+    "windowsSubtitle": "64 bits",
+    "debX64": "x64 (.deb)",
+    "debArm64": "ARM64 (.deb)",
+    "appImageX64": "x64 (.AppImage)",
+    "appImageArm64": "ARM64 (.AppImage)",
+    "detectedCta": "Descargar para {platform}",
+    "cantDetect": "¿No detecta tu sistema? Elige una de las opciones de abajo."
+  },
   "header": {
     "signIn": "Iniciar sesión",
     "getStarted": "Comenzar",

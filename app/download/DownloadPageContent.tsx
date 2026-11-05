@@ -39,18 +39,17 @@ function DownloadContent() {
   const detected = useDetectedPlatform();
   const isMobile =
     detected?.platform === "ios" || detected?.platform === "android";
+  const t = useTranslations("downloadPage");
 
   return (
     <div className="px-4 py-8 pb-16 md:px-0">
       <div className="container mx-auto max-w-3xl space-y-8">
         <div className="text-center">
           <h1 className="mb-4 text-4xl font-bold text-card-foreground">
-            {isMobile ? "Install Suricatoos" : "Download Suricatoos"}
+            {isMobile ? t("titleInstall") : t("titleDownload")}
           </h1>
           <p className="text-lg text-muted-foreground">
-            {isMobile
-              ? "Add the app to your home screen"
-              : "Get the desktop app for the best experience"}
+            {isMobile ? t("subtitleMobile") : t("subtitleDesktop")}
           </p>
         </div>
 
@@ -59,42 +58,42 @@ function DownloadContent() {
         {!isMobile && (
           <div className="rounded-md border bg-card p-6 shadow-lg">
             <h2 className="mb-4 text-xl font-semibold text-card-foreground">
-              Desktop Downloads
+              {t("desktopHeading")}
             </h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <DownloadCard
                 title="macOS"
-                subtitle="Universal (Intel & Apple Silicon)"
+                subtitle={t("macosSubtitle")}
                 href={downloadLinks.macos}
                 icon={<AppleIcon />}
               />
               <DownloadCard
                 title="Windows"
-                subtitle="64-bit"
+                subtitle={t("windowsSubtitle")}
                 href={downloadLinks.windows}
                 icon={<WindowsIcon />}
               />
               <DownloadCard
                 title="Linux"
-                subtitle="x64 (.deb)"
+                subtitle={t("debX64")}
                 href={downloadLinks.linuxDeb}
                 icon={<LinuxIcon />}
               />
               <DownloadCard
                 title="Linux"
-                subtitle="ARM64 (.deb)"
+                subtitle={t("debArm64")}
                 href={downloadLinks.linuxArm64Deb}
                 icon={<LinuxIcon />}
               />
               <DownloadCard
                 title="Linux"
-                subtitle="x64 (.AppImage)"
+                subtitle={t("appImageX64")}
                 href={downloadLinks.linuxAppImage}
                 icon={<LinuxIcon />}
               />
               <DownloadCard
                 title="Linux"
-                subtitle="ARM64 (.AppImage)"
+                subtitle={t("appImageArm64")}
                 href={downloadLinks.linuxArm64AppImage}
                 icon={<LinuxIcon />}
               />

@@ -65,6 +65,21 @@
     "notFoundDescription": "This shared task doesn't exist or is no longer available. It may have been unshared by the owner.",
     "goHome": "Go to Suricatoos"
   },
+  "downloadPage": {
+    "titleInstall": "Install Suricatoos",
+    "titleDownload": "Download Suricatoos",
+    "subtitleMobile": "Add the app to your home screen",
+    "subtitleDesktop": "Get the desktop app for the best experience",
+    "desktopHeading": "Desktop Downloads",
+    "macosSubtitle": "Universal (Intel & Apple Silicon)",
+    "windowsSubtitle": "64-bit",
+    "debX64": "x64 (.deb)",
+    "debArm64": "ARM64 (.deb)",
+    "appImageX64": "x64 (.AppImage)",
+    "appImageArm64": "ARM64 (.AppImage)",
+    "detectedCta": "Download for {platform}",
+    "cantDetect": "Can't detect your OS? Choose from the options below."
+  },
   "header": {
     "signIn": "Sign in",
     "getStarted": "Get started",
