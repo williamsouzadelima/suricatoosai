@@ -119,7 +119,12 @@ export function AppShell({
         <div className="internal-topbar sticky top-0 z-10 flex items-center gap-3.5 border-b border-border px-4 py-3.5 md:px-7">
           <MobileNav active={active} isSuperadmin={isSuperadmin} />
           <div className="flex min-w-0 items-center gap-1.5 truncate text-[13px] text-muted-foreground">
-            <span className="hidden sm:inline">Suricatoos</span>
+            <Link
+              href="/engagements"
+              className="hidden shrink-0 transition-colors hover:text-foreground sm:inline"
+            >
+              Suricatoos
+            </Link>
             {crumbs.map((c, i) => (
               <React.Fragment key={i}>
                 <span className="hidden text-border sm:inline">/</span>

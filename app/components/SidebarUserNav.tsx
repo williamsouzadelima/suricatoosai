@@ -151,6 +151,23 @@ const SidebarUserNav = ({ isCollapsed = false }: { isCollapsed?: boolean }) => {
   const { user } = useAuth();
   const { subscription } = useGlobalState();
   const { resolvedTheme, setTheme } = useTheme();
+
+  // App-switcher: mostra "Área do operador" no menu só para staff interno. O
+  // papel é server-only (allowlist), então perguntamos ao endpoint leve. O
+  // setState é assíncrono (dentro do .then), não síncrono no corpo do effect.
+  const [isStaff, setIsStaff] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/me/access", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d) setIsStaff(Boolean(d.isStaff));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const activeLocale = useLocale() as Locale;
   const tLang = useTranslations("language");
   const langRouter = useRouter();
@@ -536,6 +553,15 @@ const SidebarUserNav = ({ isCollapsed = false }: { isCollapsed?: boolean }) => {
                 </div>
               )}
             </div>
+          )}
+
+          {isStaff && (
+            <DropdownMenuItem asChild className="py-1.5">
+              <Link href="/engagements">
+                <ShieldCheck className="mr-2 h-4 w-4 text-foreground" />
+                <span>Área do operador</span>
+              </Link>
+            </DropdownMenuItem>
           )}
 
           <DropdownMenuItem
