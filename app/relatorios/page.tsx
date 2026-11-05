@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getInternalUser } from "@/lib/auth/require-internal";
+import { isSuperadmin } from "@/lib/auth/superadmin";
 import { RelatoriosPanel } from "./RelatoriosPanel";
 
 export const metadata = {
@@ -24,6 +25,7 @@ export default async function RelatoriosPage({
     <RelatoriosPanel
       userEmail={staff.user.email ?? undefined}
       userRole={staff.role}
+      isSuperadmin={isSuperadmin(staff.user.email ?? "")}
       initialEngagementId={e}
     />
   );

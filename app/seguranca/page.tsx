@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getInternalUser } from "@/lib/auth/require-internal";
+import { isSuperadmin } from "@/lib/auth/superadmin";
 import { SegurancaPanel } from "./SegurancaPanel";
 
 export const metadata = {
@@ -19,6 +20,7 @@ export default async function SegurancaPage() {
     <SegurancaPanel
       userEmail={staff.user.email ?? undefined}
       userRole={staff.role}
+      isSuperadmin={isSuperadmin(staff.user.email ?? "")}
     />
   );
 }

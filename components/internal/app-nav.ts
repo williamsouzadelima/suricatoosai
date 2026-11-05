@@ -23,6 +23,8 @@ export type NavEntry = {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Só aparece para superadmin (allowlist SUPERADMIN_EMAILS). */
+  requiresSuperadmin?: boolean;
 };
 
 export const NAV: { group: string; items: NavEntry[] }[] = [
@@ -57,6 +59,7 @@ export const NAV: { group: string; items: NavEntry[] }[] = [
         href: "/admin",
         label: "Painel admin",
         icon: LayoutDashboard,
+        requiresSuperadmin: true,
       },
       {
         key: "seguranca",
@@ -67,3 +70,15 @@ export const NAV: { group: string; items: NavEntry[] }[] = [
     ],
   },
 ];
+
+/**
+ * NAV filtrado por acesso: esconde os itens `requiresSuperadmin` de quem não é
+ * superadmin (antes o analista via "Painel admin", clicava e era EXPULSO do
+ * shell pelo redirect do /admin). Grupos que ficam vazios somem.
+ */
+export function visibleNav(isSuperadmin: boolean) {
+  return NAV.map((g) => ({
+    group: g.group,
+    items: g.items.filter((it) => !it.requiresSuperadmin || isSuperadmin),
+  })).filter((g) => g.items.length > 0);
+}

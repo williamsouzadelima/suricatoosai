@@ -13,13 +13,19 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { NAV, type ActiveKey } from "./app-nav";
+import { visibleNav, type ActiveKey } from "./app-nav";
 
 // Mobile nav drawer for the internal shell: the desktop sidebar is hidden below
 // `md`, so without this the operator/admin have no way to change sections on a
 // phone. A hamburger in the topbar opens the same NAV in a left Sheet; tapping
 // an item closes the sheet (SheetClose) and navigates.
-export function MobileNav({ active }: { active: ActiveKey }) {
+export function MobileNav({
+  active,
+  isSuperadmin,
+}: {
+  active: ActiveKey;
+  isSuperadmin?: boolean;
+}) {
   return (
     <Sheet>
       <SheetTrigger asChild>
@@ -44,7 +50,7 @@ export function MobileNav({ active }: { active: ActiveKey }) {
           </span>
         </SheetHeader>
         <nav className="flex flex-col gap-1 overflow-y-auto px-3.5 pb-5">
-          {NAV.map((g) => (
+          {visibleNav(isSuperadmin ?? false).map((g) => (
             <div key={g.group}>
               <div className="px-2.5 pb-1.5 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-chrome-fg-faint">
                 {g.group}

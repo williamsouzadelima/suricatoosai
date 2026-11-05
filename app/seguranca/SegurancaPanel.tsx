@@ -35,9 +35,11 @@ import { SecurityTab } from "@/app/components/SecurityTab";
 export function SegurancaPanel({
   userEmail,
   userRole,
+  isSuperadmin,
 }: {
   userEmail?: string;
   userRole?: string;
+  isSuperadmin?: boolean;
 }) {
   return (
     <AppShell
@@ -48,6 +50,7 @@ export function SegurancaPanel({
       breadcrumb={["Segurança"]}
       userEmail={userEmail}
       userRole={userRole}
+      isSuperadmin={isSuperadmin}
     >
       <div className="flex flex-col gap-5">
         <Card className="gap-0 py-0">

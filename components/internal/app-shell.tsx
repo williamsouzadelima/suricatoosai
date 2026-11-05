@@ -4,7 +4,7 @@ import { ArrowLeft, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SuricatoosAISVG } from "@/components/icons/suricatoos-ai-svg";
 import { MobileNav } from "./MobileNav";
-import { NAV, type ActiveKey, type NavEntry } from "./app-nav";
+import { visibleNav, type ActiveKey, type NavEntry } from "./app-nav";
 import { ThemeToggle } from "./ThemeToggle";
 
 /**
@@ -54,6 +54,7 @@ export function AppShell({
   topbarRight,
   userEmail,
   userRole,
+  isSuperadmin,
   children,
 }: {
   active: ActiveKey;
@@ -65,6 +66,7 @@ export function AppShell({
   topbarRight?: React.ReactNode;
   userEmail?: string;
   userRole?: string;
+  isSuperadmin?: boolean;
   children: React.ReactNode;
 }) {
   const crumbs = breadcrumb ?? [];
@@ -79,7 +81,7 @@ export function AppShell({
           </span>
         </div>
 
-        {NAV.map((g) => (
+        {visibleNav(isSuperadmin ?? false).map((g) => (
           <div key={g.group}>
             <div className="px-2.5 pb-1.5 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-chrome-fg-faint">
               {g.group}
@@ -115,7 +117,7 @@ export function AppShell({
       {/* Main */}
       <main className="min-w-0 overflow-auto">
         <div className="internal-topbar sticky top-0 z-10 flex items-center gap-3.5 border-b border-border px-4 py-3.5 md:px-7">
-          <MobileNav active={active} />
+          <MobileNav active={active} isSuperadmin={isSuperadmin} />
           <div className="flex min-w-0 items-center gap-1.5 truncate text-[13px] text-muted-foreground">
             <span className="hidden sm:inline">Suricatoos</span>
             {crumbs.map((c, i) => (

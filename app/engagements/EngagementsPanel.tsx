@@ -127,9 +127,11 @@ function scopeDraftKey(
 export function EngagementsPanel({
   userEmail,
   userRole,
+  isSuperadmin,
 }: {
   userEmail?: string;
   userRole?: string;
+  isSuperadmin?: boolean;
 }) {
   const clients = useQuery(api.clients.listClients);
   const engagements = useQuery(api.engagements.listEngagements, {});
@@ -184,6 +186,7 @@ export function EngagementsPanel({
       breadcrumb={["Engajamentos"]}
       userEmail={userEmail}
       userRole={userRole}
+      isSuperadmin={isSuperadmin}
     >
       <div className="flex flex-col gap-5">
         {/* Criação rápida */}

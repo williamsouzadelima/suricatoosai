@@ -347,6 +347,7 @@ export function AdminPanel({
       breadcrumb={["Painel admin", activeLabel]}
       userEmail={adminEmail}
       userRole="Superadmin"
+      isSuperadmin
       topbarRight={
         <>
           <StatusBadge

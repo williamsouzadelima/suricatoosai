@@ -60,11 +60,13 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 export function AchadosPanel({
   userEmail,
   userRole,
+  isSuperadmin,
   initialEngagementId,
   initialFindingId,
 }: {
   userEmail?: string;
   userRole?: string;
+  isSuperadmin?: boolean;
   initialEngagementId?: string;
   initialFindingId?: string;
 }) {
@@ -122,6 +124,7 @@ export function AchadosPanel({
       breadcrumb={crumbs}
       userEmail={userEmail}
       userRole={userRole}
+      isSuperadmin={isSuperadmin}
     >
       <div className="flex flex-col gap-5">
         {/* Seletor de engajamento */}

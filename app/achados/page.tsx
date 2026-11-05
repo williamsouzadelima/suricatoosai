@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getInternalUser } from "@/lib/auth/require-internal";
+import { isSuperadmin } from "@/lib/auth/superadmin";
 import { AchadosPanel } from "./AchadosPanel";
 
 export const metadata = {
@@ -26,6 +27,7 @@ export default async function AchadosPage({
     <AchadosPanel
       userEmail={staff.user.email ?? undefined}
       userRole={staff.role}
+      isSuperadmin={isSuperadmin(staff.user.email ?? "")}
       initialEngagementId={e}
       initialFindingId={f}
     />

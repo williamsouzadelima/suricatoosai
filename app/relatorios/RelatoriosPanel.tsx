@@ -51,10 +51,12 @@ import {
 export function RelatoriosPanel({
   userEmail,
   userRole,
+  isSuperadmin,
   initialEngagementId,
 }: {
   userEmail?: string;
   userRole?: string;
+  isSuperadmin?: boolean;
   initialEngagementId?: string;
 }) {
   const clients = useQuery(api.clients.listClients);
@@ -107,6 +109,7 @@ export function RelatoriosPanel({
       breadcrumb={crumbs}
       userEmail={userEmail}
       userRole={userRole}
+      isSuperadmin={isSuperadmin}
     >
       <div className="flex flex-col gap-5">
         {/* Seletor de engajamento */}
