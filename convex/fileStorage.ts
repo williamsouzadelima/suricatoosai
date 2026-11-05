@@ -379,6 +379,25 @@ export const purgeExpiredUnattachedFiles = internalMutation({
 
     let deletedCount = 0;
     for (const file of candidates) {
+      // GUARDA DE EVIDÊNCIA: nunca purgar um arquivo referenciado pela tabela
+      // `evidence`. A evidência de pentest tem de sobreviver (>= 12 meses, até o
+      // engajamento ser excluído) — a proteção NÃO pode depender só do flag
+      // is_attached (que significa "anexado a uma mensagem" e protegia a
+      // evidência por coincidência; quando esse flag falhou, sumiram 159 prints
+      // em silêncio). Se houver referência, reconcilia o flag (is_attached=true)
+      // p/ o arquivo sair do conjunto de candidatos — senão reapareceria toda
+      // hora e poderia entupir o lote (starvation de arquivos-lixo reais).
+      const evidenceRef = await ctx.db
+        .query("evidence")
+        .withIndex("by_file_id", (q) => q.eq("file_id", file._id))
+        .first();
+      if (evidenceRef) {
+        if (!file.is_attached) {
+          await ctx.db.patch(file._id, { is_attached: true });
+        }
+        continue;
+      }
+
       try {
         if (file.s3_key) {
           await ctx.scheduler.runAfter(
