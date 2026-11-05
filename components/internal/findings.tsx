@@ -493,16 +493,19 @@ export function FindingEvidence({
 // Tile de screenshot com estado de disponibilidade. O objeto no S3 pode ter
 // expirado (purge de 24h) → o <img> dá 404/502 e cai no estado "err", que
 // renderiza um placeholder EXPLÍCITO "indisponível" (não um link para um 502).
-function EvidenceThumb({
+export function EvidenceThumb({
   ev,
   state,
   onState,
+  lazy,
 }: {
   ev: Doc<"evidence">;
   state: "ok" | "err" | undefined;
   onState: (id: Id<"evidence">, s: "ok" | "err") => void;
+  lazy?: boolean;
 }) {
   const label = ev.label ?? "screenshot";
+  const [tall, setTall] = useState(false);
   if (state === "err") {
     return (
       <div
@@ -527,17 +530,33 @@ function EvidenceThumb({
       href={`/api/evidence/${ev._id}/image`}
       target="_blank"
       rel="noopener noreferrer"
-      title="Abrir em tamanho real"
+      title={
+        tall
+          ? "Captura de página inteira — abrir em tamanho real"
+          : "Abrir em tamanho real"
+      }
       className="group relative block overflow-hidden rounded-xl border bg-[#0e1b2e] shadow-[var(--shadow-soft)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)]"
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={`/api/evidence/${ev._id}/image`}
         alt={label}
-        className="aspect-[16/10] w-full object-cover"
-        onLoad={() => onState(ev._id, "ok")}
+        loading={lazy ? "lazy" : undefined}
+        className="aspect-[16/10] w-full object-cover object-top"
+        onLoad={(e) => {
+          onState(ev._id, "ok");
+          const img = e.currentTarget;
+          // Página inteira (bem mais alta que larga): o recorte 16/10 mostraria
+          // só uma faixa do topo — sinaliza e deixa abrir em tamanho real.
+          if (img.naturalHeight > img.naturalWidth * 2.2) setTall(true);
+        }}
         onError={() => onState(ev._id, "err")}
       />
+      {tall && (
+        <span className="pointer-events-none absolute right-1.5 top-1.5 z-[1] rounded-md bg-[#080f1b]/85 px-1.5 py-0.5 text-[9px] font-semibold text-[#cdd9ec] ring-1 ring-white/10">
+          página inteira
+        </span>
+      )}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-[#080f1b]/85 to-transparent px-2 pb-1.5 pt-5 font-mono text-[9.5px] text-[#cdd9ec]">
         {label}
       </div>

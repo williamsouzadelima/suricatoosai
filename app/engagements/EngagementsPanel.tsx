@@ -26,6 +26,7 @@ import {
   LayoutDashboard,
   ShieldCheck,
   Receipt,
+  Image as ImageIcon,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
@@ -50,11 +51,54 @@ import { PortalAccessCard } from "./PortalAccessCard";
 import { AppShell } from "@/components/internal/app-shell";
 import {
   FindingsBoard,
+  EvidenceThumb,
   SEV_LABEL,
   SEV_PILL,
   SEV_STRIPE,
   type Severity,
 } from "@/components/internal/findings";
+
+// Galeria de prints (screenshots) do engajamento. Reusa EvidenceThumb (a mesma
+// peça de /achados: abre em tamanho real, trata indisponível, sinaliza captura
+// de página inteira). Alimentada pelo MESMO streamEngagementEvidence da aba, só
+// filtrando as evidências que são imagem — sem query nova.
+function EngagementPrintGallery({
+  evidence,
+}: {
+  evidence: Doc<"evidence">[] | undefined;
+}) {
+  const [imgState, setImgState] = useState<Record<string, "ok" | "err">>({});
+  const markImg = (id: Id<"evidence">, s: "ok" | "err") =>
+    setImgState((m) => (m[id] === s ? m : { ...m, [id]: s }));
+  const images = useMemo(
+    () =>
+      (evidence ?? []).filter(
+        (e) =>
+          (e.file_id || e.s3_key) && (e.media_type ?? "").startsWith("image/"),
+      ),
+    [evidence],
+  );
+  if (images.length === 0) return null;
+  return (
+    <Card className="mb-5 gap-0 py-0">
+      <div className="flex items-center gap-2 border-b p-5">
+        <ImageIcon className="h-4 w-4 text-primary" />
+        <SectionHeader title="Prints capturados" count={images.length} />
+      </div>
+      <div className="grid grid-cols-2 gap-2.5 p-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        {images.map((ev) => (
+          <EvidenceThumb
+            key={ev._id}
+            ev={ev}
+            state={imgState[ev._id]}
+            onState={markImg}
+            lazy
+          />
+        ))}
+      </div>
+    </Card>
+  );
+}
 
 // Severity/FindingStatus + SEV_*/STATUS_*/RETEST_BADGE + FindingActions/
 // FindingEvidence/FindingsBoard vivem em components/internal/findings.tsx
@@ -936,6 +980,7 @@ function EngagementDetail({
 
       {/* Evidência ao vivo + chats */}
       <div className={cn(tab !== "evidencia" && "hidden")}>
+        <EngagementPrintGallery evidence={liveEvidence} />
         <div className="grid gap-5 lg:grid-cols-2">
           <Card className="gap-0 py-0">
             <div className="flex items-center gap-2 border-b p-5">
