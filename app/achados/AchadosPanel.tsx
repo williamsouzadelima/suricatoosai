@@ -448,20 +448,23 @@ function FindingsTable({
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] border-collapse">
+      <table className="w-full border-collapse md:min-w-[760px]">
         <thead>
           <tr className="border-b bg-muted/40">
             {[
-              "Problema",
-              "Severidade",
-              "Alvo",
-              "Categoria",
-              "Descoberto",
-              "Status",
-            ].map((h) => (
+              { h: "Problema" },
+              { h: "Severidade" },
+              { h: "Alvo", sec: true },
+              { h: "Categoria", sec: true },
+              { h: "Descoberto", sec: true },
+              { h: "Status" },
+            ].map(({ h, sec }) => (
               <th
                 key={h}
-                className="whitespace-nowrap px-3.5 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground"
+                className={cn(
+                  "whitespace-nowrap px-3.5 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground",
+                  sec && "hidden md:table-cell",
+                )}
               >
                 {h}
               </th>
@@ -552,16 +555,16 @@ function FindingTableRow({
           {SEV_LABEL[severity]}
         </span>
       </td>
-      <td className="px-3.5 py-3">
+      <td className="hidden px-3.5 py-3 md:table-cell">
         <span className="inline-flex items-center gap-1.5 text-[13px] text-foreground/85">
           <Server className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span className="break-all">{f.affected_asset}</span>
         </span>
       </td>
-      <td className="px-3.5 py-3 text-[13px] text-foreground/80">
+      <td className="hidden px-3.5 py-3 text-[13px] text-foreground/80 md:table-cell">
         {f.weakness_class}
       </td>
-      <td className="whitespace-nowrap px-3.5 py-3 text-[13px] tabular-nums text-muted-foreground">
+      <td className="hidden whitespace-nowrap px-3.5 py-3 text-[13px] tabular-nums text-muted-foreground md:table-cell">
         {formatDateTime(f.created_at)}
       </td>
       <td className="px-3.5 py-3">
