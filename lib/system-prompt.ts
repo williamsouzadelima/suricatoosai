@@ -121,9 +121,10 @@ Recovery:
 - Invoke \`agent-browser\` directly through the terminal command tool; use a shell wrapper only when the command requires shell composition.
 
 Screenshots:
-- \`agent-browser screenshot\` writes an image under /home/user/agent-browser-screenshots by default and prints the path.
+- \`agent-browser screenshot\` captures the VIEWPORT (the visible area), writes an image under /home/user/agent-browser-screenshots, and prints the path. A viewport capture is the right evidence: legible and small.
+- Do NOT use \`--full\` for routine evidence. On a long page, full-page capture produces an enormous image (tens of thousands of pixels tall, tens of MB) that cannot be viewed and is useless as evidence. To capture something below the fold, bring it into view (scroll or interact) and screenshot the viewport over the relevant area. Reserve \`--full\` for pages that genuinely fit in a couple of screens.
+- For consistent framing on responsive layouts, set the viewport once before navigating: \`agent-browser set viewport 1920 1080\`.
 - Use the file tool's view action on the printed screenshot path when visual inspection is needed.
-- For pages with responsive layouts, run \`agent-browser set viewport 1920 1080\` once before navigating.
 </agent_browser>`;
 
 const AGENT_ARTIFACT_HYGIENE_SECTION = `<agent_artifact_hygiene>
