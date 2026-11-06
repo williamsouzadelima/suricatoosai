@@ -10,6 +10,7 @@ import {
   enqueueS3DeleteBatch,
 } from "./cascade";
 import { fileCountAggregate } from "../fileAggregate";
+import { planEvidenceDeletion } from "./evidenceDeletePlan";
 
 /**
  * LÓGICA da exclusão DEFINITIVA (irreversível) de um engajamento. Os wrappers
@@ -207,51 +208,18 @@ export async function runEngagementHardDelete(
       (q) => q.eq("engagement_id", engagementId),
       evBatch,
     );
-    const deletedEvidenceIds = new Set<string>();
-    const directKeys: string[] = [];
-    const touchedFiles = new Set<string>();
-    for (const ev of b.docs) {
-      if (ev.s3_key) directKeys.push(ev.s3_key);
-      if (ev.file_id) touchedFiles.add(String(ev.file_id));
-      deletedEvidenceIds.add(String(ev._id));
-    }
+    // Planeja ANTES de apagar (usa o set de ids, não o estado do banco → seguro
+    // independente da ordem). A seleção de chaves é pura + testada.
+    const plan = await planEvidenceDeletion(ctx, b.docs, EVIDENCE_REF_SCAN_CAP);
     await deleteDocs(ctx, deleted, "evidence", b.docs, mode);
-
-    const fileKeys: string[] = [];
-    for (const fidStr of touchedFiles) {
-      const fid = fidStr as Id<"files">;
-      const refs = await ctx.db
-        .query("evidence")
-        .withIndex("by_file_id", (q) => q.eq("file_id", fid))
-        .take(EVIDENCE_REF_SCAN_CAP);
-      const surviving =
-        refs.length >= EVIDENCE_REF_SCAN_CAP ||
-        refs.some((r) => !deletedEvidenceIds.has(String(r._id)));
-      if (surviving) continue;
-      const file = await ctx.db.get(fid);
-      if (!file) continue;
-      if (file.s3_key) fileKeys.push(file.s3_key);
+    for (const file of plan.filesToDelete) {
       increment(deleted, "files", 1);
       if (mode === "execute") {
         await fileCountAggregate.deleteIfExists(ctx, file);
         await ctx.db.delete(file._id);
       }
     }
-    // s3_key direto: enfileira SÓ quando NENHUM files possui a chave (margem de
-    // segurança crítica — senão apagaria objeto de um files sobrevivente).
-    const safeDirect: string[] = [];
-    for (const k of directKeys) {
-      const owner = await ctx.db
-        .query("files")
-        .withIndex("by_s3_key", (q) => q.eq("s3_key", k))
-        .first();
-      if (!owner) safeDirect.push(k);
-    }
-    s3Queued += await enqueueS3DeleteBatch(
-      ctx,
-      [...fileKeys, ...safeDirect],
-      mode,
-    );
+    s3Queued += await enqueueS3DeleteBatch(ctx, plan.s3KeysToEnqueue, mode);
     hasMore = hasMore || b.hasMore;
   }
 
