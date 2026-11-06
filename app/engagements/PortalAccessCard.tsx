@@ -11,6 +11,7 @@ import {
   StatusBadge,
   Callout,
   formatDateTime,
+  useConfirm,
 } from "@/app/admin/_ui";
 
 interface Member {
@@ -36,14 +37,18 @@ export function PortalAccessCard({
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [togglingPortal, setTogglingPortal] = useState(false);
+  const [confirm, confirmUI] = useConfirm();
 
   const togglePortal = async () => {
     const next = !portalEnabled;
     if (
       !next &&
-      !window.confirm(
-        `Desabilitar o portal de ${clientName}? TODOS os contatos deste cliente perdem o acesso imediatamente (kill-switch).`,
-      )
+      !(await confirm({
+        title: "Desabilitar portal do cliente",
+        description: `Desabilitar o portal de ${clientName}? TODOS os contatos deste cliente perdem o acesso imediatamente (kill-switch).`,
+        confirmLabel: "Desabilitar",
+        tone: "destructive",
+      }))
     ) {
       return;
     }
@@ -117,7 +122,15 @@ export function PortalAccessCard({
   };
 
   const revoke = async (m: Member) => {
-    if (!window.confirm(`Revogar o acesso de ${m.email}?`)) return;
+    if (
+      !(await confirm({
+        title: "Revogar acesso",
+        description: `Revogar o acesso de ${m.email}?`,
+        confirmLabel: "Revogar",
+        tone: "destructive",
+      }))
+    )
+      return;
     try {
       const res = await fetch("/api/admin/portal-access", {
         method: "DELETE",
@@ -150,6 +163,7 @@ export function PortalAccessCard({
 
   return (
     <Card className="gap-0 py-0">
+      {confirmUI}
       <div className="border-b p-5">
         <SectionHeader
           icon={ShieldCheck}

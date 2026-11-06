@@ -52,6 +52,7 @@ import {
   EmptyState,
   Callout,
   TabBar,
+  useConfirm,
   formatDateTime,
   type Tone,
   type TabItem,
@@ -699,6 +700,7 @@ function EngagementDetail({
   const updateEngagement = useMutation(api.engagements.updateEngagement);
   const archiveEngagement = useMutation(api.engagements.archiveEngagement);
   const restoreEngagement = useMutation(api.engagements.restoreEngagement);
+  const [confirm, confirmUI] = useConfirm();
 
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -708,9 +710,12 @@ function EngagementDetail({
     const isArch = archivedAt(engagement) != null;
     if (
       !isArch &&
-      !window.confirm(
-        "Arquivar este engajamento? Ele sai das listas e do portal, mas os dados ficam intactos e você pode restaurar depois.",
-      )
+      !(await confirm({
+        title: "Arquivar engajamento",
+        description:
+          "Arquivar este engajamento? Ele sai das listas e do portal, mas os dados ficam intactos e você pode restaurar depois.",
+        confirmLabel: "Arquivar",
+      }))
     )
       return;
     try {
@@ -830,9 +835,13 @@ function EngagementDetail({
 
   const handleClearFindings = async () => {
     if (
-      !window.confirm(
-        "Limpar TODOS os achados e evidências deste engajamento? Esta ação não pode ser desfeita (use para reingerir do zero).",
-      )
+      !(await confirm({
+        title: "Limpar achados e evidências",
+        description:
+          "Limpar TODOS os achados e evidências deste engajamento? Esta ação não pode ser desfeita (use para reingerir do zero).",
+        confirmLabel: "Limpar",
+        tone: "destructive",
+      }))
     ) {
       return;
     }
@@ -855,9 +864,13 @@ function EngagementDetail({
     // ação de alto impacto, tem de confirmar (antes não confirmava, enquanto o
     // "Limpar todos" destrutivo confirmava: gating invertido).
     if (
-      !window.confirm(
-        "Aprovar TODOS os achados com evidência? Achados aprovados entram no relatório visível ao cliente.",
-      )
+      !(await confirm({
+        title: "Aprovar todos os achados",
+        description:
+          "Aprovar TODOS os achados com evidência? Achados aprovados entram no relatório visível ao cliente.",
+        confirmLabel: "Aprovar todos",
+        tone: "destructive",
+      }))
     ) {
       return;
     }
@@ -917,6 +930,7 @@ function EngagementDetail({
 
   return (
     <>
+      {confirmUI}
       {/* Cabeçalho do engajamento: nome editável (espelha na task 1:1) */}
       <Card className="gap-0 py-0">
         <div className="flex items-center justify-between gap-3 p-5">
@@ -1712,6 +1726,7 @@ function ScheduleEditor({ engagement }: { engagement: Doc<"engagements"> }) {
     toDateInputValue(Date.now() + 30 * 24 * 60 * 60 * 1000),
   );
   const [busy, setBusy] = useState(false);
+  const [confirm, confirmUI] = useConfirm();
   const exists = !!schedule;
 
   const applySchedule = async () => {
@@ -1754,7 +1769,15 @@ function ScheduleEditor({ engagement }: { engagement: Doc<"engagements"> }) {
   };
 
   const handleRemove = async () => {
-    if (!window.confirm("Remover a recorrência deste engajamento?")) return;
+    if (
+      !(await confirm({
+        title: "Remover recorrência",
+        description: "Remover a recorrência deste engajamento?",
+        confirmLabel: "Remover",
+        tone: "destructive",
+      }))
+    )
+      return;
     setBusy(true);
     try {
       await removeSchedule({ engagementId: engagement._id });
@@ -1768,6 +1791,7 @@ function ScheduleEditor({ engagement }: { engagement: Doc<"engagements"> }) {
 
   return (
     <Card className="gap-0 py-0">
+      {confirmUI}
       <div className="flex items-center justify-between gap-3 border-b p-5">
         <SectionHeader
           icon={RefreshCw}

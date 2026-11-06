@@ -7,6 +7,15 @@ import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export type Tone =
   | "primary"
@@ -496,4 +505,71 @@ export function SortableTh<K extends string>({
       </button>
     </th>
   );
+}
+
+// ── ConfirmDialog (substitui window.confirm por diálogo tokenizado) ──────────
+// Hook promise-based, SEM provider global. Uso:
+//   const [confirm, confirmUI] = useConfirm();
+//   // renderize {confirmUI} UMA vez perto do return raiz do componente;
+//   if (!(await confirm({ title, description, tone }))) return;
+// Esc / Cancelar / clicar fora resolvem false; Confirmar resolve true.
+type ConfirmOpts = {
+  title: string;
+  description?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  tone?: "default" | "destructive";
+};
+
+export function useConfirm(): [
+  (opts: ConfirmOpts) => Promise<boolean>,
+  React.ReactNode,
+] {
+  const [state, setState] = React.useState<{
+    opts: ConfirmOpts;
+    resolve: (v: boolean) => void;
+  } | null>(null);
+
+  const confirm = React.useCallback(
+    (opts: ConfirmOpts) =>
+      new Promise<boolean>((resolve) => setState({ opts, resolve })),
+    [],
+  );
+
+  const settle = (v: boolean) => {
+    state?.resolve(v);
+    setState(null);
+  };
+
+  const opts = state?.opts;
+  const dialog = (
+    <Dialog
+      open={!!state}
+      onOpenChange={(o) => {
+        if (!o) settle(false);
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{opts?.title}</DialogTitle>
+          {opts?.description ? (
+            <DialogDescription>{opts.description}</DialogDescription>
+          ) : null}
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => settle(false)}>
+            {opts?.cancelLabel ?? "Cancelar"}
+          </Button>
+          <Button
+            variant={opts?.tone === "destructive" ? "destructive" : "default"}
+            onClick={() => settle(true)}
+          >
+            {opts?.confirmLabel ?? "Confirmar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  return [confirm, dialog];
 }

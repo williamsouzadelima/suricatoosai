@@ -30,6 +30,7 @@ import {
   EmptyState,
   Callout,
   formatDateTime,
+  useConfirm,
 } from "@/app/admin/_ui";
 import {
   AUDIENCE_LABEL,
@@ -205,6 +206,7 @@ function RelatoriosForEngagement({
     useState<ReportAudience | null>(null);
   const [reprocessing, setReprocessing] = useState<string | null>(null);
   const [deletingGroup, setDeletingGroup] = useState<string | null>(null);
+  const [confirm, confirmUI] = useConfirm();
   const [togglingVisibility, setTogglingVisibility] = useState<string | null>(
     null,
   );
@@ -302,9 +304,12 @@ function RelatoriosForEngagement({
     version: number,
   ) => {
     if (
-      !window.confirm(
-        `Remover o relatório ${audienceLabel} v${version} (todos os formatos)? Esta ação não pode ser desfeita.`,
-      )
+      !(await confirm({
+        title: "Remover relatório",
+        description: `Remover o relatório ${audienceLabel} v${version} (todos os formatos)? Esta ação não pode ser desfeita.`,
+        confirmLabel: "Remover",
+        tone: "destructive",
+      }))
     ) {
       return;
     }
@@ -381,6 +386,7 @@ function RelatoriosForEngagement({
 
   return (
     <>
+      {confirmUI}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatCard
           label="Relatórios"

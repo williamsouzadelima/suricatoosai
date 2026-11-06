@@ -21,6 +21,7 @@ import {
   SectionHeader,
   StatCard,
   StatusBadge,
+  useConfirm,
   type Tone,
 } from "@/app/admin/_ui";
 
@@ -71,6 +72,7 @@ export function EngagementBilling({
   // null = segue o valor salvo (billing.enforce); boolean = override local.
   const [enforceInput, setEnforceInput] = useState<boolean | null>(null);
   const [savingBudget, setSavingBudget] = useState(false);
+  const [confirm, confirmUI] = useConfirm();
 
   const saveBudget = async () => {
     const cap =
@@ -132,6 +134,7 @@ export function EngagementBilling({
 
   return (
     <div className="space-y-5">
+      {confirmUI}
       <Card className="gap-0 py-0">
         <div className="border-b p-5">
           <SectionHeader
@@ -366,11 +369,16 @@ export function EngagementBilling({
                         size="sm"
                         variant="ghost"
                         className="text-destructive hover:text-destructive"
-                        onClick={() => {
+                        onClick={async () => {
                           if (
-                            window.confirm(`Excluir a fatura "${inv.label}"?`)
+                            await confirm({
+                              title: "Excluir fatura",
+                              description: `Excluir a fatura "${inv.label}"?`,
+                              confirmLabel: "Excluir",
+                              tone: "destructive",
+                            })
                           )
-                            void removeInvoice({ invoiceId: inv._id });
+                            await removeInvoice({ invoiceId: inv._id });
                         }}
                       >
                         <Trash2 className="h-3.5 w-3.5" />

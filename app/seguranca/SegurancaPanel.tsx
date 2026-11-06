@@ -22,6 +22,7 @@ import {
   EmptyState,
   Callout,
   formatDateTime,
+  useConfirm,
 } from "@/app/admin/_ui";
 import { SecurityTab } from "@/app/components/SecurityTab";
 
@@ -87,6 +88,7 @@ function ConnectedDevices() {
   const regenerateToken = useMutation(api.localSandbox.regenerateToken);
   const [busy, setBusy] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
+  const [confirm, confirmUI] = useConfirm();
 
   const run = async (key: string, fn: () => Promise<unknown>, ok: string) => {
     setBusy(key);
@@ -104,9 +106,13 @@ function ConnectedDevices() {
 
   const handleRegenerate = async () => {
     if (
-      !window.confirm(
-        "Regenerar o token do agente desconecta todos os conectores/desktop ativos e exige reconfigurar o comando de conexão. Continuar?",
-      )
+      !(await confirm({
+        title: "Regenerar token do agente",
+        description:
+          "Regenerar o token do agente desconecta todos os conectores/desktop ativos e exige reconfigurar o comando de conexão. Continuar?",
+        confirmLabel: "Regenerar",
+        tone: "destructive",
+      }))
     ) {
       return;
     }
@@ -126,6 +132,7 @@ function ConnectedDevices() {
 
   return (
     <Card className="gap-0 py-0">
+      {confirmUI}
       <div className="flex flex-col gap-2 border-b p-5 sm:flex-row sm:items-center sm:justify-between">
         <SectionHeader
           icon={Server}
