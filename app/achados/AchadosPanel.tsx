@@ -259,10 +259,14 @@ function AchadosForEngagement({
     engagementId,
   });
   // Quantos screenshots cada achado tem (chip "📷 N" na lista).
-  const imageCounts =
-    useQuery(api.findings.getEngagementImageEvidenceCounts, {
-      engagementId,
-    }) ?? {};
+  const imageCountsQuery = useQuery(
+    api.findings.getEngagementImageEvidenceCounts,
+    { engagementId },
+  );
+  const imageCounts = useMemo(
+    () => imageCountsQuery ?? {},
+    [imageCountsQuery],
+  );
 
   const [chip, setChip] = useState("all");
   const [q, setQ] = useState("");
@@ -297,6 +301,20 @@ function AchadosForEngagement({
     }
     return c;
   }, [findings]);
+
+  // Cobertura de prova gráfica: dos achados que vão ao entregável (não
+  // descartados), quantos já têm ≥1 screenshot. Destaca a lacuna p/ o operador
+  // fechar antes de entregar (casa com a política REQUIRE_GRAPHICAL_EVIDENCE).
+  const graphicalCoverage = useMemo(() => {
+    let total = 0;
+    let withImage = 0;
+    for (const f of findings ?? []) {
+      if (f.status === "dismissed") continue;
+      total += 1;
+      if ((imageCounts[f._id] ?? 0) > 0) withImage += 1;
+    }
+    return { total, withImage, missing: total - withImage };
+  }, [findings, imageCounts]);
 
   // Contagem de cada chip vem do array NÃO filtrado (senão o número muda ao
   // filtrar). Linhas vêm do filtrado.
@@ -339,7 +357,7 @@ function AchadosForEngagement({
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-5">
         <StatCard
           label="Achados"
           value={String(counts.total)}
@@ -366,6 +384,23 @@ function AchadosForEngagement({
           icon={RefreshCw}
           tone="warning"
           sub="aguardando curadoria"
+        />
+        <StatCard
+          label="Prova gráfica"
+          value={
+            graphicalCoverage.total > 0
+              ? `${graphicalCoverage.withImage}/${graphicalCoverage.total}`
+              : "—"
+          }
+          icon={ImageIcon}
+          tone={graphicalCoverage.missing > 0 ? "warning" : "primary"}
+          sub={
+            graphicalCoverage.total === 0
+              ? "sem achados"
+              : graphicalCoverage.missing > 0
+                ? `${graphicalCoverage.missing} sem screenshot`
+                : "todos com evidência"
+          }
         />
       </div>
 
