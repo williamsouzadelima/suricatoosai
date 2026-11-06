@@ -250,6 +250,10 @@ export default defineSchema({
     // was removed and nothing reads or writes this anymore — kept in the
     // schema so old rows still pass validation.
     codex_thread_id: v.optional(v.string()),
+    // Exclusão definitiva de engajamento DESANEXA o chat (engagement_id=undefined)
+    // e marca isto p/ que resolveEngagementForChatBackend NÃO re-provisione um
+    // engajamento "Triagem" (D6). Só a cascata seta; o chat segue utilizável.
+    suppress_auto_engagement: v.optional(v.boolean()),
   })
     .index("by_chat_id", ["id"])
     .index("by_user_and_updated", ["user_id", "update_time"])
@@ -2058,6 +2062,7 @@ export default defineSchema({
       v.literal("ioc.added"),
       v.literal("ioc.removed"),
       v.literal("user.autoblocked"),
+      v.literal("engagement.hard_deleted"),
     ),
     actor_user_id: v.optional(v.string()),
     actor_email: v.optional(v.string()),

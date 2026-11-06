@@ -115,13 +115,15 @@ export const listPortalEngagementsForBackend = query({
     validateServiceKey(args.serviceKey);
     const access = await resolveMembership(ctx, args.userId, args.clientId);
     if (!access) return [];
-    const engagements = await ctx.db
-      .query("engagements")
-      .withIndex("by_client_and_updated", (q) =>
-        q.eq("client_id", args.clientId),
-      )
-      .order("desc")
-      .collect();
+    const engagements = (
+      await ctx.db
+        .query("engagements")
+        .withIndex("by_client_and_updated", (q) =>
+          q.eq("client_id", args.clientId),
+        )
+        .order("desc")
+        .collect()
+    ).filter((e) => !e.hard_deleted_at && !e.archived_at);
     return engagements.map((e) => ({
       id: e._id,
       name: e.name,

@@ -76,6 +76,14 @@ export async function captureFinding(
     api.engagements.resolveEngagementForChatBackend,
     { serviceKey, userId: params.userId, chatId: params.chatId },
   );
+  if (!engagementId) {
+    // D6: engajamento deste chat foi excluído definitivamente e o chat foi
+    // aposentado (não re-provisiona) — não há onde anexar o achado.
+    return {
+      success: false,
+      error: "Engajamento excluído definitivamente; este chat foi aposentado.",
+    };
+  }
 
   // 2) Fingerprint estável (Node) para dedup por engajamento.
   const dedupFingerprint = createFindingFingerprint({

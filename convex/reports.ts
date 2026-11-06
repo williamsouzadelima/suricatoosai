@@ -383,6 +383,15 @@ export const createReportRequest = mutation({
     if (!engagement || engagement.user_id !== args.userId) {
       throw new ConvexError({ code: "ACCESS_DENIED", message: "Sem acesso" });
     }
+    // Engajamento excluído definitivamente: nunca cria relatório novo. CRÍTICO —
+    // a versão é max sobre as linhas; a cascata (P4) apaga as linhas, então sem
+    // esta guarda um relatório novo reusaria um número de versão já entregue.
+    if (engagement.hard_deleted_at) {
+      throw new ConvexError({
+        code: "ENGAGEMENT_DELETED",
+        message: "Engajamento foi excluído definitivamente.",
+      });
+    }
     if (args.formats.length === 0) {
       throw new ConvexError({ code: "INVALID", message: "Nenhum formato" });
     }
@@ -473,6 +482,16 @@ export const setReportTriggerRunForBackend = mutation({
       .query("reports")
       .withIndex("by_group", (q) => q.eq("report_group_id", args.reportGroupId))
       .collect();
+    const anyRow = rows[0];
+    if (anyRow) {
+      const eng = await ctx.db.get(anyRow.engagement_id);
+      if (eng?.hard_deleted_at) {
+        throw new ConvexError({
+          code: "ENGAGEMENT_DELETED",
+          message: "Engajamento foi excluído definitivamente.",
+        });
+      }
+    }
     for (const r of rows) {
       await ctx.db.patch(r._id, {
         trigger_run_id: args.triggerRunId,
@@ -493,6 +512,18 @@ async function patchGroupFormat(
     .query("reports")
     .withIndex("by_group", (q) => q.eq("report_group_id", reportGroupId))
     .collect();
+  // Guarda defensiva: engajamento excluído definitivamente recusa (normalmente a
+  // cascata já apagou as linhas → rows vazio → no-op; cobre markRendering/Ready/Failed).
+  const anyRow = rows[0];
+  if (anyRow) {
+    const eng = await ctx.db.get(anyRow.engagement_id);
+    if (eng?.hard_deleted_at) {
+      throw new ConvexError({
+        code: "ENGAGEMENT_DELETED",
+        message: "Engajamento foi excluído definitivamente.",
+      });
+    }
+  }
   const row = rows.find((r) => r.format === format);
   if (row) await ctx.db.patch(row._id, { ...patch, updated_at: Date.now() });
 }

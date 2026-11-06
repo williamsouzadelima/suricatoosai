@@ -38,6 +38,7 @@ const eventTypeArg = v.union(
   v.literal("ioc.added"),
   v.literal("ioc.removed"),
   v.literal("user.autoblocked"),
+  v.literal("engagement.hard_deleted"),
 );
 const actorKindArg = v.union(
   v.literal("internal"),

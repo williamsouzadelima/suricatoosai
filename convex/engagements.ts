@@ -8,6 +8,10 @@ import {
   MAX_TITLE,
   syncChatTitleFromEngagement,
 } from "./lib/engagementNameSync";
+import {
+  runEngagementHardDelete,
+  getEngagementOwner,
+} from "./lib/engagementHardDelete";
 
 /**
  * Engajamentos (agrupam chats + evidências + achados de um cliente).
@@ -304,6 +308,13 @@ export const claimNextDueForBackend = mutation({
       row = stuck.find((r) => (r.claimed_at ?? 0) <= now - leaseMs) ?? null;
     }
     if (!row) return { found: false };
+    // Engajamento excluído definitivamente: limpa a recorrência órfã e não
+    // despacha (P1 da cascata já apaga o schedule; isto é defensivo p/ corridas).
+    const claimedEng = await ctx.db.get(row.engagement_id);
+    if (claimedEng?.hard_deleted_at) {
+      await ctx.db.delete(row._id);
+      return { found: false };
+    }
     await ctx.db.patch(row._id, {
       status: "dispatching",
       claimed_at: now,
@@ -526,7 +537,14 @@ export const updateEngagement = mutation({
 export const archiveEngagement = mutation({
   args: { engagementId: v.id("engagements") },
   handler: async (ctx, args) => {
-    await assertOwnedEngagement(ctx, args.engagementId);
+    const { engagement } = await assertOwnedEngagement(ctx, args.engagementId);
+    // Não arquivar uma lápide (resurgiria em "Mostrar arquivados").
+    if (engagement.hard_deleted_at) {
+      throw new ConvexError({
+        code: "ENGAGEMENT_DELETED",
+        message: "Engajamento foi excluído definitivamente.",
+      });
+    }
     await ctx.db.patch(args.engagementId, {
       archived_at: Date.now(),
       updated_at: Date.now(),
@@ -674,6 +692,15 @@ export const resolveEngagementForChatBackend = mutation({
       }
     }
 
+    // D6: chat APOSENTADO por exclusão definitiva de engajamento NÃO
+    // re-provisiona uma "Triagem" nova — o caller trata engagementId nulo.
+    if (chat?.suppress_auto_engagement) {
+      return {
+        engagementId: null as Id<"engagements"> | null,
+        clientId: null as Id<"clients"> | null,
+      };
+    }
+
     // Cliente "Não atribuído" (lazy)
     let client = await ctx.db
       .query("clients")
@@ -718,6 +745,55 @@ export const resolveEngagementForChatBackend = mutation({
   },
 });
 
+/** Dono + estado da lápide (serviceKey) — a rota de hard-delete precisa do owner. */
+export const getEngagementOwnerForBackend = query({
+  args: { serviceKey: v.string(), engagementId: v.id("engagements") },
+  returns: v.union(
+    v.object({
+      userId: v.string(),
+      name: v.string(),
+      hardDeletedAt: v.union(v.number(), v.null()),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    return await getEngagementOwner(ctx, args.engagementId);
+  },
+});
+
+/**
+ * Exclusão DEFINITIVA (irreversível) — SÓ pela rota superadmin
+ * (app/api/admin/engagements/[id]/hard-delete). Cascata batcheada em
+ * convex/lib/engagementHardDelete.ts; esta é só a casca serviceKey.
+ */
+export const hardDeleteEngagementForBackend = mutation({
+  args: {
+    serviceKey: v.string(),
+    engagementId: v.id("engagements"),
+    expectedOwnerUserId: v.string(),
+    actorUserId: v.string(),
+    dryRun: v.optional(v.boolean()),
+  },
+  returns: v.object({
+    phase: v.string(),
+    hasMore: v.boolean(),
+    deleted: v.record(v.string(), v.number()),
+    detached: v.number(),
+    s3ObjectsQueued: v.number(),
+    dryRun: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    return await runEngagementHardDelete(ctx, {
+      engagementId: args.engagementId,
+      expectedOwnerUserId: args.expectedOwnerUserId,
+      actorUserId: args.actorUserId,
+      mode: args.dryRun ? "dryRun" : "execute",
+    });
+  },
+});
+
 // ── Scaffold de monetização: faturas por engajamento (identity + posse) ──────
 // Sem preço definido — amount_dollars é placeholder. Habilita margem por
 // engajamento (receita faturada − custo de IA do engajamento). Ver
@@ -744,6 +820,12 @@ export const createInvoice = mutation({
       throw new ConvexError({
         code: "ACCESS_DENIED",
         message: "Engajamento inexistente ou sem acesso",
+      });
+    }
+    if (eng.hard_deleted_at) {
+      throw new ConvexError({
+        code: "ENGAGEMENT_DELETED",
+        message: "Engajamento foi excluído definitivamente.",
       });
     }
     if (!args.label.trim()) {
@@ -809,6 +891,13 @@ export const setInvoiceStatus = mutation({
   },
   handler: async (ctx, args) => {
     const inv = await ownedInvoice(ctx, args.invoiceId);
+    const invEng = await ctx.db.get(inv.engagement_id);
+    if (invEng?.hard_deleted_at) {
+      throw new ConvexError({
+        code: "ENGAGEMENT_DELETED",
+        message: "Engajamento foi excluído definitivamente.",
+      });
+    }
     const now = Date.now();
     await ctx.db.patch(inv._id, {
       status: args.status,
@@ -829,6 +918,13 @@ export const deleteInvoice = mutation({
   args: { invoiceId: v.id("engagement_invoices") },
   handler: async (ctx, args) => {
     const inv = await ownedInvoice(ctx, args.invoiceId);
+    const invEng = await ctx.db.get(inv.engagement_id);
+    if (invEng?.hard_deleted_at) {
+      throw new ConvexError({
+        code: "ENGAGEMENT_DELETED",
+        message: "Engajamento foi excluído definitivamente.",
+      });
+    }
     await ctx.db.delete(inv._id);
     return null;
   },

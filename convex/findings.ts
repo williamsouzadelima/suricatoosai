@@ -126,6 +126,15 @@ async function insertEvidence(
     result_summary?: string;
   },
 ): Promise<void> {
+  // Guarda: engajamento excluído definitivamente não recebe nova evidência
+  // (choke point — cobre captura ao vivo, extração retroativa e merges).
+  const engForGuard = await ctx.db.get(finding.engagement_id);
+  if (engForGuard?.hard_deleted_at) {
+    throw new ConvexError({
+      code: "ENGAGEMENT_DELETED",
+      message: "Engajamento foi excluído definitivamente.",
+    });
+  }
   const now = Date.now();
   await ctx.db.insert("evidence", {
     user_id: finding.user_id,
@@ -245,6 +254,12 @@ export const captureFindingForBackend = mutation({
     const engagement = await ctx.db.get(args.engagementId);
     if (!engagement || engagement.user_id !== args.userId) {
       return { success: false, error: "Engajamento inexistente ou sem acesso" };
+    }
+    if (engagement.hard_deleted_at) {
+      return {
+        success: false,
+        error: "Engajamento foi excluído definitivamente.",
+      };
     }
     const clientId = engagement.client_id;
     const organizationId = engagement.organization_id;

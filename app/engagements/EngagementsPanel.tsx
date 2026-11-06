@@ -37,6 +37,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   SectionHeader,
   StatCard,
   StatusBadge,
@@ -65,6 +74,172 @@ import {
 // então localmente o Doc ainda não tem o campo (o valor existe em runtime).
 const archivedAt = (e?: { archived_at?: number } | null) =>
   e?.archived_at ?? null;
+
+// Exclusão DEFINITIVA (irreversível), superadmin-only. Mostra um dry-run do que
+// será apagado e exige digitar o nome do engajamento antes de liberar o botão.
+function HardDeleteEngagementDialog({
+  engagementId,
+  engagementName,
+}: {
+  engagementId: Id<"engagements">;
+  engagementName: string;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<{
+    deleted: Record<string, number>;
+    detached: number;
+    s3ObjectsQueued: number;
+    partial: boolean;
+  } | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [typed, setTyped] = useState("");
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const endpoint = `/api/admin/engagements/${engagementId}/hard-delete`;
+
+  useEffect(() => {
+    if (!open) {
+      setPreview(null);
+      setPreviewError(null);
+      setTyped("");
+      return;
+    }
+    let cancelled = false;
+    setLoadingPreview(true);
+    setPreviewError(null);
+    fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dryRun: true }),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error ?? `Erro ${res.status}`);
+        if (!cancelled) setPreview(data);
+      })
+      .catch((e) => {
+        if (!cancelled) setPreviewError(e instanceof Error ? e.message : "Erro");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingPreview(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, endpoint]);
+
+  const confirmed = typed.trim() === engagementName.trim();
+
+  const runDelete = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? `Erro ${res.status}`);
+      toast.success("Engajamento excluído definitivamente.");
+      setOpen(false);
+      router.push("/engagements");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao excluir.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const fmtCounts = (d: Record<string, number>) =>
+    Object.entries(d)
+      .filter(([, n]) => n > 0)
+      .map(([k, n]) => `${n} ${k}`)
+      .join(" · ") || "nada";
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10"
+        >
+          <Trash2 className="h-3.5 w-3.5" /> Excluir definitivamente
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Excluir definitivamente</DialogTitle>
+          <DialogDescription>
+            Ação IRREVERSÍVEL. Apaga achados, evidências (inclusive os prints no
+            S3), relatórios, recorrência e orçamento deste engajamento e encerra
+            a retenção. Faturas e log de auditoria são preservados; os chats são
+            desanexados.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          {loadingPreview ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Calculando o que será
+              apagado…
+            </div>
+          ) : previewError ? (
+            <Callout tone="warning">{previewError}</Callout>
+          ) : preview ? (
+            <Callout tone="warning">
+              <div className="font-medium">
+                {preview.partial ? "Vai apagar pelo menos: " : "Vai apagar: "}
+                {fmtCounts(preview.deleted)}.
+              </div>
+              {preview.partial && (
+                <div className="mt-1 text-[11px] font-semibold text-warning">
+                  Prévia PARCIAL (engajamento grande) — o total real é maior que
+                  o mostrado.
+                </div>
+              )}
+              <div className="text-xs">
+                Chats desanexados: {preview.detached} · objetos no S3 a remover:{" "}
+                {preview.s3ObjectsQueued}
+              </div>
+            </Callout>
+          ) : null}
+          <div>
+            <label className="text-xs text-muted-foreground">
+              Digite o nome do engajamento para confirmar:{" "}
+              <span className="font-mono text-foreground">
+                {engagementName}
+              </span>
+            </label>
+            <Input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              placeholder={engagementName}
+              className="mt-1"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={!confirmed || deleting || !!previewError}
+            onClick={() => void runDelete()}
+          >
+            {deleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+            Excluir definitivamente
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // Galeria de prints (screenshots) do engajamento. Reusa EvidenceThumb (a mesma
 // peça de /achados: abre em tamanho real, trata indisponível, sinaliza captura
@@ -814,6 +989,12 @@ function EngagementDetail({
                     </>
                   )}
                 </Button>
+                {isSuperadmin && engagement && (
+                  <HardDeleteEngagementDialog
+                    engagementId={engagementId}
+                    engagementName={engagement.name}
+                  />
+                )}
               </div>
             </>
           )}
