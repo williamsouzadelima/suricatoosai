@@ -28,6 +28,7 @@ import {
   useSortable,
   sortRows,
   SortableTh,
+  useConfirm,
 } from "./_ui";
 
 export interface UserRow {
@@ -118,14 +119,18 @@ export function UsersTable() {
     return () => clearInterval(id);
   }, [load]);
 
+  const [confirm, confirmUI] = useConfirm();
   const toggleSuspend = useCallback(
     async (u: UserRow) => {
       const action = u.suspended ? "unsuspend" : "suspend";
       if (
         action === "suspend" &&
-        !window.confirm(
-          `Suspender ${u.email}? O acesso ao chat é bloqueado imediatamente até reativar.`,
-        )
+        !(await confirm({
+          title: "Suspender usuário",
+          description: `Suspender ${u.email}? O acesso ao chat é bloqueado imediatamente até reativar.`,
+          confirmLabel: "Suspender",
+          tone: "destructive",
+        }))
       ) {
         return;
       }
@@ -150,7 +155,7 @@ export function UsersTable() {
         setBusyId(null);
       }
     },
-    [load],
+    [load, confirm],
   );
 
   const filtered = useMemo(() => {
@@ -217,6 +222,7 @@ export function UsersTable() {
 
   return (
     <Card className="gap-0 py-0">
+      {confirmUI}
       <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
         <SectionHeader icon={Users} title="Usuários" count={users.length} />
         <div className="flex items-center gap-2">

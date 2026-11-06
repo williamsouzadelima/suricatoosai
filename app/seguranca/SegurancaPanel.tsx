@@ -23,6 +23,7 @@ import {
   Callout,
   formatDateTime,
   useConfirm,
+  PanelSkeleton,
 } from "@/app/admin/_ui";
 import { SecurityTab } from "@/app/components/SecurityTab";
 
@@ -158,9 +159,7 @@ function ConnectedDevices() {
       </div>
 
       {connections === undefined ? (
-        <div className="p-6 text-center text-sm text-muted-foreground">
-          Carregando…
-        </div>
+        <PanelSkeleton rows={3} />
       ) : connections.length === 0 ? (
         <EmptyState
           icon={Server}

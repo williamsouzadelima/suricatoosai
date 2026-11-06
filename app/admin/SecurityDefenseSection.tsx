@@ -12,6 +12,7 @@ import {
   Callout,
   EmptyState,
   formatDateTime,
+  useConfirm,
 } from "./_ui";
 
 interface Block {
@@ -146,8 +147,16 @@ export function SecurityDefenseSection() {
     }
   };
 
+  const [confirm, confirmUI] = useConfirm();
   const lift = async (b: Block) => {
-    if (!window.confirm(`Desbloquear ${b.type} ${b.value}?`)) return;
+    if (
+      !(await confirm({
+        title: "Desbloquear",
+        description: `Desbloquear ${b.type} ${b.value}?`,
+        confirmLabel: "Desbloquear",
+      }))
+    )
+      return;
     try {
       const res = await fetch("/api/admin/security/blocklist", {
         method: "DELETE",
@@ -166,6 +175,7 @@ export function SecurityDefenseSection() {
 
   return (
     <div className="space-y-4">
+      {confirmUI}
       {/* Configuração */}
       <Card className="gap-0 py-0">
         <div className="flex flex-col gap-3 border-b p-5 sm:flex-row sm:items-center sm:justify-between">

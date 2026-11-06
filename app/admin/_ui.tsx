@@ -507,6 +507,23 @@ export function SortableTh<K extends string>({
   );
 }
 
+// ── PanelSkeleton (placeholder de carregamento; mata os "Carregando…" crus) ──
+export function PanelSkeleton({
+  rows = 3,
+  className,
+}: {
+  rows?: number;
+  className?: string;
+}) {
+  return (
+    <div className={cn("space-y-3 p-6", className)}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <Skeleton key={i} className={cn("h-4", i === 0 ? "w-1/3" : "w-full")} />
+      ))}
+    </div>
+  );
+}
+
 // ── ConfirmDialog (substitui window.confirm por diálogo tokenizado) ──────────
 // Hook promise-based, SEM provider global. Uso:
 //   const [confirm, confirmUI] = useConfirm();

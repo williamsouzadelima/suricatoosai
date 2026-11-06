@@ -54,6 +54,7 @@ import {
   TabBar,
   useConfirm,
   formatDateTime,
+  PanelSkeleton,
   type Tone,
   type TabItem,
 } from "@/app/admin/_ui";
@@ -599,9 +600,7 @@ export function EngagementsPanel({
             </button>
           </div>
           {engagements === undefined ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">
-              Carregando…
-            </div>
+            <PanelSkeleton rows={4} />
           ) : engagements.length === 0 ? (
             <EmptyState
               icon={ShieldAlert}
@@ -1154,9 +1153,7 @@ function EngagementDetail({
               </div>
             </div>
             {findings === undefined ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">
-                Carregando…
-              </div>
+              <PanelSkeleton rows={3} />
             ) : findings.length === 0 ? (
               <EmptyState
                 icon={ShieldAlert}
@@ -1229,9 +1226,7 @@ function EngagementDetail({
         <div className={cn(tab !== "acesso" && "hidden")}>
           {billing === undefined ? (
             <Card className="gap-0 py-0">
-              <div className="p-6 text-center text-sm text-muted-foreground">
-                Carregando…
-              </div>
+              <PanelSkeleton rows={3} />
             </Card>
           ) : billing?.clientId ? (
             <PortalAccessCard
@@ -1269,9 +1264,7 @@ function EngagementDetail({
               />
             </div>
             {liveEvidence === undefined ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">
-                Carregando…
-              </div>
+              <PanelSkeleton rows={3} />
             ) : liveEvidence.length === 0 ? (
               <EmptyState icon={Radio} title="Sem evidência ainda." />
             ) : (
@@ -1351,9 +1344,7 @@ function EngagementDetail({
             </div>
 
             {chats === undefined ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">
-                Carregando…
-              </div>
+              <PanelSkeleton rows={3} />
             ) : chats.length === 0 ? (
               <EmptyState
                 icon={MessagesSquare}
@@ -1807,7 +1798,7 @@ function ScheduleEditor({ engagement }: { engagement: Doc<"engagements"> }) {
       </div>
       <CardContent className="flex flex-col gap-4 p-5">
         {schedule === undefined ? (
-          <div className="text-sm text-muted-foreground">Carregando…</div>
+          <PanelSkeleton rows={2} />
         ) : (
           <>
             {schedule && (

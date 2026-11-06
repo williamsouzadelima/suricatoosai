@@ -23,6 +23,7 @@ import {
   SectionHeader,
   StatusBadge,
   formatDateTime,
+  useConfirm,
   type Tone,
 } from "./_ui";
 
@@ -141,17 +142,20 @@ export function MarketingTab() {
     }
   }, [valid, subject, body]);
 
+  const [confirm, confirmUI] = useConfirm();
   const sendCampaign = useCallback(async () => {
     if (!valid) {
       toast.error("Preencha assunto e mensagem.");
       return;
     }
     if (
-      !window.confirm(
-        `Enviar "${subject.trim()}" para ${recipientCount} ${
+      !(await confirm({
+        title: "Enviar campanha",
+        description: `Enviar "${subject.trim()}" para ${recipientCount} ${
           recipientCount === 1 ? "pessoa" : "pessoas"
         } (${SEGMENTS.find((s) => s.value === segment)?.label})? Esta ação não pode ser desfeita.`,
-      )
+        confirmLabel: "Enviar",
+      }))
     ) {
       return;
     }
@@ -181,7 +185,7 @@ export function MarketingTab() {
     } finally {
       setSending(false);
     }
-  }, [valid, subject, body, segment, recipientCount, load]);
+  }, [valid, subject, body, segment, recipientCount, load, confirm]);
 
   const schedule = useCallback(async () => {
     if (!valid) {
@@ -247,6 +251,7 @@ export function MarketingTab() {
 
   return (
     <div className="space-y-6">
+      {confirmUI}
       <WelcomeCard />
 
       {!emailConfigured && (

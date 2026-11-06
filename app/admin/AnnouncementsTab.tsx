@@ -12,6 +12,7 @@ import {
   StatusBadge,
   EmptyState,
   formatDateTime,
+  useConfirm,
 } from "./_ui";
 
 type Level = "info" | "warning" | "success";
@@ -157,11 +158,17 @@ export function AnnouncementsTab() {
     }
   }, [form, load]);
 
+  const [confirm, confirmUI] = useConfirm();
   const act = useCallback(
     async (a: Announcement, action: "toggle" | "delete") => {
       if (
         action === "delete" &&
-        !window.confirm(`Excluir o aviso "${a.title}"?`)
+        !(await confirm({
+          title: "Excluir aviso",
+          description: `Excluir o aviso "${a.title}"?`,
+          confirmLabel: "Excluir",
+          tone: "destructive",
+        }))
       ) {
         return;
       }
@@ -187,11 +194,12 @@ export function AnnouncementsTab() {
         setBusyId(null);
       }
     },
-    [load],
+    [load, confirm],
   );
 
   return (
     <div className="space-y-6">
+      {confirmUI}
       {/* Form */}
       <Card>
         <CardContent className="space-y-4">

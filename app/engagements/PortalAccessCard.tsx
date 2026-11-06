@@ -12,6 +12,7 @@ import {
   Callout,
   formatDateTime,
   useConfirm,
+  PanelSkeleton,
 } from "@/app/admin/_ui";
 
 interface Member {
@@ -207,7 +208,7 @@ export function PortalAccessCard({
         </div>
 
         {members === null ? (
-          <p className="text-sm text-muted-foreground">Carregando…</p>
+          <PanelSkeleton rows={2} />
         ) : members.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Ninguém tem acesso ao portal deste cliente ainda.

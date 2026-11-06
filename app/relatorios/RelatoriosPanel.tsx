@@ -31,6 +31,7 @@ import {
   Callout,
   formatDateTime,
   useConfirm,
+  PanelSkeleton,
 } from "@/app/admin/_ui";
 import {
   AUDIENCE_LABEL,
@@ -146,9 +147,7 @@ export function RelatoriosPanel({
         </Card>
 
         {engagements === undefined ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            Carregando…
-          </div>
+          <PanelSkeleton rows={3} />
         ) : engagements.length === 0 ? (
           <EmptyState
             icon={FileText}
@@ -429,9 +428,7 @@ function RelatoriosForEngagement({
             />
           </div>
           {reports === undefined ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">
-              Carregando…
-            </div>
+            <PanelSkeleton rows={3} />
           ) : groups.length === 0 ? (
             <EmptyState
               icon={FileText}

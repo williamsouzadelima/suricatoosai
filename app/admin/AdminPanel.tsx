@@ -47,6 +47,7 @@ import {
   EmptyState,
   Callout,
   formatDateTime,
+  useConfirm,
   type Tone,
 } from "./_ui";
 import { AppShell } from "@/components/internal/app-shell";
@@ -263,12 +264,15 @@ export function AdminPanel({
     [load],
   );
 
+  const [confirm, confirmUI] = useConfirm();
   const backfill = useCallback(async () => {
     if (
-      !window.confirm(
-        "Marcar TODOS os usuários atuais do WorkOS como 'ativos' na lista? " +
+      !(await confirm({
+        title: "Marcar todos como ativos",
+        description:
+          "Marcar TODOS os usuários atuais do WorkOS como 'ativos' na lista? " +
           "Faça isto uma vez, antes de ligar o acesso por convite.",
-      )
+      }))
     ) {
       return;
     }
@@ -288,7 +292,7 @@ export function AdminPanel({
     } finally {
       setBackfilling(false);
     }
-  }, [load]);
+  }, [load, confirm]);
 
   const counts = useMemo(
     () =>
@@ -369,6 +373,7 @@ export function AdminPanel({
         </>
       }
     >
+      {confirmUI}
       <div className="flex flex-col gap-5">
         {/* Abas horizontais (quebram em linha em vez de rolar) */}
         <div className="-mx-1 px-1 pb-1">

@@ -30,6 +30,7 @@ import {
   StatusBadge,
   EmptyState,
   formatDateTime,
+  PanelSkeleton,
 } from "@/app/admin/_ui";
 import {
   FindingActions,
@@ -174,9 +175,7 @@ export function AchadosPanel({
         </Card>
 
         {engagements === undefined ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            Carregando…
-          </div>
+          <PanelSkeleton rows={4} />
         ) : engagements.length === 0 ? (
           <EmptyState
             icon={Search}
@@ -408,9 +407,7 @@ function AchadosForEngagement({
         </div>
 
         {findings === undefined ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            Carregando…
-          </div>
+          <PanelSkeleton rows={4} />
         ) : findings.length === 0 ? (
           <EmptyState
             icon={ShieldAlert}

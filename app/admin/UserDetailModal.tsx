@@ -19,6 +19,7 @@ import {
   EmptyState,
   Callout,
   formatDateTime,
+  useConfirm,
 } from "./_ui";
 
 interface AuditEntry {
@@ -84,11 +85,17 @@ export function UserDetailModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const [confirm, confirmUI] = useConfirm();
   const toggleSuspend = useCallback(async () => {
     const action = user.suspended ? "unsuspend" : "suspend";
     if (
       action === "suspend" &&
-      !window.confirm(`Suspender ${user.email}? O chat é bloqueado na hora.`)
+      !(await confirm({
+        title: "Suspender usuário",
+        description: `Suspender ${user.email}? O chat é bloqueado na hora.`,
+        confirmLabel: "Suspender",
+        tone: "destructive",
+      }))
     )
       return;
     setBusy(true);
@@ -108,15 +115,18 @@ export function UserDetailModal({
     } finally {
       setBusy(false);
     }
-  }, [user, onChanged, onClose]);
+  }, [user, onChanged, onClose, confirm]);
 
   const toggleAccess = useCallback(async () => {
     const action = user.allowlistStatus === "revoked" ? "reinvite" : "revoke";
     if (
       action === "revoke" &&
-      !window.confirm(
-        `Revogar o acesso de ${user.email}? Ele não conseguirá mais entrar.`,
-      )
+      !(await confirm({
+        title: "Revogar acesso",
+        description: `Revogar o acesso de ${user.email}? Ele não conseguirá mais entrar.`,
+        confirmLabel: "Revogar",
+        tone: "destructive",
+      }))
     )
       return;
     setBusy(true);
@@ -136,13 +146,14 @@ export function UserDetailModal({
     } finally {
       setBusy(false);
     }
-  }, [user, onChanged, onClose]);
+  }, [user, onChanged, onClose, confirm]);
 
   return (
     <div
       className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4"
       onClick={onClose}
     >
+      {confirmUI}
       <div
         className="mx-auto mt-10 w-full max-w-lg rounded-xl border bg-card shadow-xl"
         onClick={(e) => e.stopPropagation()}

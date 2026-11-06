@@ -11,6 +11,7 @@ import {
   EmptyState,
   Callout,
   fmtDuration,
+  useConfirm,
 } from "./_ui";
 
 interface Run {
@@ -54,12 +55,16 @@ export function LiveRunsPanel() {
     return () => clearInterval(id);
   }, [load]);
 
+  const [confirm, confirmUI] = useConfirm();
   const kill = useCallback(
     async (r: Run) => {
       if (
-        !window.confirm(
-          `Abortar o run em execução de "${r.title}" (${r.email})? A task será cancelada.`,
-        )
+        !(await confirm({
+          title: "Abortar run",
+          description: `Abortar o run em execução de "${r.title}" (${r.email})? A task será cancelada.`,
+          confirmLabel: "Abortar",
+          tone: "destructive",
+        }))
       ) {
         return;
       }
@@ -79,11 +84,12 @@ export function LiveRunsPanel() {
         setKilling(null);
       }
     },
-    [load],
+    [load, confirm],
   );
 
   return (
     <Card className="gap-0 py-0">
+      {confirmUI}
       <div className="flex flex-col gap-3 border-b p-5 sm:flex-row sm:items-center sm:justify-between">
         <SectionHeader
           icon={Cpu}
