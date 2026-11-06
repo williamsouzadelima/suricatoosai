@@ -61,7 +61,8 @@ export type EngineFindingIngest = {
   title: string;
   affectedAsset: string;
   weaknessClass: string;
-  severity: EngineSeverity;
+  /** String livre do motor; normalizada/validada em normalizeSeverity (um de EngineSeverity). */
+  severity: string;
   description?: string;
   impact?: string;
   remediation?: string;
