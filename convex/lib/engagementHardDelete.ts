@@ -11,6 +11,7 @@ import {
 } from "./cascade";
 import { fileCountAggregate } from "../fileAggregate";
 import { planEvidenceDeletion } from "./evidenceDeletePlan";
+import { internal } from "../_generated/api";
 
 /**
  * LÓGICA da exclusão DEFINITIVA (irreversível) de um engajamento. Os wrappers
@@ -165,6 +166,24 @@ export async function runEngagementHardDelete(
         detail: `Exclusão definitiva iniciada: ${eng.name}`.slice(0, 1000),
         created_at: now,
       });
+      // 1:1 → a "tarefa" É a conversa do engajamento: apaga o chat INTEIRO
+      // (mensagens/resumos/arquivos) reusando a deleção batcheada provada
+      // (deleteChatForBackendBatch se auto-agenda p/ chats grandes). Multi-chat
+      // → P7 só DESANEXA (preserva). D6 revisto com o William: a tarefa 1:1 some
+      // junto com o engajamento (senão a lápide "volta" como tarefa no sidebar).
+      const soleChats = await ctx.db
+        .query("chats")
+        .withIndex("by_engagement_and_updated", (q) =>
+          q.eq("engagement_id", engagementId),
+        )
+        .take(2);
+      if (soleChats.length === 1) {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.chats.deleteChatForBackendBatch,
+          { chatId: soleChats[0].id, userId: soleChats[0].user_id },
+        );
+      }
     }
   }
 

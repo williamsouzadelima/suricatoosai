@@ -174,8 +174,9 @@ function HardDeleteEngagementDialog({
           <DialogDescription>
             Ação IRREVERSÍVEL. Apaga achados, evidências (inclusive os prints no
             S3), relatórios, recorrência e orçamento deste engajamento e encerra
-            a retenção. Faturas e log de auditoria são preservados; os chats são
-            desanexados.
+            a retenção. Faturas e log de auditoria são preservados. A tarefa/chat
+            1:1 deste engajamento também é apagada; chats que agrupam vários
+            engajamentos são apenas desanexados.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 text-sm">
