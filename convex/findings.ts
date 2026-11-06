@@ -6,6 +6,10 @@ import { validateServiceKey } from "./lib/utils";
 import { collectEvidencePage } from "./lib/evidenceBundle";
 import { requireOwnedDoc } from "./lib/tenantGuards";
 import { deleteOrphanedEvidenceFile } from "./fileStorage";
+import {
+  evaluateApprovalGate,
+  requireGraphicalEvidenceEnabled,
+} from "./lib/graphicalEvidence";
 
 /**
  * Achados + evidências da feature de relatórios.
@@ -397,19 +401,49 @@ export const approveFinding = mutation({
         message: "Não está em revisão",
       });
     }
-    const evidenceCount = (
-      await ctx.db
+    // Política "evidência gráfica obrigatória": com a flag ligada, aprovar exige
+    // ≥1 evidência de imagem (cobre o caminho publicado, pois publishFinding
+    // exige "approved"). Flag desligada = caminho idêntico ao de hoje.
+    if (requireGraphicalEvidenceEnabled()) {
+      const evidences = await ctx.db
         .query("evidence")
         .withIndex("by_finding_and_captured", (q) =>
           q.eq("finding_id", finding._id),
         )
-        .take(1)
-    ).length;
-    if (evidenceCount === 0) {
-      throw new ConvexError({
-        code: "INVALID",
-        message: "Aprovar exige ao menos uma evidência",
+        .collect();
+      const verdict = evaluateApprovalGate({
+        graphicalRequired: true,
+        evidences,
       });
+      if (!verdict.ok) {
+        throw new ConvexError(
+          verdict.code === "NO_GRAPHICAL_EVIDENCE"
+            ? {
+                code: "NO_GRAPHICAL_EVIDENCE",
+                message:
+                  "Aprovar exige ao menos uma evidência gráfica (screenshot). Capture uma imagem do achado antes de aprovar.",
+              }
+            : {
+                code: "INVALID",
+                message: "Aprovar exige ao menos uma evidência",
+              },
+        );
+      }
+    } else {
+      const evidenceCount = (
+        await ctx.db
+          .query("evidence")
+          .withIndex("by_finding_and_captured", (q) =>
+            q.eq("finding_id", finding._id),
+          )
+          .take(1)
+      ).length;
+      if (evidenceCount === 0) {
+        throw new ConvexError({
+          code: "INVALID",
+          message: "Aprovar exige ao menos uma evidência",
+        });
+      }
     }
     await ctx.db.patch(finding._id, {
       status: "approved",
@@ -446,6 +480,7 @@ export const approveAllForEngagement = mutation({
         q.eq("engagement_id", args.engagementId),
       )
       .collect();
+    const graphicalRequired = requireGraphicalEvidenceEnabled();
     let approved = 0;
     let skipped = 0;
     for (const f of findings) {
@@ -455,15 +490,15 @@ export const approveAllForEngagement = mutation({
       ) {
         continue;
       }
-      const hasEv = (
-        await ctx.db
-          .query("evidence")
-          .withIndex("by_finding_and_captured", (q) =>
-            q.eq("finding_id", f._id),
-          )
-          .take(1)
-      ).length;
-      if (hasEv === 0) {
+      // Com a política ligada, só aprova em massa quem tem evidência gráfica;
+      // desligada, basta ≥1 evidência (comportamento de hoje). Os sem passam a skip.
+      const evQuery = ctx.db
+        .query("evidence")
+        .withIndex("by_finding_and_captured", (q) => q.eq("finding_id", f._id));
+      const evForGate = graphicalRequired
+        ? await evQuery.collect()
+        : await evQuery.take(1);
+      if (!evaluateApprovalGate({ graphicalRequired, evidences: evForGate }).ok) {
         skipped += 1;
         continue;
       }
