@@ -3,6 +3,10 @@ import { v, ConvexError } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { validateServiceKey } from "./lib/utils";
+import {
+  isImageEvidence,
+  requireGraphicalEvidenceEnabled,
+} from "./lib/graphicalEvidence";
 
 /**
  * Relatórios: registro de solicitação/versão + insumo (getReportInput) para o
@@ -119,15 +123,33 @@ export const getReportInputForBackend = query({
         .collect()
     ).filter((f) => f.status !== "dismissed");
 
+    // Política "evidência gráfica obrigatória": com a flag ligada, achados SEM
+    // evidência de imagem são SEGURADOS do entregável e o total omitido é
+    // reportado (nada fica escondido — o operador os vê na lista de achados
+    // ainda como rascunho). Flag desligada = inclui todos (comportamento de hoje).
+    const graphicalRequired = requireGraphicalEvidenceEnabled();
+    let omittedForNoGraphicalEvidence = 0;
     const findings = [];
     for (const f of published) {
-      const evRaw = await ctx.db
+      const evQuery = ctx.db
         .query("evidence")
         .withIndex("by_finding_and_captured", (q) => q.eq("finding_id", f._id))
         // asc (crono): ao limitar, mantém os PRIMEIROS passos da cadeia
         // (recon/setup) — antes, desc perdia justamente o começo (WS3-E).
-        .order("asc")
-        .take(EVIDENCE_PER_FINDING);
+        .order("asc");
+      // Com a política ligada, varre TODA a evidência (p/ não excluir achado
+      // cuja imagem esteja além dos primeiros EVIDENCE_PER_FINDING); senão, o
+      // take(N) de sempre.
+      const evAll = graphicalRequired
+        ? await evQuery.collect()
+        : await evQuery.take(EVIDENCE_PER_FINDING);
+      if (graphicalRequired && !evAll.some(isImageEvidence)) {
+        omittedForNoGraphicalEvidence += 1;
+        continue;
+      }
+      const evRaw = graphicalRequired
+        ? evAll.slice(0, EVIDENCE_PER_FINDING)
+        : evAll;
       // Ordena pela cadeia (step_index; sem índice → pelo tempo de captura).
       const ev = evRaw
         .slice()
@@ -185,6 +207,7 @@ export const getReportInputForBackend = query({
       },
       findingCount: findings.length,
       findings,
+      omittedForNoGraphicalEvidence,
     };
   },
 });
