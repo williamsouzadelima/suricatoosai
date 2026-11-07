@@ -141,6 +141,32 @@ export function LlmKeysPanel() {
     if (ok) await post({ action: "delete", id: k.id }, "Chave removida");
   };
 
+  const testKey = async (k: KeyRow) => {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/llm-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "test", id: k.id }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        status?: string;
+        detail?: string;
+        error?: string;
+      };
+      if (!res.ok || data.error) {
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      if (data.status === "active") toast.success(data.detail ?? "Chave válida");
+      else toast.error(data.detail ?? "Chave com problema");
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao testar");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const usable = keys.filter(
     (k) => k.enabled && (k.status === "active" || k.status === "untested"),
   ).length;
@@ -272,6 +298,15 @@ export function LlmKeysPanel() {
                         </td>
                         <td className="py-2 text-right">
                           <div className="inline-flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              title="Testar a chave no OpenRouter"
+                              onClick={() => void testKey(k)}
+                            >
+                              Testar
+                            </Button>
                             {(k.status === "exhausted" ||
                               k.status === "error") && (
                               <Button

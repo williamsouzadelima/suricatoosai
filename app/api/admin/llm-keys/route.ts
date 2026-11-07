@@ -4,7 +4,7 @@ import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { recordAudit } from "@/lib/admin/audit";
-import { encryptSecret, last4 } from "@/lib/llm-keys/crypto";
+import { decryptSecret, encryptSecret, last4 } from "@/lib/llm-keys/crypto";
 
 /**
  * Admin do pool de chaves de LLM. Superadmin-only. A chave em texto puro é
@@ -144,6 +144,81 @@ export async function POST(req: NextRequest) {
       });
       await recordAudit(actor, "llm-chave.remover", id, undefined);
       return NextResponse.json({ success: true });
+    }
+
+    if (body.action === "test") {
+      const id = str(body.id);
+      if (!id) return NextResponse.json({ error: "id obrigatório" }, { status: 400 });
+      if (!encConfigured()) {
+        throw new Error("LLM_KEY_ENC_SECRET não configurado no servidor.");
+      }
+      const cipher = await convex.query(api.llmKeys.getKeyCipherForBackend, {
+        serviceKey,
+        id: id as Id<"llm_api_keys">,
+      });
+      if (!cipher) {
+        return NextResponse.json({ error: "chave não encontrada" }, { status: 404 });
+      }
+      let plaintext: string;
+      try {
+        plaintext = decryptSecret({
+          ciphertext: cipher.ciphertext,
+          iv: cipher.iv,
+          authTag: cipher.authTag,
+        });
+      } catch {
+        await convex.mutation(api.llmKeys.setKeyStatusForBackend, {
+          serviceKey,
+          id: id as Id<"llm_api_keys">,
+          status: "error",
+          error: "falha ao decifrar (segredo-mestre mudou?)",
+        });
+        return NextResponse.json({
+          ok: true,
+          status: "error",
+          detail: "Falha ao decifrar a chave — o segredo-mestre pode ter mudado.",
+        });
+      }
+      let status: "active" | "exhausted" | "error" = "error";
+      let detail = "";
+      try {
+        const r = await fetch("https://openrouter.ai/api/v1/key", {
+          headers: { Authorization: `Bearer ${plaintext}` },
+        });
+        if (r.status === 401 || r.status === 403) {
+          status = "error";
+          detail = `Chave inválida ou sem permissão (HTTP ${r.status}).`;
+        } else if (!r.ok) {
+          status = "error";
+          detail = `Erro ao validar no OpenRouter (HTTP ${r.status}).`;
+        } else {
+          const j = (await r.json().catch(() => ({}))) as {
+            data?: { limit_remaining?: number | null };
+          };
+          const rem = j?.data?.limit_remaining;
+          if (typeof rem === "number" && rem <= 0) {
+            status = "exhausted";
+            detail = "Sem crédito (limite da chave atingido).";
+          } else if (typeof rem === "number") {
+            status = "active";
+            detail = `Válida — resta US$ ${rem.toFixed(2)} no limite da chave.`;
+          } else {
+            status = "active";
+            detail = "Válida (chave sem limite / pay-as-you-go).";
+          }
+        }
+      } catch {
+        status = "error";
+        detail = "Falha ao contatar o OpenRouter.";
+      }
+      await convex.mutation(api.llmKeys.setKeyStatusForBackend, {
+        serviceKey,
+        id: id as Id<"llm_api_keys">,
+        status,
+        error: status === "active" ? undefined : detail,
+      });
+      await recordAudit(actor, "llm-chave.testar", id, status);
+      return NextResponse.json({ ok: true, status, detail });
     }
 
     return NextResponse.json({ error: "ação desconhecida" }, { status: 400 });

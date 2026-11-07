@@ -170,6 +170,23 @@ export const getNextActiveKeyForBackend = query({
   },
 });
 
+/** Material cifrado de UMA chave (por id), p/ o servidor testar/decifrar. serviceKey-gated. */
+export const getKeyCipherForBackend = query({
+  args: { serviceKey: v.string(), id: v.id("llm_api_keys") },
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const row = await ctx.db.get(args.id);
+    if (!row) return null;
+    return {
+      ciphertext: row.ciphertext,
+      iv: row.iv,
+      authTag: row.auth_tag,
+      provider: row.provider,
+      label: row.label,
+    };
+  },
+});
+
 /** Marca uso bem-sucedido (vira "active" + last_used_at). Chamado após sucesso. */
 export const markKeyUsedForBackend = mutation({
   args: { serviceKey: v.string(), id: v.id("llm_api_keys") },
