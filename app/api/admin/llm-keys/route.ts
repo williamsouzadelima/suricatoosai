@@ -146,6 +146,44 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
+    if (body.action === "import-env") {
+      if (!encConfigured()) {
+        throw new Error("LLM_KEY_ENC_SECRET não configurado no servidor.");
+      }
+      const envKey = process.env.OPENROUTER_API_KEY;
+      if (!envKey || envKey.length < 20) {
+        return NextResponse.json(
+          { error: "OPENROUTER_API_KEY não está configurada no servidor." },
+          { status: 400 },
+        );
+      }
+      const l4 = last4(envKey);
+      const existing = await convex.query(api.llmKeys.listKeysForBackend, {
+        serviceKey,
+      });
+      if (existing.some((k: { last4: string }) => k.last4 === l4)) {
+        return NextResponse.json({
+          ok: true,
+          skipped: true,
+          detail: `Já existe uma chave terminando em ${l4} no pool.`,
+        });
+      }
+      const enc = encryptSecret(envKey);
+      const res = await convex.mutation(api.llmKeys.createKeyForBackend, {
+        serviceKey,
+        label: str(body.label) ?? "Ambiente (OPENROUTER_API_KEY)",
+        provider: "openrouter",
+        ciphertext: enc.ciphertext,
+        iv: enc.iv,
+        authTag: enc.authTag,
+        last4: l4,
+        priority: toNum(body.priority) ?? 50,
+        createdBy: actor,
+      });
+      await recordAudit(actor, "llm-chave.importar-env", undefined, `last4=${l4}`);
+      return NextResponse.json({ ok: true, id: res.id, last4: l4 });
+    }
+
     if (body.action === "test") {
       const id = str(body.id);
       if (!id) return NextResponse.json({ error: "id obrigatório" }, { status: 400 });

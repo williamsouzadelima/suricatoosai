@@ -167,6 +167,36 @@ export function LlmKeysPanel() {
     }
   };
 
+  const importEnv = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/llm-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "import-env" }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        skipped?: boolean;
+        detail?: string;
+        error?: string;
+        last4?: string;
+      };
+      if (!res.ok || data.error) {
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      toast.success(
+        data.skipped
+          ? (data.detail ?? "Já existia no pool")
+          : `Chave do ambiente importada (••••${data.last4}).`,
+      );
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao importar");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const usable = keys.filter(
     (k) => k.enabled && (k.status === "active" || k.status === "untested"),
   ).length;
@@ -230,6 +260,17 @@ export function LlmKeysPanel() {
             A chave é cifrada antes de sair do servidor; aqui só ficam os últimos
             4 dígitos. Menor prioridade = tentada primeiro no failover.
           </p>
+          <div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!encConfigured || busy}
+              title="Cifra a OPENROUTER_API_KEY do servidor e traz pro pool"
+              onClick={() => void importEnv()}
+            >
+              Importar a chave do ambiente (env)
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
