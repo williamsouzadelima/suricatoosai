@@ -27,6 +27,10 @@ const AUTHKIT_BYPASS_PATHS = new Set([
   "/api/health/trigger-agent-mode",
   "/api/internal/user-research",
   "/api/internal/security-alert",
+  // Endpoint de máquina do motor autônomo (codinome): auth própria por token
+  // (x-engine-token) + 404-invisível quando desligado. Como os demais endpoints
+  // de máquina, pula o authkit (sem sessão); IP-block/observe seguem aplicados.
+  "/api/engagements/engine-ingest",
   "/robots.txt",
   "/sitemap.xml",
 ]);
