@@ -7,6 +7,7 @@ import {
   resolveActivePoolKey,
   invalidatePoolKeyCache,
   markPoolKeyExhausted,
+  markPoolKeyAuthError,
 } from "@/lib/llm-keys/pool-runtime";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -984,11 +985,12 @@ async function runOpenRouterPatchedFetch(
 }
 
 /**
- * Fetch do OpenRouter com FAILOVER por crédito. Injeta a chave ativa do pool; se
- * a resposta for 402 (sem crédito), marca a chave como esgotada e tenta a
- * próxima por prioridade. Pool vazio / todas esgotadas → chave do env (fallback)
- * = comportamento de hoje (zero retrocesso). Só rotaciona com body re-enviável
- * (string/undefined), o caso das requests do OpenRouter.
+ * Fetch do OpenRouter com FAILOVER. Injeta a chave ativa do pool; se a resposta
+ * for 402 (sem crédito) marca a chave como esgotada, se for 401 (chave inválida/
+ * expirada/do tipo errado — provisionamento não faz inferência) marca com erro,
+ * e nos dois casos tenta a próxima por prioridade. Pool vazio / todas fora →
+ * chave do env (fallback) = comportamento de hoje (zero retrocesso). Só rotaciona
+ * com body re-enviável (string/undefined), o caso das requests do OpenRouter.
  */
 export const createOpenRouterPatchFetch =
   (fetchImplementation: typeof fetch = globalThis.fetch): typeof fetch =>
@@ -1006,8 +1008,15 @@ export const createOpenRouterPatchFetch =
         init,
         poolKey?.plaintext,
       );
-      if (poolKey && response.status === 402) {
-        void markPoolKeyExhausted(poolKey.id);
+      if (poolKey && (response.status === 402 || response.status === 401)) {
+        if (response.status === 402) {
+          void markPoolKeyExhausted(poolKey.id);
+        } else {
+          void markPoolKeyAuthError(
+            poolKey.id,
+            'HTTP 401 — chave inválida, expirada ou de provisionamento (não faz inferência; OpenRouter responde "User not found").',
+          );
+        }
         triedKeyIds.push(poolKey.id);
         invalidatePoolKeyCache();
         continue;

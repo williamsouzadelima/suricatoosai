@@ -97,3 +97,28 @@ export async function markPoolKeyExhausted(id: string): Promise<void> {
     // ignore
   }
 }
+
+/**
+ * Marca a chave com erro de autenticação após um 401. Cobre a chave inválida,
+ * expirada ou do TIPO ERRADO — uma chave de provisionamento/management do
+ * OpenRouter lê o saldo mas NÃO faz inferência, e o /chat/completions responde
+ * o enganoso "User not found." (HTTP 401). Fire-and-forget; engole erros.
+ */
+export async function markPoolKeyAuthError(
+  id: string,
+  detail: string,
+): Promise<void> {
+  const sk = serviceKey();
+  if (!sk) return;
+  try {
+    await getConvexClient().mutation(api.llmKeys.setKeyStatusForBackend, {
+      serviceKey: sk,
+      id: id as Id<"llm_api_keys">,
+      status: "error",
+      error: detail,
+    });
+    console.info(`[llm-pool] chave id=${id} marcada com erro de auth (401)`);
+  } catch {
+    // ignore
+  }
+}
