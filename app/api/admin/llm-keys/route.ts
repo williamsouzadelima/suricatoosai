@@ -179,49 +179,54 @@ export async function POST(req: NextRequest) {
           detail: "Falha ao decifrar a chave — o segredo-mestre pode ter mudado.",
         });
       }
-      let status: "active" | "exhausted" | "error" = "error";
+      // null = não altera o status (erro transitório não exclui chave boa).
+      let status: "active" | "exhausted" | "error" | null = null;
       let detail = "";
       try {
-        // Completion REAL (1 token): testa validade E crédito-de-conta de fato
-        // (o /api/v1/key só valida a chave, não o saldo da conta).
-        const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${plaintext}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "openrouter/auto",
-            messages: [{ role: "user", content: "ping" }],
-            max_tokens: 1,
-          }),
+        // Saldo da CONTA (definitivo): /api/v1/credits não depende de modelo e
+        // reflete exatamente o que causa o 402 "Insufficient credits".
+        const r = await fetch("https://openrouter.ai/api/v1/credits", {
+          headers: { Authorization: `Bearer ${plaintext}` },
         });
-        if (r.status === 402) {
-          status = "exhausted";
-          detail = "Sem crédito para completar (HTTP 402 do OpenRouter).";
-        } else if (r.status === 401 || r.status === 403) {
+        if (r.status === 401 || r.status === 403) {
           status = "error";
           detail = `Chave inválida ou sem permissão (HTTP ${r.status}).`;
         } else if (r.ok) {
-          status = "active";
-          detail = "Funciona — completou uma requisição de teste.";
+          const j = (await r.json().catch(() => ({}))) as {
+            data?: { total_credits?: number; total_usage?: number };
+          };
+          const tc = j?.data?.total_credits;
+          const tu = j?.data?.total_usage;
+          if (typeof tc === "number" && typeof tu === "number") {
+            const rem = tc - tu;
+            if (rem <= 0) {
+              status = "exhausted";
+              detail = `Sem crédito na conta (usado US$ ${tu.toFixed(2)} de US$ ${tc.toFixed(2)}).`;
+            } else {
+              status = "active";
+              detail = `Conta com crédito: resta US$ ${rem.toFixed(2)} (US$ ${tu.toFixed(2)} de US$ ${tc.toFixed(2)}).`;
+            }
+          } else {
+            status = "active";
+            detail = "Chave válida (OpenRouter não retornou o saldo).";
+          }
         } else {
           const t = await r.text().catch(() => "");
-          status = "error";
-          detail = `OpenRouter HTTP ${r.status}${t ? ": " + t.slice(0, 140) : ""}`;
+          detail = `Erro transitório ao testar (HTTP ${r.status})${t ? ": " + t.slice(0, 120) : ""} — status mantido.`;
         }
       } catch {
-        status = "error";
-        detail = "Falha ao contatar o OpenRouter.";
+        detail = "Falha ao contatar o OpenRouter — status mantido.";
       }
-      await convex.mutation(api.llmKeys.setKeyStatusForBackend, {
-        serviceKey,
-        id: id as Id<"llm_api_keys">,
-        status,
-        error: status === "active" ? undefined : detail,
-      });
-      await recordAudit(actor, "llm-chave.testar", id, status);
-      return NextResponse.json({ ok: true, status, detail });
+      if (status) {
+        await convex.mutation(api.llmKeys.setKeyStatusForBackend, {
+          serviceKey,
+          id: id as Id<"llm_api_keys">,
+          status,
+          error: status === "active" ? undefined : detail,
+        });
+      }
+      await recordAudit(actor, "llm-chave.testar", id, status ?? "unchanged");
+      return NextResponse.json({ ok: true, status: status ?? "unchanged", detail });
     }
 
     return NextResponse.json({ error: "ação desconhecida" }, { status: 400 });
