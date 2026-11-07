@@ -3,6 +3,11 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { ChatMode, SelectedModel } from "@/types/chat";
 import { isOperatorModelSelection } from "@/types/chat";
 import { openrouterAttributionHeaders } from "@/lib/ai/openrouter-attribution";
+import {
+  resolveActivePoolKey,
+  invalidatePoolKeyCache,
+  markPoolKeyExhausted,
+} from "@/lib/llm-keys/pool-runtime";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -831,131 +836,76 @@ export const attachOpenRouterStreamErrorMetadata = (
 //   rejects disabled reasoning. Keep both constraints on Grok 4.6 primary
 //   requests by using their existing non-xAI fallback for forced-tool steps.
 // - The metadata header opts into OpenRouter routing metadata for attribution.
-export const createOpenRouterPatchFetch =
-  (fetchImplementation: typeof fetch = globalThis.fetch): typeof fetch =>
-  async (url, init) => {
-    let nextInit: RequestInit = {
-      ...init,
-      headers: withOpenRouterMetadataHeader(init?.headers),
-    };
+async function runOpenRouterPatchedFetch(
+  fetchImplementation: typeof fetch,
+  url: Parameters<typeof fetch>[0],
+  init: Parameters<typeof fetch>[1],
+  authBearer?: string,
+): Promise<Response> {
+  let nextInit: RequestInit = {
+    ...init,
+    headers: withOpenRouterMetadataHeader(init?.headers),
+  };
+  // Pool de chaves: sobrescreve a Authorization com a chave ativa do pool,
+  // DEPOIS do header de metadados (p/ vencer). Sem chave de pool (undefined),
+  // mantém a Authorization do SDK (OPENROUTER_API_KEY do env) = hoje.
+  if (authBearer) {
+    const authedHeaders = new Headers(nextInit.headers);
+    authedHeaders.set("Authorization", `Bearer ${authBearer}`);
+    nextInit = { ...nextInit, headers: authedHeaders };
+  }
 
-    let parsedRequestBody: unknown;
+  let parsedRequestBody: unknown;
 
-    if (nextInit.body && typeof nextInit.body === "string") {
-      try {
-        const parsedBody = JSON.parse(nextInit.body) as unknown;
-        const kimiNormalized = normalizeOpenRouterRequestForKimi(parsedBody);
-        const kimiPatched = patchKimiReasoningToolCalls(kimiNormalized.body);
-        const reasoningPatched = sanitizeOpenRouterEncryptedReasoning(
-          kimiPatched.body,
-        );
-        const xaiCompatible =
-          makeOpenRouterToolChoiceCompatibleWithXaiReasoning(
-            reasoningPatched.body,
-          );
-        parsedRequestBody = xaiCompatible.body;
-        if (
-          kimiNormalized.changed ||
-          kimiPatched.changed ||
-          reasoningPatched.changed ||
-          xaiCompatible.changed
-        ) {
-          nextInit = {
-            ...nextInit,
-            body: JSON.stringify(xaiCompatible.body),
-          };
-        }
-      } catch {
-        // If parsing fails, send the request as-is
-      }
-    }
-
-    const fetchWithinRequestLimit = async (
-      requestInit: RequestInit,
-    ): Promise<Response> => {
-      const guarded = enforceOpenRouterRequestSizeLimit(requestInit);
-      if (guarded.rejection) return guarded.rejection;
-      return fetchImplementation(url, guarded.init);
-    };
-
-    const initialResponse = await fetchWithinRequestLimit(nextInit);
-    const parserFailure = await classifyPdfParserFailure(initialResponse);
-    if (!parserFailure) {
-      return attachOpenRouterStreamErrorMetadata(initialResponse);
-    }
-
-    if (parserFailure === "generic_parse") {
-      const sandboxBody = createSandboxPdfRecoveryBody(parsedRequestBody, true);
-      if (!sandboxBody.changed) {
-        return attachOpenRouterStreamErrorMetadata(initialResponse);
-      }
-
-      logPdfParserRecovery("unknown", "sandbox", parserFailure);
-      const sandboxResponse = await fetchWithinRequestLimit({
-        ...nextInit,
-        body: JSON.stringify(sandboxBody.body),
-      });
-      return attachOpenRouterStreamErrorMetadata(
-        withPrivateResponseHeader(
-          sandboxResponse,
-          PDF_PARSER_RECOVERY_HEADER,
-          "sandbox",
-        ),
+  if (nextInit.body && typeof nextInit.body === "string") {
+    try {
+      const parsedBody = JSON.parse(nextInit.body) as unknown;
+      const kimiNormalized = normalizeOpenRouterRequestForKimi(parsedBody);
+      const kimiPatched = patchKimiReasoningToolCalls(kimiNormalized.body);
+      const reasoningPatched = sanitizeOpenRouterEncryptedReasoning(
+        kimiPatched.body,
       );
-    }
-
-    if (requestUsesPdfParserEngine(parsedRequestBody, "cloudflare-ai")) {
-      const sandboxBody = createSandboxPdfRecoveryBody(parsedRequestBody);
-      if (!sandboxBody.changed) {
-        return attachOpenRouterStreamErrorMetadata(initialResponse);
+      const xaiCompatible = makeOpenRouterToolChoiceCompatibleWithXaiReasoning(
+        reasoningPatched.body,
+      );
+      parsedRequestBody = xaiCompatible.body;
+      if (
+        kimiNormalized.changed ||
+        kimiPatched.changed ||
+        reasoningPatched.changed ||
+        xaiCompatible.changed
+      ) {
+        nextInit = {
+          ...nextInit,
+          body: JSON.stringify(xaiCompatible.body),
+        };
       }
-
-      logPdfParserRecovery("cloudflare-ai", "sandbox", parserFailure);
-      const sandboxResponse = await fetchWithinRequestLimit({
-        ...nextInit,
-        body: JSON.stringify(sandboxBody.body),
-      });
-      return attachOpenRouterStreamErrorMetadata(
-        withPrivateResponseHeader(
-          sandboxResponse,
-          PDF_PARSER_RECOVERY_HEADER,
-          "sandbox",
-        ),
-      );
+    } catch {
+      // If parsing fails, send the request as-is
     }
+  }
 
-    const cloudflareBody = replacePdfParserEngine(
-      parsedRequestBody,
-      "mistral-ocr",
-      "cloudflare-ai",
-    );
-    if (!cloudflareBody.changed) {
-      return attachOpenRouterStreamErrorMetadata(initialResponse);
-    }
+  const fetchWithinRequestLimit = async (
+    requestInit: RequestInit,
+  ): Promise<Response> => {
+    const guarded = enforceOpenRouterRequestSizeLimit(requestInit);
+    if (guarded.rejection) return guarded.rejection;
+    return fetchImplementation(url, guarded.init);
+  };
 
-    logPdfParserRecovery("mistral-ocr", "cloudflare-ai", parserFailure);
-    const cloudflareResponse = await fetchWithinRequestLimit({
-      ...nextInit,
-      body: JSON.stringify(cloudflareBody.body),
-    });
-    const cloudflareFailure =
-      await classifyPdfParserFailure(cloudflareResponse);
-    if (!cloudflareFailure) {
-      return attachOpenRouterStreamErrorMetadata(
-        withPrivateResponseHeader(
-          cloudflareResponse,
-          PDF_PARSER_ENGINE_HEADER,
-          "cloudflare-ai",
-        ),
-      );
-    }
+  const initialResponse = await fetchWithinRequestLimit(nextInit);
+  const parserFailure = await classifyPdfParserFailure(initialResponse);
+  if (!parserFailure) {
+    return attachOpenRouterStreamErrorMetadata(initialResponse);
+  }
 
-    const sandboxBody = createSandboxPdfRecoveryBody(cloudflareBody.body);
+  if (parserFailure === "generic_parse") {
+    const sandboxBody = createSandboxPdfRecoveryBody(parsedRequestBody, true);
     if (!sandboxBody.changed) {
-      return attachOpenRouterStreamErrorMetadata(cloudflareResponse);
+      return attachOpenRouterStreamErrorMetadata(initialResponse);
     }
 
-    logPdfParserRecovery("cloudflare-ai", "sandbox", cloudflareFailure);
+    logPdfParserRecovery("unknown", "sandbox", parserFailure);
     const sandboxResponse = await fetchWithinRequestLimit({
       ...nextInit,
       body: JSON.stringify(sandboxBody.body),
@@ -967,6 +917,103 @@ export const createOpenRouterPatchFetch =
         "sandbox",
       ),
     );
+  }
+
+  if (requestUsesPdfParserEngine(parsedRequestBody, "cloudflare-ai")) {
+    const sandboxBody = createSandboxPdfRecoveryBody(parsedRequestBody);
+    if (!sandboxBody.changed) {
+      return attachOpenRouterStreamErrorMetadata(initialResponse);
+    }
+
+    logPdfParserRecovery("cloudflare-ai", "sandbox", parserFailure);
+    const sandboxResponse = await fetchWithinRequestLimit({
+      ...nextInit,
+      body: JSON.stringify(sandboxBody.body),
+    });
+    return attachOpenRouterStreamErrorMetadata(
+      withPrivateResponseHeader(
+        sandboxResponse,
+        PDF_PARSER_RECOVERY_HEADER,
+        "sandbox",
+      ),
+    );
+  }
+
+  const cloudflareBody = replacePdfParserEngine(
+    parsedRequestBody,
+    "mistral-ocr",
+    "cloudflare-ai",
+  );
+  if (!cloudflareBody.changed) {
+    return attachOpenRouterStreamErrorMetadata(initialResponse);
+  }
+
+  logPdfParserRecovery("mistral-ocr", "cloudflare-ai", parserFailure);
+  const cloudflareResponse = await fetchWithinRequestLimit({
+    ...nextInit,
+    body: JSON.stringify(cloudflareBody.body),
+  });
+  const cloudflareFailure = await classifyPdfParserFailure(cloudflareResponse);
+  if (!cloudflareFailure) {
+    return attachOpenRouterStreamErrorMetadata(
+      withPrivateResponseHeader(
+        cloudflareResponse,
+        PDF_PARSER_ENGINE_HEADER,
+        "cloudflare-ai",
+      ),
+    );
+  }
+
+  const sandboxBody = createSandboxPdfRecoveryBody(cloudflareBody.body);
+  if (!sandboxBody.changed) {
+    return attachOpenRouterStreamErrorMetadata(cloudflareResponse);
+  }
+
+  logPdfParserRecovery("cloudflare-ai", "sandbox", cloudflareFailure);
+  const sandboxResponse = await fetchWithinRequestLimit({
+    ...nextInit,
+    body: JSON.stringify(sandboxBody.body),
+  });
+  return attachOpenRouterStreamErrorMetadata(
+    withPrivateResponseHeader(
+      sandboxResponse,
+      PDF_PARSER_RECOVERY_HEADER,
+      "sandbox",
+    ),
+  );
+}
+
+/**
+ * Fetch do OpenRouter com FAILOVER por crédito. Injeta a chave ativa do pool; se
+ * a resposta for 402 (sem crédito), marca a chave como esgotada e tenta a
+ * próxima por prioridade. Pool vazio / todas esgotadas → chave do env (fallback)
+ * = comportamento de hoje (zero retrocesso). Só rotaciona com body re-enviável
+ * (string/undefined), o caso das requests do OpenRouter.
+ */
+export const createOpenRouterPatchFetch =
+  (fetchImplementation: typeof fetch = globalThis.fetch): typeof fetch =>
+  async (url, init) => {
+    const bodyReusable =
+      init?.body === undefined || typeof init.body === "string";
+    const triedKeyIds: string[] = [];
+    for (;;) {
+      const poolKey = bodyReusable
+        ? await resolveActivePoolKey(triedKeyIds)
+        : null;
+      const response = await runOpenRouterPatchedFetch(
+        fetchImplementation,
+        url,
+        init,
+        poolKey?.plaintext,
+      );
+      if (poolKey && response.status === 402) {
+        void markPoolKeyExhausted(poolKey.id);
+        triedKeyIds.push(poolKey.id);
+        invalidatePoolKeyCache();
+        continue;
+      }
+      return response;
+    }
   };
 
 const openrouterPatchFetch = createOpenRouterPatchFetch();
@@ -1126,7 +1173,8 @@ export const modelDisplayNames: Record<ModelName, string> &
   "model-glm-5.3-flash-pro": "Z.ai GLM 5.3 Flash",
   "model-deepseek-v4-flash-vision": "DeepSeek V4 Flash Vision",
   "model-kimi-k3": "Moonshot Kimi K3",
-  "fallback-agent-model": "Auto, an intelligent model router built by Suricatoos",
+  "fallback-agent-model":
+    "Auto, an intelligent model router built by Suricatoos",
   "fallback-ask-model": "Auto, an intelligent model router built by Suricatoos",
   "title-generator-model": "DeepSeek V4 Flash",
   "agent-auto-review-model": "DeepSeek V4 Flash 0731",
