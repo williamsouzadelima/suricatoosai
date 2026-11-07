@@ -21,6 +21,7 @@ import {
   Wallet,
   AlertTriangle,
   ArrowLeftRight,
+  KeyRound,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,7 @@ import { TaskCostsTab } from "./TaskCostsTab";
 import { BudgetTab } from "./BudgetTab";
 import { ModelExchangePanel } from "./ModelExchangePanel";
 import { ModelQualityPanel } from "./ModelQualityPanel";
+import { LlmKeysPanel } from "./LlmKeysPanel";
 import {
   StatCard,
   StatusBadge,
@@ -65,7 +67,8 @@ type Tab =
   | "seguranca"
   | "custos"
   | "orcamentos"
-  | "pregao";
+  | "pregao"
+  | "chaves-llm";
 
 interface AllowlistEntry {
   email: string;
@@ -112,6 +115,7 @@ const NAV_GROUPS: {
       { id: "custos", label: "Custos", icon: DollarSign },
       { id: "orcamentos", label: "Orçamentos", icon: Wallet },
       { id: "pregao", label: "Pregão de LLMs", icon: ArrowLeftRight },
+      { id: "chaves-llm", label: "Chaves LLM", icon: KeyRound },
     ],
   },
   {
@@ -436,6 +440,8 @@ export function AdminPanel({
             <ModelExchangePanel />
             <ModelQualityPanel />
           </div>
+        ) : tab === "chaves-llm" ? (
+          <LlmKeysPanel />
         ) : (
           /* ---- Convites & acesso ---- */
           <div className="space-y-6">

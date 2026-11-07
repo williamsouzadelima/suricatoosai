@@ -45,6 +45,7 @@ import type * as lib_userDeletionFence from "../lib/userDeletionFence.js";
 import type * as lib_userResearchAuth from "../lib/userResearchAuth.js";
 import type * as lib_utils from "../lib/utils.js";
 import type * as liveOps from "../liveOps.js";
+import type * as llmKeys from "../llmKeys.js";
 import type * as localSandbox from "../localSandbox.js";
 import type * as messages from "../messages.js";
 import type * as monitorSettings from "../monitorSettings.js";
@@ -122,6 +123,7 @@ declare const fullApi: ApiFromModules<{
   "lib/userResearchAuth": typeof lib_userResearchAuth;
   "lib/utils": typeof lib_utils;
   liveOps: typeof liveOps;
+  llmKeys: typeof llmKeys;
   localSandbox: typeof localSandbox;
   messages: typeof messages;
   monitorSettings: typeof monitorSettings;
