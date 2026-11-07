@@ -1009,6 +1009,35 @@ export default defineSchema({
     updated_at: v.number(),
   }).index("by_user_id", ["user_id"]),
 
+  // Pool de chaves de API de LLM (OpenRouter) com failover por crédito. As chaves
+  // ficam CIFRADAS em repouso (AES-256-GCM, cifradas na camada Node do admin —
+  // ver lib/llm-keys/crypto.ts); aqui só vivem ciphertext/iv/auth_tag + metadados
+  // não-sensíveis. O plaintext NUNCA entra no Convex nem volta ao cliente.
+  llm_api_keys: defineTable({
+    label: v.string(),
+    provider: v.string(), // "openrouter" (preparado p/ outros no futuro)
+    ciphertext: v.string(),
+    iv: v.string(),
+    auth_tag: v.string(),
+    last4: v.string(),
+    enabled: v.boolean(),
+    priority: v.number(), // menor = tentada primeiro
+    status: v.union(
+      v.literal("untested"),
+      v.literal("active"),
+      v.literal("exhausted"),
+      v.literal("error"),
+    ),
+    exhausted_at: v.optional(v.number()),
+    last_used_at: v.optional(v.number()),
+    last_error: v.optional(v.string()),
+    created_by: v.optional(v.string()),
+    created_at: v.number(),
+    updated_at: v.number(),
+  })
+    .index("by_enabled_priority", ["enabled", "priority"])
+    .index("by_status", ["status"]),
+
   // Dedup durável de alertas de orçamento (sobrevive a retries do Trigger e a
   // cruzamentos multi-run do teto por usuário). 1 alerta por scope+período+threshold.
   budget_alerts: defineTable({
