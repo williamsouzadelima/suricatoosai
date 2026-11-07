@@ -182,30 +182,33 @@ export async function POST(req: NextRequest) {
       let status: "active" | "exhausted" | "error" = "error";
       let detail = "";
       try {
-        const r = await fetch("https://openrouter.ai/api/v1/key", {
-          headers: { Authorization: `Bearer ${plaintext}` },
+        // Completion REAL (1 token): testa validade E crédito-de-conta de fato
+        // (o /api/v1/key só valida a chave, não o saldo da conta).
+        const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${plaintext}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "openrouter/auto",
+            messages: [{ role: "user", content: "ping" }],
+            max_tokens: 1,
+          }),
         });
-        if (r.status === 401 || r.status === 403) {
+        if (r.status === 402) {
+          status = "exhausted";
+          detail = "Sem crédito para completar (HTTP 402 do OpenRouter).";
+        } else if (r.status === 401 || r.status === 403) {
           status = "error";
           detail = `Chave inválida ou sem permissão (HTTP ${r.status}).`;
-        } else if (!r.ok) {
-          status = "error";
-          detail = `Erro ao validar no OpenRouter (HTTP ${r.status}).`;
+        } else if (r.ok) {
+          status = "active";
+          detail = "Funciona — completou uma requisição de teste.";
         } else {
-          const j = (await r.json().catch(() => ({}))) as {
-            data?: { limit_remaining?: number | null };
-          };
-          const rem = j?.data?.limit_remaining;
-          if (typeof rem === "number" && rem <= 0) {
-            status = "exhausted";
-            detail = "Sem crédito (limite da chave atingido).";
-          } else if (typeof rem === "number") {
-            status = "active";
-            detail = `Válida — resta US$ ${rem.toFixed(2)} no limite da chave.`;
-          } else {
-            status = "active";
-            detail = "Válida (chave sem limite / pay-as-you-go).";
-          }
+          const t = await r.text().catch(() => "");
+          status = "error";
+          detail = `OpenRouter HTTP ${r.status}${t ? ": " + t.slice(0, 140) : ""}`;
         }
       } catch {
         status = "error";
