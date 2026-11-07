@@ -145,6 +145,91 @@ describe("proxy", () => {
     );
   });
 
+  it("bypasses AuthKit for engine-ingest only when enabled, POST, and token present", async () => {
+    const prev = process.env.ENGINE_INGEST_ENABLED;
+    process.env.ENGINE_INGEST_ENABLED = "true";
+    try {
+      const { default: proxy } = await import("../proxy");
+      const response = await proxy(
+        createRequest({
+          pathname: "/api/engagements/engine-ingest",
+          method: "POST",
+          headers: { "x-engine-token": "machine-token" },
+        }),
+      );
+      expect(response).toMatchObject({ kind: "next" });
+      expect(mockAuthkit).not.toHaveBeenCalled();
+      expect(mockNextResponseNext).toHaveBeenCalledWith();
+    } finally {
+      if (prev === undefined) delete process.env.ENGINE_INGEST_ENABLED;
+      else process.env.ENGINE_INGEST_ENABLED = prev;
+    }
+  });
+
+  it("does not bypass engine-ingest when the flag is off (401 like siblings)", async () => {
+    const prev = process.env.ENGINE_INGEST_ENABLED;
+    delete process.env.ENGINE_INGEST_ENABLED;
+    mockAuthkit.mockResolvedValue({
+      session: { user: null },
+      headers: new Headers(),
+      authorizationUrl: "https://auth.hackerai.co/login",
+    });
+    try {
+      const { default: proxy } = await import("../proxy");
+      await proxy(
+        createRequest({
+          pathname: "/api/engagements/engine-ingest",
+          method: "POST",
+          headers: { "x-engine-token": "machine-token" },
+        }),
+      );
+      expect(mockAuthkit).toHaveBeenCalledTimes(1);
+      expect(mockNextResponseJson).toHaveBeenCalledWith(
+        {
+          code: "unauthorized:auth",
+          message: "You need to sign in before continuing.",
+          cause: "Session expired or invalid",
+        },
+        expect.objectContaining({ status: 401 }),
+      );
+    } finally {
+      if (prev === undefined) delete process.env.ENGINE_INGEST_ENABLED;
+      else process.env.ENGINE_INGEST_ENABLED = prev;
+    }
+  });
+
+  it("does not bypass engine-ingest on non-POST even when enabled", async () => {
+    const prev = process.env.ENGINE_INGEST_ENABLED;
+    process.env.ENGINE_INGEST_ENABLED = "true";
+    mockAuthkit.mockResolvedValue({
+      session: { user: null },
+      headers: new Headers(),
+      authorizationUrl: "https://auth.hackerai.co/login",
+    });
+    try {
+      const { default: proxy } = await import("../proxy");
+      await proxy(
+        createRequest({
+          pathname: "/api/engagements/engine-ingest",
+          method: "GET",
+          headers: { "x-engine-token": "machine-token" },
+        }),
+      );
+      expect(mockAuthkit).toHaveBeenCalledTimes(1);
+      expect(mockNextResponseJson).toHaveBeenCalledWith(
+        {
+          code: "unauthorized:auth",
+          message: "You need to sign in before continuing.",
+          cause: "Session expired or invalid",
+        },
+        expect.objectContaining({ status: 401 }),
+      );
+    } finally {
+      if (prev === undefined) delete process.env.ENGINE_INGEST_ENABLED;
+      else process.env.ENGINE_INGEST_ENABLED = prev;
+    }
+  });
+
   it.each(["/robots.txt", "/sitemap.xml"])(
     "bypasses AuthKit for the public SEO route %s",
     async (pathname) => {

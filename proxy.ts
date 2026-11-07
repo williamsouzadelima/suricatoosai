@@ -27,10 +27,6 @@ const AUTHKIT_BYPASS_PATHS = new Set([
   "/api/health/trigger-agent-mode",
   "/api/internal/user-research",
   "/api/internal/security-alert",
-  // Endpoint de máquina do motor autônomo (codinome): auth própria por token
-  // (x-engine-token) + 404-invisível quando desligado. Como os demais endpoints
-  // de máquina, pula o authkit (sem sessão); IP-block/observe seguem aplicados.
-  "/api/engagements/engine-ingest",
   "/robots.txt",
   "/sitemap.xml",
 ]);
@@ -92,6 +88,22 @@ function isUnauthenticatedPath(pathname: string): boolean {
 
 function shouldBypassAuthkit(pathname: string): boolean {
   return AUTHKIT_BYPASS_PATHS.has(pathname);
+}
+
+const ENGINE_INGEST_PATH = "/api/engagements/engine-ingest";
+// Endpoint de máquina do motor (codinome): só pula o authkit quando LIGADO,
+// método POST E com o header de token PRESENTE. Caso contrário NÃO é isento →
+// cai no fluxo normal (401 JSON como as rotas irmãs), sem superfície enumerável
+// (nada de 404/405/204 distintos com a flag desligada). A VALIDADE do token é
+// checada (tempo constante) no próprio handler; aqui só a presença, para a
+// decisão de bypass — sem node:crypto (mantém o proxy edge-safe).
+function shouldBypassEngineIngest(request: NextRequest): boolean {
+  return (
+    request.nextUrl.pathname === ENGINE_INGEST_PATH &&
+    process.env.ENGINE_INGEST_ENABLED === "true" &&
+    request.method === "POST" &&
+    (request.headers.get("x-engine-token") ?? "") !== ""
+  );
 }
 
 function isUnsupportedRootPageRequest(
@@ -317,7 +329,7 @@ export default async function proxy(request: NextRequest) {
     );
   }
 
-  if (shouldBypassAuthkit(pathname)) {
+  if (shouldBypassAuthkit(pathname) || shouldBypassEngineIngest(request)) {
     return NextResponse.next();
   }
 

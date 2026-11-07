@@ -54,6 +54,19 @@ const SEVERITY_SYNONYMS: Record<string, FindingSeverity> = {
   crit: "critical",
 };
 
+// #10 SIGILO: só repassa tool_name de uma allowlist de superfícies/ferramentas
+// genéricas; qualquer outro valor (ex. nome interno de ferramenta do motor) cai
+// para "tool" — o nome real nunca chega ao relatório/entregável.
+const ALLOWED_TOOL_NAMES = new Set([
+  "browser", "ssh", "rdp", "vnc", "sqlmap", "http", "https", "terminal",
+  "shell", "cli", "nmap", "nuclei", "gowitness", "playwright", "command",
+  "curl", "ffuf", "katana", "httpx",
+]);
+function clampToolName(t?: string): string | undefined {
+  if (!t) return undefined;
+  return ALLOWED_TOOL_NAMES.has(t.toLowerCase()) ? t.toLowerCase() : "tool";
+}
+
 /** Normaliza a severidade do motor para o enum do platform; lança se desconhecida. */
 export function normalizeSeverity(raw: string): FindingSeverity {
   const key = String(raw ?? "").trim().toLowerCase();
@@ -99,7 +112,7 @@ export function mapEngineFinding(
       command: t.command,
       result_summary: t.result_summary,
       step_index: t.step_index,
-      tool_name: t.tool_name,
+      tool_name: clampToolName(t.tool_name),
     }),
   );
 
@@ -122,7 +135,7 @@ export function mapEngineFinding(
       s3_key: up.s3_key,
       media_type: up.media_type,
       step_index: img.step_index,
-      tool_name: img.tool_name,
+      tool_name: clampToolName(img.tool_name),
       command: img.command,
       result_summary: img.result_summary,
     };
