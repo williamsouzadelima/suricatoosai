@@ -58,6 +58,7 @@ export default defineConfig({
           "CONVEX_SERVICE_ROLE_KEY",
           "CONVEX_USER_RESEARCH_SERVICE_KEY",
           "OPENROUTER_API_KEY",
+          "LLM_KEY_ENC_SECRET",
           "OPENAI_API_KEY",
           "E2B_API_KEY",
           "E2B_TEMPLATE",
