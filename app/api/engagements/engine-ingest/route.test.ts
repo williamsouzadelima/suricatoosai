@@ -103,7 +103,13 @@ describe("POST engine-ingest — orquestração", () => {
     fd.set("payload", validPayload({ narrative: "# rel" }));
     const res = await POST(makeReq({ token: "tok", fd }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ ok: true, finding_id: "f1", images: 0 });
+    expect(await res.json()).toMatchObject({
+      ok: true,
+      finding_id: "f1",
+      images: 0,
+      evidenceAttached: 0,
+      evidenceSkipped: 0,
+    });
     const arg = mCapture.mock.calls[0][0];
     expect(arg.origin).toBe("agent");
     expect(arg.severity).toBe("high");
@@ -143,6 +149,47 @@ describe("POST engine-ingest — orquestração", () => {
       s3_key: "users/user_1/a.png",
       media_type: "image/png",
       label: "XSS",
+    });
+  });
+
+  it("#B3 merge devolve contagem REAL de evidência (não o nº de imagens subidas)", async () => {
+    // re-push de achado existente: 1 imagem subida ao S3, mas o backend dedupou
+    // (já presente) → evidenceAttached:0, evidenceSkipped:1. A resposta reflete
+    // isto em vez de "images:1" enganoso.
+    mUpload.mockResolvedValue({
+      file_id: "file_a",
+      s3_key: "users/user_1/a.png",
+      media_type: "image/png",
+      size: 3,
+    });
+    mCapture.mockResolvedValue({
+      success: true,
+      merged: true,
+      finding_id: "f1",
+      updated: true,
+      updatedFields: ["severity"],
+      evidenceAttached: 0,
+      evidenceSkipped: 1,
+    });
+    const fd = new FormData();
+    fd.set(
+      "payload",
+      validPayload({ images: [{ field: "img0", label: "XSS", tool_name: "browser" }] }),
+    );
+    const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const file = new File([bytes], "x.png", { type: "image/png" });
+    (file as unknown as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer =
+      async () => bytes.buffer;
+    fd.set("img0", file);
+    const res = await POST(makeReq({ token: "tok", fd }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      ok: true,
+      merged: true,
+      finding_id: "f1",
+      images: 1, // subiu 1 ao S3
+      evidenceAttached: 0, // mas 0 anexadas (dedup por conteúdo)
+      evidenceSkipped: 1,
     });
   });
 

@@ -24,6 +24,10 @@ export type EngineCaptureResult = {
   merged?: boolean;
   finding_id?: string;
   error?: string;
+  // #3: contagem REAL de evidência anexada no merge (dedup por conteúdo) — o
+  // caller usa isto em vez de uploads.length p/ não reportar nº enganoso.
+  evidenceAttached?: number;
+  evidenceSkipped?: number;
 };
 
 export async function captureEngineFinding(
@@ -57,5 +61,8 @@ export async function captureEngineFinding(
     cvssScore: args.cvssScore,
     confidence: args.confidence,
     evidence: args.evidence,
+    // Opt-in do MOTOR (isolamento/#4): habilita latest-wins + dedup por conteúdo
+    // no backend. Só o motor passa isto; o chat de produção nunca.
+    reassess: true,
   });
 }

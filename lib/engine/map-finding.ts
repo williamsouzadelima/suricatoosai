@@ -6,10 +6,12 @@
  *  - evidência de imagem SEMPRE source_type:"file" + file_id + s3_key + media_type
  *    image/* (file_id é o que sobrevive ao purge de 24h; media_type image/* é o
  *    que a galeria/relatório tratam como imagem);
- *  - LABEL ÚNICO por item: o merge dedupa evidência por
- *    source_type+tool_call_id+message_id+label e, sem tool_call_id/message_id,
- *    dois itens de mesmo source_type+label → o 2º é DESCARTADO em silêncio.
- *    Uniquificamos os labels de todos os itens para nunca perder um print.
+ *  - LABEL ÚNICO por item: a dedup de evidência no merge usa o RÓTULO como parte
+ *    da identidade (imagem = source_type+rótulo+media_type+tamanho; texto =
+ *    rótulo+passo+trecho+comando+resultado). Dois artefatos DISTINTOS no mesmo
+ *    push com rótulo igual colidiriam, então uniquificamos os rótulos ("X",
+ *    "X (2)", …) — nunca se perde um print; uma recaptura do MESMO print (mesmo
+ *    rótulo+tipo+tamanho) ainda dedupa.
  */
 
 import type { CapturedEvidenceItem, FindingSeverity } from "@/lib/db/findings";
@@ -78,17 +80,29 @@ export function normalizeSeverity(raw: string): FindingSeverity {
 }
 
 /**
- * Garante label único em todo o conjunto de evidência. Mantém o primeiro como
- * está; sufixa duplicados com " (2)", " (3)"… (comparação exata, igual ao dedup).
+ * Garante label GLOBALMENTE único no conjunto de evidência. Mantém o primeiro uso
+ * de cada rótulo; para repetidos, acha o 1º sufixo " (n)" LIVRE comparando contra
+ * TODOS os rótulos finais já usados — inclusive os que já vieram com sufixo
+ * literal (ex.: ["X","X","X (2)"] → "X","X (2)","X (2) (2)", nunca dois "X (2)").
+ * Nota: a identidade de imagem no dedup do motor é rótulo+tipo+tamanho; um
+ * content-hash (sha256) seria endurecimento futuro contra colisão de tamanho.
  */
 function uniquifyLabels(items: CapturedEvidenceItem[]): CapturedEvidenceItem[] {
-  const seen = new Map<string, number>();
+  const used = new Set<string>();
   return items.map((item) => {
     const base = item.label ?? "";
-    const count = seen.get(base) ?? 0;
-    seen.set(base, count + 1);
-    if (count === 0) return item;
-    return { ...item, label: `${base} (${count + 1})` };
+    if (!used.has(base)) {
+      used.add(base);
+      return item;
+    }
+    let n = 2;
+    let candidate = `${base} (${n})`;
+    while (used.has(candidate)) {
+      n += 1;
+      candidate = `${base} (${n})`;
+    }
+    used.add(candidate);
+    return { ...item, label: candidate };
   });
 }
 

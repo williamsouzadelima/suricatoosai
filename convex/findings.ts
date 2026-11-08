@@ -10,6 +10,12 @@ import {
   evaluateApprovalGate,
   requireGraphicalEvidenceEnabled,
 } from "./lib/graphicalEvidence";
+import {
+  computeMergePatch,
+  isMachineDraft,
+  sameEvidenceContent,
+} from "./lib/findingMerge";
+import { cvssBaseScore } from "./lib/cvss";
 
 /**
  * Achados + evidências da feature de relatórios.
@@ -179,7 +185,12 @@ async function insertEvidence(
   }
 }
 
-/** Evita reinserir evidência idêntica ao mesclar recapturas (contém acúmulo). */
+/**
+ * CHAT (produção) — dedup por IDENTIDADE DE CAPTURA (source_type + tool_call_id +
+ * message_id + label), BYTE-IDÊNTICA ao comportamento de produção. Usada SÓ no
+ * ramo do chat; o motor usa SEMPRE dedup por conteúdo
+ * (evidenceAlreadyPresentByContent), inclusive em re-push a achado em revisão.
+ */
 async function evidenceAlreadyPresent(
   ctx: MutationCtx,
   findingId: Id<"findings">,
@@ -204,6 +215,75 @@ async function evidenceAlreadyPresent(
   );
 }
 
+/**
+ * MOTOR (#B2) — dedup por CONTEÚDO. Imagem = rótulo+tipo+TAMANHO em bytes
+ * (file_id/s3_key são novos a cada upload: por eles o MESMO print re-empurrado
+ * nunca dedupava; por label-só um print CORRIGIDO seria descartado). Texto =
+ * rótulo+passo+trecho+comando+resultado. LIMITE: a identidade de imagem é só
+ * rótulo+tipo+tamanho — dois prints DIFERENTES com mesmo rótulo+tipo+tamanho exato
+ * colapsam (raro, silencioso; sha256 seria o fix). SÓ o caminho do motor usa isto —
+ * por isso o re-push do motor nunca cai na dedup por tool_call_id (que ele não tem).
+ */
+async function evidenceAlreadyPresentByContent(
+  ctx: MutationCtx,
+  findingId: Id<"findings">,
+  item: {
+    source_type: Doc<"evidence">["source_type"];
+    file_id?: Id<"files">;
+    s3_key?: string;
+    label?: string;
+    media_type?: string;
+    step_index?: number;
+    snippet?: string;
+    command?: string;
+    result_summary?: string;
+  },
+): Promise<boolean> {
+  const recent = await ctx.db
+    .query("evidence")
+    .withIndex("by_finding_and_captured", (q) => q.eq("finding_id", findingId))
+    .order("desc")
+    .take(500);
+  const candidateIsFile = (item.source_type ?? "") === "file";
+  // Imagem: tamanho autoritativo vem da linha `files` (não trafega no item).
+  let candidateSize: number | undefined;
+  if (candidateIsFile && item.file_id) {
+    const f = await ctx.db.get(item.file_id);
+    candidateSize = f?.size ?? undefined;
+  }
+  const candidate = {
+    source_type: item.source_type,
+    label: item.label,
+    media_type: item.media_type,
+    size: candidateSize,
+    step_index: item.step_index,
+    // #M2: clampa o candidato p/ casar com o que foi GRAVADO (também clampado);
+    // sem isto, um texto > teto nunca dedupava (cru != clampado).
+    snippet: clampSnippet(item.snippet),
+    command: clampText(item.command),
+    result_summary: clampText(item.result_summary),
+  };
+  for (const e of recent) {
+    if (candidateIsFile) {
+      // Só pode casar como ARQUIVO (mesmo rótulo e tipo) — só então lemos o
+      // tamanho da linha `files` (evita N leituras p/ cada evidência recente).
+      if (
+        (e.source_type ?? "") === "file" &&
+        (e.label ?? "") === (item.label ?? "") &&
+        (e.media_type ?? "") === (item.media_type ?? "")
+      ) {
+        const ef = e.file_id ? await ctx.db.get(e.file_id) : null;
+        if (sameEvidenceContent({ ...e, size: ef?.size ?? undefined }, candidate)) {
+          return true;
+        }
+      }
+    } else if (sameEvidenceContent(e, candidate)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 async function requireOwnedFinding(
   ctx: MutationCtx,
   findingId: Id<"findings">,
@@ -215,9 +295,14 @@ async function requireOwnedFinding(
 }
 
 /**
- * Captura de achado pelo agente (serviceKey). Dedup por engajamento+fingerprint:
- * se já existe um achado NÃO aprovado com o mesmo fingerprint, só anexa evidência
- * e completa campos vazios; caso contrário cria um novo em "draft".
+ * Captura de achado pelo agente/motor (serviceKey). Dedup por engajamento+
+ * fingerprint: se já existe um achado NÃO aprovado (draft/in_review) com o mesmo
+ * fingerprint, MESCLA; senão cria um novo em "draft". Dois modos de merge:
+ *  - CHAT (sem `reassess`): conservador e byte-idêntico ao de hoje — completa só
+ *    campos vazios, nunca sobrescreve, dedup por identidade de captura.
+ *  - MOTOR (`reassess:true`): em draft de máquina ainda não submetido, a avaliação
+ *    mais nova VENCE (latest-wins: severity/CVSS/narrativa/…); em achado já curado,
+ *    conservador. Evidência dedup por conteúdo. Detalhe em convex/lib/findingMerge.
  */
 export const captureFindingForBackend = mutation({
   args: {
@@ -245,6 +330,10 @@ export const captureFindingForBackend = mutation({
     sourceToolCallId: v.optional(v.string()),
     sourceSubagentId: v.optional(v.string()),
     evidence: v.optional(v.array(evidenceItemArg)),
+    // Opt-in do MOTOR (isolamento/#4): quando true, o merge usa latest-wins
+    // (em draft de máquina não curado) + dedup por conteúdo. O chat de produção
+    // NÃO passa este arg → comportamento byte-idêntico ao de hoje.
+    reassess: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     validateServiceKey(args.serviceKey);
@@ -283,30 +372,78 @@ export const captureFindingForBackend = mutation({
     );
 
     if (mergeable) {
-      // Completa apenas campos ainda vazios; não sobrescreve curadoria.
-      const patch: Record<string, unknown> = { updated_at: Date.now() };
-      if (!mergeable.description && args.description)
-        patch.description = clampText(args.description);
-      if (!mergeable.impact && args.impact)
-        patch.impact = clampText(args.impact);
-      if (!mergeable.remediation && args.remediation)
-        patch.remediation = clampText(args.remediation);
-      if (!mergeable.narrative && args.narrative)
-        patch.narrative = clampText(args.narrative);
-      if (!mergeable.cwe && args.cwe) patch.cwe = args.cwe;
-      if (!mergeable.cvss_vector && args.cvssVector)
-        patch.cvss_vector = args.cvssVector;
-      await ctx.db.patch(mergeable._id, patch);
-      for (const item of args.evidence ?? []) {
-        if (!(await evidenceAlreadyPresent(ctx, mergeable._id, item))) {
-          await insertEvidence(ctx, mergeable, item);
+      const isEngine = args.reassess === true;
+
+      // ── CHAT (produção): ramo BYTE-IDÊNTICO ao de hoje ─────────────────────
+      // Sem reassess, o fluxo é exatamente o de produção: completa só campos
+      // vazios (nunca sobrescreve curadoria), SEMPRE bate updated_at, dedup por
+      // identidade de captura. Zero mudança de comportamento no chat (#4).
+      if (!isEngine) {
+        const patch: Record<string, unknown> = { updated_at: Date.now() };
+        if (!mergeable.description && args.description)
+          patch.description = clampText(args.description);
+        if (!mergeable.impact && args.impact)
+          patch.impact = clampText(args.impact);
+        if (!mergeable.remediation && args.remediation)
+          patch.remediation = clampText(args.remediation);
+        if (!mergeable.narrative && args.narrative)
+          patch.narrative = clampText(args.narrative);
+        if (!mergeable.cwe && args.cwe) patch.cwe = args.cwe;
+        if (!mergeable.cvss_vector && args.cvssVector)
+          patch.cvss_vector = args.cvssVector;
+        await ctx.db.patch(mergeable._id, patch);
+        for (const item of args.evidence ?? []) {
+          if (!(await evidenceAlreadyPresent(ctx, mergeable._id, item))) {
+            await insertEvidence(ctx, mergeable, item);
+          }
         }
+        return {
+          success: true,
+          merged: true,
+          findingId: mergeable._id,
+          finding_id: mergeable.finding_id,
+        };
+      }
+
+      // ── MOTOR (reassess): latest-wins SÓ em draft de máquina ainda não curado.
+      // Sobrescreve a avaliação (severity/cvss atômico/narrativa/steps/confidence/
+      // verdict/impact/remediation/description/cwe) quando não-vazia; em achado já
+      // em revisão (operador curando) cai no conservador (preserva curadoria). Em
+      // AMBOS, dedup por CONTEÚDO (rótulo+tipo+tamanho) — um print DIFERENTE com
+      // mesmo rótulo+tipo+tamanho exato pode ser dedupado (raro; sha256 = fix
+      // futuro). SEM nota de "avaliação anterior" (vazava ao cliente, B2).
+      const latestWins = isMachineDraft(mergeable, args.origin);
+      const { patch, updatedFields } = computeMergePatch(
+        mergeable,
+        args,
+        { clampText, clampSteps },
+        latestWins,
+      );
+      let evidenceAttached = 0;
+      let evidenceSkipped = 0;
+      for (const item of args.evidence ?? []) {
+        if (await evidenceAlreadyPresentByContent(ctx, mergeable._id, item)) {
+          evidenceSkipped += 1;
+        } else {
+          await insertEvidence(ctx, mergeable, item);
+          evidenceAttached += 1;
+        }
+      }
+      // #L3: só grava patch/updated_at se algo de fato mudou (re-push no-op não
+      // reordena a lista nem simula atividade).
+      if (updatedFields.length > 0 || evidenceAttached > 0) {
+        patch.updated_at = Date.now();
+        await ctx.db.patch(mergeable._id, patch);
       }
       return {
         success: true,
         merged: true,
         findingId: mergeable._id,
         finding_id: mergeable.finding_id,
+        updated: updatedFields.length > 0,
+        updatedFields,
+        evidenceAttached,
+        evidenceSkipped,
       };
     }
 
@@ -328,6 +465,16 @@ export const captureFindingForBackend = mutation({
     }
 
     const now = Date.now();
+    // CVSS atômico no CREATE do motor (#B1): se vier vetor, o score é DERIVADO
+    // dele (par sempre consistente); vetor inválido é descartado (nunca grava
+    // lixo). Chat/analista (sem reassess) mantém o comportamento de hoje.
+    let createVector = args.cvssVector;
+    let createScore = args.cvssScore;
+    if (args.reassess === true && args.cvssVector) {
+      const derived = cvssBaseScore(args.cvssVector);
+      if (derived !== null) createScore = derived;
+      else createVector = undefined;
+    }
     const findingId = await ctx.db.insert("findings", {
       user_id: args.userId,
       organization_id: organizationId,
@@ -349,8 +496,8 @@ export const captureFindingForBackend = mutation({
       reproduction_steps: clampSteps(args.reproductionSteps),
       narrative: clampText(args.narrative),
       severity: args.severity,
-      cvss_vector: args.cvssVector,
-      cvss_score: args.cvssScore,
+      cvss_vector: createVector,
+      cvss_score: createScore,
       verdict: args.verdict,
       confidence: args.confidence,
       status: "draft",
@@ -362,12 +509,23 @@ export const captureFindingForBackend = mutation({
     });
 
     const finding = await ctx.db.get(findingId);
+    // #F4: conta a evidência REALMENTE gravada (um achado novo com N textos e 0
+    // imagens responde evidenceAttached:N — não o nº de imagens subidas).
+    let evidenceAttached = 0;
     if (finding) {
       for (const item of args.evidence ?? []) {
         await insertEvidence(ctx, finding, item);
+        evidenceAttached += 1;
       }
     }
-    return { success: true, merged: false, findingId, finding_id: findingRef };
+    return {
+      success: true,
+      merged: false,
+      findingId,
+      finding_id: findingRef,
+      evidenceAttached,
+      evidenceSkipped: 0,
+    };
   },
 });
 

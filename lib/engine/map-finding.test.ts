@@ -102,6 +102,18 @@ describe("mapEngineFinding", () => {
     ]);
   });
 
+  it("#F5 sufixo literal pré-existente não colide: [X, X, X (2)] → 3 rótulos únicos", () => {
+    // Bug do reviewer: o uniquify antigo gerava DOIS "X (2)" (o 2º X virava
+    // "X (2)" e colidia com o literal "X (2)") → um print era descartado no dedup.
+    const ingest = baseIngest({
+      textEvidence: [{ label: "X" }, { label: "X" }, { label: "X (2)" }],
+    });
+    const out = mapEngineFinding(ingest, []);
+    const labels = out.evidence.map((e) => e.label);
+    expect(new Set(labels).size).toBe(3);
+    expect(labels).toEqual(["X", "X (2)", "X (2) (2)"]);
+  });
+
   it("lança se uma imagem declarada não tem upload resolvido", () => {
     const ingest = baseIngest({ images: [{ field: "missing", label: "x" }] });
     expect(() => mapEngineFinding(ingest, [])).toThrow(/sem upload resolvido/);

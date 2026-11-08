@@ -270,7 +270,13 @@ export async function POST(req: NextRequest) {
       ok: true,
       merged: result.merged ?? false,
       finding_id: result.finding_id,
+      // imagens SUBIDAS ao S3 nesta chamada (sempre acurado).
       images: uploads.length,
+      // #3/#4: contagem REAL de evidência anexada vs ignorada (dedup por conteúdo).
+      // Ambos os ramos do motor sempre devolvem evidenceAttached; NUNCA cair para
+      // uploads.length (que conta só imagens e reintroduziria o nº enganoso do F4).
+      evidenceAttached: result.evidenceAttached ?? 0,
+      evidenceSkipped: result.evidenceSkipped ?? 0,
     });
   } catch (err) {
     // #11: nunca logar o erro cru (pode conter args/conteúdo de cliente). Só um
