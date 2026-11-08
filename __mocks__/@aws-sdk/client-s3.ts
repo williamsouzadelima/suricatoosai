@@ -12,9 +12,9 @@ export const CopyObjectCommand = jest
   .fn()
   .mockImplementation((params: any) => ({ params }));
 
-export class GetObjectCommand {
-  constructor(params: any) {}
-}
+export const GetObjectCommand = jest
+  .fn()
+  .mockImplementation((params: any) => ({ params }));
 
 export class DeleteObjectCommand {
   constructor(params: any) {}

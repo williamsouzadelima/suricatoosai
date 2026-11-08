@@ -281,8 +281,13 @@ export const getFileUrlAction = action({
         return null;
       }
 
-      // S3 file: Generate presigned download URL (valid for 1 hour)
-      return await generateS3DownloadUrl(file.s3_key);
+      // S3 file: Generate presigned download URL (valid for 1 hour). Thread the
+      // stored media_type so raster/pdf stay inline and svg/html/unknown become
+      // attachment (same-origin stored-XSS mitigation).
+      return await generateS3DownloadUrl(file.s3_key, {
+        mediaType: file.media_type,
+        filename: file.name,
+      });
     } catch (error) {
       convexLogger.error("file_get_url_failed", {
         userId: identity.subject,
@@ -357,7 +362,10 @@ export const getFileUrlsByFileIdsAction = action({
           }
 
           if (file.s3_key) {
-            return await generateS3DownloadUrl(file.s3_key);
+            return await generateS3DownloadUrl(file.s3_key, {
+              mediaType: file.media_type,
+              filename: file.name,
+            });
           }
 
           return null;
@@ -431,7 +439,10 @@ export const getFileUrlInfosByFileIdsAction = action({
 
             if (file.s3_key) {
               return {
-                url: await generateS3DownloadUrl(file.s3_key),
+                url: await generateS3DownloadUrl(file.s3_key, {
+                  mediaType: file.media_type,
+                  filename: file.name,
+                }),
                 sizeBytes: file.size,
                 mediaType: file.media_type,
                 name: file.name,
@@ -535,7 +546,10 @@ export const getFileUrlsBatchAction = action({
           continue;
         }
 
-        const url = await generateS3DownloadUrl(file.s3_key);
+        const url = await generateS3DownloadUrl(file.s3_key, {
+          mediaType: file.media_type,
+          filename: file.name,
+        });
         urlMap[fileId] = url;
       } catch (error) {
         // Log error but continue processing other files (partial failure handling)

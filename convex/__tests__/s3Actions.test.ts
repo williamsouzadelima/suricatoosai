@@ -531,6 +531,7 @@ describe("s3Actions", () => {
       );
       expect(mockGenerateS3DownloadUrl).toHaveBeenCalledWith(
         "users/user123/123-uuid-test.pdf",
+        { mediaType: "application/pdf", filename: "test.pdf" },
       );
     });
 

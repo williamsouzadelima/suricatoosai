@@ -1077,7 +1077,10 @@ export const saveSandboxGeneratedFile = action({
     }
 
     try {
-      const fileUrl = await generateS3DownloadUrl(args.s3Key);
+      const fileUrl = await generateS3DownloadUrl(args.s3Key, {
+        mediaType: args.mediaType,
+        filename: args.name,
+      });
       const fileId = (await ctx.runMutation(internal.fileStorage.saveFileToDb, {
         s3Key: args.s3Key,
         userId: args.userId,

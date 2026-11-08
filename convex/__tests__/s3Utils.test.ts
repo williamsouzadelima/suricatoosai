@@ -152,6 +152,68 @@ describe("s3Utils", () => {
       expect(url).toBe("https://s3.amazonaws.com/download-url");
       expect(mockGetSignedUrl).toHaveBeenCalled();
     });
+
+    it("defaults to attachment disposition without a media type (secure default)", async () => {
+      const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+      const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+      (
+        getSignedUrl as jest.MockedFunction<typeof getSignedUrl>
+      ).mockResolvedValue("https://s3.amazonaws.com/download-url");
+
+      const { generateS3DownloadUrl } = await import("../s3Utils");
+      await generateS3DownloadUrl("users/user123/file.bin");
+
+      expect(GetObjectCommand).toHaveBeenLastCalledWith(
+        expect.objectContaining({ ResponseContentDisposition: "attachment" }),
+      );
+    });
+
+    it("requests a pinned canonical Content-Type for inline and omits it for attachment (label-mismatch pin; runtime closure gated by G1)", async () => {
+      const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+      const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+      (
+        getSignedUrl as jest.MockedFunction<typeof getSignedUrl>
+      ).mockResolvedValue("https://s3.amazonaws.com/download-url");
+
+      const { generateS3DownloadUrl } = await import("../s3Utils");
+
+      // Inline-safe: dispõe inline E pina o Content-Type ao tipo canônico — assim
+      // um objeto com Content-Type mentiroso (ex. text/html salvo sob image/png)
+      // é servido image/png + inline, nunca executado como HTML (Finding 1).
+      await generateS3DownloadUrl("users/u/a.png", {
+        mediaType: "image/png",
+        filename: "a.png",
+      });
+      expect(GetObjectCommand).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          ResponseContentDisposition: 'inline; filename="a.png"',
+          ResponseContentType: "image/png",
+        }),
+      );
+
+      // Alias image/jpg → canônico image/jpeg no pin.
+      await generateS3DownloadUrl("users/u/b.jpg", { mediaType: "image/jpg" });
+      expect(GetObjectCommand).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          ResponseContentDisposition: "inline",
+          ResponseContentType: "image/jpeg",
+        }),
+      );
+
+      // Não-inline: attachment e SEM pin de Content-Type (o attachment já impede
+      // a renderização, então o Content-Type do objeto é irrelevante).
+      await generateS3DownloadUrl("users/u/x.svg", {
+        mediaType: "image/svg+xml",
+        filename: "x.svg",
+      });
+      const svgParams = (GetObjectCommand as unknown as jest.Mock).mock.calls.at(
+        -1,
+      )?.[0];
+      expect(svgParams.ResponseContentDisposition).toBe(
+        'attachment; filename="x.svg"',
+      );
+      expect(svgParams).not.toHaveProperty("ResponseContentType");
+    });
   });
 
   describe("deleteS3Object", () => {

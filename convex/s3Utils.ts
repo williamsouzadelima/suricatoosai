@@ -11,6 +11,10 @@ import {
   getS3UrlLifetimeSeconds,
   S3_USER_FILES_PREFIX,
 } from "../lib/constants/s3";
+import {
+  contentDispositionFor,
+  inlineSafeContentType,
+} from "../lib/utils/media-disposition";
 
 /**
  * Get environment variable with validation
@@ -101,16 +105,40 @@ export async function generateS3UploadUrl(
 }
 
 /**
- * Generate presigned URL for file download
+ * Generate presigned URL for file download.
+ *
+ * Segurança (stored-XSS same-origin): AWS_S3_ENDPOINT está no MESMO origin que o
+ * app, então um objeto servido INLINE executa no nosso origin. Duas defesas:
+ *  1) Content-Disposition por tipo — só raster/pdf vão inline; o resto vira
+ *     attachment (SEM `opts.mediaType` o padrão é attachment, seguro).
+ *  2) Para inline, FIXA o Content-Type ao tipo canônico seguro (não o Content-Type
+ *     do OBJETO no S3, que o upload controla e pode mentir — ex. text/html salvo
+ *     sob rótulo image/png). Sem o pin, inline + Content-Type-do-objeto = XSS; com
+ *     ele, a resposta é image/png + inline → o browser renderiza como imagem (desde
+ *     que o backend S3 HONRE o ResponseContentType — verificar no deploy, gate G1),
+ *     nunca como HTML. Callers inline (imagem/pdf) passam o `media_type` do registro.
  */
-export async function generateS3DownloadUrl(s3Key: string): Promise<string> {
+export async function generateS3DownloadUrl(
+  s3Key: string,
+  opts?: { mediaType?: string | null; filename?: string | null },
+): Promise<string> {
   try {
     const s3Client = getS3Client();
     const bucketName = getRequiredEnvVar("AWS_S3_BUCKET_NAME");
 
+    // Definido só quando inline-safe; para attachment fica undefined (o attachment
+    // já impede a renderização, então o Content-Type do objeto é irrelevante).
+    const pinnedContentType = inlineSafeContentType(opts?.mediaType);
     const command = new GetObjectCommand({
       Bucket: bucketName,
       Key: s3Key,
+      ResponseContentDisposition: contentDispositionFor(
+        opts?.mediaType,
+        opts?.filename,
+      ),
+      ...(pinnedContentType
+        ? { ResponseContentType: pinnedContentType }
+        : {}),
     });
 
     const downloadUrl = await getSignedUrl(s3Client, command, {

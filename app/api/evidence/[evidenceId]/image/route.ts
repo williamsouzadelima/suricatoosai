@@ -5,6 +5,10 @@ import { getConvexClient } from "@/lib/db/convex-client";
 import { getS3Client } from "@/convex/s3Utils";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import {
+  contentDispositionFor,
+  inlineSafeContentType,
+} from "@/lib/utils/media-disposition";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,10 +57,21 @@ export async function GET(
     if (!body) {
       return NextResponse.json({ error: "Objeto vazio" }, { status: 502 });
     }
+    // Defesa same-origin: pina o Content-Type ao tipo canônico seguro quando
+    // inline-safe (raster/pdf) — consistente com a disposição e com a doc de
+    // media-disposition; senão usa o rótulo/fallback (a disposição será attachment).
+    // nosniff impede o browser de adivinhar o tipo. Ingest de evidência é
+    // raster-only por allowlist de extensão.
+    const pinnedContentType = inlineSafeContentType(meta.mediaType);
     return new Response(body.transformToWebStream(), {
       headers: {
         "Content-Type":
-          meta.mediaType || obj.ContentType || "application/octet-stream",
+          pinnedContentType ||
+          meta.mediaType ||
+          obj.ContentType ||
+          "application/octet-stream",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Disposition": contentDispositionFor(meta.mediaType),
         "Cache-Control": "private, max-age=300",
       },
     });
