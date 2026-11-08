@@ -311,7 +311,7 @@ function partnerPoints(brand: ReportBrand): ValuePoint[] {
     },
     {
       title: "Confidencialidade total",
-      body: "Evidências sob controle de acesso, relatórios classificados e cadeia de custódia documentada para cada arquivo.",
+      body: "Evidências sob controle de acesso, relatórios classificados e hash de integridade (sha256) documentado para cada arquivo.",
     },
     {
       title: "Experiência ofensiva real",
