@@ -193,10 +193,13 @@ export async function buildPortalSummary(
   ctx: QueryCtx,
   args: { userId: string; clientId: Id<"clients">; nowMs: number },
   resolveMembership: ResolveMembershipFn,
+  opts?: { findingsCapPerEngagement?: number },
 ): Promise<PortalSummary | null> {
   const access = await resolveMembership(ctx, args.userId, args.clientId);
   if (!access) return null;
 
+  const findingsCap =
+    opts?.findingsCapPerEngagement ?? FINDINGS_CAP_PER_ENGAGEMENT;
   let truncated = false;
 
   // Engajamentos visíveis (mesma fonte da listagem; reconciliação por construção).
@@ -247,8 +250,8 @@ export async function buildPortalSummary(
         q.eq("engagement_id", e._id).eq("status", "published"),
       )
       .order("desc")
-      .take(FINDINGS_CAP_PER_ENGAGEMENT);
-    if (fs.length >= FINDINGS_CAP_PER_ENGAGEMENT) truncated = true;
+      .take(findingsCap);
+    if (fs.length >= findingsCap) truncated = true;
     if (fs.length > 0) withFindings += 1;
 
     const row: PerEngagementRow = {

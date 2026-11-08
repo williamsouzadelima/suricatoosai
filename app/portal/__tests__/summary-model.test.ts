@@ -41,29 +41,18 @@ function heroInput(
   } as unknown as PortalSummary;
 }
 
-const FORBIDDEN = /score|nota de seguran|grade|seguro|protegid|tend[êe]ncia/i;
+// "ainda" entra no guard: a copy de AUSÊNCIA nunca deve usá-la (R2). A única
+// "ainda" legítima é "ainda vulnerável" (= still vulnerable, afirmação VERDADEIRA
+// do reteste) — testada por string exata no S4+sv, FORA deste loop.
+const FORBIDDEN =
+  /ainda|score|nota de seguran|grade|seguro|protegid|tend[êe]ncia/i;
 
-describe("hero: numeral/tom/frase honestos + cobertura", () => {
-  it("S1 sem publicados → '—', muted", () => {
+describe("hero: numeral/tom/frase honestos + cobertura em TODA afirmação", () => {
+  it("S1 sem publicados → '—', muted, SEM 'ainda'", () => {
     const s = heroInput({ published: 0 });
     expect(heroNumeral(s)).toBe("—");
     expect(heroTone(s)).toBe("muted");
-    expect(heroSentence(s)).toBe(
-      "Nenhum achado publicado neste portfólio ainda.",
-    );
-  });
-
-  it("S2 nada aberto + COBERTURA PARCIAL → NEUTRAL (nunca falso all-clear)", () => {
-    const s = heroInput(
-      { published: 3, open: 0 },
-      { total: 3, withFindings: 2 },
-    );
-    expect(heroNumeral(s)).toBe("0");
-    expect(heroTone(s)).toBe("neutral");
-    expect(isFullCoverage(s)).toBe(false);
-    expect(heroSentence(s)).toBe(
-      "2 de 3 engajamentos com achados publicados; os demais ainda sem publicação.",
-    );
+    expect(heroSentence(s)).toBe("Nenhum achado publicado neste portfólio.");
   });
 
   it("S2 nada aberto + COBERTURA TOTAL → success", () => {
@@ -73,8 +62,9 @@ describe("hero: numeral/tom/frase honestos + cobertura", () => {
     );
     expect(heroNumeral(s)).toBe("0");
     expect(heroTone(s)).toBe("success");
-    expect(heroSentence(s)).toContain("todos os 3 achados publicados");
-    expect(heroSentence(s)).toContain("validados por reteste");
+    expect(heroSentence(s)).toBe(
+      "Nenhum achado em aberto: todos os 3 achados publicados foram validados por reteste.",
+    );
   });
 
   it("S2 singular, cobertura total", () => {
@@ -88,18 +78,33 @@ describe("hero: numeral/tom/frase honestos + cobertura", () => {
     );
   });
 
-  it("truncated força NÃO-success + aviso de resumo parcial", () => {
+  it("S2 nada aberto + COBERTURA PARCIAL → NEUTRAL + qualificador (nunca falso all-clear)", () => {
+    const s = heroInput(
+      { published: 3, open: 0 },
+      { total: 3, withFindings: 2 },
+    );
+    expect(heroNumeral(s)).toBe("0");
+    expect(heroTone(s)).toBe("neutral");
+    expect(isFullCoverage(s)).toBe(false);
+    expect(heroSentence(s)).toBe(
+      "Nenhum achado em aberto entre os 3 achados publicados. Cobertura: 2 de 3 engajamentos com achados publicados.",
+    );
+  });
+
+  it("nada aberto + TRUNCADO → neutral + aviso de resumo parcial", () => {
     const s = heroInput(
       { published: 3, open: 0 },
       { total: 3, withFindings: 3, truncated: true },
     );
-    expect(isFullCoverage(s)).toBe(false);
     expect(heroTone(s)).toBe("neutral");
     expect(truncationNotice(s)).toBe(SUMMARY_TRUNCATED_COPY);
-    expect(heroSentence(s)).toContain("resumo parcial");
+    expect(heroSentence(s)).toContain(
+      "Nenhum achado em aberto entre os 3 achados publicados",
+    );
+    expect(heroSentence(s)).toContain(SUMMARY_TRUNCATED_COPY);
   });
 
-  it("S3 aberto sem crítico/alto → '0', neutral", () => {
+  it("S3 aberto sem crítico/alto, cobertura total → '0', neutral", () => {
     const s = heroInput(
       { published: 5, open: 2, openCriticalHigh: 0 },
       { total: 3, withFindings: 3 },
@@ -111,7 +116,31 @@ describe("hero: numeral/tom/frase honestos + cobertura", () => {
     );
   });
 
-  it("S4 crítico/alto em aberto → N, destructive, +ainda vulnerável", () => {
+  it("R1: aberto sem crítico/alto + COBERTURA PARCIAL → qualificador anexado", () => {
+    const s = heroInput(
+      { published: 4, open: 2, openCriticalHigh: 0 },
+      { total: 3, withFindings: 1 },
+    );
+    expect(heroNumeral(s)).toBe("0");
+    expect(heroTone(s)).toBe("neutral");
+    const sent = heroSentence(s);
+    expect(sent).toContain("2 achados em aberto, nenhum crítico ou alto.");
+    expect(sent).toContain(
+      "Cobertura: 1 de 3 engajamentos com achados publicados.",
+    );
+  });
+
+  it("R1: aberto sem crítico/alto + TRUNCADO → 'nenhum crítico ou alto' é SUAVIZADO", () => {
+    const s = heroInput(
+      { published: 2, open: 2, openCriticalHigh: 0 },
+      { total: 1, withFindings: 1, truncated: true },
+    );
+    const sent = heroSentence(s);
+    expect(sent).toContain("entre os achados carregados");
+    expect(sent).toContain(SUMMARY_TRUNCATED_COPY);
+  });
+
+  it("S4 crítico/alto em aberto → N, destructive, +ainda vulnerável (string exata)", () => {
     const s = heroInput(
       {
         published: 5,
@@ -129,23 +158,48 @@ describe("hero: numeral/tom/frase honestos + cobertura", () => {
     );
   });
 
-  it("copy-guard: nenhuma frase do herói usa termo proibido", () => {
+  it("R1: crítico/alto + TRUNCADO → contagem crit/alto + aviso de resumo parcial", () => {
+    const s = heroInput(
+      {
+        published: 5,
+        open: 3,
+        openCriticalHigh: 2,
+        openBySeverity: { critical: 2, high: 0, medium: 1, low: 0, info: 0 },
+        retest: { fixed: 0, stillVulnerable: 0, pending: 0, notRetested: 3 },
+      },
+      { total: 1, withFindings: 1, truncated: true },
+    );
+    const sent = heroSentence(s);
+    expect(sent).toContain("2 críticos e 0 altos");
+    expect(sent).toContain(SUMMARY_TRUNCATED_COPY);
+  });
+
+  it("copy-guard: nenhuma frase de AUSÊNCIA usa 'ainda'/termo proibido", () => {
     const inputs = [
       heroInput({ published: 0 }),
-      heroInput({ published: 3, open: 0 }, { total: 3, withFindings: 2 }),
       heroInput({ published: 3, open: 0 }, { total: 3, withFindings: 3 }),
       heroInput({ published: 1, open: 0 }),
+      heroInput({ published: 3, open: 0 }, { total: 3, withFindings: 2 }),
+      heroInput(
+        { published: 3, open: 0 },
+        { total: 3, withFindings: 3, truncated: true },
+      ),
       heroInput(
         { published: 5, open: 2, openCriticalHigh: 0 },
         { total: 3, withFindings: 3 },
       ),
+      heroInput(
+        { published: 4, open: 2, openCriticalHigh: 0 },
+        { total: 3, withFindings: 1 },
+      ),
+      // S4 SEM still_vulnerable (sv=0) → sem "ainda vulnerável" legítimo
       heroInput(
         {
           published: 5,
           open: 4,
           openCriticalHigh: 2,
           openBySeverity: { critical: 2, high: 0, medium: 1, low: 1, info: 0 },
-          retest: { fixed: 0, stillVulnerable: 1, pending: 0, notRetested: 4 },
+          retest: { fixed: 0, stillVulnerable: 0, pending: 0, notRetested: 4 },
         },
         { total: 3, withFindings: 3 },
       ),

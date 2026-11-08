@@ -51,34 +51,51 @@ export function heroTone(s: PortalSummary): HeroTone {
   return "neutral";
 }
 
+/** Qualificador de cobertura/truncamento — anexado onde um fato de achado poderia
+ *  ser lido como COMPLETO. "" quando cobertura total e não truncado. */
+function coverageQualifier(s: PortalSummary): string {
+  const { total, withFindings } = s.engagements;
+  let q = "";
+  if (withFindings < total) {
+    q += ` Cobertura: ${withFindings} de ${total} ${plural(
+      total,
+      "engajamento",
+      "engajamentos",
+    )} com achados publicados.`;
+  }
+  if (s.truncated) {
+    q += ` ${SUMMARY_TRUNCATED_COPY}`;
+  }
+  return q;
+}
+
 /**
- * Frase do herói — SEMPRE acompanha o numeral (nunca um número solto). Diz a
- * base (só publicados) e o que foi contado. Ausência NÃO vira "tudo limpo", e o
- * verde de "nada em aberto" só sai com cobertura total (senão é falso all-clear).
+ * Frase do herói — SEMPRE acompanha o numeral (nunca um número solto). O
+ * qualificador de cobertura/truncamento é anexado a TODA afirmação que poderia
+ * ser lida como completa; ausência NÃO vira "tudo limpo".
  */
 export function heroSentence(s: PortalSummary): string {
   const f = s.findings;
-  const { total, withFindings } = s.engagements;
+  const q = coverageQualifier(s);
   if (f.published === 0) {
-    return "Nenhum achado publicado neste portfólio ainda.";
+    return "Nenhum achado publicado neste portfólio.";
   }
   if (f.open === 0) {
-    if (withFindings < total) {
-      return `${withFindings} de ${total} ${plural(
-        total,
-        "engajamento",
-        "engajamentos",
-      )} com achados publicados; os demais ainda sem publicação.`;
-    }
-    if (s.truncated) {
-      return "Nenhum achado em aberto entre os achados carregados; resumo parcial.";
+    if (q) {
+      // cobertura parcial ou truncado → NÃO é um "tudo limpo" limpo.
+      return `Nenhum achado em aberto entre os ${f.published} achados publicados.${q}`;
     }
     return f.published === 1
       ? "Nenhum achado em aberto: o único achado publicado foi validado por reteste."
       : `Nenhum achado em aberto: todos os ${f.published} achados publicados foram validados por reteste.`;
   }
   if (f.openCriticalHigh === 0) {
-    return `${f.open} ${plural(f.open, "achado em aberto", "achados em aberto")}, nenhum crítico ou alto.`;
+    const base = `${f.open} ${plural(
+      f.open,
+      "achado em aberto",
+      "achados em aberto",
+    )}, nenhum crítico ou alto${s.truncated ? " entre os achados carregados" : ""}.`;
+    return base + q;
   }
   const c = f.openBySeverity.critical;
   const h = f.openBySeverity.high;
@@ -88,13 +105,15 @@ export function heroSentence(s: PortalSummary): string {
     "crítico",
     "críticos",
   )} e ${h} ${plural(h, "alto", "altos")}.`;
-  return sv > 0
-    ? `${base} ${sv} ${plural(
-        sv,
-        "confirmado ainda vulnerável",
-        "confirmados ainda vulneráveis",
-      )} no reteste.`
-    : base;
+  const svtxt =
+    sv > 0
+      ? ` ${sv} ${plural(
+          sv,
+          "confirmado ainda vulnerável",
+          "confirmados ainda vulneráveis",
+        )} no reteste.`
+      : "";
+  return base + svtxt + q;
 }
 
 /** Rótulo de reteste no PORTAL (vocabulário único client-facing). NÃO edita o

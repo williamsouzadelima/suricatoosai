@@ -462,9 +462,10 @@ const portalSummaryReturns = v.union(
     }),
   }),
 );
-// Guarda em tempo de compilação: falha o `tsc` se o validador de retorno e o
-// tipo PortalSummary divergirem (trava a reincidência convex-returns-estrito se
-// um campo/spread futuro entrar só de um lado).
+// Guarda em tempo de compilação: falha o `tsc` se um campo EXPLÍCITO do validador
+// de retorno e do tipo PortalSummary divergir. NÃO pega campo introduzido por
+// `...spread` (o tipo o absorve) → isso é coberto pelo teste de key-set em
+// convex/__tests__/portalSummary.test.ts.
 type _Equal<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
     ? true

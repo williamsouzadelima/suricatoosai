@@ -10,15 +10,24 @@ import {
 type Row = { _id: string; [k: string]: unknown };
 type Tables = Record<string, Row[]>;
 
-// ctx-stub: query(table).withIndex(name, build).order()?.take(n)/collect(),
-// filtrando pelos eq() do builder. order() é no-op (agregação não depende de ordem).
+// ctx-stub: query(table).withIndex(name, build).order("desc")?.take(n)/collect(),
+// filtrando pelos eq() do builder. order("desc") ORDENA por _creationTime desc
+// (depois take corta) — espelha o keep-newest do servidor sob o teto de leitura.
 function ctxOf(tables: Tables) {
   const chain = (rows: Row[]) => {
+    let current = rows;
     const c = {
-      order: (_dir?: string) => c,
-      take: async (n: number) => rows.slice(0, n),
-      collect: async () => rows,
-      first: async () => rows[0] ?? null,
+      order: (dir?: string) => {
+        current = [...current].sort((a, b) => {
+          const av = (a._creationTime as number) ?? 0;
+          const bv = (b._creationTime as number) ?? 0;
+          return dir === "desc" ? bv - av : av - bv;
+        });
+        return c;
+      },
+      take: async (n: number) => current.slice(0, n),
+      collect: async () => current,
+      first: async () => current[0] ?? null,
     };
     return c;
   };
@@ -404,6 +413,157 @@ describe("buildPortalSummary", () => {
       createdAt: 600,
       formats: ["docx"],
     });
+  });
+
+  it("key-set: cada objeto do contrato tem EXATAMENTE as chaves do validador (pega ...spread futuro)", async () => {
+    const s = await buildPortalSummary(
+      ctxOf(fixtures()),
+      { userId: "u", clientId: "C1" as never, nowMs: 999 },
+      granted as never,
+    );
+    if (!s) throw new Error("esperava resumo");
+    const keys = (o: object) => Object.keys(o).sort();
+    expect(keys(s)).toEqual(
+      [
+        "generatedAt",
+        "truncated",
+        "engagements",
+        "findings",
+        "priorities",
+        "perEngagement",
+        "reports",
+      ].sort(),
+    );
+    expect(keys(s.engagements)).toEqual(
+      ["total", "withFindings", "byStatus", "withWindow", "withScope"].sort(),
+    );
+    expect(keys(s.engagements.byStatus)).toEqual(
+      ["planned", "active", "review", "reporting", "closed"].sort(),
+    );
+    expect(keys(s.findings)).toEqual(
+      [
+        "published",
+        "publishedWithoutDate",
+        "open",
+        "openBySeverity",
+        "openCriticalHigh",
+        "worstOpenSeverity",
+        "retest",
+        "lastPublishedAt",
+        "lastRetestedAt",
+      ].sort(),
+    );
+    expect(keys(s.findings.openBySeverity)).toEqual(
+      ["critical", "high", "medium", "low", "info"].sort(),
+    );
+    expect(keys(s.findings.retest)).toEqual(
+      ["fixed", "stillVulnerable", "pending", "notRetested"].sort(),
+    );
+    expect(keys(s.reports)).toEqual(
+      ["available", "lastCreatedAt", "latestExecutive"].sort(),
+    );
+    if (!s.reports.latestExecutive) {
+      throw new Error("fixture deve ter latestExecutive");
+    }
+    expect(keys(s.reports.latestExecutive)).toEqual(
+      [
+        "engagementId",
+        "engagementName",
+        "version",
+        "createdAt",
+        "formats",
+      ].sort(),
+    );
+    expect(keys(s.perEngagement[0])).toEqual(
+      [
+        "engagementId",
+        "engagementName",
+        "status",
+        "published",
+        "open",
+        "openCriticalHigh",
+        "worstOpenSeverity",
+        "lastPublishedAt",
+      ].sort(),
+    );
+    expect(keys(s.priorities[0])).toEqual(
+      [
+        "id",
+        "engagementId",
+        "engagementName",
+        "ref",
+        "title",
+        "severity",
+        "affectedAsset",
+        "weaknessClass",
+        "cwe",
+        "cvssScore",
+        "cvssVersion",
+        "cvssVector",
+        "retestStatus",
+        "publishedAt",
+        "evidenceCount",
+      ].sort(),
+    );
+  });
+
+  it("teto por engajamento injetável: keep-NEWEST sob o cap, truncated=true", async () => {
+    const capFixture: Tables = {
+      engagements: [
+        { _id: "EC", client_id: "CT", name: "Cap", status: "active" },
+      ],
+      findings: [
+        {
+          _id: "Fa",
+          engagement_id: "EC",
+          status: "published",
+          severity: "critical",
+          published_at: 10,
+          _creationTime: 1,
+          title: "a",
+          affected_asset: "a",
+          weakness_class: "a",
+        },
+        {
+          _id: "Fb",
+          engagement_id: "EC",
+          status: "published",
+          severity: "critical",
+          published_at: 20,
+          _creationTime: 2,
+          title: "b",
+          affected_asset: "b",
+          weakness_class: "b",
+        },
+        {
+          _id: "Fc",
+          engagement_id: "EC",
+          status: "published",
+          severity: "critical",
+          published_at: 30,
+          _creationTime: 3,
+          title: "c",
+          affected_asset: "c",
+          weakness_class: "c",
+        },
+      ],
+      reports: [],
+      evidence: [],
+    };
+    const s = await buildPortalSummary(
+      ctxOf(capFixture),
+      { userId: "u", clientId: "CT" as never, nowMs: 1 },
+      granted as never,
+      { findingsCapPerEngagement: 2 },
+    );
+    if (!s) throw new Error("esperava resumo");
+    expect(s.truncated).toBe(true);
+    expect(s.findings.published).toBe(2);
+    expect(s.perEngagement[0].published).toBe(2);
+    // os 2 MAIS NOVOS (Fc, Fb) ficam; o mais antigo (Fa) é descartado.
+    expect(s.priorities.map((p) => p.id)).toEqual(["Fc", "Fb"]);
+    expect(s.priorities.map((p) => p.id)).not.toContain("Fa");
+    expect(s.findings.lastPublishedAt).toBe(30);
   });
 });
 

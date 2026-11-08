@@ -3,6 +3,7 @@ import { getPortalSessionUser } from "@/lib/auth/require-portal";
 import { getConvexClient } from "@/lib/db/convex-client";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import type { PortalSummary } from "@/convex/lib/portalSummary";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,12 +26,18 @@ export async function GET(req: NextRequest) {
   }
   const convex = getConvexClient();
   const cid = clientId as Id<"clients">;
-  const summary = await convex.query(api.portal.listPortalSummaryForBackend, {
-    serviceKey,
-    userId: u.id,
-    clientId: cid,
-    nowMs: Date.now(),
-  });
+  let summary: PortalSummary | null = null;
+  try {
+    summary = await convex.query(api.portal.listPortalSummaryForBackend, {
+      serviceKey,
+      userId: u.id,
+      clientId: cid,
+      nowMs: Date.now(),
+    });
+  } catch (e) {
+    console.error("portal summary: query falhou", e);
+    return NextResponse.json({ error: "Resumo indisponível" }, { status: 503 });
+  }
   // Auditoria durável (fail-closed): registra a visualização do resumo (ou a
   // negação) antes de responder. Sem gravação → 503, nunca serve.
   let auditOk = false;
