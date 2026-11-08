@@ -1,5 +1,5 @@
 import { mutation, query } from "./_generated/server";
-import { v } from "convex/values";
+import { v, type Infer } from "convex/values";
 import { validateServiceKey } from "./lib/utils";
 import { collectEvidencePage } from "./lib/evidenceBundle";
 import type { Id, Doc } from "./_generated/dataModel";
@@ -8,6 +8,7 @@ import {
   buildPortalSummary,
   buildPortalSummaryAuditRow,
   listVisibleEngagements,
+  type PortalSummary,
 } from "./lib/portalSummary";
 
 /**
@@ -374,6 +375,105 @@ export const listPortalEvidenceForFindingForBackend = query({
  * `nowMs` vem da rota (o handler não chama Date.now()). Nega por padrão → null
  * (NUNCA um objeto zerado). Lógica em convex/lib/portalSummary.ts.
  */
+const portalSummaryReturns = v.union(
+  v.null(),
+  v.object({
+    generatedAt: v.number(),
+    truncated: v.boolean(),
+    engagements: v.object({
+      total: v.number(),
+      withFindings: v.number(),
+      byStatus: v.object({
+        planned: v.number(),
+        active: v.number(),
+        review: v.number(),
+        reporting: v.number(),
+        closed: v.number(),
+      }),
+      withWindow: v.number(),
+      withScope: v.number(),
+    }),
+    findings: v.object({
+      published: v.number(),
+      publishedWithoutDate: v.number(),
+      open: v.number(),
+      openBySeverity: v.object({
+        critical: v.number(),
+        high: v.number(),
+        medium: v.number(),
+        low: v.number(),
+        info: v.number(),
+      }),
+      openCriticalHigh: v.number(),
+      worstOpenSeverity: v.union(v.string(), v.null()),
+      retest: v.object({
+        fixed: v.number(),
+        stillVulnerable: v.number(),
+        pending: v.number(),
+        notRetested: v.number(),
+      }),
+      lastPublishedAt: v.union(v.number(), v.null()),
+      lastRetestedAt: v.union(v.number(), v.null()),
+    }),
+    priorities: v.array(
+      v.object({
+        id: v.id("findings"),
+        engagementId: v.id("engagements"),
+        engagementName: v.string(),
+        ref: v.union(v.string(), v.null()),
+        title: v.string(),
+        severity: v.string(),
+        affectedAsset: v.string(),
+        weaknessClass: v.string(),
+        cwe: v.union(v.string(), v.null()),
+        cvssScore: v.union(v.number(), v.null()),
+        cvssVersion: v.union(v.string(), v.null()),
+        cvssVector: v.union(v.string(), v.null()),
+        retestStatus: v.union(v.string(), v.null()),
+        publishedAt: v.union(v.number(), v.null()),
+        evidenceCount: v.number(),
+      }),
+    ),
+    perEngagement: v.array(
+      v.object({
+        engagementId: v.id("engagements"),
+        engagementName: v.string(),
+        status: v.string(),
+        published: v.number(),
+        open: v.number(),
+        openCriticalHigh: v.number(),
+        worstOpenSeverity: v.union(v.string(), v.null()),
+        lastPublishedAt: v.union(v.number(), v.null()),
+      }),
+    ),
+    reports: v.object({
+      available: v.number(),
+      lastCreatedAt: v.union(v.number(), v.null()),
+      latestExecutive: v.union(
+        v.null(),
+        v.object({
+          engagementId: v.id("engagements"),
+          engagementName: v.string(),
+          version: v.number(),
+          createdAt: v.number(),
+          formats: v.array(v.string()),
+        }),
+      ),
+    }),
+  }),
+);
+// Guarda em tempo de compilação: falha o `tsc` se o validador de retorno e o
+// tipo PortalSummary divergirem (trava a reincidência convex-returns-estrito se
+// um campo/spread futuro entrar só de um lado).
+type _Equal<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+    ? true
+    : false;
+type _Expect<T extends true> = T;
+type _PortalSummaryContract = _Expect<
+  _Equal<Infer<typeof portalSummaryReturns>, PortalSummary | null>
+>;
+
 export const listPortalSummaryForBackend = query({
   args: {
     serviceKey: v.string(),
@@ -381,90 +481,7 @@ export const listPortalSummaryForBackend = query({
     clientId: v.id("clients"),
     nowMs: v.number(),
   },
-  returns: v.union(
-    v.null(),
-    v.object({
-      generatedAt: v.number(),
-      truncated: v.boolean(),
-      engagements: v.object({
-        total: v.number(),
-        byStatus: v.object({
-          planned: v.number(),
-          active: v.number(),
-          review: v.number(),
-          reporting: v.number(),
-          closed: v.number(),
-        }),
-        withWindow: v.number(),
-        withScope: v.number(),
-      }),
-      findings: v.object({
-        published: v.number(),
-        publishedWithoutDate: v.number(),
-        open: v.number(),
-        openBySeverity: v.object({
-          critical: v.number(),
-          high: v.number(),
-          medium: v.number(),
-          low: v.number(),
-          info: v.number(),
-        }),
-        openCriticalHigh: v.number(),
-        worstOpenSeverity: v.union(v.string(), v.null()),
-        retest: v.object({
-          fixed: v.number(),
-          stillVulnerable: v.number(),
-          pending: v.number(),
-          notRetested: v.number(),
-        }),
-        lastPublishedAt: v.union(v.number(), v.null()),
-        lastRetestedAt: v.union(v.number(), v.null()),
-      }),
-      priorities: v.array(
-        v.object({
-          id: v.id("findings"),
-          engagementId: v.id("engagements"),
-          engagementName: v.string(),
-          ref: v.union(v.string(), v.null()),
-          title: v.string(),
-          severity: v.string(),
-          affectedAsset: v.string(),
-          weaknessClass: v.string(),
-          cwe: v.union(v.string(), v.null()),
-          cvssScore: v.union(v.number(), v.null()),
-          cvssVersion: v.union(v.string(), v.null()),
-          cvssVector: v.union(v.string(), v.null()),
-          retestStatus: v.union(v.string(), v.null()),
-          publishedAt: v.union(v.number(), v.null()),
-          evidenceCount: v.number(),
-        }),
-      ),
-      perEngagement: v.array(
-        v.object({
-          engagementId: v.id("engagements"),
-          published: v.number(),
-          open: v.number(),
-          openCriticalHigh: v.number(),
-          worstOpenSeverity: v.union(v.string(), v.null()),
-          lastPublishedAt: v.union(v.number(), v.null()),
-        }),
-      ),
-      reports: v.object({
-        available: v.number(),
-        lastCreatedAt: v.union(v.number(), v.null()),
-        latestExecutive: v.union(
-          v.null(),
-          v.object({
-            engagementId: v.id("engagements"),
-            engagementName: v.string(),
-            version: v.number(),
-            createdAt: v.number(),
-            formats: v.array(v.string()),
-          }),
-        ),
-      }),
-    }),
-  ),
+  returns: portalSummaryReturns,
   handler: async (ctx, args) => {
     validateServiceKey(args.serviceKey);
     return await buildPortalSummary(

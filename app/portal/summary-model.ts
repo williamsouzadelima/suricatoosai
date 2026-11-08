@@ -8,6 +8,7 @@
  * (o servidor e a UI ordenam idêntico; sem divergência de desempate).
  */
 import type { PortalSummary } from "@/convex/lib/portalSummary";
+import { EVIDENCE_COUNT_CAP } from "@/convex/lib/portalSummary";
 
 export {
   comparePriority,
@@ -35,24 +36,43 @@ export function heroNumeral(s: PortalSummary): string {
   return String(s.findings.openCriticalHigh);
 }
 
+/** Cobertura total = TODO engajamento visível tem achado publicado E a leitura
+ *  não truncou. Só então "sem achados em aberto" pode ser VERDE (sucesso); senão
+ *  o verde seria um falso "tudo certo" que ignora o que nunca foi reportado. */
+export function isFullCoverage(s: PortalSummary): boolean {
+  return s.engagements.withFindings === s.engagements.total && !s.truncated;
+}
+
 export function heroTone(s: PortalSummary): HeroTone {
   const f = s.findings;
   if (f.published === 0) return "muted";
   if (f.openCriticalHigh > 0) return "destructive";
-  if (f.open === 0) return "success";
+  if (f.open === 0 && isFullCoverage(s)) return "success";
   return "neutral";
 }
 
 /**
  * Frase do herói — SEMPRE acompanha o numeral (nunca um número solto). Diz a
- * base (só publicados) e o que foi contado. Ausência NÃO vira "tudo limpo".
+ * base (só publicados) e o que foi contado. Ausência NÃO vira "tudo limpo", e o
+ * verde de "nada em aberto" só sai com cobertura total (senão é falso all-clear).
  */
 export function heroSentence(s: PortalSummary): string {
   const f = s.findings;
+  const { total, withFindings } = s.engagements;
   if (f.published === 0) {
     return "Nenhum achado publicado neste portfólio ainda.";
   }
   if (f.open === 0) {
+    if (withFindings < total) {
+      return `${withFindings} de ${total} ${plural(
+        total,
+        "engajamento",
+        "engajamentos",
+      )} com achados publicados; os demais ainda sem publicação.`;
+    }
+    if (s.truncated) {
+      return "Nenhum achado em aberto entre os achados carregados; resumo parcial.";
+    }
     return f.published === 1
       ? "Nenhum achado em aberto: o único achado publicado foi validado por reteste."
       : `Nenhum achado em aberto: todos os ${f.published} achados publicados foram validados por reteste.`;
@@ -105,3 +125,14 @@ export const SUMMARY_ERROR_COPY =
 export const SUMMARY_TRUNCATED_COPY =
   "Resumo parcial: o volume excede o limite de leitura; os números podem estar incompletos.";
 export const RISK_UNAVAILABLE_COPY = "Riscos indisponíveis agora";
+
+/** Aviso de resumo parcial (o volume estourou o teto de leitura por engajamento).
+ *  null quando completo. A UI mostra como Callout de atenção acima dos números. */
+export function truncationNotice(s: PortalSummary): string | null {
+  return s.truncated ? SUMMARY_TRUNCATED_COPY : null;
+}
+
+/** evidenceCount honesto no teto: "200+" quando bateu o limite de leitura. */
+export function formatEvidenceCount(n: number): string {
+  return n >= EVIDENCE_COUNT_CAP ? `${EVIDENCE_COUNT_CAP}+` : String(n);
+}

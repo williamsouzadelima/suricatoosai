@@ -311,6 +311,15 @@ describe("buildPortalSummary", () => {
     });
     expect(s.engagements.withWindow).toBe(2); // E1 starts, E3 ends
     expect(s.engagements.withScope).toBe(1); // E1 (E3 scope vazio não conta)
+    expect(s.engagements.withFindings).toBe(2); // E1, E2 publicam; E3 não
+    // perEngagement expressa "não medido" (status + nome; sem 2ª busca de eng)
+    const e3row = s.perEngagement.find((r) => r.engagementId === "E3");
+    expect(e3row).toMatchObject({
+      engagementName: "Eng Tres",
+      status: "planned",
+      published: 0,
+      open: 0,
+    });
 
     // Achados — F6/F7 (eng arquivado/apagado) NÃO contados; Fdraft (não publicado) fora.
     expect(s.findings.published).toBe(5);
@@ -376,21 +385,24 @@ describe("buildPortalSummary", () => {
     }
   });
 
-  it("relatórios: available/latestExecutive honestos (maior versão executiva)", async () => {
+  it("relatórios: available=grupos distintos; latestExecutive=mais recente por data", async () => {
     const s = await buildPortalSummary(
       ctxOf(fixtures()),
       { userId: "u", clientId: "C1" as never, nowMs: 999 },
       granted as never,
     );
     if (!s) throw new Error("esperava resumo");
-    expect(s.reports.available).toBe(4); // R1,R2,R3,R4 (R5 deleted, R6 oculto, Rq queued fora)
+    // 3 ENTREGÁVEIS distintos (R1+R2 compartilham G1), não 4 linhas-por-formato.
+    expect(s.reports.available).toBe(3);
     expect(s.reports.lastCreatedAt).toBe(600);
+    // G2 (data 600) é mais RECENTE que G1 (data 500) apesar da versão menor —
+    // version NÃO compara entre engajamentos.
     expect(s.reports.latestExecutive).toEqual({
-      engagementId: "E1",
-      engagementName: "Eng Um",
-      version: 2,
-      createdAt: 500,
-      formats: ["docx", "pdf"],
+      engagementId: "E2",
+      engagementName: "Eng Dois",
+      version: 1,
+      createdAt: 600,
+      formats: ["docx"],
     });
   });
 });

@@ -4,16 +4,28 @@ import {
   heroNumeral,
   heroTone,
   heroSentence,
+  isFullCoverage,
+  truncationNotice,
+  formatEvidenceCount,
   plural,
   retestPortalLabel,
   scopeCoverageLine,
   selectPriorityOrder,
   comparePriority,
+  SUMMARY_TRUNCATED_COPY,
   type PortalSummary,
 } from "../summary-model";
 
-function heroInput(f: Partial<PortalSummary["findings"]>): PortalSummary {
+function heroInput(
+  f: Partial<PortalSummary["findings"]>,
+  opts: { total?: number; withFindings?: number; truncated?: boolean } = {},
+): PortalSummary {
   return {
+    truncated: opts.truncated ?? false,
+    engagements: {
+      total: opts.total ?? 1,
+      withFindings: opts.withFindings ?? 1,
+    },
     findings: {
       published: 0,
       publishedWithoutDate: 0,
@@ -31,8 +43,8 @@ function heroInput(f: Partial<PortalSummary["findings"]>): PortalSummary {
 
 const FORBIDDEN = /score|nota de seguran|grade|seguro|protegid|tend[êe]ncia/i;
 
-describe("hero: numeral/tom/frase honestos", () => {
-  it("S1 sem publicados → '—', muted, ausência não é limpo", () => {
+describe("hero: numeral/tom/frase honestos + cobertura", () => {
+  it("S1 sem publicados → '—', muted", () => {
     const s = heroInput({ published: 0 });
     expect(heroNumeral(s)).toBe("—");
     expect(heroTone(s)).toBe("muted");
@@ -41,23 +53,57 @@ describe("hero: numeral/tom/frase honestos", () => {
     );
   });
 
-  it("S2 publicados mas nada aberto → '0', success", () => {
-    const s = heroInput({ published: 3, open: 0 });
+  it("S2 nada aberto + COBERTURA PARCIAL → NEUTRAL (nunca falso all-clear)", () => {
+    const s = heroInput(
+      { published: 3, open: 0 },
+      { total: 3, withFindings: 2 },
+    );
+    expect(heroNumeral(s)).toBe("0");
+    expect(heroTone(s)).toBe("neutral");
+    expect(isFullCoverage(s)).toBe(false);
+    expect(heroSentence(s)).toBe(
+      "2 de 3 engajamentos com achados publicados; os demais ainda sem publicação.",
+    );
+  });
+
+  it("S2 nada aberto + COBERTURA TOTAL → success", () => {
+    const s = heroInput(
+      { published: 3, open: 0 },
+      { total: 3, withFindings: 3 },
+    );
     expect(heroNumeral(s)).toBe("0");
     expect(heroTone(s)).toBe("success");
     expect(heroSentence(s)).toContain("todos os 3 achados publicados");
     expect(heroSentence(s)).toContain("validados por reteste");
   });
 
-  it("S2 singular", () => {
-    const s = heroInput({ published: 1, open: 0 });
+  it("S2 singular, cobertura total", () => {
+    const s = heroInput(
+      { published: 1, open: 0 },
+      { total: 1, withFindings: 1 },
+    );
+    expect(heroTone(s)).toBe("success");
     expect(heroSentence(s)).toBe(
       "Nenhum achado em aberto: o único achado publicado foi validado por reteste.",
     );
   });
 
+  it("truncated força NÃO-success + aviso de resumo parcial", () => {
+    const s = heroInput(
+      { published: 3, open: 0 },
+      { total: 3, withFindings: 3, truncated: true },
+    );
+    expect(isFullCoverage(s)).toBe(false);
+    expect(heroTone(s)).toBe("neutral");
+    expect(truncationNotice(s)).toBe(SUMMARY_TRUNCATED_COPY);
+    expect(heroSentence(s)).toContain("resumo parcial");
+  });
+
   it("S3 aberto sem crítico/alto → '0', neutral", () => {
-    const s = heroInput({ published: 5, open: 2, openCriticalHigh: 0 });
+    const s = heroInput(
+      { published: 5, open: 2, openCriticalHigh: 0 },
+      { total: 3, withFindings: 3 },
+    );
     expect(heroNumeral(s)).toBe("0");
     expect(heroTone(s)).toBe("neutral");
     expect(heroSentence(s)).toBe(
@@ -66,13 +112,16 @@ describe("hero: numeral/tom/frase honestos", () => {
   });
 
   it("S4 crítico/alto em aberto → N, destructive, +ainda vulnerável", () => {
-    const s = heroInput({
-      published: 5,
-      open: 4,
-      openCriticalHigh: 2,
-      openBySeverity: { critical: 2, high: 0, medium: 1, low: 1, info: 0 },
-      retest: { fixed: 0, stillVulnerable: 1, pending: 0, notRetested: 4 },
-    });
+    const s = heroInput(
+      {
+        published: 5,
+        open: 4,
+        openCriticalHigh: 2,
+        openBySeverity: { critical: 2, high: 0, medium: 1, low: 1, info: 0 },
+        retest: { fixed: 0, stillVulnerable: 1, pending: 0, notRetested: 4 },
+      },
+      { total: 3, withFindings: 3 },
+    );
     expect(heroNumeral(s)).toBe("2");
     expect(heroTone(s)).toBe("destructive");
     expect(heroSentence(s)).toBe(
@@ -83,26 +132,37 @@ describe("hero: numeral/tom/frase honestos", () => {
   it("copy-guard: nenhuma frase do herói usa termo proibido", () => {
     const inputs = [
       heroInput({ published: 0 }),
-      heroInput({ published: 3, open: 0 }),
+      heroInput({ published: 3, open: 0 }, { total: 3, withFindings: 2 }),
+      heroInput({ published: 3, open: 0 }, { total: 3, withFindings: 3 }),
       heroInput({ published: 1, open: 0 }),
-      heroInput({ published: 5, open: 2, openCriticalHigh: 0 }),
-      heroInput({
-        published: 5,
-        open: 4,
-        openCriticalHigh: 2,
-        openBySeverity: { critical: 2, high: 0, medium: 1, low: 1, info: 0 },
-        retest: { fixed: 0, stillVulnerable: 1, pending: 0, notRetested: 4 },
-      }),
+      heroInput(
+        { published: 5, open: 2, openCriticalHigh: 0 },
+        { total: 3, withFindings: 3 },
+      ),
+      heroInput(
+        {
+          published: 5,
+          open: 4,
+          openCriticalHigh: 2,
+          openBySeverity: { critical: 2, high: 0, medium: 1, low: 1, info: 0 },
+          retest: { fixed: 0, stillVulnerable: 1, pending: 0, notRetested: 4 },
+        },
+        { total: 3, withFindings: 3 },
+      ),
     ];
-    for (const s of inputs) {
-      expect(heroSentence(s)).not.toMatch(FORBIDDEN);
-    }
+    for (const s of inputs) expect(heroSentence(s)).not.toMatch(FORBIDDEN);
     expect(scopeCoverageLine(2, 5)).toBe("Escopo registrado em 2 de 5");
     expect(scopeCoverageLine(2, 5)).not.toMatch(FORBIDDEN);
   });
 });
 
-describe("plural / rótulo de reteste", () => {
+describe("evidenceCount / plural / rótulo de reteste", () => {
+  it("formatEvidenceCount: '200+' no teto, exato abaixo", () => {
+    expect(formatEvidenceCount(0)).toBe("0");
+    expect(formatEvidenceCount(5)).toBe("5");
+    expect(formatEvidenceCount(199)).toBe("199");
+    expect(formatEvidenceCount(200)).toBe("200+");
+  });
   it("plural", () => {
     expect(plural(1, "um", "muitos")).toBe("um");
     expect(plural(2, "um", "muitos")).toBe("muitos");
@@ -127,11 +187,11 @@ describe("comparador de prioridade (fonte única servidor/UI)", () => {
       { severity: "high", cvssScore: 7.0, publishedAt: 10, id: "d" },
     ];
     expect(selectPriorityOrder(items).map((x) => x.id)).toEqual([
-      "b", // critical cvss9.8
-      "a", // critical cvss9.1
-      "c", // critical cvss null (por último entre críticos)
-      "d", // high
-      "z", // low
+      "b",
+      "a",
+      "c",
+      "d",
+      "z",
     ]);
   });
 

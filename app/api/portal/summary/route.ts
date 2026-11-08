@@ -33,18 +33,24 @@ export async function GET(req: NextRequest) {
   });
   // Auditoria durável (fail-closed): registra a visualização do resumo (ou a
   // negação) antes de responder. Sem gravação → 503, nunca serve.
+  let auditOk = false;
   try {
-    await convex.mutation(api.portal.recordPortalSummaryViewForBackend, {
-      serviceKey,
-      userId: u.id,
-      clientId: cid,
-      published: summary?.findings.published ?? 0,
-      engagements: summary?.engagements.total ?? 0,
-      actorEmail: u.email ?? undefined,
-      ip:
-        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined,
-      userAgent: req.headers.get("user-agent") ?? undefined,
-    });
+    const audit = await convex.mutation(
+      api.portal.recordPortalSummaryViewForBackend,
+      {
+        serviceKey,
+        userId: u.id,
+        clientId: cid,
+        published: summary?.findings.published ?? 0,
+        engagements: summary?.engagements.total ?? 0,
+        actorEmail: u.email ?? undefined,
+        ip:
+          req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+          undefined,
+        userAgent: req.headers.get("user-agent") ?? undefined,
+      },
+    );
+    auditOk = audit.ok;
   } catch (e) {
     console.error("portal summary: auditoria indisponível, recusando", e);
     return NextResponse.json(
@@ -52,9 +58,10 @@ export async function GET(req: NextRequest) {
       { status: 503 },
     );
   }
-  // null = sem acesso (não-membro ou portal desabilitado). Eco do clientId deixa
-  // o cliente descartar respostas obsoletas ao trocar de cliente.
-  if (summary === null) {
+  // null = sem acesso no momento da query; !auditOk = membership revogada ENTRE a
+  // query e a auditoria. Qualquer um → 404 (nunca serve o resumo sem acesso
+  // vigente). Eco do clientId deixa o cliente descartar respostas obsoletas.
+  if (summary === null || !auditOk) {
     return NextResponse.json({ error: "Sem acesso" }, { status: 404 });
   }
   return NextResponse.json({ clientId, summary });

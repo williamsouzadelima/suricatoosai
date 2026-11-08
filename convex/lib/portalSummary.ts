@@ -34,7 +34,7 @@ export const SEV_RANK: Record<string, number> = {
 /** Teto de leitura de achados por engajamento (defensivo; clientes reais ficam
  *  muito abaixo). Estourou → `truncated=true`, nunca subcontagem silenciosa. */
 export const FINDINGS_CAP_PER_ENGAGEMENT = 2000;
-const EVIDENCE_COUNT_CAP = 200;
+export const EVIDENCE_COUNT_CAP = 200;
 const TOP_PRIORITIES = 5;
 
 export type Severity = (typeof SEVERITIES)[number];
@@ -64,6 +64,8 @@ export interface PriorityItem extends PriorityKey {
 
 export interface PerEngagementRow {
   engagementId: Id<"engagements">;
+  engagementName: string;
+  status: string;
   published: number;
   open: number;
   openCriticalHigh: number;
@@ -76,6 +78,7 @@ export interface PortalSummary {
   truncated: boolean;
   engagements: {
     total: number;
+    withFindings: number;
     byStatus: {
       planned: number;
       active: number;
@@ -210,6 +213,7 @@ export async function buildPortalSummary(
   };
   let withWindow = 0;
   let withScope = 0;
+  let withFindings = 0;
 
   const openBySeverity = {
     critical: 0,
@@ -235,16 +239,22 @@ export async function buildPortalSummary(
     if (e.starts_at != null || e.ends_at != null) withWindow += 1;
     if ((e.scope ?? []).length > 0) withScope += 1;
 
+    // order("desc") ANTES do take: se estourar o teto, descarta os MAIS ANTIGOS
+    // (mantém os recentes, que dirigem lastPublishedAt + o top-5).
     const fs = await ctx.db
       .query("findings")
       .withIndex("by_engagement_and_status", (q) =>
         q.eq("engagement_id", e._id).eq("status", "published"),
       )
+      .order("desc")
       .take(FINDINGS_CAP_PER_ENGAGEMENT);
     if (fs.length >= FINDINGS_CAP_PER_ENGAGEMENT) truncated = true;
+    if (fs.length > 0) withFindings += 1;
 
     const row: PerEngagementRow = {
       engagementId: e._id,
+      engagementName: nameById.get(e._id as string) ?? e.name,
+      status: e.status,
       published: fs.length,
       open: 0,
       openCriticalHigh: 0,
@@ -326,8 +336,11 @@ export async function buildPortalSummary(
     p.evidenceCount = ev.length;
   }
 
-  // Relatórios PRONTOS/visíveis (mesmo filtro da lista do portal).
-  let reportsAvailable = 0;
+  // Relatórios PRONTOS/visíveis (mesmo filtro da lista do portal). `available` =
+  // ENTREGÁVEIS distintos (report_group_id), NÃO linhas-por-formato (reports.ts
+  // insere uma linha por formato com o mesmo group_id). Datas usam
+  // generated_at ?? created_at (mesma convenção do download, portal.ts).
+  const availableGroups = new Set<string>();
   let lastCreatedAt: number | null = null;
   const execGroups = new Map<string, Doc<"reports">[]>();
   for (const e of engagements) {
@@ -343,8 +356,8 @@ export async function buildPortalSummary(
       ) {
         continue;
       }
-      reportsAvailable += 1;
-      lastCreatedAt = maxOrNull(lastCreatedAt, r.created_at);
+      availableGroups.add(r.report_group_id);
+      lastCreatedAt = maxOrNull(lastCreatedAt, r.generated_at ?? r.created_at);
       if (r.audience === "executive") {
         const g = execGroups.get(r.report_group_id) ?? [];
         g.push(r);
@@ -352,23 +365,23 @@ export async function buildPortalSummary(
       }
     }
   }
+  const reportsAvailable = availableGroups.size;
 
+  // latestExecutive = o GRUPO executivo mais RECENTE por DATA (generated_at ??
+  // created_at). `version` é a versão DESSE grupo — NUNCA comparada entre
+  // engajamentos (version é por engagement+audience, incomparável).
   let latestExecutive: PortalSummary["reports"]["latestExecutive"] = null;
+  let latestExecDate = -Infinity;
   for (const rows of execGroups.values()) {
-    const version = Math.max(...rows.map((r) => r.version));
-    const createdAt = Math.max(...rows.map((r) => r.created_at));
-    if (
-      !latestExecutive ||
-      version > latestExecutive.version ||
-      (version === latestExecutive.version &&
-        createdAt > latestExecutive.createdAt)
-    ) {
+    const date = Math.max(...rows.map((r) => r.generated_at ?? r.created_at));
+    if (date > latestExecDate) {
+      latestExecDate = date;
       const engagementId = rows[0].engagement_id;
       latestExecutive = {
         engagementId,
         engagementName: nameById.get(engagementId as string) ?? "",
-        version,
-        createdAt,
+        version: rows[0].version,
+        createdAt: date,
         formats: [...new Set(rows.map((r) => r.format))].sort(),
       };
     }
@@ -379,6 +392,7 @@ export async function buildPortalSummary(
     truncated,
     engagements: {
       total: engagements.length,
+      withFindings,
       byStatus,
       withWindow,
       withScope,
