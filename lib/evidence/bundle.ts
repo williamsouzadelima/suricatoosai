@@ -56,17 +56,24 @@ Conteudo CONFIDENCIAL. Distribua apenas conforme o contrato do engajamento.
 
 function extFor(mt: string | null): string {
   if (!mt) return "bin";
-  return EXT[mt.toLowerCase()] ?? "bin";
+  const k = mt.toLowerCase();
+  // hasOwnProperty: mediaType vem do LLM; sem isto, "constructor"/"__proto__"
+  // resolveriam para membros herdados de Object.prototype (função/objeto) e
+  // virariam nomes de arquivo absurdos no tar.
+  return Object.prototype.hasOwnProperty.call(EXT, k) ? EXT[k] : "bin";
 }
 
 function sanitize(s: string): string {
-  const out = (s || "x")
+  let out = (s || "x")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^A-Za-z0-9._-]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .slice(0, 60)
     .replace(/_+$/g, "");
+  // Nunca deixar o componente ser "." ou ".." — viraria traversal no caminho do
+  // tar (zip-slip na extração). Neutraliza para "_".
+  if (out === "." || out === "..") out = "_";
   return out || "x";
 }
 
@@ -97,14 +104,47 @@ function errName(e: unknown): string {
   return "error";
 }
 
+/**
+ * Baixa um objeto do S3. NÃO adicionamos retry aqui: o S3Client já repete erros
+ * transitórios (retry padrão do SDK) — uma segunda camada apenas MULTIPLICARIA as
+ * requisições (e pioraria throttling). Passamos o abortSignal para cancelar o GET
+ * em voo quando o cliente desiste. Lança se os bytes não vierem — o chamador
+ * registra em missing[].
+ */
+async function fetchS3Bytes(
+  s3: S3Client,
+  bucket: string,
+  key: string,
+  signal?: AbortSignal,
+): Promise<Uint8Array> {
+  if (signal?.aborted) throw new Error("aborted");
+  const obj = await s3.send(
+    new GetObjectCommand({ Bucket: bucket, Key: key }),
+    signal ? { abortSignal: signal } : undefined,
+  );
+  const body = obj.Body as
+    | { transformToByteArray: () => Promise<Uint8Array> }
+    | undefined;
+  if (!body) throw new Error("empty_body");
+  return await body.transformToByteArray();
+}
+
 export function buildEvidenceBundleStream(opts: {
   s3: S3Client;
   bucket: string;
   engagementName: string;
   generatedAt: number;
   fetchPage: (cursor: string | null) => Promise<EvidencePage>;
+  // Cancela a geração quando o cliente desiste do download (para de paginar o
+  // Convex e de baixar do S3 — poupa egress/queries em download abandonado).
+  signal?: AbortSignal;
 }): ReadableStream {
   const pack = tar.pack();
+  // O erro do pack já chega ao consumidor pelo gzStream; sem ESTE listener, um
+  // pack.destroy() (ex.: cliente aborta o download) emitiria 'error' sem ouvinte
+  // → uncaughtException a cada download abandonado. O driver recebe as falhas de
+  // escrita pelos callbacks de addBufferEntry.
+  pack.on("error", () => {});
   const gzip = createGzip({ level: 1 });
   const gzStream = pack.pipe(gzip);
 
@@ -128,6 +168,7 @@ export function buildEvidenceBundleStream(opts: {
     try {
       let cursor: string | null = null;
       do {
+        if (opts.signal?.aborted) break;
         const res = await opts.fetchPage(cursor);
         if (res.denied) {
           // Acesso revogado / engajamento removido NO MEIO da geração: os
@@ -139,6 +180,7 @@ export function buildEvidenceBundleStream(opts: {
           break;
         }
         for (const ev of res.page) {
+          if (opts.signal?.aborted) break;
           evidenceCount++;
           let filePath: string | null = null;
           let sha256: string | null = null;
@@ -153,14 +195,12 @@ export function buildEvidenceBundleStream(opts: {
               status = "available";
             } else {
               try {
-                const obj = await opts.s3.send(
-                  new GetObjectCommand({ Bucket: opts.bucket, Key: ev.s3Key }),
+                const bytes = await fetchS3Bytes(
+                  opts.s3,
+                  opts.bucket,
+                  ev.s3Key,
+                  opts.signal,
                 );
-                const body = obj.Body as
-                  | { transformToByteArray: () => Promise<Uint8Array> }
-                  | undefined;
-                if (!body) throw new Error("empty_body");
-                const bytes = await body.transformToByteArray();
                 const buf = Buffer.from(bytes);
                 // Hash de integridade do CONTEÚDO: sha256 do arquivo exatamente
                 // como empacotado. Detecta corrupção/edição do arquivo vs. este
@@ -188,20 +228,19 @@ export function buildEvidenceBundleStream(opts: {
                 status = "missing";
               }
             }
-          } else if (ev.fileId) {
-            // Evidência de ARQUIVO com file_id mas SEM s3_key (linha legada): o
-            // bundle só empacota por s3_key, então não dá pra recuperar. Marca
-            // missing — nunca "text_only" calado, que apresentaria uma captura
-            // como se fosse texto, contradizendo "nunca some calado".
-            // NÃO usamos source_type=="file" aqui: ele vem do LLM e texto
-            // legítimo pode vir rotulado "file" sem arquivo (falso positivo →
-            // falsa perda declarada). Falha de anexo SEM file_id (upload falhou)
-            // segue como pré-existente text_only; cobri-la exige persistir o
-            // caminho do sandbox na captura — follow-up, fora deste PR.
+          } else if (ev.fileId || ev.sandboxPath) {
+            // Evidência de ARQUIVO que não dá pra empacotar (sem s3_key):
+            //  - file_id sem s3_key (linha legada), ou
+            //  - sandbox_path sem s3_key (anexo falhou / sem sandbox na captura).
+            // Marca missing — nunca "text_only" calado, que apresentaria uma
+            // captura como se fosse texto, contradizendo "nunca some calado".
+            // source_type NÃO é sinal: vem do LLM e texto pode vir rotulado
+            // "file" sem arquivo (falso positivo → falsa perda declarada).
+            const reason = ev.fileId ? "no_s3_key" : "file_not_attached";
             missing.push({
               evidenceId: ev.evidenceId,
               s3Key: null,
-              reason: "no_s3_key",
+              reason,
             });
             status = "missing";
           }
@@ -230,6 +269,13 @@ export function buildEvidenceBundleStream(opts: {
         }
         cursor = res.isDone ? null : res.continueCursor;
       } while (cursor !== null);
+
+      // Cliente desistiu do download: encerra sem gastar em manifesto/finalização
+      // (os bytes iriam para um consumidor que já foi embora).
+      if (opts.signal?.aborted) {
+        pack.destroy();
+        return;
+      }
 
       const manifest = {
         tool: "Suricatoos",

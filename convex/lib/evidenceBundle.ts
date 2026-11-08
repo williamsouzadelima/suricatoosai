@@ -26,6 +26,7 @@ export type EvidenceBundleRow = {
   resultSummary: string | null;
   s3Key: string | null;
   fileId: string | null;
+  sandboxPath: string | null;
   mediaType: string | null;
   capturedAt: number;
 };
@@ -101,6 +102,7 @@ export async function collectEvidencePage(
       resultSummary: ev.result_summary ?? null,
       s3Key: ev.s3_key ?? null,
       fileId: ev.file_id ?? null,
+      sandboxPath: ev.sandbox_path ?? null,
       mediaType: ev.media_type ?? null,
       capturedAt: ev.captured_at,
     });

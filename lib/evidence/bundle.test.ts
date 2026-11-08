@@ -17,6 +17,18 @@ import type { Id } from "@/convex/_generated/dataModel";
 
 type BundleOpts = Parameters<typeof buildEvidenceBundleStream>[0];
 
+type BundleManifest = {
+  hashAlgorithm: string;
+  counts: { evidence: number; files: number; missing: number };
+  evidence: Array<{
+    evidenceId: string;
+    file: string | null;
+    sha256: string | null;
+    status: string;
+  }>;
+  missing: Array<{ evidenceId: string; s3Key: string | null; reason: string }>;
+};
+
 function row(over: Partial<EvidenceBundleRow> & { evidenceId: string }): EvidenceBundleRow {
   const { evidenceId, ...rest } = over;
   return {
@@ -35,6 +47,7 @@ function row(over: Partial<EvidenceBundleRow> & { evidenceId: string }): Evidenc
     resultSummary: null,
     s3Key: null,
     fileId: null,
+    sandboxPath: null,
     mediaType: null,
     capturedAt: 1700000000000,
     ...rest,
@@ -63,12 +76,19 @@ function fakeS3Send() {
   });
 }
 
-async function runBundle(rows: EvidenceBundleRow[]) {
+async function runBundle(
+  rows: EvidenceBundleRow[],
+  opts: {
+    send?: (cmd: { params?: { Key?: string } }) => Promise<unknown>;
+    signal?: AbortSignal;
+  } = {},
+) {
   const web = buildEvidenceBundleStream({
-    s3: { send: fakeS3Send() } as unknown as BundleOpts["s3"],
+    s3: { send: opts.send ?? fakeS3Send() } as unknown as BundleOpts["s3"],
     bucket: "bkt",
     engagementName: "Engajamento X",
     generatedAt: 1700000000000,
+    signal: opts.signal,
     fetchPage: async () => ({
       denied: false,
       page: rows,
@@ -106,7 +126,9 @@ async function runBundle(rows: EvidenceBundleRow[]) {
     Readable.from(tarBuf).pipe(extract);
   });
 
-  const manifest = JSON.parse(files["manifest.json"].toString("utf-8"));
+  const manifest = JSON.parse(
+    files["manifest.json"].toString("utf-8"),
+  ) as BundleManifest;
   return { files, manifest };
 }
 
@@ -138,17 +160,7 @@ describe("buildEvidenceBundleStream — integridade por sha256 + classificação
   ];
 
   let files: Record<string, Buffer>;
-  let manifest: {
-    hashAlgorithm: string;
-    counts: { evidence: number; files: number; missing: number };
-    evidence: Array<{
-      evidenceId: string;
-      file: string | null;
-      sha256: string | null;
-      status: string;
-    }>;
-    missing: Array<{ evidenceId: string; s3Key: string | null; reason: string }>;
-  };
+  let manifest: BundleManifest;
 
   beforeAll(async () => {
     const out = await runBundle(rows);
@@ -241,5 +253,115 @@ describe("buildEvidenceBundleStream — integridade por sha256 + classificação
   it("contagens honestas: 7 evidências, 2 missing (404 + file_id sem s3_key)", () => {
     expect(manifest.counts.evidence).toBe(7);
     expect(manifest.counts.missing).toBe(2);
+  });
+});
+
+describe("buildEvidenceBundleStream — endurecimento (A anexo; B abort/retry/zip-slip)", () => {
+  const find = (m: BundleManifest, id: string) =>
+    m.evidence.find((e) => e.evidenceId === id)!;
+
+  it("A: sandbox_path sem s3_key (anexo falhou) → missing/file_not_attached, sem vazar o caminho", async () => {
+    const { manifest } = await runBundle([
+      row({
+        evidenceId: "a1",
+        s3Key: null,
+        sandboxPath: "/home/sandbox/shot.png",
+        sourceType: "file",
+        label: "anexo-falhou",
+      }),
+    ]);
+    const e = find(manifest, "a1");
+    expect(e.status).toBe("missing");
+    expect(e.sha256).toBeNull();
+    expect(e.file).toBeNull();
+    const m = manifest.missing.find((x) => x.evidenceId === "a1")!;
+    expect(m.reason).toBe("file_not_attached");
+    // o caminho interno do sandbox NÃO vaza em lugar nenhum do manifesto
+    expect(JSON.stringify(manifest)).not.toContain("/home/sandbox/");
+  });
+
+  it("B3: findingRef '..' não vira traversal no caminho do tar (zip-slip)", async () => {
+    const { files, manifest } = await runBundle([
+      row({
+        evidenceId: "z1",
+        s3Key: "s3/a.png",
+        mediaType: "image/png",
+        label: "a",
+        findingRef: "..",
+      }),
+    ]);
+    const e = find(manifest, "z1");
+    expect(e.file).not.toBeNull();
+    expect(e.file!.startsWith("evidence/")).toBe(true);
+    for (const k of Object.keys(files)) {
+      expect(k.includes("..")).toBe(false);
+    }
+  });
+
+  it("Item5: mediaType malicioso (prototype pollution) não gera nome absurdo", async () => {
+    const { files, manifest } = await runBundle([
+      row({ evidenceId: "x1", s3Key: "s3/a.png", mediaType: "constructor", label: "poc" }),
+      row({ evidenceId: "x2", s3Key: "s3/b.png", mediaType: "__proto__", label: "poc2" }),
+    ]);
+    for (const id of ["x1", "x2"]) {
+      const e = find(manifest, id);
+      expect(e.file).not.toBeNull();
+      expect(e.file!.endsWith(".bin")).toBe(true); // extensão cai p/ .bin
+      expect(e.file).not.toContain("Object");
+      expect(e.file).not.toContain("function");
+    }
+    for (const k of Object.keys(files)) {
+      expect(k.includes("Object")).toBe(false);
+    }
+  });
+
+  it("B2: falha de send do S3 → missing, SEM retry da camada (o SDK já repete)", async () => {
+    let calls = 0;
+    const send = async () => {
+      calls += 1;
+      throw Object.assign(new Error("indisp"), {
+        name: "ServiceUnavailable",
+        $metadata: { httpStatusCode: 503 },
+      });
+    };
+    const { manifest } = await runBundle(
+      [row({ evidenceId: "p1", s3Key: "s3/x.png", mediaType: "image/png", label: "x" })],
+      { send },
+    );
+    expect(find(manifest, "p1").status).toBe("missing");
+    expect(calls).toBe(1); // a camada chama send UMA vez; o retry é do SDK
+  });
+
+  it("B1: signal já abortado → não pagina nem baixa (para cedo)", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const send = jest.fn();
+    const fetchPage = jest.fn(async () => ({
+      denied: false,
+      page: [
+        row({ evidenceId: "ab1", s3Key: "s3/a.png", mediaType: "image/png", label: "a" }),
+      ],
+      isDone: true,
+      continueCursor: "",
+    }));
+    const web = buildEvidenceBundleStream({
+      s3: { send } as unknown as BundleOpts["s3"],
+      bucket: "bkt",
+      engagementName: "X",
+      generatedAt: 1,
+      signal: controller.signal,
+      fetchPage,
+    });
+    try {
+      const reader = (web as ReadableStream<Uint8Array>).getReader();
+      for (;;) {
+        const { done } = await reader.read();
+        if (done) break;
+      }
+    } catch {
+      // stream destruído no abort — esperado
+    }
+    expect(fetchPage).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
   });
 });

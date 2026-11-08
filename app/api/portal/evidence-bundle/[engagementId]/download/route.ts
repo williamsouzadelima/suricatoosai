@@ -119,6 +119,7 @@ export async function GET(
     bucket,
     engagementName: engName,
     generatedAt,
+    signal: req.signal,
     fetchPage: async (cursor) => {
       const r = await convex.query(
         api.portal.listAllEvidenceForEngagementPagePortalForBackend,

@@ -84,6 +84,11 @@ export const createCaptureFinding = (context: ToolContext) => {
             message_id: e.message_id,
           };
           if (e.file_path) {
+            // Registra o caminho do arquivo SEMPRE que há file_path (sucesso,
+            // sem-sandbox, ou falha de anexo). O bundle usa isto para classificar
+            // evidência de arquivo NÃO empacotada como missing (nunca "texto"
+            // calado). É caminho interno do sandbox → NÃO vai ao manifesto.
+            item.sandbox_path = e.file_path;
             const mediaType = inferMediaType(e.file_path, e.media_type);
             if (!sandbox) {
               // Sem sandbox: registra a evidência como referência textual.
@@ -103,7 +108,6 @@ export const createCaptureFinding = (context: ToolContext) => {
                 item.file_id = uploaded.fileId;
                 item.s3_key = uploaded.s3Key;
                 item.media_type = uploaded.mediaType;
-                item.sandbox_path = e.file_path;
                 if (!item.label) item.label = uploaded.name;
               } catch (upErr) {
                 console.error(
