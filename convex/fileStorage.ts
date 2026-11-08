@@ -667,9 +667,15 @@ export const saveFileToDb = internalMutation({
         });
       }
 
+      // Defesa-em-profundidade (stored-XSS, label mismatch): NÃO sobrescreve o
+      // media_type da reserva com o valor de SAVE. A reserva guarda o Content-Type
+      // do UPLOAD, que é o Content-Type REAL do objeto no S3 (o PUT pré-assinado o
+      // impõe). Um media_type de save divergente (ex. reserva text/html, save
+      // image/png) era o vetor do mismatch; mantendo o da reserva, o media_type do
+      // banco sempre reflete o tipo realmente servido. (O pin em s3Utils já fecha o
+      // XSS; isto mantém o banco honesto p/ os demais consumidores do media_type.)
       await ctx.db.patch(existing._id, {
         name: args.name,
-        media_type: args.mediaType,
         file_token_size: args.fileTokenSize,
         content: args.content,
         is_attached: false,
