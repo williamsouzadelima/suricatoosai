@@ -109,6 +109,15 @@ export const listPortalEngagementsForBackend = query({
       code: v.union(v.string(), v.null()),
       status: v.string(),
       updatedAt: v.number(),
+      startsAt: v.union(v.number(), v.null()),
+      endsAt: v.union(v.number(), v.null()),
+      scope: v.array(
+        v.object({
+          kind: v.string(),
+          value: v.string(),
+          inScope: v.boolean(),
+        }),
+      ),
     }),
   ),
   handler: async (ctx, args) => {
@@ -130,6 +139,13 @@ export const listPortalEngagementsForBackend = query({
       code: e.code ?? null,
       status: e.status,
       updatedAt: e.updated_at,
+      startsAt: e.starts_at ?? null,
+      endsAt: e.ends_at ?? null,
+      scope: (e.scope ?? []).map((s) => ({
+        kind: s.kind,
+        value: s.value,
+        inScope: s.in_scope,
+      })),
     }));
   },
 });
@@ -265,6 +281,9 @@ export const listPortalFindingsForBackend = query({
       remediation: v.union(v.string(), v.null()),
       narrative: v.union(v.string(), v.null()),
       retestStatus: v.union(v.string(), v.null()),
+      retestedAt: v.union(v.number(), v.null()),
+      publishedAt: v.union(v.number(), v.null()),
+      cvssVersion: v.union(v.string(), v.null()),
     }),
   ),
   handler: async (ctx, args) => {
@@ -295,6 +314,9 @@ export const listPortalFindingsForBackend = query({
       remediation: f.remediation ?? null,
       narrative: f.narrative ?? null,
       retestStatus: f.retest_status ?? null,
+      retestedAt: f.retested_at ?? null,
+      publishedAt: f.published_at ?? null,
+      cvssVersion: f.cvss_version ?? null,
     }));
   },
 });

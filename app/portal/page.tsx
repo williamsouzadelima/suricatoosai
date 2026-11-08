@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ChevronRight,
+  Crosshair,
   Download,
   FileText,
   KeyRound,
@@ -76,12 +77,20 @@ interface ClientOpt {
   id: string;
   name: string;
 }
+interface ScopeItem {
+  kind: string;
+  value: string;
+  inScope: boolean;
+}
 interface Engagement {
   id: string;
   name: string;
   code: string | null;
   status: string;
   updatedAt: number;
+  startsAt: number | null;
+  endsAt: number | null;
+  scope: ScopeItem[];
 }
 interface Report {
   id: string;
@@ -107,6 +116,9 @@ interface Finding {
   remediation: string | null;
   narrative: string | null;
   retestStatus: string | null;
+  retestedAt: number | null;
+  publishedAt: number | null;
+  cvssVersion: string | null;
 }
 interface Evidence {
   id: string;
@@ -169,8 +181,38 @@ function cvssVersionFromVector(vector: string | null): string | null {
 }
 function cvssText(f: Finding): string | null {
   if (f.cvssScore == null) return null;
-  const v = cvssVersionFromVector(f.cvssVector);
+  const v = f.cvssVersion ?? cvssVersionFromVector(f.cvssVector);
   return `CVSS ${v ? `${v} · ` : ""}${f.cvssScore.toFixed(1)}`;
+}
+
+/** Data dd/mm/aaaa (sem hora), pt-BR. */
+function fmtDateOnly(t: number): string {
+  return new Date(t).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+/** Janela autorizada "dd/mm/aaaa – dd/mm/aaaa"; null quando ambos ausentes. */
+function windowText(
+  startsAt: number | null,
+  endsAt: number | null,
+): string | null {
+  if (startsAt == null && endsAt == null) return null;
+  return `${startsAt == null ? "—" : fmtDateOnly(startsAt)} – ${
+    endsAt == null ? "—" : fmtDateOnly(endsAt)
+  }`;
+}
+/** Máxima data de publicação entre os achados publicados (ou null). */
+function lastPublishedAt(findings: Finding[] | null | undefined): number | null {
+  if (!findings || findings.length === 0) return null;
+  let max: number | null = null;
+  for (const f of findings) {
+    if (f.publishedAt != null && (max == null || f.publishedAt > max)) {
+      max = f.publishedAt;
+    }
+  }
+  return max;
 }
 
 /** 401 numa ação deliberada do usuário: avisa e manda ao login. */
@@ -593,7 +635,7 @@ function PortfolioView({
 }
 
 // ── TELA B — Engajamento (hero por engajamento + abas). ────────────────────
-type EngTab = "visao" | "achados" | "relatorios" | "evidencia";
+type EngTab = "visao" | "escopo" | "achados" | "relatorios" | "evidencia";
 
 function EngagementView({
   engagement,
@@ -622,14 +664,28 @@ function EngagementView({
 }) {
   const published = findings?.length ?? 0;
   const openCount = (findings ?? []).filter(isOpen).length;
-  const active: EngTab = (
-    ["visao", "achados", "relatorios", "evidencia"] as const
-  ).includes(tab as EngTab)
+  const win = windowText(engagement.startsAt, engagement.endsAt);
+  const lastPub = lastPublishedAt(findings);
+  const scope = engagement.scope ?? [];
+  const showScopeTab = scope.length > 0 || win != null;
+  const validTabs: EngTab[] = [
+    "visao",
+    ...(showScopeTab ? (["escopo"] as EngTab[]) : []),
+    "achados",
+    "relatorios",
+    "evidencia",
+  ];
+  const active: EngTab = validTabs.includes(tab as EngTab)
     ? (tab as EngTab)
     : "visao";
 
   const tabs: TabItem<EngTab>[] = [
     { id: "visao", label: "Visão geral", icon: LayoutDashboard },
+    ...(showScopeTab
+      ? ([
+          { id: "escopo", label: "Escopo & janela", icon: Crosshair },
+        ] as TabItem<EngTab>[])
+      : []),
     {
       id: "achados",
       label: "Achados",
@@ -669,7 +725,10 @@ function EngagementView({
             {engagement.code && (
               <span className="font-mono">{engagement.code}</span>
             )}
-            <span>Atualizado {formatDateTime(engagement.updatedAt)}</span>
+            <span>Janela {win ?? "não informada"}</span>
+            {!findingsError && lastPub != null && (
+              <span>Última publicação {fmtDateOnly(lastPub)}</span>
+            )}
           </div>
         </div>
       </div>
@@ -682,6 +741,9 @@ function EngagementView({
           error={findingsError}
           onOpenFinding={onOpenFinding}
         />
+      )}
+      {active === "escopo" && (
+        <ScopeWindowTab scope={scope} windowLabel={win} />
       )}
       {active === "achados" && (
         <FindingsTab
@@ -729,6 +791,95 @@ function EngagementView({
         <p className="text-xs text-muted-foreground">
           Nenhum achado em aberto neste engajamento.
         </p>
+      )}
+    </div>
+  );
+}
+
+const SCOPE_KIND_LABEL: Record<string, string> = {
+  domain: "Domínio",
+  ip: "IP",
+  cidr: "Faixa (CIDR)",
+  url: "URL",
+  app: "Aplicação",
+  other: "Outro",
+};
+
+// Aba "Escopo & janela" (Tela B): alvos autorizados/testados + período.
+// O escopo chega dentro do engagement JÁ carregado — não há fetch nem estado
+// de erro próprios, então scope: [] é inequívoco (o engajamento carregou; o
+// escopo não foi itemizado). A cópia usa "não informado" (ausência de
+// registro), nunca "nada no escopo"; e "Alvos fora desta lista não foram
+// testados." só aparece quando há lista — afirmar fronteira de cobertura sem
+// dados seria tratar ausência como presença.
+function ScopeWindowTab({
+  scope,
+  windowLabel,
+}: {
+  scope: ScopeItem[];
+  windowLabel: string | null;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <SectionHeader
+        icon={Crosshair}
+        title="Escopo & janela"
+        description="Alvos autorizados para teste e período de execução deste engajamento."
+      />
+      <Card className="py-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 p-5">
+          <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            Janela autorizada
+          </span>
+          <span className="text-sm font-medium text-foreground">
+            {windowLabel ?? "Não informada"}
+          </span>
+        </div>
+      </Card>
+      {scope.length > 0 ? (
+        <>
+          <Card className="py-0">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse md:min-w-[520px]">
+                <thead>
+                  <tr className="border-b bg-muted/40 text-left text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">
+                    <th className="px-4 py-3">Tipo</th>
+                    <th className="px-4 py-3">Alvo</th>
+                    <th className="px-4 py-3">Situação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scope.map((s, i) => (
+                    <tr
+                      key={`${s.kind}:${s.value}:${i}`}
+                      className="border-b last:border-0"
+                    >
+                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                        {SCOPE_KIND_LABEL[s.kind] ?? s.kind}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-[13px] text-foreground">
+                        {s.value}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge
+                          tone={s.inScope ? "success" : "neutral"}
+                          label={s.inScope ? "No escopo" : "Fora do escopo"}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+          <p className="text-xs text-muted-foreground">
+            Alvos fora desta lista não foram testados.
+          </p>
+        </>
+      ) : (
+        <Callout tone="neutral" icon={Crosshair}>
+          O escopo detalhado deste engajamento não foi informado no portal.
+        </Callout>
       )}
     </div>
   );
@@ -1423,6 +1574,9 @@ function FindingSheetBody({
           <span>{finding.weaknessClass}</span>
           {finding.cwe && <span className="font-mono">{finding.cwe}</span>}
           {engagementName && <span>· {engagementName}</span>}
+          {finding.publishedAt != null && (
+            <span>· Publicado em {fmtDateOnly(finding.publishedAt)}</span>
+          )}
         </div>
         {cvss && (
           <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -1451,6 +1605,14 @@ function FindingSheetBody({
 
         {stab === "resumo" && (
           <div className="mt-4 flex flex-col gap-4">
+            {finding.retestStatus === "fixed" &&
+              finding.retestedAt != null && (
+                <Callout tone="success" icon={ShieldCheck}>
+                  <span className="font-semibold">
+                    Validado por reteste em {fmtDateOnly(finding.retestedAt)}.
+                  </span>
+                </Callout>
+              )}
             {finding.narrative && (
               <DetailBlock label="Narrativa" text={finding.narrative} />
             )}
