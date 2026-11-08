@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
  * descasamento de hidratação e sem setState-em-effect; a direção é decidida
  * no clique via `resolvedTheme`.
  */
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string }) {
   const { resolvedTheme, setTheme } = useTheme();
   return (
     <Button
@@ -18,6 +18,7 @@ export function ThemeToggle() {
       size="icon"
       aria-label="Alternar tema claro/escuro"
       title="Alternar tema"
+      className={className}
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
     >
       <SunMoon className="h-4 w-4" />
