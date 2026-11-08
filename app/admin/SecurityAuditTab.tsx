@@ -40,7 +40,11 @@ const EVENTS: { value: string; label: string; tone: Tone }[] = [
     label: "Evidência baixada",
     tone: "primary",
   },
-  { value: "mfa.challenge_issued", label: "MFA: desafio emitido", tone: "info" },
+  {
+    value: "mfa.challenge_issued",
+    label: "MFA: desafio emitido",
+    tone: "info",
+  },
   { value: "mfa.verify_succeeded", label: "MFA: verificado", tone: "success" },
   {
     value: "mfa.verify_failed",
@@ -69,6 +73,11 @@ const EVENTS: { value: string; label: string; tone: Tone }[] = [
     value: "user.autoblocked",
     label: "Usuário auto-bloqueado",
     tone: "destructive",
+  },
+  {
+    value: "portal.summary_viewed",
+    label: "Resumo do portfólio visto",
+    tone: "neutral",
   },
 ];
 const EVENT_MAP = new Map(EVENTS.map((e) => [e.value, e]));

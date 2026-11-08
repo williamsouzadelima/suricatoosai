@@ -2092,6 +2092,7 @@ export default defineSchema({
       v.literal("ioc.removed"),
       v.literal("user.autoblocked"),
       v.literal("engagement.hard_deleted"),
+      v.literal("portal.summary_viewed"),
     ),
     actor_user_id: v.optional(v.string()),
     actor_email: v.optional(v.string()),

@@ -39,6 +39,7 @@ const eventTypeArg = v.union(
   v.literal("ioc.removed"),
   v.literal("user.autoblocked"),
   v.literal("engagement.hard_deleted"),
+  v.literal("portal.summary_viewed"),
 );
 const actorKindArg = v.union(
   v.literal("internal"),
@@ -124,6 +125,7 @@ const AUDIT_EVENT_TYPES = [
   "ioc.added",
   "ioc.removed",
   "user.autoblocked",
+  "portal.summary_viewed",
 ] as const;
 
 export const getSecurityAuditForBackend = query({

@@ -4,6 +4,11 @@ import { validateServiceKey } from "./lib/utils";
 import { collectEvidencePage } from "./lib/evidenceBundle";
 import type { Id, Doc } from "./_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
+import {
+  buildPortalSummary,
+  buildPortalSummaryAuditRow,
+  listVisibleEngagements,
+} from "./lib/portalSummary";
 
 /**
  * Portal do cliente (read-only) — núcleo de AUTORIZAÇÃO. Todas as funções são
@@ -124,15 +129,7 @@ export const listPortalEngagementsForBackend = query({
     validateServiceKey(args.serviceKey);
     const access = await resolveMembership(ctx, args.userId, args.clientId);
     if (!access) return [];
-    const engagements = (
-      await ctx.db
-        .query("engagements")
-        .withIndex("by_client_and_updated", (q) =>
-          q.eq("client_id", args.clientId),
-        )
-        .order("desc")
-        .collect()
-    ).filter((e) => !e.hard_deleted_at && !e.archived_at);
+    const engagements = await listVisibleEngagements(ctx, args.clientId);
     return engagements.map((e) => ({
       id: e._id,
       name: e.name,
@@ -370,6 +367,114 @@ export const listPortalEvidenceForFindingForBackend = query({
   },
 });
 
+/**
+ * Resumo de portfólio do cliente (Fase 1b) — agrega os engajamentos VISÍVEIS e
+ * seus achados PUBLICADOS num cabeçalho de board (SEM score fabricado). Query
+ * PURA (não escreve; a auditoria é a mutation abaixo, fail-closed na rota). O
+ * `nowMs` vem da rota (o handler não chama Date.now()). Nega por padrão → null
+ * (NUNCA um objeto zerado). Lógica em convex/lib/portalSummary.ts.
+ */
+export const listPortalSummaryForBackend = query({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    clientId: v.id("clients"),
+    nowMs: v.number(),
+  },
+  returns: v.union(
+    v.null(),
+    v.object({
+      generatedAt: v.number(),
+      truncated: v.boolean(),
+      engagements: v.object({
+        total: v.number(),
+        byStatus: v.object({
+          planned: v.number(),
+          active: v.number(),
+          review: v.number(),
+          reporting: v.number(),
+          closed: v.number(),
+        }),
+        withWindow: v.number(),
+        withScope: v.number(),
+      }),
+      findings: v.object({
+        published: v.number(),
+        publishedWithoutDate: v.number(),
+        open: v.number(),
+        openBySeverity: v.object({
+          critical: v.number(),
+          high: v.number(),
+          medium: v.number(),
+          low: v.number(),
+          info: v.number(),
+        }),
+        openCriticalHigh: v.number(),
+        worstOpenSeverity: v.union(v.string(), v.null()),
+        retest: v.object({
+          fixed: v.number(),
+          stillVulnerable: v.number(),
+          pending: v.number(),
+          notRetested: v.number(),
+        }),
+        lastPublishedAt: v.union(v.number(), v.null()),
+        lastRetestedAt: v.union(v.number(), v.null()),
+      }),
+      priorities: v.array(
+        v.object({
+          id: v.id("findings"),
+          engagementId: v.id("engagements"),
+          engagementName: v.string(),
+          ref: v.union(v.string(), v.null()),
+          title: v.string(),
+          severity: v.string(),
+          affectedAsset: v.string(),
+          weaknessClass: v.string(),
+          cwe: v.union(v.string(), v.null()),
+          cvssScore: v.union(v.number(), v.null()),
+          cvssVersion: v.union(v.string(), v.null()),
+          cvssVector: v.union(v.string(), v.null()),
+          retestStatus: v.union(v.string(), v.null()),
+          publishedAt: v.union(v.number(), v.null()),
+          evidenceCount: v.number(),
+        }),
+      ),
+      perEngagement: v.array(
+        v.object({
+          engagementId: v.id("engagements"),
+          published: v.number(),
+          open: v.number(),
+          openCriticalHigh: v.number(),
+          worstOpenSeverity: v.union(v.string(), v.null()),
+          lastPublishedAt: v.union(v.number(), v.null()),
+        }),
+      ),
+      reports: v.object({
+        available: v.number(),
+        lastCreatedAt: v.union(v.number(), v.null()),
+        latestExecutive: v.union(
+          v.null(),
+          v.object({
+            engagementId: v.id("engagements"),
+            engagementName: v.string(),
+            version: v.number(),
+            createdAt: v.number(),
+            formats: v.array(v.string()),
+          }),
+        ),
+      }),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    return await buildPortalSummary(
+      ctx,
+      { userId: args.userId, clientId: args.clientId, nowMs: args.nowMs },
+      resolveMembership,
+    );
+  },
+});
+
 // ── Auditoria de VIEW do portal (trilha durável; rotas são fail-closed) ──────
 // Hoje só o download era auditado. Estas gravam que o cliente LISTOU achados /
 // VIU evidência (o conteúdo exposto na Fatia 2a). Re-resolvem o cliente do
@@ -450,6 +555,45 @@ export const recordPortalEvidenceViewForBackend = mutation({
       detail: `${args.count} evidência(s) (portal)`,
       created_at: Date.now(),
     });
+    return { ok: access !== null };
+  },
+});
+
+/** Audita a visualização do RESUMO de portfólio pelo cliente (evento DEDICADO
+ *  portal.summary_viewed; SEM engagement_id — abrange o portfólio). Fail-closed
+ *  na rota: se esta gravação falhar, a rota recusa (503) e não serve o resumo. */
+export const recordPortalSummaryViewForBackend = mutation({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    clientId: v.id("clients"),
+    published: v.number(),
+    engagements: v.number(),
+    actorEmail: v.optional(v.string()),
+    ip: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+  },
+  returns: v.object({ ok: v.boolean() }),
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    const access = await resolveMembership(ctx, args.userId, args.clientId);
+    await ctx.db.insert(
+      "security_audit_log",
+      buildPortalSummaryAuditRow(
+        {
+          userId: args.userId,
+          clientId: args.clientId,
+          actorEmail: args.actorEmail,
+          ip: args.ip,
+          userAgent: args.userAgent,
+          organizationId: access?.client.organization_id,
+        },
+        access !== null,
+        args.published,
+        args.engagements,
+        Date.now(),
+      ),
+    );
     return { ok: access !== null };
   },
 });
