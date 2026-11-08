@@ -835,7 +835,7 @@ export const updateFinding = mutation({
     tags: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const { finding } = await requireOwnedFinding(ctx, args.findingId);
+    const { subject, finding } = await requireOwnedFinding(ctx, args.findingId);
     if (finding.status === "dismissed") {
       throw new ConvexError({
         code: "INVALID",
@@ -859,6 +859,15 @@ export const updateFinding = mutation({
     if (args.cvssVector !== undefined) patch.cvss_vector = args.cvssVector;
     if (args.cvssScore !== undefined) patch.cvss_score = args.cvssScore;
     if (args.tags !== undefined) patch.tags = args.tags;
+    // Edição humana de um DRAFT de máquina (created_by="agent") grava reviewed_by →
+    // isMachineDraft passa a false, então uma recaptura do MOTOR (latest-wins, com
+    // ENGINE_INGEST_ENABLED já LIGADA no host) NÃO sobrescreve a curadoria humana.
+    // HOJE updateFinding não tem caller (dormente) — isto fica pronto para quando
+    // uma tela de edição de draft for ligada; não é proteção ativa ainda.
+    // (approved/published saem de "draft" abaixo → já protegidos por status.)
+    if (finding.status === "draft" && finding.created_by === "agent") {
+      patch.reviewed_by = subject;
+    }
     // Editar um achado já aprovado o devolve para revisão (audit-safe).
     if (finding.status === "approved" || finding.status === "published") {
       patch.status = "in_review";

@@ -18,13 +18,12 @@
  *    rótulo+passo+trecho+comando+resultado p/ texto), não por ids que mudam a cada
  *    PUT.
  *
- * reviewed_by: `isMachineDraft` o checa como guarda, mas HOJE nada o grava. A
- * proteção efetiva é o STATUS: submeter (→ in_review) tira o draft do latest-wins.
- * ATENÇÃO: `updateFinding` JÁ edita um draft no lugar (hoje sem caller) e NÃO grava
- * reviewed_by nem muda o status — então, se uma UI editar um draft de agente e a
- * flag do motor estiver ligada, o próximo re-push faria latest-wins por cima. Hoje
- * o guard se sustenta só pela ausência de caller; ANTES de ligar a flag: gravar
- * reviewed_by em updateFinding p/ drafts de agente (ou recusar essas edições).
+ * reviewed_by: `isMachineDraft` o checa como guarda. `updateFinding` GRAVA
+ * reviewed_by ao editar um draft de agente no lugar → o guard fica ATIVO nesse caso
+ * (uma recaptura do motor não sobrescreve a edição humana). Como updateFinding
+ * ainda não tem caller de UI, na prática a proteção efetiva hoje é o STATUS
+ * (submeter → in_review tira do latest-wins); o stamp já está pronto para quando a
+ * tela de edição de draft existir.
  */
 
 import { cvssBaseScore } from "./cvss";
@@ -85,10 +84,10 @@ function cleanSteps(steps: string[] | undefined): string[] | undefined {
 /**
  * Um DRAFT criado pela MÁQUINA (created_by="agent"), AINDA não marcado como curado
  * (sem reviewed_by), re-empurrado por máquina (origin != "analyst"): elegível a
- * latest-wins. Fora disso → conservador. NOTA: hoje NADA grava reviewed_by — a
- * proteção real é o STATUS (submeter tira do "draft"). Ver o cabeçalho do módulo:
- * updateFinding já edita draft no lugar sem gravar reviewed_by, então antes de
- * ligar a flag do motor é preciso gravá-lo (ou recusar edição de draft de agente).
+ * latest-wins. Fora disso → conservador. NOTA: `updateFinding` grava reviewed_by ao
+ * editar um draft de agente (guard ativo nesse caso); como ainda não há caller de
+ * UI, na prática a proteção efetiva hoje é o STATUS (submeter tira do "draft"). Ver
+ * o cabeçalho do módulo.
  */
 export function isMachineDraft(
   m: { status: string; created_by?: string; reviewed_by?: string | null },
