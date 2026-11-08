@@ -24,6 +24,12 @@ export async function GET(req: NextRequest) {
   if (!clientId) {
     return NextResponse.json({ error: "clientId ausente" }, { status: 400 });
   }
+  // Redige o serviceKey de qualquer erro logado (defesa-em-profundidade: se o
+  // Convex ecoar os args numa ValidationError, o segredo não vaza pro log).
+  const redact = (x: unknown) =>
+    (x instanceof Error ? x.message : String(x))
+      .split(serviceKey)
+      .join("[REDACTED]");
   const convex = getConvexClient();
   const cid = clientId as Id<"clients">;
   let summary: PortalSummary | null = null;
@@ -35,7 +41,7 @@ export async function GET(req: NextRequest) {
       nowMs: Date.now(),
     });
   } catch (e) {
-    console.error("portal summary: query falhou", e);
+    console.error("portal summary: query falhou:", redact(e));
     return NextResponse.json({ error: "Resumo indisponível" }, { status: 503 });
   }
   // Auditoria durável (fail-closed): registra a visualização do resumo (ou a
@@ -59,7 +65,7 @@ export async function GET(req: NextRequest) {
     );
     auditOk = audit.ok;
   } catch (e) {
-    console.error("portal summary: auditoria indisponível, recusando", e);
+    console.error("portal summary: auditoria indisponível, recusando:", redact(e));
     return NextResponse.json(
       { error: "Auditoria indisponível" },
       { status: 503 },

@@ -78,12 +78,18 @@ export function heroSentence(s: PortalSummary): string {
   const f = s.findings;
   const q = coverageQualifier(s);
   if (f.published === 0) {
-    return "Nenhum achado publicado neste portfólio.";
+    // Mesmo sem nada publicado, a cobertura (0 de N) diz que há engajamentos em
+    // andamento — ausência de publicação NÃO é "nada a reportar".
+    return "Nenhum achado publicado neste portfólio." + q;
   }
   if (f.open === 0) {
     if (q) {
       // cobertura parcial ou truncado → NÃO é um "tudo limpo" limpo.
-      return `Nenhum achado em aberto entre os ${f.published} achados publicados.${q}`;
+      const base =
+        f.published === 1
+          ? "O único achado publicado não está em aberto."
+          : `Nenhum achado em aberto entre os ${f.published} achados publicados.`;
+      return base + q;
     }
     return f.published === 1
       ? "Nenhum achado em aberto: o único achado publicado foi validado por reteste."

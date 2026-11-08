@@ -48,11 +48,25 @@ const FORBIDDEN =
   /ainda|score|nota de seguran|grade|seguro|protegid|tend[êe]ncia/i;
 
 describe("hero: numeral/tom/frase honestos + cobertura em TODA afirmação", () => {
-  it("S1 sem publicados → '—', muted, SEM 'ainda'", () => {
-    const s = heroInput({ published: 0 });
+  it("S1 sem publicados, cobertura parcial → '—', muted, cobertura 0 de N (SEM 'ainda')", () => {
+    const s = heroInput({ published: 0 }, { total: 3, withFindings: 0 });
     expect(heroNumeral(s)).toBe("—");
     expect(heroTone(s)).toBe("muted");
+    expect(heroSentence(s)).toBe(
+      "Nenhum achado publicado neste portfólio. Cobertura: 0 de 3 engajamentos com achados publicados.",
+    );
+  });
+
+  it("S1 sem publicados, sem engajamentos → só a base, sem cobertura", () => {
+    const s = heroInput({ published: 0 }, { total: 0, withFindings: 0 });
     expect(heroSentence(s)).toBe("Nenhum achado publicado neste portfólio.");
+  });
+
+  it("open===0, 1 publicado, cobertura parcial → gramática singular", () => {
+    const s = heroInput({ published: 1, open: 0 }, { total: 2, withFindings: 1 });
+    expect(heroSentence(s)).toBe(
+      "O único achado publicado não está em aberto. Cobertura: 1 de 2 engajamentos com achados publicados.",
+    );
   });
 
   it("S2 nada aberto + COBERTURA TOTAL → success", () => {
