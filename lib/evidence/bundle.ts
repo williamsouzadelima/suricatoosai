@@ -1,5 +1,6 @@
 import { Readable } from "node:stream";
 import { createGzip } from "node:zlib";
+import { createHash } from "node:crypto";
 import * as tar from "tar-stream";
 import { GetObjectCommand, type S3Client } from "@aws-sdk/client-s3";
 import { brtFilenameStamp } from "@/lib/reports/report-filename";
@@ -8,10 +9,11 @@ import type { EvidenceBundleRow } from "@/convex/lib/evidenceBundle";
 /**
  * Monta o .tar.gz de TODA a evidência do engajamento ON-THE-FLY (sempre atual).
  * Streama (tar-stream + gzip) — bufferiza UM objeto do S3 por vez (screenshots
- * são pequenos), então é memory-safe sem artefato pré-gerado. O manifesto é a
- * ÚLTIMA entrada (só então se conhece `missing[]`; e um stream que morre no meio
- * fica sem manifesto → truncamento detectável). "Sem exceção" é honesto: objeto
- * irrecuperável (404) vai pra `missing[]`, nunca some calado.
+ * são pequenos), então é memory-safe sem artefato pré-gerado. SHA256SUMS (se há
+ * arquivos), o manifesto e o README são as ÚLTIMAS entradas (só então se conhece
+ * `missing[]`; e um stream que morre no meio fica sem manifesto → truncamento
+ * detectável). "Sem exceção" é honesto: evidência não empacotada (objeto 404,
+ * sem s3_key, ou erro de leitura) vai pra `missing[]`, nunca some calado.
  */
 
 type EvidencePage = {
@@ -37,8 +39,17 @@ const README = `Pacote de evidencias - Suricatoos
 
 Este .tar.gz contem TODA a evidencia do engajamento (export forense completo):
 - manifest.json : catalogo completo (achados, comandos, provas, metadados) +
-  a lista "missing" de objetos irrecuperaveis (nunca omitidos em silencio).
+  o 'sha256' de cada arquivo empacotado + a lista "missing" de evidencia nao
+  empacotada (nunca omitida em silencio).
+- SHA256SUMS    : linhas 'sha256  caminho' (presente so quando ha arquivos);
+  valide com 'sha256sum -c SHA256SUMS' a partir da raiz extraida.
 - evidence/<achado>/<arquivo> : screenshots e arquivos capturados.
+
+Integridade do conteudo: o 'sha256' detecta corrupcao ou edicao de um arquivo
+em relacao a este manifesto. O manifesto NAO e assinado e os hashes sao
+calculados na exportacao — isto comprova integridade do conteudo empacotado,
+nao autenticidade nem cadeia de custodia (quem reescreve o pacote tambem
+recalcula o hash).
 
 Conteudo CONFIDENCIAL. Distribua apenas conforme o contrato do engajamento.
 `;
@@ -110,6 +121,8 @@ export function buildEvidenceBundleStream(opts: {
     const warnings: string[] = [];
     const usedNames = new Set<string>();
     const s3KeyToPath = new Map<string, string>();
+    const s3KeyToSha = new Map<string, string>();
+    const sha256Sums: string[] = [];
     let fileCount = 0;
     let evidenceCount = 0;
     try {
@@ -128,11 +141,15 @@ export function buildEvidenceBundleStream(opts: {
         for (const ev of res.page) {
           evidenceCount++;
           let filePath: string | null = null;
+          let sha256: string | null = null;
           let status: "available" | "missing" | "text_only" = "text_only";
           if (ev.s3Key) {
             const existing = s3KeyToPath.get(ev.s3Key);
             if (existing) {
               filePath = existing;
+              // Mesmo objeto S3 já empacotado: reusa o caminho E o hash
+              // (conteúdo idêntico → mesmo sha256).
+              sha256 = s3KeyToSha.get(ev.s3Key) ?? null;
               status = "available";
             } else {
               try {
@@ -144,12 +161,25 @@ export function buildEvidenceBundleStream(opts: {
                   | undefined;
                 if (!body) throw new Error("empty_body");
                 const bytes = await body.transformToByteArray();
+                const buf = Buffer.from(bytes);
+                // Hash de integridade do CONTEÚDO: sha256 do arquivo exatamente
+                // como empacotado. Detecta corrupção/edição do arquivo vs. este
+                // manifesto (não é assinatura: o manifesto não é assinado e o
+                // hash é calculado na exportação — não prova autenticidade).
+                sha256 = createHash("sha256").update(buf).digest("hex");
                 filePath = entryName(ev, usedNames);
-                await addBufferEntry(pack, filePath, Buffer.from(bytes));
+                await addBufferEntry(pack, filePath, buf);
                 s3KeyToPath.set(ev.s3Key, filePath);
+                s3KeyToSha.set(ev.s3Key, sha256);
+                sha256Sums.push(`${sha256}  ${filePath}`);
                 fileCount++;
                 status = "available";
               } catch (e) {
+                // Pode ter falhado APÓS atribuir filePath/sha256 (ex.: pack
+                // destruído em addBufferEntry) — zera para manter o invariante
+                // "file/sha256 nulos quando o arquivo não entrou no tar".
+                filePath = null;
+                sha256 = null;
                 missing.push({
                   evidenceId: ev.evidenceId,
                   s3Key: ev.s3Key,
@@ -158,6 +188,22 @@ export function buildEvidenceBundleStream(opts: {
                 status = "missing";
               }
             }
+          } else if (ev.fileId) {
+            // Evidência de ARQUIVO com file_id mas SEM s3_key (linha legada): o
+            // bundle só empacota por s3_key, então não dá pra recuperar. Marca
+            // missing — nunca "text_only" calado, que apresentaria uma captura
+            // como se fosse texto, contradizendo "nunca some calado".
+            // NÃO usamos source_type=="file" aqui: ele vem do LLM e texto
+            // legítimo pode vir rotulado "file" sem arquivo (falso positivo →
+            // falsa perda declarada). Falha de anexo SEM file_id (upload falhou)
+            // segue como pré-existente text_only; cobri-la exige persistir o
+            // caminho do sandbox na captura — follow-up, fora deste PR.
+            missing.push({
+              evidenceId: ev.evidenceId,
+              s3Key: null,
+              reason: "no_s3_key",
+            });
+            status = "missing";
           }
           manifestEvidence.push({
             evidenceId: ev.evidenceId,
@@ -178,6 +224,7 @@ export function buildEvidenceBundleStream(opts: {
             mediaType: ev.mediaType,
             capturedAt: ev.capturedAt,
             file: filePath,
+            sha256,
             status,
           });
         }
@@ -195,11 +242,19 @@ export function buildEvidenceBundleStream(opts: {
           files: fileCount,
           missing: missing.length,
         },
+        hashAlgorithm: "sha256",
         evidence: manifestEvidence,
         missing,
         warnings,
-        note: "Export completo de evidencia. 'missing' lista objetos irrecuperaveis (expirados antes do fix de retencao, ou nunca persistidos no S3). 'warnings' sinaliza truncamento.",
+        note: "Export completo de evidencia. 'sha256' (algoritmo em hashAlgorithm) e o hash do conteudo de cada ARQUIVO empacotado em evidence/, repetido em SHA256SUMS para 'sha256sum -c'. Comprova integridade do conteudo vs. este manifesto (nao assinado; hash calculado na exportacao), nao autenticidade. Campos de texto (snippet/command/resultSummary) e o proprio manifesto nao sao hasheados. 'missing' lista evidencia nao empacotada (sem s3_key, objeto ausente no S3, ou erro de leitura); 'warnings' sinaliza truncamento.",
       };
+      if (sha256Sums.length > 0) {
+        await addBufferEntry(
+          pack,
+          "SHA256SUMS",
+          Buffer.from(sha256Sums.join("\n") + "\n", "utf-8"),
+        );
+      }
       await addBufferEntry(
         pack,
         "manifest.json",
