@@ -63,7 +63,7 @@ const IDLE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 // Agent version — KEEP IN SYNC with packages/local/package.json "version".
 // Reported to the server so the Remote Control UI can flag "update available".
-const AGENT_VERSION = "0.1.8";
+const AGENT_VERSION = "0.1.9";
 
 // How often the agent polls the server for a pending update (Update button).
 const UPDATE_POLL_INTERVAL_MS = 20 * 1000; // 20s
@@ -1611,8 +1611,13 @@ async function runInstall(): Promise<void> {
   console.log(chalk.gray(`Wrote ${UNIT_PATH}.`));
 
   await runChild("systemctl", ["daemon-reload"]);
-  if (!(await runChild("systemctl", ["enable", "--now", SERVICE_NAME]))) {
-    console.error(chalk.red(`systemctl enable --now ${SERVICE_NAME} failed.`));
+  // enable (persist across boot) THEN restart (apply the unit now). `enable
+  // --now` only *starts* a stopped unit, so re-installing over an already-running
+  // connector would leave the OLD process on the OLD unit/binary; restart swaps it
+  // onto the freshly written unit whether or not it was already running.
+  await runChild("systemctl", ["enable", SERVICE_NAME]);
+  if (!(await runChild("systemctl", ["restart", SERVICE_NAME]))) {
+    console.error(chalk.red(`systemctl restart ${SERVICE_NAME} failed.`));
     process.exit(1);
   }
 
@@ -1779,7 +1784,7 @@ ${chalk.cyan("Lifecycle:")}
   const idleTimeoutMinutes = Number.parseFloat(getArg("--idle-timeout") ?? "");
   const config: Config = {
     convexUrl: getArg("--convex-url") || PRODUCTION_CONVEX_URL,
-    token: getArg("--token") || "",
+    token: getArg("--token") || process.env.SURICATOOS_TOKEN || "",
     name: getArg("--name") || os.hostname(),
     idleTimeoutMs:
       Number.isFinite(idleTimeoutMinutes) && idleTimeoutMinutes > 0

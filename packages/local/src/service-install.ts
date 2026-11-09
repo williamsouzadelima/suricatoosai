@@ -61,8 +61,9 @@ export interface UnitFileOptions {
  * freshly installed version; revocation exits 0 (success) -> stays stopped (so
  * a revoked connector does not busy-loop into a connect() the server rejects).
  * HOME=/root so the agent's self-update `npm` reads root's config. The token is
- * passed via systemd's ${SURICATOOS_TOKEN} expansion from the root-only env
- * file — never written inline into the unit.
+ * NOT on the command line: systemd loads it from the root-only EnvironmentFile
+ * into SURICATOOS_TOKEN and the agent reads it from the environment, so it never
+ * appears in `ps` / `/proc/<pid>/cmdline`, nor inline in the unit.
  */
 export function buildUnitFile(options: UnitFileOptions): string {
   const envFile = options.envFile ?? ENV_FILE;
@@ -77,7 +78,8 @@ Type=simple
 Environment=HOME=/root
 Environment=PATH=${options.nodeDir}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 EnvironmentFile=${envFile}
-ExecStart=${options.binPath} --token \${SURICATOOS_TOKEN}
+ExecStart=${options.binPath}
+SyslogIdentifier=suricatoos-connector
 Restart=on-failure
 RestartSec=3
 

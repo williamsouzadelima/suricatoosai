@@ -68,8 +68,9 @@ sudo systemctl daemon-reload
 - **Restart policy is `on-failure` on purpose.** Self-update exits `1` (relaunch);
   **revocation exits `0` (stays stopped)**. `Restart=always` would relaunch a
   revoked agent into a `connect()` the server rejects.
-- The token is passed as `--token ${SURICATOOS_TOKEN}` (expanded by systemd from
-  the root-only env file). On a single-user box its only reader is root, which
-  already holds the token. (`suricatoos-reference.service` is a static copy of the
-  generated unit for reference — `install.sh` is the supported path, since it fills
-  in the real `node`/bin paths for your box.)
+- The token is **not** on the command line. systemd loads it from the root-only
+  `EnvironmentFile` into `SURICATOOS_TOKEN` and the agent reads it from the
+  environment, so it never appears in `ps` / `/proc/<pid>/cmdline`. (`suricatoos-
+  reference.service` is a static copy of the generated unit for reference —
+  `install.sh` is the supported path, since it fills in the real `node`/bin paths
+  for your box.)

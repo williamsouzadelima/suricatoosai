@@ -83,9 +83,9 @@ fi
 
 # 3) Write the unit. Absolute bin path + node dir on PATH (the bin's shebang is
 #    `#!/usr/bin/env node`, and systemd's default PATH may not include nvm/node).
-#    The token is passed as --token ${SURICATOOS_TOKEN}, expanded by systemd from
-#    the root-only env file; on a single-user box its only reader is root, which
-#    already holds the token.
+#    The token is NOT on the command line: systemd loads it from the root-only
+#    EnvironmentFile into SURICATOOS_TOKEN and the agent reads it from the
+#    environment, so it never appears in `ps` / `/proc/<pid>/cmdline`.
 cat > "${UNIT}" <<UNIT_EOF
 [Unit]
 Description=Suricatoos Remote Control connector (@suricatoos/local)
@@ -97,7 +97,8 @@ Wants=network-online.target
 Type=simple
 Environment=PATH=${NODE_DIR}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 EnvironmentFile=${ENV_FILE}
-ExecStart=${BIN} --token \${SURICATOOS_TOKEN}
+ExecStart=${BIN}
+SyslogIdentifier=suricatoos-connector
 # on-failure is deliberate and matches the agent's exit-code contract:
 #  - self-update exits 1 (failure) -> relaunched into the freshly installed version
 #  - revocation exits 0 (success)  -> NOT relaunched (so it won't busy-loop into a
@@ -116,7 +117,7 @@ systemctl daemon-reload
 echo "==> Installed unit: ${UNIT}"
 echo
 echo "Stop any MANUAL connector first (Ctrl+C in its terminal) so you don't run two."
-echo "Then enable + start:"
-echo "    sudo systemctl enable --now ${SERVICE}"
+echo "Then enable at boot + (re)start to apply this unit:"
+echo "    sudo systemctl enable ${SERVICE} && sudo systemctl restart ${SERVICE}"
 echo "Follow logs:"
 echo "    journalctl -u ${SERVICE} -f"

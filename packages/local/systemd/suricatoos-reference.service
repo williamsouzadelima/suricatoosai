@@ -18,8 +18,11 @@ Wants=network-online.target
 Type=simple
 Environment=PATH=<NODE_DIR>:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 EnvironmentFile=/etc/suricatoos/connector.env
-ExecStart=<BIN> --token ${SURICATOOS_TOKEN}
+ExecStart=<BIN>
+SyslogIdentifier=suricatoos-connector
 # on-failure: self-update exits 1 (relaunch); revocation exits 0 (stays stopped).
+# Token: NOT on argv -- systemd loads it from the EnvironmentFile into
+# SURICATOOS_TOKEN and the agent reads it from the environment.
 Restart=on-failure
 RestartSec=3
 

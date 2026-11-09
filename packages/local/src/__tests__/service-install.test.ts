@@ -56,12 +56,21 @@ describe("buildUnitFile", () => {
     nodeDir: "/root/.nvm/versions/node/v22.23.2/bin",
   });
 
-  it("passes the token via systemd env expansion, never inline", () => {
+  it("keeps the token off the command line (read from the EnvironmentFile)", () => {
+    // ExecStart is just the bin path — no --token — so the token never leaks via
+    // `ps` / `/proc/<pid>/cmdline`.
     expect(unit).toContain(
-      "ExecStart=/root/.nvm/versions/node/v22.23.2/bin/suricatoos-local --token ${SURICATOOS_TOKEN}",
+      "ExecStart=/root/.nvm/versions/node/v22.23.2/bin/suricatoos-local\n",
     );
-    // A real token must never be baked into the unit.
-    expect(unit).not.toMatch(/--token (?!\$\{)/);
+    expect(unit).not.toContain("--token");
+    // It is still provided to the process, from the root-only env file.
+    expect(unit).toContain(`EnvironmentFile=${ENV_FILE}`);
+    // ...and no real token value is ever baked inline into the unit.
+    expect(unit).not.toMatch(/SURICATOOS_TOKEN=\S/);
+  });
+
+  it("sets SyslogIdentifier so journald captures the connector's logs", () => {
+    expect(unit).toContain("SyslogIdentifier=suricatoos-connector");
   });
 
   it("uses Restart=on-failure (matches the agent exit-code contract)", () => {
