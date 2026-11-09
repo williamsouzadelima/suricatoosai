@@ -74,6 +74,7 @@ import {
   type PriorityItem,
   type PerEngagementRow,
 } from "./summary-model";
+import type { PortalOpenFindings } from "@/convex/lib/portalSummary";
 import {
   Sheet,
   SheetContent,
@@ -170,6 +171,8 @@ const FORMAT_LABEL: Record<string, string> = {
 function formatLabel(f: string): string {
   return FORMAT_LABEL[f.toLowerCase()] ?? f.toUpperCase();
 }
+/** Teto da lista "ver todos" — espelha OPEN_LIST_CAP do backend (portalSummary.ts). */
+const OPEN_LIST_CAP = 500;
 const SOURCE_TYPE_LABEL: Record<string, string> = {
   note: "Nota do analista",
   command: "Comando",
@@ -247,37 +250,9 @@ function redirectToLogin() {
   window.location.href = "/login";
 }
 
-// Item da lista "todos em aberto" (Fase 1c) — projeção da rota /api/portal/open-findings.
-interface OpenFindingItem {
-  id: string;
-  engagementId: string;
-  engagementName: string;
-  ref: string | null;
-  title: string;
-  severity: string;
-  affectedAsset: string;
-  weaknessClass: string;
-  cwe: string | null;
-  cvssScore: number | null;
-  cvssVersion: string | null;
-  cvssVector: string | null;
-  retestStatus: string | null;
-  publishedAt: number | null;
-}
-interface OpenFindingsResp {
-  generatedAt: number;
-  scanTruncated: boolean;
-  total: number;
-  openBySeverity: {
-    critical: number;
-    high: number;
-    medium: number;
-    low: number;
-    info: number;
-  };
-  listCapped: boolean;
-  items: OpenFindingItem[];
-}
+// A lista "todos em aberto" usa o TIPO DO BACKEND direto (PortalOpenFindings) —
+// zero duplicação, zero drift: o import é o contrato (o bug B1 era não
+// desembrulhar o envelope `{ clientId, openFindings }`, agora tipado).
 
 export default function PortalPage() {
   const router = useRouter();
@@ -329,7 +304,7 @@ export default function PortalPage() {
   );
   const [summaryErr, setSummaryErr] = useState(false);
   const [openList, setOpenList] = useState<
-    OpenFindingsResp | null | undefined
+    PortalOpenFindings | null | undefined
   >(undefined);
   const [openListErr, setOpenListErr] = useState(false);
 
@@ -422,6 +397,12 @@ export default function PortalPage() {
     };
   }, [clientId]);
 
+  // Troca de cliente invalida a lista "em aberto" (evita flash de A sob B).
+  useEffect(() => {
+    setOpenList(undefined);
+    setOpenListErr(false);
+  }, [clientId]);
+
   // Lista "todos em aberto" (Fase 1c) — só carrega na sub-vista ?vista=abertos.
   // Mesmo guard de corrida do resumo (active + eco do clientId). Erro ≠ vazio.
   useEffect(() => {
@@ -445,9 +426,14 @@ export default function PortalPage() {
           return;
         }
         if (!res.ok) throw new Error(`open-findings ${res.status}`);
-        const d = await res.json();
+        const d = (await res.json()) as {
+          clientId?: string;
+          openFindings?: PortalOpenFindings;
+        };
         if (!active || d.clientId !== clientId) return;
-        setOpenList(d);
+        // A rota envelopa em { clientId, openFindings } — desembrulha (como o
+        // resumo faz com d.summary); guardar o envelope quebra a sub-vista.
+        setOpenList(d.openFindings ?? null);
       } catch {
         if (active) setOpenListErr(true);
       }
@@ -653,8 +639,17 @@ export default function PortalPage() {
           />
         ) : vista === "abertos" ? (
           <OpenFindingsView
+            key={clientId ?? "none"}
             data={openList}
             error={openListErr}
+            coverage={
+              summary
+                ? {
+                    withFindings: summary.engagements.withFindings,
+                    total: summary.engagements.total,
+                  }
+                : null
+            }
             onBack={() => setParams({ vista: null })}
             onOpenFinding={(eid, fid) =>
               setParams({ e: eid, f: fid, tab: null, vista: null })
@@ -896,6 +891,13 @@ function PortfolioSummary({
                     e.byStatus.active + e.byStatus.review + e.byStatus.reporting
                   } em andamento`
                 : ""}
+              {e.byStatus.planned > 0
+                ? ` · ${e.byStatus.planned} ${plural(
+                    e.byStatus.planned,
+                    "planejado",
+                    "planejados",
+                  )}`
+                : ""}
               .
             </p>
           </div>
@@ -988,7 +990,7 @@ function PortfolioSummary({
                 {f.lastRetestedAt != null
                   ? `Último resultado de reteste registrado em ${fmtDateOnly(
                       f.lastRetestedAt,
-                    )}.`
+                    )} (data do registro do resultado, não da correção).`
                   : "Nenhum resultado de reteste registrado ainda."}
               </p>
             </div>
@@ -1023,25 +1025,12 @@ function PortfolioSummary({
               className="self-start"
               onClick={onViewAll}
             >
-              Ver todos os {f.open} em aberto
+              {f.open > OPEN_LIST_CAP
+                ? `Ver os ${OPEN_LIST_CAP} primeiros de ${f.open} em aberto`
+                : `Ver todos os ${f.open} em aberto`}
             </Button>
           )}
         </div>
-      )}
-
-      {s.reports.available > 0 && (
-        <p className="text-xs text-muted-foreground">
-          {s.reports.available}{" "}
-          {plural(
-            s.reports.available,
-            "relatório disponível",
-            "relatórios disponíveis",
-          )}{" "}
-          nos engajamentos
-          {s.reports.lastCreatedAt != null &&
-            ` · último em ${fmtDateOnly(s.reports.lastCreatedAt)}`}
-          .
-        </p>
       )}
 
       <Collapsible>
@@ -1065,9 +1054,9 @@ function PortfolioSummary({
           </p>
           <p>
             As prioridades são ordenadas por severidade; depois, os ainda
-            vulneráveis no reteste; depois, a publicação mais antiga. O CVSS
-            aparece como informação e não define a ordem (3.1 e 4.0 não são
-            diretamente comparáveis).
+            vulneráveis no reteste; depois, a publicação registrada mais antiga.
+            O CVSS aparece quando registrado, como informação, e não define a
+            ordem (3.1 e 4.0 não são diretamente comparáveis).
           </p>
           <p>
             &ldquo;Publicado em&rdquo; é a data da última publicação do achado.
@@ -1110,16 +1099,28 @@ function ExecutiveReportBand({
   onOpen: (engagementId: string) => void;
 }) {
   const le = reports.latestExecutive;
+  const countLine =
+    reports.available > 0
+      ? `${reports.available} ${plural(
+          reports.available,
+          "relatório disponível",
+          "relatórios disponíveis",
+        )} nos engajamentos${
+          reports.lastCreatedAt != null
+            ? ` · último gerado em ${fmtDateOnly(reports.lastCreatedAt)}`
+            : ""
+        }.`
+      : null;
   return (
     <Card className="gap-0 py-0">
-      <div className="flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 p-5 md:flex-row md:items-start md:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <FileText className="h-4 w-4" />
           </div>
           <div className="min-w-0">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Relatório executivo
+              Último relatório executivo
             </span>
             {le ? (
               <>
@@ -1130,18 +1131,31 @@ function ExecutiveReportBand({
                   <span>
                     Versão {le.version} · Gerado em {fmtDateOnly(le.createdAt)}
                   </span>
-                  {le.formats.map((fmt) => (
-                    <StatusBadge
-                      key={fmt}
-                      tone="neutral"
-                      label={fmt.toUpperCase()}
-                    />
-                  ))}
+                  {le.formats
+                    .filter((fmt) => fmt.toLowerCase() !== "json")
+                    .map((fmt) => (
+                      <StatusBadge
+                        key={fmt}
+                        tone="neutral"
+                        label={formatLabel(fmt)}
+                      />
+                    ))}
                 </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Conteúdo fixado na geração ({fmtDateOnly(le.createdAt)}); a
+                  posição atual pode ter mudado. Os demais estão na aba
+                  Relatórios de cada engajamento.
+                </p>
+                {countLine && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {countLine}
+                  </p>
+                )}
               </>
             ) : (
               <p className="mt-0.5 text-sm text-muted-foreground">
                 Nenhum relatório executivo disponível ainda.
+                {countLine ? ` ${countLine}` : ""}
               </p>
             )}
           </div>
@@ -1167,11 +1181,13 @@ function ExecutiveReportBand({
 function OpenFindingsView({
   data,
   error,
+  coverage,
   onBack,
   onOpenFinding,
 }: {
-  data: OpenFindingsResp | null | undefined;
+  data: PortalOpenFindings | null | undefined;
   error: boolean;
+  coverage: { withFindings: number; total: number } | null;
   onBack: () => void;
   onOpenFinding: (engagementId: string, findingId: string) => void;
 }) {
@@ -1217,7 +1233,7 @@ function OpenFindingsView({
       <div className="flex flex-col gap-4">
         {header}
         <EmptyState
-          icon={ShieldCheck}
+          icon={KeyRound}
           title="Sem acesso a esta lista."
           description="Sua sessão pode ter expirado ou o acesso foi revogado. Atualize a página."
         />
@@ -1248,9 +1264,9 @@ function OpenFindingsView({
       </p>
       <p className="text-xs text-muted-foreground">
         Ordem de prioridade: severidade; depois, os ainda vulneráveis no reteste;
-        depois, a data de publicação mais antiga. O CVSS aparece em cada linha
-        como informação e não define a ordem (3.1 e 4.0 não são comparáveis).
-        Posição em {formatDateTime(data.generatedAt)}.
+        depois, a data de publicação registrada mais antiga. O CVSS aparece
+        quando registrado, como informação, e não define a ordem (3.1 e 4.0 não
+        são comparáveis). Posição em {formatDateTime(data.generatedAt)}.
       </p>
 
       {data.scanTruncated && (
@@ -1262,11 +1278,29 @@ function OpenFindingsView({
       )}
 
       {data.total === 0 ? (
-        <EmptyState
-          icon={ShieldCheck}
-          title="Nenhum achado em aberto."
-          description="Nenhum achado publicado segue em aberto neste portfólio."
-        />
+        coverage &&
+        coverage.withFindings === coverage.total &&
+        !data.scanTruncated ? (
+          <EmptyState
+            icon={ShieldCheck}
+            title="Nenhum achado em aberto."
+            description="Todos os achados publicados foram validados por reteste neste portfólio."
+          />
+        ) : (
+          <EmptyState
+            icon={ListChecks}
+            title="Nenhum achado em aberto entre os achados carregados."
+            description={`${
+              coverage && coverage.withFindings < coverage.total
+                ? `Engajamentos com achados publicados: ${coverage.withFindings} de ${coverage.total}. `
+                : ""
+            }${
+              data.scanTruncated
+                ? "Resumo parcial: o volume excede o limite de leitura."
+                : ""
+            }`.trim()}
+          />
+        )
       ) : (
         <>
           <div className="flex flex-wrap gap-1.5">
@@ -1274,6 +1308,7 @@ function OpenFindingsView({
               <button
                 key={c.label}
                 type="button"
+                aria-pressed={sevFilter === c.key}
                 onClick={() => {
                   setSevFilter(c.key);
                   setLimit(50);
@@ -1292,8 +1327,9 @@ function OpenFindingsView({
 
           {data.listCapped && (
             <p className="text-xs text-muted-foreground">
-              Mostrando os {data.items.length} primeiros de {data.total} em
-              aberto, na ordem de prioridade.
+              Lista completa: os {data.items.length} primeiros de {data.total} em
+              aberto, na ordem de prioridade (os demais excedem o limite de
+              leitura).
             </p>
           )}
 
@@ -1342,15 +1378,37 @@ function OpenFindingsView({
                     <span className="inline-flex items-center gap-1">
                       <Server className="h-3.5 w-3.5" /> {p.affectedAsset}
                     </span>
-                    {cvss && <span className="font-mono">{cvss}</span>}
-                    {p.publishedAt != null && (
+                    {cvss ? (
+                      <span className="font-mono">{cvss}</span>
+                    ) : (
+                      <span className="text-muted-foreground/70">
+                        CVSS não registrado
+                      </span>
+                    )}
+                    {p.publishedAt != null ? (
                       <span>Publicado em {fmtDateOnly(p.publishedAt)}</span>
+                    ) : (
+                      <span className="text-muted-foreground/70">
+                        Publicação sem data registrada
+                      </span>
                     )}
                   </div>
                 </div>
               );
             })}
           </div>
+
+          {visible.length === 0 && sevFilter && (
+            <p className="text-xs text-muted-foreground">
+              {data.listCapped
+                ? `Nenhum achado ${SEV_LABEL[sevFilter]} entre os ${
+                    data.items.length
+                  } exibidos (${
+                    data.total - data.items.length
+                  } além do limite de leitura).`
+                : `Nenhum achado ${SEV_LABEL[sevFilter]} nesta lista.`}
+            </p>
+          )}
 
           {shown.length > limit && (
             <Button
@@ -1413,9 +1471,17 @@ function PortfolioPriorityRow({
         <span className="inline-flex items-center gap-1">
           <Server className="h-3.5 w-3.5" /> {p.affectedAsset}
         </span>
-        {cvss && <span className="font-mono">{cvss}</span>}
-        {p.publishedAt != null && (
+        {cvss ? (
+          <span className="font-mono">{cvss}</span>
+        ) : (
+          <span className="text-muted-foreground/70">CVSS não registrado</span>
+        )}
+        {p.publishedAt != null ? (
           <span>Publicado em {fmtDateOnly(p.publishedAt)}</span>
+        ) : (
+          <span className="text-muted-foreground/70">
+            Publicação sem data registrada
+          </span>
         )}
         {p.evidenceCount === 0 ? (
           <span className="text-warning">Sem evidência registrada</span>
