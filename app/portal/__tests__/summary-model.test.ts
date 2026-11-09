@@ -18,13 +18,31 @@ import {
 
 function heroInput(
   f: Partial<PortalSummary["findings"]>,
-  opts: { total?: number; withFindings?: number; truncated?: boolean } = {},
+  opts: {
+    total?: number;
+    withFindings?: number;
+    truncated?: boolean;
+    byStatus?: Partial<PortalSummary["engagements"]["byStatus"]>;
+  } = {},
 ): PortalSummary {
+  const total = opts.total ?? 1;
   return {
     truncated: opts.truncated ?? false,
     engagements: {
-      total: opts.total ?? 1,
+      total,
       withFindings: opts.withFindings ?? 1,
+      // default: TODO encerrado (o portão do verde exige isso). Um teste que
+      // precise de engajamento "em andamento" passa byStatus com active/etc.
+      byStatus: {
+        planned: 0,
+        active: 0,
+        review: 0,
+        reporting: 0,
+        closed: total,
+        ...opts.byStatus,
+      },
+      withWindow: 0,
+      withScope: 0,
     },
     findings: {
       published: 0,
@@ -53,7 +71,7 @@ describe("hero: numeral/tom/frase honestos + cobertura em TODA afirmação", () 
     expect(heroNumeral(s)).toBe("—");
     expect(heroTone(s)).toBe("muted");
     expect(heroSentence(s)).toBe(
-      "Nenhum achado publicado neste portfólio. Cobertura: 0 de 3 engajamentos com achados publicados.",
+      "Nenhum achado publicado neste portfólio. Engajamentos com achados publicados: 0 de 3.",
     );
   });
 
@@ -65,7 +83,7 @@ describe("hero: numeral/tom/frase honestos + cobertura em TODA afirmação", () 
   it("open===0, 1 publicado, cobertura parcial → gramática singular", () => {
     const s = heroInput({ published: 1, open: 0 }, { total: 2, withFindings: 1 });
     expect(heroSentence(s)).toBe(
-      "O único achado publicado não está em aberto. Cobertura: 1 de 2 engajamentos com achados publicados.",
+      "O único achado publicado não está em aberto. Engajamentos com achados publicados: 1 de 2.",
     );
   });
 
@@ -101,21 +119,33 @@ describe("hero: numeral/tom/frase honestos + cobertura em TODA afirmação", () 
     expect(heroTone(s)).toBe("neutral");
     expect(isFullCoverage(s)).toBe(false);
     expect(heroSentence(s)).toBe(
-      "Nenhum achado em aberto entre os 3 achados publicados. Cobertura: 2 de 3 engajamentos com achados publicados.",
+      "Nenhum achado em aberto entre os 3 achados publicados. Engajamentos com achados publicados: 2 de 3.",
     );
   });
 
-  it("nada aberto + TRUNCADO → neutral + aviso de resumo parcial", () => {
+  it("HIGH-1: pleno de achados mas ENGAJAMENTO EM ANDAMENTO → NEUTRAL (nunca verde)", () => {
+    const s = heroInput(
+      { published: 3, open: 0 },
+      { total: 2, withFindings: 2, byStatus: { active: 1, closed: 1 } },
+    );
+    expect(isFullCoverage(s)).toBe(false);
+    expect(heroTone(s)).toBe("neutral");
+    expect(heroSentence(s)).toBe(
+      "Nenhum achado em aberto entre os 3 achados publicados.",
+    );
+  });
+
+  it("nada aberto + TRUNCADO → neutral; truncamento FORA da frase (só Callout)", () => {
     const s = heroInput(
       { published: 3, open: 0 },
       { total: 3, withFindings: 3, truncated: true },
     );
     expect(heroTone(s)).toBe("neutral");
     expect(truncationNotice(s)).toBe(SUMMARY_TRUNCATED_COPY);
-    expect(heroSentence(s)).toContain(
-      "Nenhum achado em aberto entre os 3 achados publicados",
+    expect(heroSentence(s)).toBe(
+      "Nenhum achado em aberto entre os 3 achados publicados.",
     );
-    expect(heroSentence(s)).toContain(SUMMARY_TRUNCATED_COPY);
+    expect(heroSentence(s)).not.toContain(SUMMARY_TRUNCATED_COPY);
   });
 
   it("S3 aberto sem crítico/alto, cobertura total → '0', neutral", () => {
@@ -139,19 +169,17 @@ describe("hero: numeral/tom/frase honestos + cobertura em TODA afirmação", () 
     expect(heroTone(s)).toBe("neutral");
     const sent = heroSentence(s);
     expect(sent).toContain("2 achados em aberto, nenhum crítico ou alto.");
-    expect(sent).toContain(
-      "Cobertura: 1 de 3 engajamentos com achados publicados.",
-    );
+    expect(sent).toContain("Engajamentos com achados publicados: 1 de 3.");
   });
 
-  it("R1: aberto sem crítico/alto + TRUNCADO → 'nenhum crítico ou alto' é SUAVIZADO", () => {
+  it("R1: aberto sem crítico/alto + TRUNCADO → frase sem truncamento; aviso só no Callout", () => {
     const s = heroInput(
       { published: 2, open: 2, openCriticalHigh: 0 },
       { total: 1, withFindings: 1, truncated: true },
     );
-    const sent = heroSentence(s);
-    expect(sent).toContain("entre os achados carregados");
-    expect(sent).toContain(SUMMARY_TRUNCATED_COPY);
+    expect(heroSentence(s)).toBe("2 achados em aberto, nenhum crítico ou alto.");
+    expect(heroSentence(s)).not.toContain(SUMMARY_TRUNCATED_COPY);
+    expect(truncationNotice(s)).toBe(SUMMARY_TRUNCATED_COPY);
   });
 
   it("S4 crítico/alto em aberto → N, destructive, +ainda vulnerável (string exata)", () => {
@@ -185,7 +213,8 @@ describe("hero: numeral/tom/frase honestos + cobertura em TODA afirmação", () 
     );
     const sent = heroSentence(s);
     expect(sent).toContain("2 críticos e 0 altos");
-    expect(sent).toContain(SUMMARY_TRUNCATED_COPY);
+    expect(sent).not.toContain(SUMMARY_TRUNCATED_COPY);
+    expect(truncationNotice(s)).toBe(SUMMARY_TRUNCATED_COPY);
   });
 
   it("copy-guard: nenhuma frase de AUSÊNCIA usa 'ainda'/termo proibido", () => {

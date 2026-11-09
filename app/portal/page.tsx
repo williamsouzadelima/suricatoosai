@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -36,6 +42,7 @@ import {
   SortableTh,
   useSortable,
   type TabItem,
+  type Tone,
 } from "@/app/admin/_ui";
 import {
   SEV_LABEL,
@@ -57,7 +64,12 @@ import {
   scopeCoverageLine,
   windowCoverageLine,
   formatEvidenceCount,
+  truncationNotice,
+  retestPortalLabel,
+  selectPriorityOrder,
+  plural,
   SUMMARY_ERROR_COPY,
+  RISK_UNAVAILABLE_COPY,
   type PortalSummary,
   type PriorityItem,
   type PerEngagementRow,
@@ -551,7 +563,7 @@ export default function PortalPage() {
           <EmptyState
             icon={ShieldCheck}
             title="Nenhum acesso liberado."
-            description="Sua conta ainda não tem acesso a nenhum portal. Fale com seu contato de segurança."
+            description="Sua conta não tem acesso a nenhum portal. Fale com seu contato de segurança."
           />
         ) : selectedEng ? (
           <EngagementView
@@ -614,17 +626,32 @@ export default function PortalPage() {
 // compartilhado; o TOM continua vindo de engagementStatusTone. Mantém o
 // operador e engagement-status.ts intactos (só o texto ao cliente muda aqui).
 const PORTAL_STATUS_LABEL: Record<string, string> = {
+  planned: "Planejado",
   active: "Em andamento",
+  review: "Em revisão",
   reporting: "Relatório em elaboração",
   closed: "Encerrado",
 };
 function portalStatusLabel(status: string): string {
   return PORTAL_STATUS_LABEL[status] ?? engagementStatusLabel(status);
 }
+/** Tom do pill de status NO PORTAL (não é o do operador): só "Encerrado" é
+ *  verde; tudo em andamento é neutro — um engajamento aberto nunca lê verde. */
+function portalStatusTone(status: string): Tone {
+  return status === "closed" ? "success" : "neutral";
+}
+/** Ativa onClick por teclado (Enter/Espaço) para um elemento role="button". */
+function onActivate(fn: () => void) {
+  return (ev: KeyboardEvent) => {
+    if (ev.key === "Enter" || ev.key === " ") {
+      ev.preventDefault();
+      fn();
+    }
+  };
+}
 
-// ── TELA A — Portfólio (lista de engajamentos). Sem números agregados na Fase
-//    0 (o agregado de portfólio é Fase 1; somar via N+1 de /findings polui a
-//    auditoria). ───────────────────────────────────────────────────────────
+// ── TELA A — Portfólio: cards + resumo de portfólio (Fase 1b) servido pela rota
+//    /api/portal/summary; números e honestidade vêm de summary-model.ts. ──────
 function PortfolioView({
   engagements,
   error,
@@ -688,6 +715,7 @@ function PortfolioView({
               key={e.id}
               engagement={e}
               row={perEng.get(e.id)}
+              summaryLoaded={!!summary}
               onOpen={() => onOpen(e.id)}
             />
           ))}
@@ -725,6 +753,11 @@ function PortfolioSummary({
 
   return (
     <div className="flex flex-col gap-5">
+      {truncationNotice(s) && (
+        <Callout tone="warning" icon={AlertTriangle}>
+          {truncationNotice(s)}
+        </Callout>
+      )}
       <div className="grid gap-4 lg:grid-cols-12">
         <Card className="gap-0 py-0 lg:col-span-5">
           <div className="flex flex-col gap-2.5 p-5">
@@ -744,6 +777,9 @@ function PortfolioSummary({
               {scopeCoverageLine(e.withScope, e.total)} ·{" "}
               {windowCoverageLine(e.withWindow, e.total)}
             </p>
+            <p className="text-xs text-muted-foreground">
+              Posição em {formatDateTime(s.generatedAt)}.
+            </p>
           </div>
         </Card>
 
@@ -751,20 +787,24 @@ function PortfolioSummary({
           <StatCard
             label="Engajamentos"
             value={String(e.total)}
-            sub={`${e.byStatus.active} em andamento`}
+            sub={`${
+              e.byStatus.active + e.byStatus.review + e.byStatus.reporting
+            } em andamento`}
             icon={Crosshair}
           />
           <StatCard
             label="Em aberto"
-            value={String(f.open)}
-            sub={`de ${f.published} publicados`}
+            value={f.published === 0 ? "—" : String(f.open)}
+            sub={
+              f.published === 0 ? undefined : `de ${f.published} publicados`
+            }
             icon={ShieldAlert}
             tone={f.open > 0 ? "warning" : "neutral"}
           />
           <StatCard
             label="Validados por reteste"
-            value={String(f.retest.fixed)}
-            sub={`de ${f.published}`}
+            value={f.published === 0 ? "—" : String(f.retest.fixed)}
+            sub={f.published === 0 ? undefined : `de ${f.published}`}
             icon={ShieldCheck}
             tone={f.retest.fixed > 0 ? "success" : "neutral"}
           />
@@ -775,7 +815,11 @@ function PortfolioSummary({
             }
             sub={
               f.publishedWithoutDate > 0
-                ? `${f.publishedWithoutDate} sem data`
+                ? `${f.publishedWithoutDate} ${plural(
+                    f.publishedWithoutDate,
+                    "publicado sem data registrada",
+                    "publicados sem data registrada",
+                  )}`
                 : undefined
             }
             icon={FileText}
@@ -850,7 +894,13 @@ function PortfolioSummary({
 
       {s.reports.available > 0 && (
         <p className="text-xs text-muted-foreground">
-          {s.reports.available} relatório(s) disponível(is) nos engajamentos
+          {s.reports.available}{" "}
+          {plural(
+            s.reports.available,
+            "relatório disponível",
+            "relatórios disponíveis",
+          )}{" "}
+          nos engajamentos
           {s.reports.lastCreatedAt != null &&
             ` · último em ${fmtDateOnly(s.reports.lastCreatedAt)}`}
           .
@@ -873,7 +923,12 @@ function PortfolioSummary({
           </p>
           <p>
             Severidade é a registrada no achado; CVSS é a pontuação registrada,
-            com a versão. Não é uma nota de segurança nem uma tendência.
+            com a versão. Não é uma nota de segurança nem uma tendência, e não
+            compara com outras organizações.
+          </p>
+          <p>
+            CVSS 3.1 e 4.0 não são diretamente comparáveis; as prioridades são
+            ordenadas por severidade e, depois, por CVSS.
           </p>
           <p>Um mesmo problema em dois engajamentos conta duas vezes.</p>
         </CollapsibleContent>
@@ -909,9 +964,13 @@ function PortfolioPriorityRow({
   const retest = p.retestStatus ? RETEST_BADGE[p.retestStatus] : undefined;
   const cvss = cvssText(p);
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Abrir achado ${p.title} (${p.engagementName})`}
       onClick={onOpen}
-      className="group relative overflow-hidden rounded-xl border bg-card p-4 text-left shadow-[var(--shadow-soft)] transition-colors hover:border-ring"
+      onKeyDown={onActivate(onOpen)}
+      className="group relative cursor-pointer overflow-hidden rounded-xl border bg-card p-4 text-left shadow-[var(--shadow-soft)] transition-colors hover:border-ring focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span
         className={cn(
@@ -924,7 +983,12 @@ function PortfolioPriorityRow({
         <span className="min-w-0 flex-1 font-medium text-foreground">
           {p.title}
         </span>
-        {retest && <StatusBadge tone={retest.tone} label={retest.label} />}
+        {retest && p.retestStatus && (
+          <StatusBadge
+            tone={retest.tone}
+            label={retestPortalLabel(p.retestStatus)}
+          />
+        )}
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
       </div>
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 pl-2 text-xs text-muted-foreground">
@@ -935,24 +999,40 @@ function PortfolioPriorityRow({
           <Server className="h-3.5 w-3.5" /> {p.affectedAsset}
         </span>
         {cvss && <span className="font-mono">{cvss}</span>}
-        <span>{formatEvidenceCount(p.evidenceCount)} evidência(s)</span>
+        {p.evidenceCount === 0 ? (
+          <span className="text-warning">Sem evidência registrada</span>
+        ) : (
+          <span>
+            {formatEvidenceCount(p.evidenceCount)}{" "}
+            {plural(p.evidenceCount, "evidência", "evidências")}
+          </span>
+        )}
       </div>
-    </button>
+    </div>
   );
 }
 
 function PortfolioEngagementCard({
   engagement: e,
   row,
+  summaryLoaded,
   onOpen,
 }: {
   engagement: Engagement;
   row: PerEngagementRow | undefined;
+  summaryLoaded: boolean;
   onOpen: () => void;
 }) {
   const win = windowText(e.startsAt, e.endsAt);
   return (
-    <button onClick={onOpen} className="group text-left">
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Abrir engajamento ${e.name}`}
+      onClick={onOpen}
+      onKeyDown={onActivate(onOpen)}
+      className="group cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       <Card className="gap-0 py-0 transition-colors group-hover:border-ring">
         <div className="flex items-start gap-3 p-5">
           <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -964,16 +1044,22 @@ function PortfolioEngagementCard({
               {e.code && <span className="font-mono">{e.code}</span>}
               <span>{win ? `Janela ${win}` : "Janela não informada"}</span>
             </div>
-            {row && <EngagementRiskLine row={row} status={e.status} />}
+            {row ? (
+              <EngagementRiskLine row={row} status={e.status} />
+            ) : summaryLoaded ? (
+              <div className="mt-2 text-xs text-warning">
+                {RISK_UNAVAILABLE_COPY}
+              </div>
+            ) : null}
           </div>
           <StatusBadge
-            tone={engagementStatusTone(e.status)}
+            tone={portalStatusTone(e.status)}
             label={portalStatusLabel(e.status)}
           />
           <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
         </div>
       </Card>
-    </button>
+    </div>
   );
 }
 
@@ -984,16 +1070,23 @@ function EngagementRiskLine({
   row: PerEngagementRow;
   status: string;
 }) {
-  const closedWithRisk = status === "closed" && row.openCriticalHigh > 0;
+  const closed = status === "closed";
+  const closedWithRisk = closed && row.openCriticalHigh > 0;
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
       {row.published === 0 ? (
         <span className="text-muted-foreground">
-          Ainda sem achados publicados
+          Sem achados publicados{!closed && " · em andamento"}
         </span>
       ) : row.open === 0 ? (
-        <span className="font-medium text-success">
-          Todos os {row.published} validados por reteste
+        // Verde "validado" só num engajamento ENCERRADO; em andamento = neutro.
+        <span
+          className={closed ? "font-medium text-success" : "text-foreground/80"}
+        >
+          {row.published === 1
+            ? "O único achado publicado foi validado por reteste"
+            : `Todos os ${row.published} validados por reteste`}
+          {!closed && " · em andamento"}
         </span>
       ) : (
         <>
@@ -1003,7 +1096,11 @@ function EngagementRiskLine({
           <span className="text-foreground/80">
             {row.open} em aberto
             {row.openCriticalHigh > 0 &&
-              ` · ${row.openCriticalHigh} crítico(s)/alto(s)`}
+              ` · ${row.openCriticalHigh} ${plural(
+                row.openCriticalHigh,
+                "crítico/alto",
+                "críticos/altos",
+              )}`}
           </span>
         </>
       )}
@@ -1297,15 +1394,9 @@ function computeSummary(findings: Finding[]) {
     else if (f.retestStatus === "pending") retest.pending += 1;
     else retest.none += 1;
   }
-  const priorities = open
-    .slice()
-    .sort((a, b) => {
-      const ra =
-        SEV_RANK[asSeverity(b.severity)] - SEV_RANK[asSeverity(a.severity)];
-      if (ra !== 0) return ra;
-      return (b.cvssScore ?? -1) - (a.cvssScore ?? -1);
-    })
-    .slice(0, 5);
+  // Mesma ordem da Tela A (comparePriority): severidade → CVSS → publicado → id,
+  // para que Tela A e Tela B não divirjam em empates.
+  const priorities = selectPriorityOrder(open).slice(0, 5);
   return { open, sevCounts, worstOpen, retest, priorities };
 }
 
@@ -1330,7 +1421,7 @@ function OverviewTab({
     return (
       <EmptyState
         icon={ShieldCheck}
-        title="Nenhum achado publicado ainda."
+        title="Nenhum achado publicado."
         description="Assim que houver achados publicados neste engajamento, o resumo aparece aqui."
       />
     );
@@ -1351,7 +1442,7 @@ function OverviewTab({
                 </div>
                 <p className="text-sm text-foreground/80">
                   {s.sevCounts.critical > 0 || s.sevCounts.high > 0
-                    ? `${s.sevCounts.critical} crítico(s) e ${s.sevCounts.high} alto(s) sem correção validada por reteste.`
+                    ? `${s.sevCounts.critical} ${plural(s.sevCounts.critical, "crítico", "críticos")} e ${s.sevCounts.high} ${plural(s.sevCounts.high, "alto", "altos")} sem correção validada por reteste.`
                     : "Nenhum achado crítico ou alto em aberto no momento."}
                 </p>
               </>
@@ -1362,8 +1453,8 @@ function OverviewTab({
               </p>
             )}
             <div className="text-xs text-muted-foreground">
-              {s.open.length} em aberto · {s.retest.fixed} validado(s) por
-              reteste
+              {s.open.length} em aberto · {s.retest.fixed}{" "}
+              {plural(s.retest.fixed, "validado", "validados")} por reteste
             </div>
           </div>
         </Card>
@@ -1492,7 +1583,12 @@ function PriorityRow({
         <span className="min-w-0 flex-1 font-medium text-foreground">
           {f.title}
         </span>
-        {retest && <StatusBadge tone={retest.tone} label={retest.label} />}
+        {retest && (
+          <StatusBadge
+            tone={retest.tone}
+            label={retestPortalLabel(f.retestStatus)}
+          />
+        )}
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
       </div>
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 pl-2 text-xs text-muted-foreground">
@@ -1535,7 +1631,7 @@ function FindingsTab({
   if (findings.length === 0)
     return (
       <p className="py-2 text-sm text-muted-foreground">
-        Nenhum achado publicado ainda.
+        Nenhum achado publicado.
       </p>
     );
 
@@ -1669,7 +1765,10 @@ function FindingsTab({
                     </td>
                     <td className="px-4 py-3">
                       {retest ? (
-                        <StatusBadge tone={retest.tone} label={retest.label} />
+                        <StatusBadge
+                          tone={retest.tone}
+                          label={retestPortalLabel(f.retestStatus)}
+                        />
                       ) : (
                         <span className="text-xs text-muted-foreground">
                           Sem reteste
@@ -1711,7 +1810,7 @@ function ReportsTab({
   if (reports.length === 0)
     return (
       <p className="py-2 text-sm text-muted-foreground">
-        Nenhum relatório disponível ainda.
+        Nenhum relatório disponível.
       </p>
     );
 
@@ -1849,7 +1948,8 @@ function AudienceReports({
         <Collapsible>
           <CollapsibleTrigger className="inline-flex w-fit items-center gap-1 pl-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
             <ChevronRight className="h-3.5 w-3.5" />
-            {older.length} versão(ões) anterior(es)
+            {older.length}{" "}
+            {plural(older.length, "versão anterior", "versões anteriores")}
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-1.5 flex flex-col gap-2.5 pl-3">
             {older.map((v) => (
@@ -1945,7 +2045,12 @@ function FindingSheetBody({
       <SheetHeader className="space-y-3 border-b bg-muted/30 p-5">
         <div className="flex flex-wrap items-center gap-2">
           <SeverityBadge severity={finding.severity} hint />
-          {retest && <StatusBadge tone={retest.tone} label={retest.label} />}
+          {retest && (
+            <StatusBadge
+              tone={retest.tone}
+              label={retestPortalLabel(finding.retestStatus)}
+            />
+          )}
           {finding.ref && (
             <span className="font-mono text-[11.5px] text-muted-foreground">
               {finding.ref}
@@ -2038,10 +2143,13 @@ function FindingSheetBody({
                 Reteste
               </div>
               {retest ? (
-                <StatusBadge tone={retest.tone} label={retest.label} />
+                <StatusBadge
+                  tone={retest.tone}
+                  label={retestPortalLabel(finding.retestStatus)}
+                />
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Ainda sem reteste para este achado.
+                  Sem reteste para este achado.
                 </p>
               )}
             </div>

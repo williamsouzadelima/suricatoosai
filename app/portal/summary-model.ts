@@ -4,8 +4,9 @@
  * A UI (retida até a conferência visual do William) consome isto; os testes
  * asseguram a honestidade das frases (nunca "score"/"nota"/"tendência").
  *
- * Reexporta o comparador/ordenação de convex/lib/portalSummary → FONTE ÚNICA
- * (o servidor e a UI ordenam idêntico; sem divergência de desempate).
+ * Reexporta o comparador/ordenação de convex/lib/portalSummary para que a UI e o
+ * servidor usem os MESMOS critérios de desempate — quando a UI consome este
+ * comparador em vez de recalcular por conta própria (ver Tela A e Tela B).
  */
 import type { PortalSummary } from "@/convex/lib/portalSummary";
 import { EVIDENCE_COUNT_CAP } from "@/convex/lib/portalSummary";
@@ -36,11 +37,19 @@ export function heroNumeral(s: PortalSummary): string {
   return String(s.findings.openCriticalHigh);
 }
 
-/** Cobertura total = TODO engajamento visível tem achado publicado E a leitura
- *  não truncou. Só então "sem achados em aberto" pode ser VERDE (sucesso); senão
- *  o verde seria um falso "tudo certo" que ignora o que nunca foi reportado. */
+/** Portão do VERDE (sucesso) — raro por desenho. "Sem achados em aberto" só pode
+ *  ser verde quando TODO engajamento está ENCERRADO (nada planejado/ativo/em
+ *  revisão/em relatório), há publicação, todo engajamento tem achado publicado e
+ *  a leitura não truncou. Um engajamento em andamento NUNCA lê verde. */
 export function isFullCoverage(s: PortalSummary): boolean {
-  return s.engagements.withFindings === s.engagements.total && !s.truncated;
+  const b = s.engagements.byStatus;
+  const inProgress = b.planned + b.active + b.review + b.reporting;
+  return (
+    s.findings.published > 0 &&
+    inProgress === 0 &&
+    s.engagements.withFindings === s.engagements.total &&
+    !s.truncated
+  );
 }
 
 export function heroTone(s: PortalSummary): HeroTone {
@@ -51,22 +60,15 @@ export function heroTone(s: PortalSummary): HeroTone {
   return "neutral";
 }
 
-/** Qualificador de cobertura/truncamento — anexado onde um fato de achado poderia
- *  ser lido como COMPLETO. "" quando cobertura total e não truncado. */
+/** Qualificador de cobertura — anexado onde um fato de achado poderia ser lido
+ *  como COMPLETO. "" quando todo engajamento tem achado publicado. (Truncamento
+ *  é avisado UMA vez, como Callout no topo da UI — não entra na frase.) */
 function coverageQualifier(s: PortalSummary): string {
   const { total, withFindings } = s.engagements;
-  let q = "";
   if (withFindings < total) {
-    q += ` Cobertura: ${withFindings} de ${total} ${plural(
-      total,
-      "engajamento",
-      "engajamentos",
-    )} com achados publicados.`;
+    return ` Engajamentos com achados publicados: ${withFindings} de ${total}.`;
   }
-  if (s.truncated) {
-    q += ` ${SUMMARY_TRUNCATED_COPY}`;
-  }
-  return q;
+  return "";
 }
 
 /**
@@ -83,24 +85,23 @@ export function heroSentence(s: PortalSummary): string {
     return "Nenhum achado publicado neste portfólio." + q;
   }
   if (f.open === 0) {
-    if (q) {
-      // cobertura parcial ou truncado → NÃO é um "tudo limpo" limpo.
-      const base =
-        f.published === 1
-          ? "O único achado publicado não está em aberto."
-          : `Nenhum achado em aberto entre os ${f.published} achados publicados.`;
-      return base + q;
+    if (isFullCoverage(s)) {
+      // VERDE só aqui: todo engajamento encerrado, pleno e não truncado.
+      return f.published === 1
+        ? "Nenhum achado em aberto: o único achado publicado foi validado por reteste."
+        : `Nenhum achado em aberto: todos os ${f.published} achados publicados foram validados por reteste.`;
     }
+    // cobertura parcial, em andamento ou truncado → NÃO é um "tudo limpo".
     return f.published === 1
-      ? "Nenhum achado em aberto: o único achado publicado foi validado por reteste."
-      : `Nenhum achado em aberto: todos os ${f.published} achados publicados foram validados por reteste.`;
+      ? "O único achado publicado não está em aberto." + q
+      : `Nenhum achado em aberto entre os ${f.published} achados publicados.` + q;
   }
   if (f.openCriticalHigh === 0) {
     const base = `${f.open} ${plural(
       f.open,
       "achado em aberto",
       "achados em aberto",
-    )}, nenhum crítico ou alto${s.truncated ? " entre os achados carregados" : ""}.`;
+    )}, nenhum crítico ou alto.`;
     return base + q;
   }
   const c = f.openBySeverity.critical;
