@@ -275,26 +275,57 @@ describe("evidenceCount / plural / rótulo de reteste", () => {
 });
 
 describe("comparador de prioridade (fonte única servidor/UI)", () => {
-  it("severidade desc → cvss desc (nulo por último) → publicado desc (nulo por último) → id asc", () => {
+  it("severidade desc → ainda-vulnerável primeiro → publicado MAIS ANTIGO (nulo por último) → id asc; CVSS NÃO ordena", () => {
     const items = [
-      { severity: "low", cvssScore: null, publishedAt: null, id: "z" },
-      { severity: "critical", cvssScore: 9.1, publishedAt: 100, id: "a" },
-      { severity: "critical", cvssScore: 9.8, publishedAt: 50, id: "b" },
-      { severity: "critical", cvssScore: null, publishedAt: 999, id: "c" },
-      { severity: "high", cvssScore: 7.0, publishedAt: 10, id: "d" },
+      { severity: "low", retestStatus: null, publishedAt: null, id: "z" },
+      // crítico não-retestado, publicado 100
+      { severity: "critical", retestStatus: null, publishedAt: 100, id: "a" },
+      // crítico que FALHOU no reteste → vem primeiro apesar de ser o MAIS NOVO
+      {
+        severity: "critical",
+        retestStatus: "still_vulnerable",
+        publishedAt: 900,
+        id: "b",
+      },
+      // crítico pendente (mesmo rank de 'a'), porém mais ANTIGO → antes de 'a'
+      {
+        severity: "critical",
+        retestStatus: "pending",
+        publishedAt: 50,
+        id: "c",
+      },
+      { severity: "high", retestStatus: null, publishedAt: 10, id: "d" },
     ];
     expect(selectPriorityOrder(items).map((x) => x.id)).toEqual([
       "b",
-      "a",
       "c",
+      "a",
       "d",
       "z",
     ]);
   });
 
+  it("publicado nulo vai por ÚLTIMO (asc), não negando o desc", () => {
+    const items = [
+      { severity: "high", retestStatus: null, publishedAt: null, id: "n" },
+      { severity: "high", retestStatus: null, publishedAt: 5, id: "m" },
+    ];
+    expect(selectPriorityOrder(items).map((x) => x.id)).toEqual(["m", "n"]);
+  });
+
   it("desempate por id asc quando tudo igual", () => {
-    const a = { severity: "high", cvssScore: 7, publishedAt: 5, id: "aaa" };
-    const b = { severity: "high", cvssScore: 7, publishedAt: 5, id: "bbb" };
+    const a = {
+      severity: "high",
+      retestStatus: "pending",
+      publishedAt: 5,
+      id: "aaa",
+    };
+    const b = {
+      severity: "high",
+      retestStatus: "pending",
+      publishedAt: 5,
+      id: "bbb",
+    };
     expect(comparePriority(a, b)).toBeLessThan(0);
     expect(comparePriority(b, a)).toBeGreaterThan(0);
     expect(comparePriority(a, a)).toBe(0);

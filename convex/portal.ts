@@ -6,9 +6,11 @@ import type { Id, Doc } from "./_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import {
   buildPortalSummary,
+  buildPortalOpenFindings,
   buildPortalSummaryAuditRow,
   listVisibleEngagements,
   type PortalSummary,
+  type PortalOpenFindings,
 } from "./lib/portalSummary";
 
 /**
@@ -460,6 +462,19 @@ const portalSummaryReturns = v.union(
         }),
       ),
     }),
+    trend: v.object({
+      status: v.union(
+        v.literal("series"),
+        v.literal("suppressed_truncated"),
+        v.literal("suppressed_unplaceable"),
+        v.literal("no_publications"),
+      ),
+      clipped: v.boolean(),
+      months: v.array(
+        v.object({ ym: v.string(), critical: v.number(), high: v.number() }),
+      ),
+      unplaceableCriticalHigh: v.number(),
+    }),
   }),
 );
 // Guarda em tempo de compilação: falha o `tsc` se um campo EXPLÍCITO do validador
@@ -486,6 +501,68 @@ export const listPortalSummaryForBackend = query({
   handler: async (ctx, args) => {
     validateServiceKey(args.serviceKey);
     return await buildPortalSummary(
+      ctx,
+      { userId: args.userId, clientId: args.clientId, nowMs: args.nowMs },
+      resolveMembership,
+    );
+  },
+});
+
+const portalOpenFindingsReturns = v.union(
+  v.null(),
+  v.object({
+    generatedAt: v.number(),
+    scanTruncated: v.boolean(),
+    total: v.number(),
+    openBySeverity: v.object({
+      critical: v.number(),
+      high: v.number(),
+      medium: v.number(),
+      low: v.number(),
+      info: v.number(),
+    }),
+    listCapped: v.boolean(),
+    items: v.array(
+      v.object({
+        id: v.id("findings"),
+        engagementId: v.id("engagements"),
+        engagementName: v.string(),
+        ref: v.union(v.string(), v.null()),
+        title: v.string(),
+        severity: v.string(),
+        affectedAsset: v.string(),
+        weaknessClass: v.string(),
+        cwe: v.union(v.string(), v.null()),
+        cvssScore: v.union(v.number(), v.null()),
+        cvssVersion: v.union(v.string(), v.null()),
+        cvssVector: v.union(v.string(), v.null()),
+        retestStatus: v.union(v.string(), v.null()),
+        publishedAt: v.union(v.number(), v.null()),
+      }),
+    ),
+  }),
+);
+type _PortalOpenFindingsContract = _Expect<
+  _Equal<Infer<typeof portalOpenFindingsReturns>, PortalOpenFindings | null>
+>;
+
+/**
+ * Lista portfólio-inteiro de achados EM ABERTO ("Ver todos em aberto") — até
+ * OPEN_LIST_CAP itens na ordem de prioridade (paginação é client-side). Query
+ * PURA; nega por padrão → null; auditoria fail-closed na rota (reusa o literal
+ * portal.summary_viewed com view=open_list). total/openBySeverity são COMPLETOS.
+ */
+export const listPortalOpenFindingsForBackend = query({
+  args: {
+    serviceKey: v.string(),
+    userId: v.string(),
+    clientId: v.id("clients"),
+    nowMs: v.number(),
+  },
+  returns: portalOpenFindingsReturns,
+  handler: async (ctx, args) => {
+    validateServiceKey(args.serviceKey);
+    return await buildPortalOpenFindings(
       ctx,
       { userId: args.userId, clientId: args.clientId, nowMs: args.nowMs },
       resolveMembership,
@@ -590,11 +667,14 @@ export const recordPortalSummaryViewForBackend = mutation({
     actorEmail: v.optional(v.string()),
     ip: v.optional(v.string()),
     userAgent: v.optional(v.string()),
+    // open_list: audita a lista "ver todos" (published=itens, engagements=total).
+    view: v.optional(v.union(v.literal("summary"), v.literal("open_list"))),
   },
   returns: v.object({ ok: v.boolean() }),
   handler: async (ctx, args) => {
     validateServiceKey(args.serviceKey);
     const access = await resolveMembership(ctx, args.userId, args.clientId);
+    const openList = args.view === "open_list";
     await ctx.db.insert(
       "security_audit_log",
       buildPortalSummaryAuditRow(
@@ -610,6 +690,12 @@ export const recordPortalSummaryViewForBackend = mutation({
         args.published,
         args.engagements,
         Date.now(),
+        openList
+          ? {
+              targetType: "portfolio_open_findings",
+              detail: `lista de achados em aberto (portal): ${args.published} de ${args.engagements}`,
+            }
+          : undefined,
       ),
     );
     return { ok: access !== null };

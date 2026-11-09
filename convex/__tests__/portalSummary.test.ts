@@ -4,7 +4,10 @@ import { describe, it, expect } from "@jest/globals";
 // padrão de evidenceDeletePlan.test / engagementHardDelete.test.
 import {
   buildPortalSummary,
+  buildPortalOpenFindings,
   buildPortalSummaryAuditRow,
+  computeTrend,
+  monthIdxSP,
 } from "../lib/portalSummary";
 
 type Row = { _id: string; [k: string]: unknown };
@@ -365,7 +368,7 @@ describe("buildPortalSummary", () => {
     expect(sum((r) => r.openCriticalHigh)).toBe(s.findings.openCriticalHigh);
   });
 
-  it("prioridades: top-5 ordenadas (sev→cvss→publicado→id) + evidenceCount só delas", async () => {
+  it("prioridades: top-5 (sev→reteste-falho→publicado-mais-antigo→id) + evidenceCount só delas", async () => {
     const s = await buildPortalSummary(
       ctxOf(fixtures()),
       { userId: "u", clientId: "C1" as never, nowMs: 999 },
@@ -432,6 +435,7 @@ describe("buildPortalSummary", () => {
         "priorities",
         "perEngagement",
         "reports",
+        "trend",
       ].sort(),
     );
     expect(keys(s.engagements)).toEqual(
@@ -505,6 +509,27 @@ describe("buildPortalSummary", () => {
         "evidenceCount",
       ].sort(),
     );
+    expect(keys(s.trend)).toEqual(
+      ["status", "clipped", "months", "unplaceableCriticalHigh"].sort(),
+    );
+    if (s.trend.months.length > 0) {
+      expect(keys(s.trend.months[0])).toEqual(
+        ["ym", "critical", "high"].sort(),
+      );
+    }
+  });
+
+  it("tendência: na fixture é 'series' e reconcilia (último mês == openCriticalHigh)", async () => {
+    const s = await buildPortalSummary(
+      ctxOf(fixtures()),
+      { userId: "u", clientId: "C1" as never, nowMs: 999 },
+      granted as never,
+    );
+    if (!s) throw new Error("esperava resumo");
+    expect(s.trend.status).toBe("series");
+    expect(s.trend.months.length).toBeGreaterThan(0);
+    const last = s.trend.months[s.trend.months.length - 1];
+    expect(last.critical + last.high).toBe(s.findings.openCriticalHigh);
   });
 
   it("teto por engajamento injetável: keep-NEWEST sob o cap, truncated=true", async () => {
@@ -560,8 +585,9 @@ describe("buildPortalSummary", () => {
     expect(s.truncated).toBe(true);
     expect(s.findings.published).toBe(2);
     expect(s.perEngagement[0].published).toBe(2);
-    // os 2 MAIS NOVOS (Fc, Fb) ficam; o mais antigo (Fa) é descartado.
-    expect(s.priorities.map((p) => p.id)).toEqual(["Fc", "Fb"]);
+    // Leitura: os 2 MAIS NOVOS por criação (Fc, Fb) ficam sob o cap; Fa sai.
+    // Exibição: publicado mais ANTIGO primeiro → Fb(20) antes de Fc(30).
+    expect(s.priorities.map((p) => p.id)).toEqual(["Fb", "Fc"]);
     expect(s.priorities.map((p) => p.id)).not.toContain("Fa");
     expect(s.findings.lastPublishedAt).toBe(30);
   });
@@ -599,5 +625,193 @@ describe("buildPortalSummaryAuditRow", () => {
     );
     expect(row.event_type).toBe("access.denied");
     expect(row.outcome).toBe("denied");
+  });
+
+  it("open_list: mesmo literal, target_type portfolio_open_findings + detail próprio", () => {
+    const row = buildPortalSummaryAuditRow(
+      { userId: "u", clientId: "C1" as never },
+      true,
+      7,
+      42,
+      5,
+      {
+        targetType: "portfolio_open_findings",
+        detail: `lista de achados em aberto (portal): 7 de 42`,
+      },
+    );
+    expect(row.event_type).toBe("portal.summary_viewed"); // literal reaproveitado
+    expect(row.target_type).toBe("portfolio_open_findings");
+    expect(row.detail).toContain("lista de achados em aberto");
+    expect(row.detail).toContain("7 de 42");
+  });
+});
+
+describe("computeTrend (reconstrução honesta + supressão)", () => {
+  const M = (y: number, mZeroBased: number, day = 15) =>
+    Date.UTC(y, mZeroBased, day, 15, 0, 0); // meio-dia SP, bem dentro do mês
+
+  it("série multi-mês: críticos/altos abertos por mês + reconcilia no último mês", () => {
+    const now = M(2026, 10, 15); // nov/2026
+    const inputs = [
+      // crítico publicado em mar, nunca retestado → aberto mar..nov
+      {
+        severity: "critical",
+        publishedAt: M(2026, 2, 10),
+        retestStatus: null,
+        retestedAt: null,
+      },
+      // alto publicado em mai, corrigido em ago → aberto mai,jun,jul (fecha em ago)
+      {
+        severity: "high",
+        publishedAt: M(2026, 4, 1),
+        retestStatus: "fixed",
+        retestedAt: M(2026, 7, 20),
+      },
+    ];
+    const first = monthIdxSP(M(2026, 2, 10));
+    const t = computeTrend(inputs, first, now, false);
+    expect(t.status).toBe("series");
+    expect(t.unplaceableCriticalHigh).toBe(0);
+    // começa em mar/2026, termina em nov/2026 → 9 meses
+    expect(t.months[0].ym).toBe("2026-03");
+    expect(t.months[t.months.length - 1].ym).toBe("2026-11");
+    // mar: só o crítico
+    expect(t.months[0]).toMatchObject({ critical: 1, high: 0 });
+    // jun: crítico + alto
+    const jun = t.months.find((m) => m.ym === "2026-06");
+    expect(jun).toMatchObject({ critical: 1, high: 1 });
+    // ago: alto já fechou
+    const ago = t.months.find((m) => m.ym === "2026-08");
+    expect(ago).toMatchObject({ critical: 1, high: 0 });
+    // último mês reconcilia com o aberto atual (1 crítico; o alto está fixed)
+    const last = t.months[t.months.length - 1];
+    expect(last.critical + last.high).toBe(1);
+  });
+
+  it("supressão: crítico sem data de publicação → suppressed_unplaceable, months []", () => {
+    const now = M(2026, 10, 15);
+    const t = computeTrend(
+      [
+        {
+          severity: "critical",
+          publishedAt: null,
+          retestStatus: null,
+          retestedAt: null,
+        },
+      ],
+      Infinity,
+      now,
+      false,
+    );
+    expect(t.status).toBe("suppressed_unplaceable");
+    expect(t.unplaceableCriticalHigh).toBe(1);
+    expect(t.months).toEqual([]);
+  });
+
+  it("supressão: truncado tem precedência sobre tudo, months []", () => {
+    const now = M(2026, 10, 15);
+    const t = computeTrend(
+      [
+        {
+          severity: "high",
+          publishedAt: M(2026, 9, 1),
+          retestStatus: null,
+          retestedAt: null,
+        },
+      ],
+      monthIdxSP(M(2026, 9, 1)),
+      now,
+      true,
+    );
+    expect(t.status).toBe("suppressed_truncated");
+    expect(t.months).toEqual([]);
+  });
+
+  it("sem publicação datada → no_publications, months []", () => {
+    const t = computeTrend([], Infinity, M(2026, 10, 15), false);
+    expect(t.status).toBe("no_publications");
+    expect(t.months).toEqual([]);
+  });
+
+  it("fronteira São Paulo: 01/06 02:00Z cai em MAIO (UTC−03:00)", () => {
+    const edge = Date.UTC(2026, 5, 1, 2, 0, 0); // 23:00 de 31/mai em SP
+    const t = computeTrend(
+      [
+        {
+          severity: "critical",
+          publishedAt: edge,
+          retestStatus: null,
+          retestedAt: null,
+        },
+      ],
+      monthIdxSP(edge),
+      edge,
+      false,
+    );
+    expect(t.status).toBe("series");
+    expect(t.months[t.months.length - 1].ym).toBe("2026-05");
+  });
+});
+
+describe("buildPortalOpenFindings", () => {
+  it("nega por padrão → null", async () => {
+    const r = await buildPortalOpenFindings(
+      ctxOf(fixtures()),
+      { userId: "u", clientId: "C1" as never, nowMs: 999 },
+      denied as never,
+    );
+    expect(r).toBeNull();
+  });
+
+  it("lista completa + reconcilia com o resumo (total==open, slice(0,5)==priorities)", async () => {
+    const s = await buildPortalSummary(
+      ctxOf(fixtures()),
+      { userId: "u", clientId: "C1" as never, nowMs: 999 },
+      granted as never,
+    );
+    const r = await buildPortalOpenFindings(
+      ctxOf(fixtures()),
+      { userId: "u", clientId: "C1" as never, nowMs: 999 },
+      granted as never,
+    );
+    if (!s || !r) throw new Error("esperava dados");
+    expect(r.total).toBe(s.findings.open); // 4
+    expect(r.scanTruncated).toBe(false);
+    expect(r.listCapped).toBe(false);
+    expect(r.openBySeverity).toEqual(s.findings.openBySeverity);
+    // mesma varredura + mesmo comparador → top-5 idêntico ao resumo
+    expect(r.items.slice(0, 5).map((i) => i.id)).toEqual(
+      s.priorities.map((p) => p.id),
+    );
+    expect(r.items.map((i) => i.id)).toEqual(["F4", "F1", "F3", "F5"]);
+    // never-expose: só os campos do OpenItem
+    const keys = Object.keys(r.items[0]).sort();
+    expect(keys).toEqual(
+      [
+        "id",
+        "engagementId",
+        "engagementName",
+        "ref",
+        "title",
+        "severity",
+        "affectedAsset",
+        "weaknessClass",
+        "cwe",
+        "cvssScore",
+        "cvssVersion",
+        "cvssVector",
+        "retestStatus",
+        "publishedAt",
+      ].sort(),
+    );
+    for (const banned of [
+      "retest_note",
+      "reviewed_by",
+      "evidenceCount",
+      "source_type",
+      "verdict",
+    ]) {
+      expect(keys).not.toContain(banned);
+    }
   });
 });
