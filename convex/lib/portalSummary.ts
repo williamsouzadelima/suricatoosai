@@ -127,9 +127,14 @@ export interface PortalSummary {
       formats: string[];
     };
   };
-  trend: PortalTrend;
 }
 
+// ── Tendência reconstruída — DORMENTE (não servida) ──────────────────────────
+// O histórico NÃO é estável: reopen/publish/retest reescrevem published_at /
+// retested_at, então meses PASSADOS da reconstrução mudam silenciosamente (o
+// invariante do último mês não pega isso). Decisão (William): NÃO servir a
+// tendência até existir um schema de histórico write-once (first_published_at +
+// log de transições). `computeTrend` + testes ficam prontos para re-ligar então.
 export type TrendStatus =
   | "series"
   | "suppressed_truncated"
@@ -184,8 +189,12 @@ export function computeTrend(
   }[] = [];
   for (const f of critHigh) {
     const fixed = f.retestStatus === "fixed";
-    const badPub = f.publishedAt == null || f.publishedAt > nowMs;
-    const badRetest = fixed && (f.retestedAt == null || f.retestedAt > nowMs);
+    // NaN/Infinity passam no "== null" mas quebram o mês → não-finito = não-posicionável.
+    const badPub =
+      !Number.isFinite(f.publishedAt) || (f.publishedAt as number) > nowMs;
+    const badRetest =
+      fixed &&
+      (!Number.isFinite(f.retestedAt) || (f.retestedAt as number) > nowMs);
     if (badPub || badRetest) {
       unplaceable += 1;
       continue;
@@ -371,11 +380,6 @@ export async function buildPortalSummary(
   const openFindings: PriorityItem[] = [];
   const perEngagement: PerEngagementRow[] = [];
 
-  // Insumos da tendência (só crít/alto) + 1ª publicação datada (QUALQUER
-  // severidade), que define o início da série reconstruída.
-  const trendInputs: TrendInput[] = [];
-  let firstDatedPubIdx = Infinity;
-
   for (const { engagement: e, findings: fs } of perEngagementFindings) {
     if (e.status in byStatus) {
       byStatus[e.status as keyof typeof byStatus] += 1;
@@ -404,20 +408,6 @@ export async function buildPortalSummary(
         row.lastPublishedAt,
         f.published_at ?? null,
       );
-
-      // 1ª publicação datada (qualquer severidade) → início da série.
-      if (f.published_at != null && f.published_at <= args.nowMs) {
-        const idx = monthIdxSP(f.published_at);
-        if (idx < firstDatedPubIdx) firstDatedPubIdx = idx;
-      }
-      if (f.severity === "critical" || f.severity === "high") {
-        trendInputs.push({
-          severity: f.severity,
-          publishedAt: f.published_at ?? null,
-          retestStatus: f.retest_status ?? null,
-          retestedAt: f.retested_at ?? null,
-        });
-      }
 
       switch (f.retest_status) {
         case "fixed":
@@ -472,12 +462,6 @@ export async function buildPortalSummary(
 
   const openCriticalHigh = openBySeverity.critical + openBySeverity.high;
   const worstOpen = worstOpenSeverity(openFindings);
-  const trend = computeTrend(
-    trendInputs,
-    firstDatedPubIdx,
-    args.nowMs,
-    truncated,
-  );
 
   // Top-5 prioridades + contagem de evidência SÓ delas (leitura limitada).
   const top = selectPriorityOrder(openFindings).slice(0, TOP_PRIORITIES);
@@ -568,7 +552,6 @@ export async function buildPortalSummary(
       lastCreatedAt,
       latestExecutive,
     },
-    trend,
   };
 }
 

@@ -462,19 +462,6 @@ const portalSummaryReturns = v.union(
         }),
       ),
     }),
-    trend: v.object({
-      status: v.union(
-        v.literal("series"),
-        v.literal("suppressed_truncated"),
-        v.literal("suppressed_unplaceable"),
-        v.literal("no_publications"),
-      ),
-      clipped: v.boolean(),
-      months: v.array(
-        v.object({ ym: v.string(), critical: v.number(), high: v.number() }),
-      ),
-      unplaceableCriticalHigh: v.number(),
-    }),
   }),
 );
 // Guarda em tempo de compilação: falha o `tsc` se um campo EXPLÍCITO do validador

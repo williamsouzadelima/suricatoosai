@@ -435,7 +435,6 @@ describe("buildPortalSummary", () => {
         "priorities",
         "perEngagement",
         "reports",
-        "trend",
       ].sort(),
     );
     expect(keys(s.engagements)).toEqual(
@@ -509,27 +508,6 @@ describe("buildPortalSummary", () => {
         "evidenceCount",
       ].sort(),
     );
-    expect(keys(s.trend)).toEqual(
-      ["status", "clipped", "months", "unplaceableCriticalHigh"].sort(),
-    );
-    if (s.trend.months.length > 0) {
-      expect(keys(s.trend.months[0])).toEqual(
-        ["ym", "critical", "high"].sort(),
-      );
-    }
-  });
-
-  it("tendência: na fixture é 'series' e reconcilia (último mês == openCriticalHigh)", async () => {
-    const s = await buildPortalSummary(
-      ctxOf(fixtures()),
-      { userId: "u", clientId: "C1" as never, nowMs: 999 },
-      granted as never,
-    );
-    if (!s) throw new Error("esperava resumo");
-    expect(s.trend.status).toBe("series");
-    expect(s.trend.months.length).toBeGreaterThan(0);
-    const last = s.trend.months[s.trend.months.length - 1];
-    expect(last.critical + last.high).toBe(s.findings.openCriticalHigh);
   });
 
   it("teto por engajamento injetável: keep-NEWEST sob o cap, truncated=true", async () => {
