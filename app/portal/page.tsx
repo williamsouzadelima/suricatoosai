@@ -51,6 +51,18 @@ import {
   engagementStatusTone,
 } from "@/components/internal/engagement-status";
 import {
+  heroNumeral,
+  heroTone,
+  heroSentence,
+  scopeCoverageLine,
+  windowCoverageLine,
+  formatEvidenceCount,
+  SUMMARY_ERROR_COPY,
+  type PortalSummary,
+  type PriorityItem,
+  type PerEngagementRow,
+} from "./summary-model";
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -179,7 +191,9 @@ function cvssVersionFromVector(vector: string | null): string | null {
   const m = vector.match(/^CVSS:(\d+\.\d+)\//);
   return m ? m[1] : null;
 }
-function cvssText(f: Finding): string | null {
+function cvssText(
+  f: Pick<Finding, "cvssScore" | "cvssVersion" | "cvssVector">,
+): string | null {
   if (f.cvssScore == null) return null;
   const v = f.cvssVersion ?? cvssVersionFromVector(f.cvssVector);
   return `CVSS ${v ? `${v} · ` : ""}${f.cvssScore.toFixed(1)}`;
@@ -265,6 +279,10 @@ export default function PortalPage() {
   const [evidenceErr, setEvidenceErr] = useState<Record<string, boolean>>({});
   const [downloading, setDownloading] = useState<string | null>(null);
   const [securityOpen, setSecurityOpen] = useState(false);
+  const [summary, setSummary] = useState<PortalSummary | null | undefined>(
+    undefined,
+  );
+  const [summaryErr, setSummaryErr] = useState(false);
 
   const clientId = clientParam ?? clients?.[0]?.id ?? null;
 
@@ -289,6 +307,7 @@ export default function PortalPage() {
 
   useEffect(() => {
     if (!clientId) return;
+    let active = true;
     setEngagements(null);
     setEngagementsErr(false);
     (async () => {
@@ -297,18 +316,61 @@ export default function PortalPage() {
           `/api/portal/engagements?clientId=${encodeURIComponent(clientId)}`,
           { cache: "no-store" },
         );
+        if (!active) return;
         if (res.status === 401) {
           window.location.href = "/login";
           return;
         }
         if (!res.ok) throw new Error(`engagements ${res.status}`);
         const d = await res.json();
+        if (!active) return;
         setEngagements(d.engagements ?? []);
       } catch {
-        setEngagementsErr(true);
-        setEngagements([]);
+        if (active) {
+          setEngagementsErr(true);
+          setEngagements([]);
+        }
       }
     })();
+    return () => {
+      active = false;
+    };
+  }, [clientId]);
+
+  // Resumo de portfólio (Fase 1b) — carga por cliente, guardada contra corrida
+  // (uma troca de cliente cancela a resposta anterior + o eco do clientId a
+  // descarta). Erro ≠ vazio: summaryErr dispara o Callout, NUNCA "tudo limpo".
+  useEffect(() => {
+    if (!clientId) return;
+    let active = true;
+    setSummary(undefined);
+    setSummaryErr(false);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/portal/summary?clientId=${encodeURIComponent(clientId)}`,
+          { cache: "no-store" },
+        );
+        if (!active) return;
+        if (res.status === 401) {
+          window.location.href = "/login";
+          return;
+        }
+        if (res.status === 404) {
+          setSummary(null);
+          return;
+        }
+        if (!res.ok) throw new Error(`summary ${res.status}`);
+        const d = await res.json();
+        if (!active || d.clientId !== clientId) return;
+        setSummary(d.summary ?? null);
+      } catch {
+        if (active) setSummaryErr(true);
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, [clientId]);
 
   // Carrega relatórios + achados do engajamento selecionado (?e=).
@@ -509,7 +571,12 @@ export default function PortalPage() {
           <PortfolioView
             engagements={engagements}
             error={engagementsErr}
+            summary={summary}
+            summaryError={summaryErr}
             onOpen={(id) => setParams({ e: id, tab: null, f: null })}
+            onOpenFinding={(eid, fid) =>
+              setParams({ e: eid, f: fid, tab: null })
+            }
           />
         )}
       </main>
@@ -561,14 +628,26 @@ function portalStatusLabel(status: string): string {
 function PortfolioView({
   engagements,
   error,
+  summary,
+  summaryError,
   onOpen,
+  onOpenFinding,
 }: {
   engagements: Engagement[] | null;
   error: boolean;
+  summary: PortalSummary | null | undefined;
+  summaryError: boolean;
   onOpen: (id: string) => void;
+  onOpenFinding: (engagementId: string, findingId: string) => void;
 }) {
+  const perEng = useMemo(() => {
+    const m = new Map<string, PerEngagementRow>();
+    if (summary) for (const r of summary.perEngagement) m.set(r.engagementId, r);
+    return m;
+  }, [summary]);
+
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-display text-xl font-bold tracking-tight text-foreground">
           Seus testes de segurança
@@ -578,6 +657,16 @@ function PortfolioView({
           cada engajamento.
         </p>
       </div>
+
+      {summaryError ? (
+        <Callout tone="destructive" icon={AlertTriangle}>
+          {SUMMARY_ERROR_COPY}
+        </Callout>
+      ) : summary === undefined ? (
+        <PanelSkeleton rows={3} />
+      ) : summary ? (
+        <PortfolioSummary summary={summary} onOpenFinding={onOpenFinding} />
+      ) : null}
 
       {error ? (
         <Callout tone="destructive" icon={AlertTriangle}>
@@ -595,33 +684,12 @@ function PortfolioView({
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {engagements.map((e) => (
-            <button
+            <PortfolioEngagementCard
               key={e.id}
-              onClick={() => onOpen(e.id)}
-              className="group text-left"
-            >
-              <Card className="gap-0 py-0 transition-colors group-hover:border-ring">
-                <div className="flex items-start gap-3 p-5">
-                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <ShieldCheck className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-semibold text-foreground">
-                      {e.name}
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                      {e.code && <span className="font-mono">{e.code}</span>}
-                      <span>Atualizado {formatDateTime(e.updatedAt)}</span>
-                    </div>
-                  </div>
-                  <StatusBadge
-                    tone={engagementStatusTone(e.status)}
-                    label={portalStatusLabel(e.status)}
-                  />
-                  <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                </div>
-              </Card>
-            </button>
+              engagement={e}
+              row={perEng.get(e.id)}
+              onOpen={() => onOpen(e.id)}
+            />
           ))}
         </div>
       )}
@@ -630,6 +698,326 @@ function PortfolioView({
         As contagens consideram apenas achados publicados. Ausência de achados
         publicados não atesta ausência de risco.
       </p>
+    </div>
+  );
+}
+
+// ── Resumo de portfólio (Tela A) — nível board. Honestidade no modelo PURO
+//    (summary-model.ts): tom/frase/ordem vêm de lá, nada é recalculado aqui. ──
+function PortfolioSummary({
+  summary: s,
+  onOpenFinding,
+}: {
+  summary: PortalSummary;
+  onOpenFinding: (engagementId: string, findingId: string) => void;
+}) {
+  const tone = heroTone(s);
+  const numeralClass =
+    tone === "destructive"
+      ? "text-destructive"
+      : tone === "success"
+        ? "text-success"
+        : tone === "muted"
+          ? "text-muted-foreground"
+          : "text-foreground";
+  const e = s.engagements;
+  const f = s.findings;
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="grid gap-4 lg:grid-cols-12">
+        <Card className="gap-0 py-0 lg:col-span-5">
+          <div className="flex flex-col gap-2.5 p-5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Críticos e altos em aberto
+            </span>
+            <div
+              className={cn(
+                "font-display text-4xl font-bold tabular-nums",
+                numeralClass,
+              )}
+            >
+              {heroNumeral(s)}
+            </div>
+            <p className="text-sm text-foreground/80">{heroSentence(s)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {scopeCoverageLine(e.withScope, e.total)} ·{" "}
+              {windowCoverageLine(e.withWindow, e.total)}
+            </p>
+          </div>
+        </Card>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:col-span-7">
+          <StatCard
+            label="Engajamentos"
+            value={String(e.total)}
+            sub={`${e.byStatus.active} em andamento`}
+            icon={Crosshair}
+          />
+          <StatCard
+            label="Em aberto"
+            value={String(f.open)}
+            sub={`de ${f.published} publicados`}
+            icon={ShieldAlert}
+            tone={f.open > 0 ? "warning" : "neutral"}
+          />
+          <StatCard
+            label="Validados por reteste"
+            value={String(f.retest.fixed)}
+            sub={`de ${f.published}`}
+            icon={ShieldCheck}
+            tone={f.retest.fixed > 0 ? "success" : "neutral"}
+          />
+          <StatCard
+            label="Última publicação"
+            value={
+              f.lastPublishedAt != null ? fmtDateOnly(f.lastPublishedAt) : "—"
+            }
+            sub={
+              f.publishedWithoutDate > 0
+                ? `${f.publishedWithoutDate} sem data`
+                : undefined
+            }
+            icon={FileText}
+          />
+        </div>
+      </div>
+
+      {f.published > 0 && (
+        <div className="grid gap-4 lg:grid-cols-12">
+          <Card className="gap-0 py-0 lg:col-span-7">
+            <div className="flex flex-col gap-3 p-5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Em aberto por severidade
+              </span>
+              <SeverityStrip counts={f.openBySeverity} />
+            </div>
+          </Card>
+          <Card className="gap-0 py-0 lg:col-span-5">
+            <div className="flex flex-col gap-3 p-5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Situação do reteste
+              </span>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                <RetestLine
+                  label="Validados"
+                  n={f.retest.fixed}
+                  className="text-success"
+                />
+                <RetestLine
+                  label="Ainda vulneráveis"
+                  n={f.retest.stillVulnerable}
+                  className="text-destructive"
+                />
+                <RetestLine
+                  label="Pendentes"
+                  n={f.retest.pending}
+                  className="text-warning"
+                />
+                <RetestLine
+                  label="Sem reteste"
+                  n={f.retest.notRetested}
+                  className="text-muted-foreground"
+                />
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {s.priorities.length > 0 && (
+        <div className="flex flex-col gap-2.5">
+          <SectionHeader
+            icon={ShieldAlert}
+            title="Prioridades de correção"
+            description={
+              f.open > s.priorities.length
+                ? `As ${s.priorities.length} de maior severidade, de ${f.open} em aberto.`
+                : undefined
+            }
+          />
+          <div className="flex flex-col gap-2">
+            {s.priorities.map((p) => (
+              <PortfolioPriorityRow
+                key={p.id}
+                item={p}
+                onOpen={() => onOpenFinding(p.engagementId, p.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {s.reports.available > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {s.reports.available} relatório(s) disponível(is) nos engajamentos
+          {s.reports.lastCreatedAt != null &&
+            ` · último em ${fmtDateOnly(s.reports.lastCreatedAt)}`}
+          .
+        </p>
+      )}
+
+      <Collapsible>
+        <CollapsibleTrigger className="group flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
+          <ChevronRight className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-90" />
+          Como ler estes números
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-2 flex flex-col gap-1.5 text-xs text-muted-foreground">
+          <p>
+            As contagens consideram apenas achados <strong>publicados</strong>;
+            ausência de publicação não atesta ausência de risco.
+          </p>
+          <p>
+            &ldquo;Em aberto&rdquo; = achado publicado ainda não validado como
+            corrigido por reteste.
+          </p>
+          <p>
+            Severidade é a registrada no achado; CVSS é a pontuação registrada,
+            com a versão. Não é uma nota de segurança nem uma tendência.
+          </p>
+          <p>Um mesmo problema em dois engajamentos conta duas vezes.</p>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  );
+}
+
+function RetestLine({
+  label,
+  n,
+  className,
+}: {
+  label: string;
+  n: number;
+  className?: string;
+}) {
+  return (
+    <span className="flex items-center justify-between gap-2">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={cn("font-semibold tabular-nums", className)}>{n}</span>
+    </span>
+  );
+}
+
+function PortfolioPriorityRow({
+  item: p,
+  onOpen,
+}: {
+  item: PriorityItem;
+  onOpen: () => void;
+}) {
+  const retest = p.retestStatus ? RETEST_BADGE[p.retestStatus] : undefined;
+  const cvss = cvssText(p);
+  return (
+    <button
+      onClick={onOpen}
+      className="group relative overflow-hidden rounded-xl border bg-card p-4 text-left shadow-[var(--shadow-soft)] transition-colors hover:border-ring"
+    >
+      <span
+        className={cn(
+          "absolute inset-y-3 left-0 w-1 rounded-r-full",
+          SEV_STRIPE[asSeverity(p.severity)],
+        )}
+      />
+      <div className="flex flex-wrap items-center gap-2 pl-2">
+        <SeverityBadge severity={p.severity} />
+        <span className="min-w-0 flex-1 font-medium text-foreground">
+          {p.title}
+        </span>
+        {retest && <StatusBadge tone={retest.tone} label={retest.label} />}
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 pl-2 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1">
+          <ListChecks className="h-3.5 w-3.5" /> {p.engagementName}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Server className="h-3.5 w-3.5" /> {p.affectedAsset}
+        </span>
+        {cvss && <span className="font-mono">{cvss}</span>}
+        <span>{formatEvidenceCount(p.evidenceCount)} evidência(s)</span>
+      </div>
+    </button>
+  );
+}
+
+function PortfolioEngagementCard({
+  engagement: e,
+  row,
+  onOpen,
+}: {
+  engagement: Engagement;
+  row: PerEngagementRow | undefined;
+  onOpen: () => void;
+}) {
+  const win = windowText(e.startsAt, e.endsAt);
+  return (
+    <button onClick={onOpen} className="group text-left">
+      <Card className="gap-0 py-0 transition-colors group-hover:border-ring">
+        <div className="flex items-start gap-3 p-5">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <ShieldCheck className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-foreground">{e.name}</div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+              {e.code && <span className="font-mono">{e.code}</span>}
+              <span>{win ? `Janela ${win}` : "Janela não informada"}</span>
+            </div>
+            {row && <EngagementRiskLine row={row} status={e.status} />}
+          </div>
+          <StatusBadge
+            tone={engagementStatusTone(e.status)}
+            label={portalStatusLabel(e.status)}
+          />
+          <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        </div>
+      </Card>
+    </button>
+  );
+}
+
+function EngagementRiskLine({
+  row,
+  status,
+}: {
+  row: PerEngagementRow;
+  status: string;
+}) {
+  const closedWithRisk = status === "closed" && row.openCriticalHigh > 0;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+      {row.published === 0 ? (
+        <span className="text-muted-foreground">
+          Ainda sem achados publicados
+        </span>
+      ) : row.open === 0 ? (
+        <span className="font-medium text-success">
+          Todos os {row.published} validados por reteste
+        </span>
+      ) : (
+        <>
+          {row.worstOpenSeverity && (
+            <SeverityBadge severity={row.worstOpenSeverity} />
+          )}
+          <span className="text-foreground/80">
+            {row.open} em aberto
+            {row.openCriticalHigh > 0 &&
+              ` · ${row.openCriticalHigh} crítico(s)/alto(s)`}
+          </span>
+        </>
+      )}
+      {closedWithRisk && (
+        <StatusBadge
+          tone="warning"
+          label="Encerrado com crítico/alto em aberto"
+        />
+      )}
+      {row.lastPublishedAt != null && (
+        <span className="text-muted-foreground">
+          · Última publicação {fmtDateOnly(row.lastPublishedAt)}
+        </span>
+      )}
     </div>
   );
 }
@@ -1101,7 +1489,7 @@ function PriorityRow({
       />
       <div className="flex flex-wrap items-center gap-2 pl-2">
         <SeverityBadge severity={f.severity} />
-        <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+        <span className="min-w-0 flex-1 font-medium text-foreground">
           {f.title}
         </span>
         {retest && <StatusBadge tone={retest.tone} label={retest.label} />}
