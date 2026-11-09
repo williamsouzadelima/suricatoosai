@@ -247,6 +247,38 @@ function redirectToLogin() {
   window.location.href = "/login";
 }
 
+// Item da lista "todos em aberto" (Fase 1c) — projeção da rota /api/portal/open-findings.
+interface OpenFindingItem {
+  id: string;
+  engagementId: string;
+  engagementName: string;
+  ref: string | null;
+  title: string;
+  severity: string;
+  affectedAsset: string;
+  weaknessClass: string;
+  cwe: string | null;
+  cvssScore: number | null;
+  cvssVersion: string | null;
+  cvssVector: string | null;
+  retestStatus: string | null;
+  publishedAt: number | null;
+}
+interface OpenFindingsResp {
+  generatedAt: number;
+  scanTruncated: boolean;
+  total: number;
+  openBySeverity: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    info: number;
+  };
+  listCapped: boolean;
+  items: OpenFindingItem[];
+}
+
 export default function PortalPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -256,6 +288,7 @@ export default function PortalPage() {
   const engagementId = searchParams.get("e");
   const tab = searchParams.get("tab") ?? "visao";
   const findingId = searchParams.get("f");
+  const vista = searchParams.get("vista"); // "abertos" = sub-vista da lista completa
 
   const setParams = useCallback(
     (updates: Record<string, string | null>, replace = false) => {
@@ -295,6 +328,10 @@ export default function PortalPage() {
     undefined,
   );
   const [summaryErr, setSummaryErr] = useState(false);
+  const [openList, setOpenList] = useState<
+    OpenFindingsResp | null | undefined
+  >(undefined);
+  const [openListErr, setOpenListErr] = useState(false);
 
   const clientId = clientParam ?? clients?.[0]?.id ?? null;
 
@@ -384,6 +421,41 @@ export default function PortalPage() {
       active = false;
     };
   }, [clientId]);
+
+  // Lista "todos em aberto" (Fase 1c) — só carrega na sub-vista ?vista=abertos.
+  // Mesmo guard de corrida do resumo (active + eco do clientId). Erro ≠ vazio.
+  useEffect(() => {
+    if (vista !== "abertos" || !clientId) return;
+    let active = true;
+    setOpenList(undefined);
+    setOpenListErr(false);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/portal/open-findings?clientId=${encodeURIComponent(clientId)}`,
+          { cache: "no-store" },
+        );
+        if (!active) return;
+        if (res.status === 401) {
+          window.location.href = "/login";
+          return;
+        }
+        if (res.status === 404) {
+          setOpenList(null);
+          return;
+        }
+        if (!res.ok) throw new Error(`open-findings ${res.status}`);
+        const d = await res.json();
+        if (!active || d.clientId !== clientId) return;
+        setOpenList(d);
+      } catch {
+        if (active) setOpenListErr(true);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [vista, clientId]);
 
   // Carrega relatórios + achados do engajamento selecionado (?e=).
   useEffect(() => {
@@ -579,16 +651,29 @@ export default function PortalPage() {
             onBack={() => setParams({ e: null, tab: null, f: null })}
             onOpenFinding={(fid) => setParams({ f: fid })}
           />
+        ) : vista === "abertos" ? (
+          <OpenFindingsView
+            data={openList}
+            error={openListErr}
+            onBack={() => setParams({ vista: null })}
+            onOpenFinding={(eid, fid) =>
+              setParams({ e: eid, f: fid, tab: null, vista: null })
+            }
+          />
         ) : (
           <PortfolioView
             engagements={engagements}
             error={engagementsErr}
             summary={summary}
             summaryError={summaryErr}
-            onOpen={(id) => setParams({ e: id, tab: null, f: null })}
+            onOpen={(id) => setParams({ e: id, tab: null, f: null, vista: null })}
             onOpenFinding={(eid, fid) =>
-              setParams({ e: eid, f: fid, tab: null })
+              setParams({ e: eid, f: fid, tab: null, vista: null })
             }
+            onOpenEngagementReports={(eid) =>
+              setParams({ e: eid, tab: "relatorios", f: null, vista: null })
+            }
+            onViewAll={() => setParams({ vista: "abertos" })}
           />
         )}
       </main>
@@ -659,6 +744,8 @@ function PortfolioView({
   summaryError,
   onOpen,
   onOpenFinding,
+  onOpenEngagementReports,
+  onViewAll,
 }: {
   engagements: Engagement[] | null;
   error: boolean;
@@ -666,6 +753,8 @@ function PortfolioView({
   summaryError: boolean;
   onOpen: (id: string) => void;
   onOpenFinding: (engagementId: string, findingId: string) => void;
+  onOpenEngagementReports: (engagementId: string) => void;
+  onViewAll: () => void;
 }) {
   const perEng = useMemo(() => {
     const m = new Map<string, PerEngagementRow>();
@@ -692,7 +781,12 @@ function PortfolioView({
       ) : summary === undefined ? (
         <PanelSkeleton rows={3} />
       ) : summary ? (
-        <PortfolioSummary summary={summary} onOpenFinding={onOpenFinding} />
+        <PortfolioSummary
+          summary={summary}
+          onOpenFinding={onOpenFinding}
+          onOpenEngagementReports={onOpenEngagementReports}
+          onViewAll={onViewAll}
+        />
       ) : null}
 
       {error ? (
@@ -735,9 +829,13 @@ function PortfolioView({
 function PortfolioSummary({
   summary: s,
   onOpenFinding,
+  onOpenEngagementReports,
+  onViewAll,
 }: {
   summary: PortalSummary;
   onOpenFinding: (engagementId: string, findingId: string) => void;
+  onOpenEngagementReports: (engagementId: string) => void;
+  onViewAll: () => void;
 }) {
   const tone = heroTone(s);
   const numeralClass =
@@ -779,6 +877,26 @@ function PortfolioSummary({
             </p>
             <p className="text-xs text-muted-foreground">
               Posição em {formatDateTime(s.generatedAt)}.
+            </p>
+            {f.worstOpenSeverity && (
+              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                Pior severidade em aberto:{" "}
+                <SeverityBadge severity={f.worstOpenSeverity} />
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              {e.byStatus.closed} de {e.total}{" "}
+              {plural(
+                e.total,
+                "engajamento encerrado",
+                "engajamentos encerrados",
+              )}
+              {e.byStatus.active + e.byStatus.review + e.byStatus.reporting > 0
+                ? ` · ${
+                    e.byStatus.active + e.byStatus.review + e.byStatus.reporting
+                  } em andamento`
+                : ""}
+              .
             </p>
           </div>
         </Card>
@@ -827,6 +945,8 @@ function PortfolioSummary({
         </div>
       </div>
 
+      <ExecutiveReportBand reports={s.reports} onOpen={onOpenEngagementReports} />
+
       {f.published > 0 && (
         <div className="grid gap-4 lg:grid-cols-12">
           <Card className="gap-0 py-0 lg:col-span-7">
@@ -864,6 +984,13 @@ function PortfolioSummary({
                   className="text-muted-foreground"
                 />
               </div>
+              <p className="text-xs text-muted-foreground">
+                {f.lastRetestedAt != null
+                  ? `Último resultado de reteste registrado em ${fmtDateOnly(
+                      f.lastRetestedAt,
+                    )}.`
+                  : "Nenhum resultado de reteste registrado ainda."}
+              </p>
             </div>
           </Card>
         </div>
@@ -876,7 +1003,7 @@ function PortfolioSummary({
             title="Prioridades de correção"
             description={
               f.open > s.priorities.length
-                ? `As ${s.priorities.length} de maior severidade, de ${f.open} em aberto.`
+                ? `As ${s.priorities.length} primeiras na ordem de prioridade, de ${f.open} em aberto.`
                 : undefined
             }
           />
@@ -889,6 +1016,16 @@ function PortfolioSummary({
               />
             ))}
           </div>
+          {f.open > s.priorities.length && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="self-start"
+              onClick={onViewAll}
+            >
+              Ver todos os {f.open} em aberto
+            </Button>
+          )}
         </div>
       )}
 
@@ -927,8 +1064,15 @@ function PortfolioSummary({
             compara com outras organizações.
           </p>
           <p>
-            CVSS 3.1 e 4.0 não são diretamente comparáveis; as prioridades são
-            ordenadas por severidade e, depois, por CVSS.
+            As prioridades são ordenadas por severidade; depois, os ainda
+            vulneráveis no reteste; depois, a publicação mais antiga. O CVSS
+            aparece como informação e não define a ordem (3.1 e 4.0 não são
+            diretamente comparáveis).
+          </p>
+          <p>
+            &ldquo;Publicado em&rdquo; é a data da última publicação do achado.
+            &ldquo;Último resultado de reteste&rdquo; é o resultado mais recente
+            registrado pela equipe, não a data em que o problema foi corrigido.
           </p>
           <p>Um mesmo problema em dois engajamentos conta duas vezes.</p>
         </CollapsibleContent>
@@ -951,6 +1095,276 @@ function RetestLine({
       <span className="text-muted-foreground">{label}</span>
       <span className={cn("font-semibold tabular-nums", className)}>{n}</span>
     </span>
+  );
+}
+
+// Banda de relatório executivo (Fase 1c) — o artefato de board. Sem mudança de
+// servidor: usa summary.reports.latestExecutive e navega p/ a aba de relatórios
+// do engajamento (não há id de relatório no payload — latestExecutive é um grupo
+// multi-formato).
+function ExecutiveReportBand({
+  reports,
+  onOpen,
+}: {
+  reports: PortalSummary["reports"];
+  onOpen: (engagementId: string) => void;
+}) {
+  const le = reports.latestExecutive;
+  return (
+    <Card className="gap-0 py-0">
+      <div className="flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <FileText className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Relatório executivo
+            </span>
+            {le ? (
+              <>
+                <div className="mt-0.5 font-semibold text-foreground">
+                  {le.engagementName}
+                </div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                  <span>
+                    Versão {le.version} · Gerado em {fmtDateOnly(le.createdAt)}
+                  </span>
+                  {le.formats.map((fmt) => (
+                    <StatusBadge
+                      key={fmt}
+                      tone="neutral"
+                      label={fmt.toUpperCase()}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Nenhum relatório executivo disponível ainda.
+              </p>
+            )}
+          </div>
+        </div>
+        {le && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full shrink-0 md:w-auto"
+            onClick={() => onOpen(le.engagementId)}
+          >
+            Abrir relatórios do engajamento
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+// Sub-vista "todos em aberto" (?vista=abertos, Fase 1c) — lista completa dos
+// achados em aberto do portfólio, na mesma ordem das prioridades. Fonte única:
+// rota /api/portal/open-findings. Erro ≠ vazio (TIER-1).
+function OpenFindingsView({
+  data,
+  error,
+  onBack,
+  onOpenFinding,
+}: {
+  data: OpenFindingsResp | null | undefined;
+  error: boolean;
+  onBack: () => void;
+  onOpenFinding: (engagementId: string, findingId: string) => void;
+}) {
+  const [limit, setLimit] = useState(50);
+  const [sevFilter, setSevFilter] = useState<Severity | null>(null);
+
+  const header = (
+    <div>
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" /> Resumo do portfólio
+      </button>
+      <h1 className="mt-2 font-display text-xl font-bold tracking-tight text-foreground">
+        Achados em aberto
+      </h1>
+    </div>
+  );
+
+  if (error) {
+    return (
+      <div className="flex flex-col gap-4">
+        {header}
+        <Callout tone="destructive" icon={AlertTriangle}>
+          Não foi possível carregar a lista de achados em aberto. O serviço está
+          indisponível; isso não significa ausência de achados.
+        </Callout>
+      </div>
+    );
+  }
+  if (data === undefined) {
+    return (
+      <div className="flex flex-col gap-4">
+        {header}
+        <PanelSkeleton rows={6} />
+      </div>
+    );
+  }
+  if (data === null) {
+    return (
+      <div className="flex flex-col gap-4">
+        {header}
+        <EmptyState
+          icon={ShieldCheck}
+          title="Sem acesso a esta lista."
+          description="Sua sessão pode ter expirado ou o acesso foi revogado. Atualize a página."
+        />
+      </div>
+    );
+  }
+
+  const chips: { key: Severity | null; label: string; n: number }[] = [
+    { key: null, label: "Todas", n: data.total },
+    ...SEV_ORDER.map((sev) => ({
+      key: sev,
+      label: SEV_LABEL[sev],
+      n: data.openBySeverity[sev],
+    })),
+  ];
+  const shown = sevFilter
+    ? data.items.filter((i) => asSeverity(i.severity) === sevFilter)
+    : data.items;
+  const visible = shown.slice(0, limit);
+
+  return (
+    <div className="flex flex-col gap-4">
+      {header}
+      <p className="text-sm text-muted-foreground">
+        {data.total}{" "}
+        {plural(data.total, "achado em aberto", "achados em aberto")}. Em aberto
+        = publicado e ainda não validado por reteste.
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Ordem de prioridade: severidade; depois, os ainda vulneráveis no reteste;
+        depois, a data de publicação mais antiga. O CVSS aparece em cada linha
+        como informação e não define a ordem (3.1 e 4.0 não são comparáveis).
+        Posição em {formatDateTime(data.generatedAt)}.
+      </p>
+
+      {data.scanTruncated && (
+        <Callout tone="warning" icon={AlertTriangle}>
+          Resumo parcial: o volume excede o limite de leitura; os números podem
+          estar incompletos. Achados criados há mais tempo podem estar fora desta
+          lista.
+        </Callout>
+      )}
+
+      {data.total === 0 ? (
+        <EmptyState
+          icon={ShieldCheck}
+          title="Nenhum achado em aberto."
+          description="Nenhum achado publicado segue em aberto neste portfólio."
+        />
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-1.5">
+            {chips.map((c) => (
+              <button
+                key={c.label}
+                type="button"
+                onClick={() => {
+                  setSevFilter(c.key);
+                  setLimit(50);
+                }}
+                className={cn(
+                  "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                  sevFilter === c.key
+                    ? "border-ring bg-primary/10 text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {c.label} <span className="tabular-nums">{c.n}</span>
+              </button>
+            ))}
+          </div>
+
+          {data.listCapped && (
+            <p className="text-xs text-muted-foreground">
+              Mostrando os {data.items.length} primeiros de {data.total} em
+              aberto, na ordem de prioridade.
+            </p>
+          )}
+
+          <div className="flex flex-col gap-2">
+            {visible.map((p) => {
+              const retest = p.retestStatus
+                ? RETEST_BADGE[p.retestStatus]
+                : undefined;
+              const cvss = cvssText(p);
+              return (
+                <div
+                  key={p.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Abrir achado ${p.title} (${p.engagementName})`}
+                  onClick={() => onOpenFinding(p.engagementId, p.id)}
+                  onKeyDown={onActivate(() =>
+                    onOpenFinding(p.engagementId, p.id),
+                  )}
+                  className="group relative cursor-pointer overflow-hidden rounded-xl border bg-card p-4 text-left shadow-[var(--shadow-soft)] transition-colors hover:border-ring focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span
+                    className={cn(
+                      "absolute inset-y-3 left-0 w-1 rounded-r-full",
+                      SEV_STRIPE[asSeverity(p.severity)],
+                    )}
+                  />
+                  <div className="flex flex-wrap items-center gap-2 pl-2">
+                    <SeverityBadge severity={p.severity} />
+                    <span className="min-w-0 flex-1 font-medium text-foreground">
+                      {p.title}
+                    </span>
+                    {retest && p.retestStatus && (
+                      <StatusBadge
+                        tone={retest.tone}
+                        label={retestPortalLabel(p.retestStatus)}
+                      />
+                    )}
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 pl-2 text-xs text-muted-foreground">
+                    {p.ref && <span className="font-mono">{p.ref}</span>}
+                    <span className="inline-flex items-center gap-1">
+                      <ListChecks className="h-3.5 w-3.5" /> {p.engagementName}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Server className="h-3.5 w-3.5" /> {p.affectedAsset}
+                    </span>
+                    {cvss && <span className="font-mono">{cvss}</span>}
+                    {p.publishedAt != null && (
+                      <span>Publicado em {fmtDateOnly(p.publishedAt)}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {shown.length > limit && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="self-start"
+              onClick={() => setLimit((l) => l + 50)}
+            >
+              Mostrar mais {Math.min(50, shown.length - limit)}
+            </Button>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -992,6 +1406,7 @@ function PortfolioPriorityRow({
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
       </div>
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 pl-2 text-xs text-muted-foreground">
+        {p.ref && <span className="font-mono">{p.ref}</span>}
         <span className="inline-flex items-center gap-1">
           <ListChecks className="h-3.5 w-3.5" /> {p.engagementName}
         </span>
@@ -999,6 +1414,9 @@ function PortfolioPriorityRow({
           <Server className="h-3.5 w-3.5" /> {p.affectedAsset}
         </span>
         {cvss && <span className="font-mono">{cvss}</span>}
+        {p.publishedAt != null && (
+          <span>Publicado em {fmtDateOnly(p.publishedAt)}</span>
+        )}
         {p.evidenceCount === 0 ? (
           <span className="text-warning">Sem evidência registrada</span>
         ) : (
@@ -1394,8 +1812,8 @@ function computeSummary(findings: Finding[]) {
     else if (f.retestStatus === "pending") retest.pending += 1;
     else retest.none += 1;
   }
-  // Mesma ordem da Tela A (comparePriority): severidade → CVSS → publicado → id,
-  // para que Tela A e Tela B não divirjam em empates.
+  // Mesma ordem da Tela A (comparePriority): severidade → ainda-vulnerável →
+  // publicado mais antigo → id (CVSS NÃO ordena), p/ Tela A e B não divergirem.
   const priorities = selectPriorityOrder(open).slice(0, 5);
   return { open, sevCounts, worstOpen, retest, priorities };
 }
