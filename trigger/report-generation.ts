@@ -11,6 +11,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { api } from "@/convex/_generated/api";
 import { buildReportModel } from "@/lib/reports/build-report-model";
+import { gifKeyFramePng } from "@/lib/evidence/image-frame";
 import { generateEngagementNarrative } from "./generate-narrative";
 import { cvssBaseScore } from "@/lib/reports/cvss";
 import type { ReportInput } from "@/lib/reports/report-model";
@@ -206,11 +207,21 @@ export const generateEngagementReport = schemaTask({
             );
             const bytes = await obj.Body?.transformToByteArray();
             if (!bytes) continue;
-            const ext = mt.split("/")[1]?.split("+")[0] || "png";
+            // GIF animado nao renderiza em pdf/docx/pptx: embute o QUADRO-CHAVE
+            // (ultimo frame) como PNG estatico. Fail-safe: null => mantem o GIF.
+            let outBytes: Uint8Array = bytes;
+            let ext = mt.split("/")[1]?.split("+")[0] || "png";
+            if (mt === "image/gif") {
+              const framed = await gifKeyFramePng(Buffer.from(bytes));
+              if (framed) {
+                outBytes = framed;
+                ext = "png";
+              }
+            }
             const rel = `evidence/img_${imgIdx}.${ext}`;
-            const ab = bytes.buffer.slice(
-              bytes.byteOffset,
-              bytes.byteOffset + bytes.byteLength,
+            const ab = outBytes.buffer.slice(
+              outBytes.byteOffset,
+              outBytes.byteOffset + outBytes.byteLength,
             ) as ArrayBuffer;
             await sbx.files.write(`${base}/${rel}`, ab);
             imagePathByS3.set(key, rel);
