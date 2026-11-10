@@ -7,7 +7,12 @@
  * "nodejs"). O mock de window no jest.setup.js é guardado por `typeof window`,
  * então não quebra aqui.
  */
-import { createHash } from "node:crypto";
+import {
+  createHash,
+  generateKeyPairSync,
+  createPublicKey,
+  verify as edVerify,
+} from "node:crypto";
 import { Readable } from "node:stream";
 import { gunzipSync } from "node:zlib";
 import * as tar from "tar-stream";
@@ -363,5 +368,84 @@ describe("buildEvidenceBundleStream — endurecimento (A anexo; B abort/retry/zi
     }
     expect(fetchPage).not.toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe("buildEvidenceBundleStream — assinatura Ed25519 do manifesto (cadeia de custodia)", () => {
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const privPem = privateKey.export({ type: "pkcs8", format: "pem" }) as string;
+  const pubDer = publicKey.export({ type: "spki", format: "der" }) as Buffer;
+  const expectedFp = createHash("sha256").update(pubDer).digest("hex").slice(0, 32);
+
+  const signedRows = [
+    row({ evidenceId: "s1", s3Key: "s3/a.png", mediaType: "image/png", label: "a" }),
+  ];
+
+  let files: Record<string, Buffer>;
+  let manifest: BundleManifest & {
+    signed?: boolean;
+    signature?: Record<string, unknown>;
+  };
+
+  beforeAll(async () => {
+    process.env.EVIDENCE_SIGNING_KEY = privPem;
+    try {
+      const out = await runBundle(signedRows);
+      files = out.files;
+      manifest = out.manifest as typeof manifest;
+    } finally {
+      delete process.env.EVIDENCE_SIGNING_KEY;
+    }
+  }, 20000);
+
+  it("adiciona manifest.json.sig, manifest.pub e verify.mjs ao pacote", () => {
+    expect(files["manifest.json.sig"]).toBeDefined();
+    expect(files["manifest.pub"]).toBeDefined();
+    expect(files["verify.mjs"]).toBeDefined();
+  });
+
+  it("marca signed=true e declara a assinatura + fingerprint no manifesto", () => {
+    expect(manifest.signed).toBe(true);
+    expect(manifest.signature).toMatchObject({
+      algorithm: "ed25519",
+      signatureFile: "manifest.json.sig",
+      publicKeyFile: "manifest.pub",
+      keyFingerprint: expectedFp,
+    });
+  });
+
+  it("a assinatura verifica contra os BYTES EXATOS de manifest.json com a chave inclusa", () => {
+    const sig = Buffer.from(
+      files["manifest.json.sig"].toString("utf-8").trim(),
+      "base64",
+    );
+    const pub = createPublicKey(files["manifest.pub"].toString("utf-8"));
+    expect(edVerify(null, files["manifest.json"], pub, sig)).toBe(true);
+    const packedFp = createHash("sha256")
+      .update(pub.export({ type: "spki", format: "der" }) as Buffer)
+      .digest("hex")
+      .slice(0, 32);
+    expect(packedFp).toBe(expectedFp);
+  });
+
+  it("adulterar manifest.json invalida a assinatura (tamper-evident)", () => {
+    const tampered = Buffer.from(
+      files["manifest.json"].toString("utf-8").replace("Suricatoos", "Evil"),
+      "utf-8",
+    );
+    const sig = Buffer.from(
+      files["manifest.json.sig"].toString("utf-8").trim(),
+      "base64",
+    );
+    const pub = createPublicKey(files["manifest.pub"].toString("utf-8"));
+    expect(edVerify(null, tampered, pub, sig)).toBe(false);
+  });
+
+  it("zero-retrocesso: SEM a chave, nenhum arquivo de assinatura e signed=false", async () => {
+    const out = await runBundle(signedRows); // env ja deletado no beforeAll
+    expect(out.files["manifest.json.sig"]).toBeUndefined();
+    expect(out.files["manifest.pub"]).toBeUndefined();
+    expect(out.files["verify.mjs"]).toBeUndefined();
+    expect((out.manifest as { signed?: boolean }).signed).toBe(false);
   });
 });

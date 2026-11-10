@@ -1,6 +1,11 @@
 import { Readable } from "node:stream";
 import { createGzip } from "node:zlib";
-import { createHash } from "node:crypto";
+import {
+  createHash,
+  createPrivateKey,
+  createPublicKey,
+  sign as edSign,
+} from "node:crypto";
 import * as tar from "tar-stream";
 import { GetObjectCommand, type S3Client } from "@aws-sdk/client-s3";
 import { brtFilenameStamp } from "@/lib/reports/report-filename";
@@ -35,24 +40,103 @@ const EXT: Record<string, string> = {
   "application/json": "json",
 };
 
-const README = `Pacote de evidencias - Suricatoos
-
-Este .tar.gz contem TODA a evidencia do engajamento (export forense completo):
-- manifest.json : catalogo completo (achados, comandos, provas, metadados) +
-  o 'sha256' de cada arquivo empacotado + a lista "missing" de evidencia nao
-  empacotada (nunca omitida em silencio).
-- SHA256SUMS    : linhas 'sha256  caminho' (presente so quando ha arquivos);
-  valide com 'sha256sum -c SHA256SUMS' a partir da raiz extraida.
-- evidence/<achado>/<arquivo> : screenshots e arquivos capturados.
-
-Integridade do conteudo: o 'sha256' detecta corrupcao ou edicao de um arquivo
+function readmeFor(signed: boolean, fingerprint: string): string {
+  const fileList = [
+    "- manifest.json : catalogo completo (achados, comandos, provas, metadados) +",
+    '  o \'sha256\' de cada arquivo empacotado + a lista "missing" de evidencia nao',
+    "  empacotada (nunca omitida em silencio).",
+    "- SHA256SUMS    : linhas 'sha256  caminho' (presente so quando ha arquivos);",
+    "  valide com 'sha256sum -c SHA256SUMS' a partir da raiz extraida.",
+    ...(signed
+      ? [
+          "- manifest.json.sig / manifest.pub : assinatura Ed25519 do manifest.json + a",
+          "  chave publica que a verifica; 'node verify.mjs' faz a verificacao.",
+        ]
+      : []),
+    "- evidence/<achado>/<arquivo> : screenshots e arquivos capturados.",
+  ].join("\n");
+  const integrity = signed
+    ? `Integridade + AUTENTICIDADE (cadeia de custodia): o 'sha256' detecta corrupcao
+ou edicao de um arquivo vs. este manifesto; e o manifest.json esta ASSINADO
+(Ed25519 — manifest.json.sig, chave em manifest.pub, fingerprint sha256
+${fingerprint}). Como o manifesto carrega o sha256 de cada arquivo, a assinatura
+prova que o pacote inteiro e exatamente o que a Suricatoos gerou e nao foi
+reescrito — reescrever invalida a assinatura. Verifique com 'node verify.mjs'
+(ou sua propria ferramenta) e confira o fingerprint de manifest.pub contra a
+chave publicada da Suricatoos.`
+    : `Integridade do conteudo: o 'sha256' detecta corrupcao ou edicao de um arquivo
 em relacao a este manifesto. O manifesto NAO e assinado e os hashes sao
 calculados na exportacao — isto comprova integridade do conteudo empacotado,
 nao autenticidade nem cadeia de custodia (quem reescreve o pacote tambem
-recalcula o hash).
+recalcula o hash).`;
+  return `Pacote de evidencias - Suricatoos
+
+Este .tar.gz contem TODA a evidencia do engajamento (export forense completo):
+${fileList}
+
+${integrity}
 
 Conteudo CONFIDENCIAL. Distribua apenas conforme o contrato do engajamento.
 `;
+}
+
+const MANIFEST_NOTE_UNSIGNED =
+  "Export completo de evidencia. 'sha256' (algoritmo em hashAlgorithm) e o hash do conteudo de cada ARQUIVO empacotado em evidence/, repetido em SHA256SUMS para 'sha256sum -c'. Comprova integridade do conteudo vs. este manifesto (nao assinado; hash calculado na exportacao), nao autenticidade. Campos de texto (snippet/command/resultSummary) e o proprio manifesto nao sao hasheados. 'missing' lista evidencia nao empacotada (sem s3_key, objeto ausente no S3, ou erro de leitura); 'warnings' sinaliza truncamento.";
+
+const MANIFEST_NOTE_SIGNED =
+  "Export completo de evidencia, com MANIFESTO ASSINADO (Ed25519). 'sha256' (algoritmo em hashAlgorithm) e o hash do conteudo de cada ARQUIVO empacotado, repetido em SHA256SUMS. 'manifest.json.sig' assina o conteudo EXATO deste manifest.json com a chave em 'manifest.pub' — como o manifesto carrega o sha256 de cada arquivo, a assinatura autentica o pacote inteiro (reescrever invalida). Verifique com 'node verify.mjs' e confira o fingerprint (signature.keyFingerprint) contra a chave publicada da Suricatoos. 'missing' lista evidencia nao empacotada; 'warnings' sinaliza truncamento.";
+
+const VERIFY_MJS = `// verify.mjs — verifica a assinatura do manifesto deste pacote. Rode: node verify.mjs
+import { readFileSync } from "node:fs";
+import { createPublicKey, verify, createHash } from "node:crypto";
+try {
+  const manifest = readFileSync("manifest.json");
+  const sig = Buffer.from(readFileSync("manifest.json.sig", "utf-8").trim(), "base64");
+  const pub = createPublicKey(readFileSync("manifest.pub", "utf-8"));
+  if (!verify(null, manifest, pub, sig)) {
+    console.error("FAIL: a assinatura NAO corresponde a manifest.json (pacote alterado?).");
+    process.exit(1);
+  }
+  const fp = createHash("sha256").update(pub.export({ type: "spki", format: "der" })).digest("hex").slice(0, 32);
+  console.log("OK: manifest.json esta integro e assinado pela chave inclusa.");
+  console.log("fingerprint da chave (sha256, 32 hex): " + fp);
+  console.log("Confirme este fingerprint com a chave publicada da Suricatoos para garantir autenticidade.");
+} catch (e) {
+  console.error("ERRO ao verificar: " + (e && e.message ? e.message : String(e)));
+  process.exit(2);
+}
+`;
+
+/**
+ * Assinante Ed25519 do manifesto. A chave privada (PKCS8 PEM) vem de
+ * EVIDENCE_SIGNING_KEY; ausente/invalida => NAO assina (bundle byte-identico ao
+ * caminho sem assinatura = zero regressao). Assinar o manifesto — que carrega o
+ * sha256 de CADA arquivo — autentica o pacote inteiro: o destinatario verifica a
+ * assinatura com a chave publica inclusa e confere o fingerprint dela contra a
+ * chave publicada da Suricatoos.
+ */
+function getManifestSigner():
+  | { sign: (b: Buffer) => Buffer; pubPem: string; fingerprint: string }
+  | null {
+  const pem = process.env.EVIDENCE_SIGNING_KEY;
+  if (!pem || !pem.trim()) return null;
+  try {
+    const priv = createPrivateKey(pem);
+    if (priv.asymmetricKeyType !== "ed25519") return null;
+    const pub = createPublicKey(priv);
+    const pubPem = pub.export({ type: "spki", format: "pem" }) as string;
+    const pubDer = pub.export({ type: "spki", format: "der" }) as Buffer;
+    const fingerprint = createHash("sha256")
+      .update(pubDer)
+      .digest("hex")
+      .slice(0, 32);
+    return { sign: (b) => edSign(null, b, priv), pubPem, fingerprint };
+  } catch {
+    // Chave mal-configurada NUNCA assina com lixo em silencio: cai pro caminho
+    // nao-assinado (honesto) em vez de produzir uma assinatura invalida.
+    return null;
+  }
+}
 
 function extFor(mt: string | null): string {
   if (!mt) return "bin";
@@ -277,6 +361,7 @@ export function buildEvidenceBundleStream(opts: {
         return;
       }
 
+      const signer = getManifestSigner();
       const manifest = {
         tool: "Suricatoos",
         kind: "evidence-bundle",
@@ -289,10 +374,21 @@ export function buildEvidenceBundleStream(opts: {
           missing: missing.length,
         },
         hashAlgorithm: "sha256",
+        signed: Boolean(signer),
+        ...(signer
+          ? {
+              signature: {
+                algorithm: "ed25519",
+                signatureFile: "manifest.json.sig",
+                publicKeyFile: "manifest.pub",
+                keyFingerprint: signer.fingerprint,
+              },
+            }
+          : {}),
         evidence: manifestEvidence,
         missing,
         warnings,
-        note: "Export completo de evidencia. 'sha256' (algoritmo em hashAlgorithm) e o hash do conteudo de cada ARQUIVO empacotado em evidence/, repetido em SHA256SUMS para 'sha256sum -c'. Comprova integridade do conteudo vs. este manifesto (nao assinado; hash calculado na exportacao), nao autenticidade. Campos de texto (snippet/command/resultSummary) e o proprio manifesto nao sao hasheados. 'missing' lista evidencia nao empacotada (sem s3_key, objeto ausente no S3, ou erro de leitura); 'warnings' sinaliza truncamento.",
+        note: signer ? MANIFEST_NOTE_SIGNED : MANIFEST_NOTE_UNSIGNED,
       };
       if (sha256Sums.length > 0) {
         await addBufferEntry(
@@ -301,12 +397,35 @@ export function buildEvidenceBundleStream(opts: {
           Buffer.from(sha256Sums.join("\n") + "\n", "utf-8"),
         );
       }
+      // Assina os BYTES EXATOS de manifest.json que vao no tar — a assinatura
+      // cobre o manifesto, que por sua vez carrega o sha256 de cada arquivo.
+      const manifestBytes = Buffer.from(
+        JSON.stringify(manifest, null, 2),
+        "utf-8",
+      );
+      await addBufferEntry(pack, "manifest.json", manifestBytes);
+      if (signer) {
+        const sigB64 = signer.sign(manifestBytes).toString("base64");
+        await addBufferEntry(
+          pack,
+          "manifest.json.sig",
+          Buffer.from(sigB64 + "\n", "utf-8"),
+        );
+        await addBufferEntry(
+          pack,
+          "manifest.pub",
+          Buffer.from(signer.pubPem, "utf-8"),
+        );
+        await addBufferEntry(pack, "verify.mjs", Buffer.from(VERIFY_MJS, "utf-8"));
+      }
       await addBufferEntry(
         pack,
-        "manifest.json",
-        Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"),
+        "README.txt",
+        Buffer.from(
+          readmeFor(Boolean(signer), signer?.fingerprint ?? ""),
+          "utf-8",
+        ),
       );
-      await addBufferEntry(pack, "README.txt", Buffer.from(README, "utf-8"));
       pack.finalize();
     } catch (e) {
       // Erro inesperado no driver → quebra o stream (sem manifesto = truncamento
