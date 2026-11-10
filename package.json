@@ -142,6 +142,7 @@
     "react-textarea-autosize": "^8.5.9",
     "redis": "^6.2.1",
     "resumable-stream": "^2.2.12",
+    "sharp": "^0.35.5",
     "shiki": "^4.4.3",
     "sonner": "^2.0.8",
     "streamdown": "^2.6.0",

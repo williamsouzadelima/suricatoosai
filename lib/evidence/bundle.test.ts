@@ -16,6 +16,7 @@ import {
 import { Readable } from "node:stream";
 import { gunzipSync } from "node:zlib";
 import * as tar from "tar-stream";
+import sharp from "sharp";
 import { buildEvidenceBundleStream } from "@/lib/evidence/bundle";
 import type { EvidenceBundleRow } from "@/convex/lib/evidenceBundle";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -448,4 +449,82 @@ describe("buildEvidenceBundleStream — assinatura Ed25519 do manifesto (cadeia 
     expect(out.files["verify.mjs"]).toBeUndefined();
     expect((out.manifest as { signed?: boolean }).signed).toBe(false);
   });
+});
+
+describe("buildEvidenceBundleStream — marca d'agua (EVIDENCE_WATERMARK, sharp)", () => {
+  const W = 400;
+  const H = 220;
+  let realPng: Buffer;
+
+  beforeAll(async () => {
+    realPng = await sharp({
+      create: { width: W, height: H, channels: 3, background: { r: 0x33, g: 0x66, b: 0xcc } },
+    })
+      .png()
+      .toBuffer();
+  });
+
+  function sendBytes(bytes: Buffer) {
+    return jest.fn(async (cmd: { params?: { Key?: string } }) => {
+      if (cmd?.params?.Key === "s3/real.png") {
+        return { Body: { transformToByteArray: async () => new Uint8Array(bytes) } };
+      }
+      throw new Error("chave inesperada no teste");
+    });
+  }
+  const wmRow = (id: string, label: string) =>
+    row({ evidenceId: id, s3Key: "s3/real.png", mediaType: "image/png", label });
+
+  it("com a flag: marca (!= original), PNG valido, TEXTO renderiza, sha256 bate, watermarked=true", async () => {
+    process.env.EVIDENCE_WATERMARK = "true";
+    try {
+      const { files, manifest } = await runBundle([wmRow("w1", "shot")], {
+        send: sendBytes(realPng),
+      });
+      expect((manifest as { watermarked?: boolean }).watermarked).toBe(true);
+      const e = manifest.evidence.find((x) => x.evidenceId === "w1")!;
+      const packed = files[e.file!];
+      expect(packed).toBeDefined();
+      expect(packed.equals(realPng)).toBe(false); // marca aplicada
+      expect(packed.subarray(0, 4).toString("hex")).toBe("89504e47"); // PNG
+      expect(e.sha256).toBe(createHash("sha256").update(packed).digest("hex")); // hash do empacotado
+      // prova que o TEXTO branco renderizou na faixa do rodape
+      const barH = Math.min(60, Math.max(22, Math.round(H * 0.05)));
+      const { data, info } = await sharp(packed)
+        .extract({ left: 0, top: H - barH, width: 240, height: barH })
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      let whiteish = 0;
+      for (let i = 0; i < data.length; i += info.channels) {
+        if (data[i] > 200 && data[i + 1] > 200 && data[i + 2] > 200) whiteish++;
+      }
+      expect(whiteish).toBeGreaterThan(0);
+    } finally {
+      delete process.env.EVIDENCE_WATERMARK;
+    }
+  }, 20000);
+
+  it("zero-retrocesso: SEM a flag, o arquivo empacotado e byte-identico ao original", async () => {
+    const { files, manifest } = await runBundle([wmRow("w2", "shot")], {
+      send: sendBytes(realPng),
+    });
+    expect((manifest as { watermarked?: boolean }).watermarked).toBe(false);
+    const e = manifest.evidence.find((x) => x.evidenceId === "w2")!;
+    expect(files[e.file!].equals(realPng)).toBe(true);
+  });
+
+  it("fail-safe: buffer nao-decodavel com a flag on nao quebra o bundle (usa o original)", async () => {
+    process.env.EVIDENCE_WATERMARK = "true";
+    try {
+      const junk = Buffer.from("isto-nao-e-imagem-nenhuma-0123456789");
+      const { files, manifest } = await runBundle([wmRow("w3", "junk")], {
+        send: sendBytes(junk),
+      });
+      const e = manifest.evidence.find((x) => x.evidenceId === "w3")!;
+      expect(e.status).toBe("available");
+      expect(files[e.file!].equals(junk)).toBe(true);
+    } finally {
+      delete process.env.EVIDENCE_WATERMARK;
+    }
+  }, 20000);
 });

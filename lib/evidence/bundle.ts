@@ -10,6 +10,7 @@ import * as tar from "tar-stream";
 import { GetObjectCommand, type S3Client } from "@aws-sdk/client-s3";
 import { brtFilenameStamp } from "@/lib/reports/report-filename";
 import type { EvidenceBundleRow } from "@/convex/lib/evidenceBundle";
+import sharp from "sharp";
 
 /**
  * Monta o .tar.gz de TODA a evidência do engajamento ON-THE-FLY (sempre atual).
@@ -138,6 +139,56 @@ function getManifestSigner():
   }
 }
 
+// --- marca d'agua (opcional, flag EVIDENCE_WATERMARK=true) ---
+// Carimba um rodape "CONFIDENCIAL · engajamento · data" na COPIA que entra no
+// bundle (PNG/JPEG), para rastrear/dissuadir o vazamento de uma imagem solta. O
+// ORIGINAL no S3 fica intacto; o sha256 do manifesto e o da versao MARCADA (o que
+// o cliente recebe) e a assinatura cobre isso. Renderiza o texto com sharp (lib
+// padrao do Next) via SVG — usa a fonte do sistema (o host precisa de UMA fonte;
+// ex.: `apt install fonts-dejavu-core`). FAIL-SAFE: qualquer erro (formato
+// nao-decodavel, imagem minuscula, sharp indisponivel) retorna a imagem ORIGINAL
+// — o pacote nunca quebra por causa da marca.
+const WATERMARK_MIME = new Set(["image/png", "image/jpeg", "image/jpg"]);
+function escapeXml(s: string): string {
+  return s.replace(/[<>&'"]/g, (c) =>
+    c === "<"
+      ? "&lt;"
+      : c === ">"
+        ? "&gt;"
+        : c === "&"
+          ? "&amp;"
+          : c === "'"
+            ? "&apos;"
+            : "&quot;",
+  );
+}
+async function watermarkImage(
+  buf: Buffer,
+  mediaType: string | null,
+  text: string,
+): Promise<Buffer> {
+  try {
+    const mt = (mediaType || "").toLowerCase();
+    if (!WATERMARK_MIME.has(mt)) return buf;
+    const meta = await sharp(buf).metadata();
+    const w = meta.width ?? 0;
+    const h = meta.height ?? 0;
+    if (w < 120 || h < 48) return buf; // pequena demais p/ um rodape legivel
+    const barH = Math.min(60, Math.max(22, Math.round(h * 0.05)));
+    const fontSize = Math.round(barH * 0.55);
+    const ty = h - Math.round(barH * 0.3);
+    const svg = `<svg width="${w}" height="${h}"><rect x="0" y="${h - barH}" width="${w}" height="${barH}" fill="black" fill-opacity="0.6"/><text x="8" y="${ty}" font-family="sans-serif" font-size="${fontSize}" fill="white">${escapeXml(text)}</text></svg>`;
+    const pipe = sharp(buf).composite([
+      { input: Buffer.from(svg), top: 0, left: 0 },
+    ]);
+    return mt === "image/png"
+      ? await pipe.png().toBuffer()
+      : await pipe.jpeg({ quality: 90 }).toBuffer();
+  } catch {
+    return buf; // fail-safe: nunca quebra o bundle por causa da marca
+  }
+}
+
 function extFor(mt: string | null): string {
   if (!mt) return "bin";
   const k = mt.toLowerCase();
@@ -249,6 +300,10 @@ export function buildEvidenceBundleStream(opts: {
     const sha256Sums: string[] = [];
     let fileCount = 0;
     let evidenceCount = 0;
+    const watermarkOn = process.env.EVIDENCE_WATERMARK === "true";
+    const wmText = watermarkOn
+      ? `CONFIDENCIAL  ${(opts.engagementName || "").slice(0, 42)}  ${brtFilenameStamp(opts.generatedAt)}`
+      : "";
     try {
       let cursor: string | null = null;
       do {
@@ -285,7 +340,13 @@ export function buildEvidenceBundleStream(opts: {
                   ev.s3Key,
                   opts.signal,
                 );
-                const buf = Buffer.from(bytes);
+                let buf: Buffer = Buffer.from(bytes);
+                // Marca d'agua opcional na COPIA do bundle (fail-safe: erro =>
+                // imagem original). Feito ANTES do hash para o sha256 do manifesto
+                // bater com o arquivo marcado que o cliente recebe.
+                if (watermarkOn) {
+                  buf = await watermarkImage(buf, ev.mediaType, wmText);
+                }
                 // Hash de integridade do CONTEÚDO: sha256 do arquivo exatamente
                 // como empacotado. Detecta corrupção/edição do arquivo vs. este
                 // manifesto (não é assinatura: o manifesto não é assinado e o
@@ -374,6 +435,7 @@ export function buildEvidenceBundleStream(opts: {
           missing: missing.length,
         },
         hashAlgorithm: "sha256",
+        watermarked: watermarkOn,
         signed: Boolean(signer),
         ...(signer
           ? {
