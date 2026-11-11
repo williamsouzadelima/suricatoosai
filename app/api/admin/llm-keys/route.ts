@@ -5,6 +5,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { recordAudit } from "@/lib/admin/audit";
 import { decryptSecret, encryptSecret, last4 } from "@/lib/llm-keys/crypto";
+import { invalidatePoolKeyCache } from "@/lib/llm-keys/pool-runtime";
 
 /**
  * Admin do pool de chaves de LLM. Superadmin-only. A chave em texto puro é
@@ -83,6 +84,67 @@ async function inspectOpenRouterKey(plaintext: string): Promise<KeyInspection> {
   }
 }
 
+/** Valida o provedor contra o conjunto fechado (H3). Vazio → openrouter. */
+function validProvider(v: unknown): "openrouter" | "unorouter" {
+  const s = typeof v === "string" ? v.trim() : "";
+  if (s === "unorouter") return "unorouter";
+  if (s === "" || s === "openrouter") return "openrouter";
+  throw new Error(`Provedor inválido: "${s}". Use "openrouter" ou "unorouter".`);
+}
+
+/**
+ * Inspeciona uma chave do UNOROUTER via PROBE DE INFERÊNCIA (H4): `/v1/key` e
+ * `/v1/credits` só provam autenticação/saldo — NÃO provam que a chave RODA modelo
+ * (a mesma armadilha da chave de provisionamento do OpenRouter). Um POST
+ * /chat/completions com max_tokens:1 contra um modelo free é o teste autoritativo
+ * de "válida". Fail-open: hiccup → "unknown" (nunca bloqueia por instabilidade).
+ */
+async function inspectUnoRouterKey(plaintext: string): Promise<KeyInspection> {
+  try {
+    const r = await fetch("https://api.unorouter.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${plaintext}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gemma-4-31b-it:free",
+        messages: [{ role: "user", content: "ping" }],
+        max_tokens: 1,
+      }),
+    });
+    if (r.status === 401 || r.status === 403) {
+      return {
+        kind: "invalid",
+        detail: `Chave UnoRouter inválida ou sem permissão (HTTP ${r.status}).`,
+      };
+    }
+    if (r.status === 402) {
+      return {
+        kind: "limited",
+        detail:
+          "Conta UnoRouter sem crédito (HTTP 402) — mesmo os modelos free exigem saldo ≥ 0.",
+      };
+    }
+    if (r.ok) {
+      return {
+        kind: "ok",
+        detail: "Chave UnoRouter válida — faz inferência (probe de 1 token OK).",
+      };
+    }
+    const t = await r.text().catch(() => "");
+    return {
+      kind: "unknown",
+      detail: `UnoRouter respondeu HTTP ${r.status} no probe${t ? ": " + t.slice(0, 120) : ""}.`,
+    };
+  } catch {
+    return {
+      kind: "unknown",
+      detail: "Não foi possível contatar o UnoRouter para testar a chave.",
+    };
+  }
+}
+
 export async function GET() {
   const admin = await getSuperadminUser();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -130,13 +192,18 @@ export async function POST(req: NextRequest) {
       }
       const key = str(body.key);
       const label = str(body.label);
+      const provider = validProvider(body.provider);
       if (!key || key.length < 20) {
         throw new Error("Chave inválida (vazia ou curta demais).");
       }
       if (!label) throw new Error("Rótulo obrigatório.");
-      // Rejeita na hora a chave do tipo errado (provisionamento não faz
-      // inferência) ou inválida — não deixa entrar no pool. Fail-open em hiccup.
-      const addCheck = await inspectOpenRouterKey(key);
+      // Rejeita na hora a chave do tipo errado — OpenRouter: provisionamento não
+      // faz inferência; UnoRouter: probe de inferência prova que roda modelo.
+      // Fail-open em hiccup (kind "unknown" não bloqueia).
+      const addCheck =
+        provider === "unorouter"
+          ? await inspectUnoRouterKey(key)
+          : await inspectOpenRouterKey(key);
       if (addCheck.kind === "provisioning" || addCheck.kind === "invalid") {
         throw new Error(addCheck.detail);
       }
@@ -144,7 +211,7 @@ export async function POST(req: NextRequest) {
       const res = await convex.mutation(api.llmKeys.createKeyForBackend, {
         serviceKey,
         label,
-        provider: str(body.provider) ?? "openrouter",
+        provider,
         ciphertext: enc.ciphertext,
         iv: enc.iv,
         authTag: enc.authTag,
@@ -152,7 +219,13 @@ export async function POST(req: NextRequest) {
         priority: toNum(body.priority),
         createdBy: actor,
       });
-      await recordAudit(actor, "llm-chave.adicionar", label, `last4=${last4(key)}`);
+      invalidatePoolKeyCache(provider); // M2: a chave nova vale já (não espera o TTL de 20s)
+      await recordAudit(
+        actor,
+        "llm-chave.adicionar",
+        label,
+        `last4=${last4(key)} provider=${provider}`,
+      );
       return NextResponse.json({ success: true, id: res.id, last4: last4(key) });
     }
 
@@ -166,6 +239,7 @@ export async function POST(req: NextRequest) {
         enabled: typeof body.enabled === "boolean" ? body.enabled : undefined,
         priority: toNum(body.priority),
       });
+      invalidatePoolKeyCache(); // M2: mudança no pool vale já (todos os providers)
       await recordAudit(
         actor,
         "llm-chave.editar",
@@ -193,6 +267,7 @@ export async function POST(req: NextRequest) {
         id: id as Id<"llm_api_keys">,
         status: status as "untested" | "active" | "exhausted" | "error",
       });
+      invalidatePoolKeyCache(); // M2
       await recordAudit(actor, "llm-chave.status", id, status);
       return NextResponse.json({ success: true });
     }
@@ -204,6 +279,7 @@ export async function POST(req: NextRequest) {
         serviceKey,
         id: id as Id<"llm_api_keys">,
       });
+      invalidatePoolKeyCache(); // M2
       await recordAudit(actor, "llm-chave.remover", id, undefined);
       return NextResponse.json({ success: true });
     }
@@ -242,6 +318,7 @@ export async function POST(req: NextRequest) {
         priority: toNum(body.priority) ?? 50,
         createdBy: actor,
       });
+      invalidatePoolKeyCache("openrouter"); // M2
       await recordAudit(actor, "llm-chave.importar-env", undefined, `last4=${l4}`);
       return NextResponse.json({ ok: true, id: res.id, last4: l4 });
     }
@@ -282,50 +359,66 @@ export async function POST(req: NextRequest) {
       // null = não altera o status (erro transitório não exclui chave boa).
       let status: "active" | "exhausted" | "error" | null = null;
       let detail = "";
-      // 1) TIPO da chave (decisivo): provisionamento/management lê o saldo mas
-      //    NÃO faz inferência (o chat dá "User not found"). Checar ANTES do saldo.
-      const info = await inspectOpenRouterKey(plaintext);
-      if (info.kind === "provisioning" || info.kind === "invalid") {
-        status = "error";
-        detail = info.detail;
-      } else if (info.kind === "limited") {
-        status = "exhausted";
-        detail = info.detail;
+      if (cipher.provider === "unorouter") {
+        // UnoRouter: o teste autoritativo é um PROBE DE INFERÊNCIA (H4) — /key e
+        // /credits não provam que a chave RODA modelo.
+        const info = await inspectUnoRouterKey(plaintext);
+        if (info.kind === "invalid") {
+          status = "error";
+          detail = info.detail;
+        } else if (info.kind === "limited") {
+          status = "exhausted";
+          detail = info.detail;
+        } else if (info.kind === "ok") {
+          status = "active";
+          detail = info.detail;
+        } else {
+          detail = info.detail; // unknown → status mantido
+        }
       } else {
-        // 2) chave de inferência OK (ou /key indisponível): conferir o saldo da
-        //    CONTA via /credits, que reflete o 402 "Insufficient credits".
-        try {
-          const r = await fetch("https://openrouter.ai/api/v1/credits", {
-            headers: { Authorization: `Bearer ${plaintext}` },
-          });
-          if (r.status === 401 || r.status === 403) {
-            status = "error";
-            detail = `Chave inválida ou sem permissão (HTTP ${r.status}).`;
-          } else if (r.ok) {
-            const j = (await r.json().catch(() => ({}))) as {
-              data?: { total_credits?: number; total_usage?: number };
-            };
-            const tc = j?.data?.total_credits;
-            const tu = j?.data?.total_usage;
-            if (typeof tc === "number" && typeof tu === "number") {
-              const rem = tc - tu;
-              if (rem <= 0) {
-                status = "exhausted";
-                detail = `Sem crédito na conta (usado US$ ${tu.toFixed(2)} de US$ ${tc.toFixed(2)}).`;
+        // OpenRouter: 1) TIPO (provisionamento/management lê o saldo mas NÃO faz
+        //    inferência — "User not found"); 2) saldo da conta via /credits.
+        const info = await inspectOpenRouterKey(plaintext);
+        if (info.kind === "provisioning" || info.kind === "invalid") {
+          status = "error";
+          detail = info.detail;
+        } else if (info.kind === "limited") {
+          status = "exhausted";
+          detail = info.detail;
+        } else {
+          try {
+            const r = await fetch("https://openrouter.ai/api/v1/credits", {
+              headers: { Authorization: `Bearer ${plaintext}` },
+            });
+            if (r.status === 401 || r.status === 403) {
+              status = "error";
+              detail = `Chave inválida ou sem permissão (HTTP ${r.status}).`;
+            } else if (r.ok) {
+              const j = (await r.json().catch(() => ({}))) as {
+                data?: { total_credits?: number; total_usage?: number };
+              };
+              const tc = j?.data?.total_credits;
+              const tu = j?.data?.total_usage;
+              if (typeof tc === "number" && typeof tu === "number") {
+                const rem = tc - tu;
+                if (rem <= 0) {
+                  status = "exhausted";
+                  detail = `Sem crédito na conta (usado US$ ${tu.toFixed(2)} de US$ ${tc.toFixed(2)}).`;
+                } else {
+                  status = "active";
+                  detail = `Chave de inferência OK — conta com US$ ${rem.toFixed(2)} de saldo (US$ ${tu.toFixed(2)} de US$ ${tc.toFixed(2)}).`;
+                }
               } else {
                 status = "active";
-                detail = `Chave de inferência OK — conta com US$ ${rem.toFixed(2)} de saldo (US$ ${tu.toFixed(2)} de US$ ${tc.toFixed(2)}).`;
+                detail = "Chave válida (OpenRouter não retornou o saldo).";
               }
             } else {
-              status = "active";
-              detail = "Chave válida (OpenRouter não retornou o saldo).";
+              const t = await r.text().catch(() => "");
+              detail = `Erro transitório ao testar (HTTP ${r.status})${t ? ": " + t.slice(0, 120) : ""} — status mantido.`;
             }
-          } else {
-            const t = await r.text().catch(() => "");
-            detail = `Erro transitório ao testar (HTTP ${r.status})${t ? ": " + t.slice(0, 120) : ""} — status mantido.`;
+          } catch {
+            detail = "Falha ao contatar o OpenRouter — status mantido.";
           }
-        } catch {
-          detail = "Falha ao contatar o OpenRouter — status mantido.";
         }
       }
       if (status) {
@@ -335,6 +428,7 @@ export async function POST(req: NextRequest) {
           status,
           error: status === "active" ? undefined : detail,
         });
+        invalidatePoolKeyCache(cipher.provider); // M2: status novo vale já
       }
       await recordAudit(actor, "llm-chave.testar", id, status ?? "unchanged");
       return NextResponse.json({ ok: true, status: status ?? "unchanged", detail });

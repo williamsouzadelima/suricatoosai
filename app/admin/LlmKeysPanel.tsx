@@ -60,6 +60,9 @@ export function LlmKeysPanel() {
   const [label, setLabel] = useState("");
   const [secret, setSecret] = useState("");
   const [priority, setPriority] = useState("100");
+  const [provider, setProvider] = useState<"openrouter" | "unorouter">(
+    "openrouter",
+  );
   const [confirm, confirmUI] = useConfirm();
 
   const load = useCallback(async () => {
@@ -120,6 +123,7 @@ export function LlmKeysPanel() {
         action: "add",
         label: label.trim(),
         key: secret.trim(),
+        provider,
         priority: Number(priority) || 100,
       },
       "Chave adicionada",
@@ -206,7 +210,7 @@ export function LlmKeysPanel() {
       <SectionHeader
         icon={KeyRound}
         title="Pool de chaves de LLM"
-        description="Várias chaves OpenRouter com failover automático quando uma fica sem crédito."
+        description="Chaves OpenRouter (pago/agente) + UnoRouter (modelos gratuitos), com failover automático por provedor."
         count={keys.length}
       />
 
@@ -228,7 +232,19 @@ export function LlmKeysPanel() {
 
       <Card>
         <CardContent className="space-y-3 pt-4">
-          <div className="grid gap-3 sm:grid-cols-[1fr_2fr_7rem_auto]">
+          <div className="grid gap-3 sm:grid-cols-[8rem_1fr_2fr_7rem_auto]">
+            <select
+              value={provider}
+              onChange={(e) =>
+                setProvider(e.target.value as "openrouter" | "unorouter")
+              }
+              disabled={!encConfigured || busy}
+              title="Provedor desta chave"
+              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+            >
+              <option value="openrouter">OpenRouter</option>
+              <option value="unorouter">UnoRouter</option>
+            </select>
             <Input
               placeholder="Rótulo (ex.: OpenRouter #2)"
               value={label}
@@ -237,7 +253,11 @@ export function LlmKeysPanel() {
             />
             <Input
               type="password"
-              placeholder="Chave de API (sk-or-...)"
+              placeholder={
+                provider === "unorouter"
+                  ? "Chave UnoRouter (unorouter.com/en/token)"
+                  : "Chave de API (sk-or-...)"
+              }
               value={secret}
               onChange={(e) => setSecret(e.target.value)}
               disabled={!encConfigured || busy}
@@ -280,7 +300,7 @@ export function LlmKeysPanel() {
         <EmptyState
           icon={KeyRound}
           title="Nenhuma chave no pool"
-          description="Adicione uma chave OpenRouter acima para habilitar o failover por crédito."
+          description="Adicione uma chave (OpenRouter ou UnoRouter) acima para habilitar o failover por crédito."
         />
       ) : (
         <Card>
@@ -295,6 +315,7 @@ export function LlmKeysPanel() {
                   <tr className="border-b border-border/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="pb-2 pr-3 font-medium">Rótulo</th>
                     <th className="pb-2 pr-3 font-medium">Chave</th>
+                    <th className="pb-2 pr-3 font-medium">Provedor</th>
                     <th className="pb-2 pr-3 font-medium">Status</th>
                     <th className="pb-2 pr-3 font-medium">Prior.</th>
                     <th className="pb-2 pr-3 font-medium">Último uso</th>
@@ -315,6 +336,13 @@ export function LlmKeysPanel() {
                         </td>
                         <td className="py-2 pr-3 font-mono text-muted-foreground">
                           ••••{k.last4}
+                        </td>
+                        <td className="py-2 pr-3">
+                          <span className="rounded border border-border/60 px-1.5 py-0.5 text-xs text-muted-foreground">
+                            {k.provider === "unorouter"
+                              ? "UnoRouter"
+                              : "OpenRouter"}
+                          </span>
                         </td>
                         <td className="py-2 pr-3">
                           <StatusBadge tone={meta.tone} label={meta.label} />
