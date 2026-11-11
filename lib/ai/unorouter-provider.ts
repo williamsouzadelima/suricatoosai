@@ -31,10 +31,12 @@ function failClosedResponse(): Response {
   return new Response(
     JSON.stringify({
       error: {
+        // Honesto: resolveActivePoolKey devolve null tanto SEM chave quanto
+        // quando TODAS as chaves UnoRouter estão sem crédito/erro (finding #3).
         message:
-          "UnoRouter não configurado: adicione uma chave UnoRouter no admin (Chaves LLM) para usar os modelos gratuitos.",
-        type: "no_unorouter_key",
-        code: "no_unorouter_key",
+          "Sem chave UnoRouter ATIVA no pool (não configurada, ou todas sem crédito/erro) — verifique no admin (Chaves LLM) para usar os modelos gratuitos.",
+        type: "no_active_unorouter_key",
+        code: "no_active_unorouter_key",
       },
     }),
     { status: 503, headers: { "content-type": "application/json" } },
@@ -99,6 +101,10 @@ export const createUnoRouterPatchFetch =
 /** Instância OpenAI-compat apontada ao UnoRouter, com failover de pool + fail-closed. */
 export function createUnoRouterProvider() {
   return createOpenAI({
+    // model.provider vira "unorouter.chat" → detecção ROBUSTA do que é uno-roteado
+    // no provider-map (o teste de paridade do portão deriva disto, não de uma
+    // constante-espelho — MED-1). O sufixo .chat/.responses também guarda o #1.
+    name: UNOROUTER_PROVIDER,
     apiKey: PLACEHOLDER_API_KEY,
     baseURL: UNOROUTER_BASE_URL,
     fetch: createUnoRouterPatchFetch(),

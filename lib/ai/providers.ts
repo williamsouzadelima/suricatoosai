@@ -1113,13 +1113,16 @@ const buildProviderMap = (
     "model-grok-4.7": or(GROK_4_7_SLUG),
     "model-deepseek-v4.1-flash": or(DEEPSEEK_V4_1_FLASH_SLUG),
     // Gratuitos ($0; treinam com o prompt → só chats sem engajamento) — via
-    // UnoRouter (slugs pelados). ⚠️ ask-model-free/agent-model-free acima NÃO
-    // entram aqui: são roteadores do PLANO free p/ modelos PAGOS (OpenRouter),
-    // não-gated; repontá-los p/ UnoRouter vazaria dado de cliente (H1).
-    "model-nemotron-3-ultra-free": uno(NEMOTRON_3_ULTRA_FREE_UNO_SLUG),
-    "model-nemotron-3-super-free": uno(NEMOTRON_3_SUPER_FREE_UNO_SLUG),
-    "model-qwen3.8-27b-free": uno(QWEN_3_8_27B_FREE_UNO_SLUG),
-    "model-gemma-4-31b-free": uno(GEMMA_4_31B_FREE_UNO_SLUG),
+    // UnoRouter. ⚠️ USAR `uno.chat()` (= /v1/chat/completions): o callable default
+    // do SDK OpenAI (`uno(slug)`) vai p/ /v1/responses, endpoint que o "Testar"
+    // NÃO prova e cuja semântica (Responses API) o UnoRouter pode não honrar igual
+    // p/ estes modelos de terceiros. chat/completions é o padrão OpenAI-compat e
+    // casa com o probe. ⚠️ ask-model-free/agent-model-free acima NÃO entram aqui:
+    // roteadores do PLANO free p/ modelos PAGOS (OpenRouter), não-gated (H1).
+    "model-nemotron-3-ultra-free": uno.chat(NEMOTRON_3_ULTRA_FREE_UNO_SLUG),
+    "model-nemotron-3-super-free": uno.chat(NEMOTRON_3_SUPER_FREE_UNO_SLUG),
+    "model-qwen3.8-27b-free": uno.chat(QWEN_3_8_27B_FREE_UNO_SLUG),
+    "model-gemma-4-31b-free": uno.chat(GEMMA_4_31B_FREE_UNO_SLUG),
     // Separate internal keys use the same Grok 4.5 provider model while
     // provider reasoning options distinguish Standard from Pro vision.
     "model-grok-4.5": or(GROK_4_5_SLUG),
@@ -1152,6 +1155,22 @@ const buildProviderMap = (
 const baseProviders = buildProviderMap(openrouter, uno);
 
 export type ModelName = keyof typeof baseProviders;
+
+// DERIVADO do mapa VIVO (não de uma constante-espelho): os ids cujo `model.provider`
+// começa com "unorouter" (ver `name` em createUnoRouterProvider). O teste de
+// paridade do portão usa ISTO → um 5º `uno.chat()` futuro NÃO burla o portão
+// "free só sem cliente" com a suíte verde (MED-1). O provider string (`.chat` vs
+// `.responses`) deixa o teste garantir o endpoint certo (finding #1).
+export const unoRoutedProviderById: Record<string, string> = Object.fromEntries(
+  Object.entries(baseProviders)
+    .map(
+      ([id, m]) =>
+        [id, String((m as { provider?: string }).provider ?? "")] as const,
+    )
+    .filter(([, p]) => p.startsWith("unorouter")),
+);
+export const UNOROUTER_ROUTED_IDS: string[] =
+  Object.keys(unoRoutedProviderById);
 
 export const modelCutoffDates: Partial<Record<ModelName, string>> &
   Record<string, string | undefined> = {

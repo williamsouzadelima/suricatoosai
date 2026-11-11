@@ -49,19 +49,21 @@ describe("free models — fallback invariants", () => {
     );
   });
 
-  it("(a) todo free cai no padrão pago mais barato", () => {
+  it("(a) o ALVO de retry de um free é PAGO, nunca outro free (direção segura)", () => {
+    // getRetryFallbackModel(free) = o pago mais barato. ⚠️ HONESTO (MED-2): isto é
+    // o ALVO do retry; ele só DISPARA em modo auto (shouldAttemptProviderRetry
+    // exige isAutoModel). Num pick EXPLÍCITO de free que erra, o retry NÃO dispara
+    // e o erro sobe ao usuário (também seguro: sem vazamento, sem cobrança-paga
+    // silenciosa). O que importa p/ segurança é a DIREÇÃO: free→pago, nunca
+    // free→free. (Não afirmo o array `openrouter.models` p/ free: é INERTE no
+    // caminho UnoRouter — createOpenAI ignora providerOptions.openrouter, B3; o
+    // invariante pago→free-NUNCA do array vive no teste (b), no caminho OpenRouter.)
     for (const id of FREE_MODEL_SELECTIONS) {
       for (const mode of ["ask", "agent"] as const) {
-        expect(getRetryFallbackModel(id, mode)).toBe(
-          "model-deepseek-v4-flash-0731",
-        );
+        const target = getRetryFallbackModel(id, mode);
+        expect(target).toBe("model-deepseek-v4-flash-0731");
+        expect(FREE_MODEL_NAME_SET.has(target)).toBe(false);
       }
-      // Cadeia OpenRouter do free também aponta só pra slug PAGO.
-      const models: string[] =
-        (buildProviderOptions(true, "u", id, "agent") as any).openrouter
-          .models ?? [];
-      expect(models.length).toBeGreaterThan(0);
-      for (const s of models) expect(looksFree(s)).toBe(false);
     }
   });
 

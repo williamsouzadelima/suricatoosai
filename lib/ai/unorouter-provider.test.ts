@@ -20,7 +20,12 @@ jest.mock("@/lib/llm-keys/pool-runtime", () => ({
   invalidatePoolKeyCache: (...args: unknown[]) => mockInvalidate(...args),
 }));
 
-import { createUnoRouterPatchFetch } from "./unorouter-provider";
+import { generateText } from "ai";
+
+import {
+  createUnoRouterPatchFetch,
+  createUnoRouterProvider,
+} from "./unorouter-provider";
 
 const URL = "https://api.unorouter.com/v1/chat/completions";
 
@@ -77,5 +82,47 @@ describe("createUnoRouterPatchFetch", () => {
     expect(res.status).toBe(200);
     expect(mockExhausted).toHaveBeenCalledWith("uno1");
     expect(underlying).toHaveBeenCalledTimes(2);
+  });
+
+  it("o provider roteia via /chat/completions (uno.chat), NÃO /v1/responses (default do SDK OpenAI)", async () => {
+    // O callable default do @ai-sdk/openai (`uno(slug)`) vai p/ /v1/responses; o
+    // "Testar" prova /chat/completions. buildProviderMap DEVE usar `uno.chat()`
+    // p/ o endpoint de produção casar com o probe e ser OpenAI-compat padrão.
+    mockResolve.mockResolvedValue({ id: "uno1", plaintext: "UNOKEY" });
+    const chatOk = () =>
+      new Response(
+        JSON.stringify({
+          id: "x",
+          object: "chat.completion",
+          created: 0,
+          model: "gemma-4-31b-it:free",
+          choices: [
+            {
+              index: 0,
+              message: { role: "assistant", content: "ok" },
+              finish_reason: "stop",
+            },
+          ],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    const spy = jest.fn(() => Promise.resolve(chatOk()));
+    const realFetch = global.fetch;
+    (global as unknown as { fetch: typeof fetch }).fetch =
+      spy as unknown as typeof fetch;
+    try {
+      await generateText({
+        model: createUnoRouterProvider().chat("gemma-4-31b-it:free"),
+        prompt: "ping",
+      });
+    } catch {
+      // o formato da resposta não é o foco — a URL já foi capturada no spy
+    } finally {
+      (global as unknown as { fetch: typeof fetch }).fetch = realFetch;
+    }
+    const url = String(spy.mock.calls[0]?.[0] ?? "");
+    expect(url).toContain("/chat/completions");
+    expect(url).not.toContain("/responses");
   });
 });

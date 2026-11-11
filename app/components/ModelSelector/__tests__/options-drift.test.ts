@@ -10,6 +10,8 @@ import {
   myProvider,
   resolveTierToProviderKey,
   UNOROUTER_FREE_MODEL_IDS,
+  UNOROUTER_ROUTED_IDS,
+  unoRoutedProviderById,
 } from "@/lib/ai/providers";
 import {
   FREE_MODEL_SELECTIONS,
@@ -186,16 +188,28 @@ describe("ModelSelector — grupo GRATUITO (free)", () => {
     expect(freeAsk.every((o) => !o.thinking)).toBe(true);
   });
 
-  it("H1: ids roteados p/ UnoRouter == FREE_MODEL_SELECTIONS (todos gated; sem roteador de plano-free)", () => {
+  it("H1 (DERIVADO do mapa vivo): ids uno-roteados == FREE_MODEL_SELECTIONS (todos gated; sem roteador de plano-free)", () => {
+    // DERIVADO do buildProviderMap (model.provider "unorouter.*"), NÃO de uma
+    // constante-espelho — um 5º uno.chat() futuro sem gate QUEBRA aqui (MED-1).
     // Se um id vai p/ o UnoRouter (treina) mas não está em FREE_MODEL_SELECTIONS,
     // o portão "free só sem cliente" fica cego p/ ele → vazaria dado de cliente.
-    expect([...UNOROUTER_FREE_MODEL_IDS].sort()).toEqual(
+    expect([...UNOROUTER_ROUTED_IDS].sort()).toEqual(
       [...FREE_MODEL_SELECTIONS].sort(),
     );
     // Os roteadores do PLANO free (pagos, não-gated) NÃO podem ser uno-roteados.
-    const unoIds = UNOROUTER_FREE_MODEL_IDS as readonly string[];
-    expect(unoIds).not.toContain("ask-model-free");
-    expect(unoIds).not.toContain("agent-model-free");
+    expect(UNOROUTER_ROUTED_IDS).not.toContain("ask-model-free");
+    expect(UNOROUTER_ROUTED_IDS).not.toContain("agent-model-free");
+    // A constante-espelho exportada bate com o mapa vivo (sem drift silencioso).
+    expect([...UNOROUTER_FREE_MODEL_IDS].sort()).toEqual(
+      [...UNOROUTER_ROUTED_IDS].sort(),
+    );
+  });
+
+  it("finding #1: todo free uno-roteado usa /chat/completions (provider .chat), nunca .responses", () => {
+    for (const id of UNOROUTER_ROUTED_IDS) {
+      expect(unoRoutedProviderById[id]).toContain(".chat");
+      expect(unoRoutedProviderById[id]).not.toContain(".responses");
+    }
   });
 
   it("nenhum PAGO é classificado como 'free' (a faixa free é só dos gratuitos)", () => {

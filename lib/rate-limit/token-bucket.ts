@@ -191,14 +191,24 @@ const MODEL_PRICING_MAP: Record<string, ModelPricing> = {
   "deepseek/deepseek-v4.1-flash": DEEPSEEK_V4_1_FLASH_PRICING,
   // Gratuitos ($0) — UnoRouter serve o slug "pelado", com ou sem `:free`. Sem
   // estas entradas o `default` (NÃO-zero) cobraria um turno free como PAGO (H6).
+  // Belt-and-suspenders: também a forma vendor-prefixed, caso o UnoRouter ecoe
+  // `response.model` com prefixo — nunca cair no default num turno free.
   "nemotron-3-ultra-550b-a55b:free": FREE_PRICING,
   "nemotron-3-ultra-550b-a55b": FREE_PRICING,
+  "nvidia/nemotron-3-ultra-550b-a55b:free": FREE_PRICING,
+  "nvidia/nemotron-3-ultra-550b-a55b": FREE_PRICING,
   "nemotron-3-super-120b-a12b:free": FREE_PRICING,
   "nemotron-3-super-120b-a12b": FREE_PRICING,
+  "nvidia/nemotron-3-super-120b-a12b:free": FREE_PRICING,
+  "nvidia/nemotron-3-super-120b-a12b": FREE_PRICING,
   "qwen3.8-27b:free": FREE_PRICING,
   "qwen3.8-27b": FREE_PRICING,
+  "qwen/qwen3.8-27b:free": FREE_PRICING,
+  "qwen/qwen3.8-27b": FREE_PRICING,
   "gemma-4-31b-it:free": FREE_PRICING,
   "gemma-4-31b-it": FREE_PRICING,
+  "google/gemma-4-31b-it:free": FREE_PRICING,
+  "google/gemma-4-31b-it": FREE_PRICING,
   "deepseek/deepseek-v4-flash": DEEPSEEK_V4_FLASH_PRICING,
   "deepseek/deepseek-v4-flash-20260423": DEEPSEEK_V4_FLASH_PRICING,
   "deepseek/deepseek-v4-flash-0731": DEEPSEEK_V4_FLASH_0731_PRICING,
