@@ -1,5 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 
+import { FREE_MODEL_SELECTIONS } from "@/types/chat";
+
 import {
   billableCostDollarsToPoints,
   calculateRawModelUsageCostDollars,
@@ -28,19 +30,28 @@ describe("token-bucket", () => {
   // calculateTokenCost - Core pricing logic
   // ==========================================================================
   describe("calculateTokenCost", () => {
-    it("modelos GRATUITOS custam $0 (chave interna e slug com/sem `:free`), pagos não", () => {
-      for (const id of [
-        "model-nemotron-3-ultra-free",
-        "model-qwen3.8-27b-free",
-        "qwen/qwen3.8-27b:free",
-        "qwen/qwen3.8-27b",
-        "google/gemma-4-31b-it:free",
-      ]) {
-        expect(calculateTokenCost(1_000_000, "input", id)).toBe(0);
-        expect(calculateTokenCost(1_000_000, "output", id)).toBe(0);
+    it("modelos GRATUITOS custam $0 — ids internos (FREE_MODEL_SELECTIONS) E slugs servidos do UnoRouter (pelado, com/sem `:free`); pagos não", () => {
+      // Itera a FONTE DA VERDADE dos ids free + os slugs que o UnoRouter serve.
+      // Se um id ou slug servido faltar no MODEL_PRICING_MAP ele cai no `default`
+      // (NÃO-zero) e esta asserção pega (H6) — um turno free jamais pode cobrar.
+      const unorouterServedSlugs = [
+        "nemotron-3-ultra-550b-a55b:free",
+        "nemotron-3-ultra-550b-a55b",
+        "nemotron-3-super-120b-a12b:free",
+        "nemotron-3-super-120b-a12b",
+        "qwen3.8-27b:free",
+        "qwen3.8-27b",
+        "gemma-4-31b-it:free",
+        "gemma-4-31b-it",
+      ];
+      for (const key of [...FREE_MODEL_SELECTIONS, ...unorouterServedSlugs]) {
+        expect(calculateTokenCost(1_000_000, "input", key)).toBe(0);
+        expect(calculateTokenCost(1_000_000, "output", key)).toBe(0);
       }
       // Sanidade: um pago segue cobrando.
-      expect(calculateTokenCost(1_000_000, "output", "model-grok-4.7")).toBeGreaterThan(0);
+      expect(
+        calculateTokenCost(1_000_000, "output", "model-grok-4.7"),
+      ).toBeGreaterThan(0);
     });
 
     it("should return 0 for zero or negative tokens", () => {

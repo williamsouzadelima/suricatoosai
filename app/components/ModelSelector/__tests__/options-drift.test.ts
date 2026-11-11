@@ -6,7 +6,11 @@ import {
   getFreeModelOptions,
 } from "../constants";
 import { getCostTier } from "../CostIndicator";
-import { myProvider, resolveTierToProviderKey } from "@/lib/ai/providers";
+import {
+  myProvider,
+  resolveTierToProviderKey,
+  UNOROUTER_FREE_MODEL_IDS,
+} from "@/lib/ai/providers";
 import {
   FREE_MODEL_SELECTIONS,
   isFreeModelSelection,
@@ -177,9 +181,21 @@ describe("ModelSelector — grupo GRATUITO (free)", () => {
     }
   });
 
-  it("agent carrega thinking; ask não", () => {
-    expect(freeAgent.every((o) => o.thinking === true)).toBe(true);
+  it("free NÃO anuncia thinking em nenhum modo (UnoRouter OpenAI-compat ignora o reasoning do OpenRouter — B3)", () => {
+    expect(freeAgent.every((o) => !o.thinking)).toBe(true);
     expect(freeAsk.every((o) => !o.thinking)).toBe(true);
+  });
+
+  it("H1: ids roteados p/ UnoRouter == FREE_MODEL_SELECTIONS (todos gated; sem roteador de plano-free)", () => {
+    // Se um id vai p/ o UnoRouter (treina) mas não está em FREE_MODEL_SELECTIONS,
+    // o portão "free só sem cliente" fica cego p/ ele → vazaria dado de cliente.
+    expect([...UNOROUTER_FREE_MODEL_IDS].sort()).toEqual(
+      [...FREE_MODEL_SELECTIONS].sort(),
+    );
+    // Os roteadores do PLANO free (pagos, não-gated) NÃO podem ser uno-roteados.
+    const unoIds = UNOROUTER_FREE_MODEL_IDS as readonly string[];
+    expect(unoIds).not.toContain("ask-model-free");
+    expect(unoIds).not.toContain("agent-model-free");
   });
 
   it("nenhum PAGO é classificado como 'free' (a faixa free é só dos gratuitos)", () => {

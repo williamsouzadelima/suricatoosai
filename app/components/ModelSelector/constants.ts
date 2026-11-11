@@ -87,43 +87,45 @@ export const getDefaultModelForMode = (mode: ChatMode): SelectedModel => {
 };
 
 /**
- * Modelos GRATUITOS ($0 no OpenRouter) — grupo SEPARADO no seletor, depois dos
- * pagos, com selo de política de dados. O provedor pode TREINAR com o prompt →
- * o servidor bloqueia em chats com engajamento/cliente (a UI só cinza). Ordem:
- * do maior/mais capaz ao menor (custo é igual: zero).
+ * Modelos GRATUITOS ($0, servidos pelo UNOROUTER) — grupo SEPARADO no seletor,
+ * depois dos pagos, com selo de política de dados. O provedor pode TREINAR com o
+ * prompt → o servidor bloqueia em chats com engajamento/cliente (a UI só cinza).
+ * Ordem: do maior/mais capaz ao menor (custo é igual: zero).
  */
 const FREE_MODEL_OPTIONS_BASE: ModelOption[] = [
   {
     id: "model-nemotron-3-ultra-free",
     label: "NVIDIA Nemotron 3 Ultra",
     description: "Gratuito · 550B MoE, o maior dos free",
-    poweredBy: "NVIDIA · 1M contexto · pode treinar com o prompt",
+    poweredBy: "NVIDIA · via UnoRouter · pode treinar com o prompt",
     free: true,
   },
   {
     id: "model-nemotron-3-super-free",
     label: "NVIDIA Nemotron 3 Super",
     description: "Gratuito · 120B, equilíbrio entre força e velocidade",
-    poweredBy: "NVIDIA · 262k contexto · pode treinar com o prompt",
+    poweredBy: "NVIDIA · via UnoRouter · pode treinar com o prompt",
     free: true,
   },
   {
     id: "model-qwen3.8-27b-free",
     label: "Qwen 3.8 27B",
     description: "Gratuito · tool-calling sólido",
-    poweredBy: "Alibaba Qwen · 262k contexto · pode treinar com o prompt",
+    poweredBy: "Alibaba Qwen · via UnoRouter · pode treinar com o prompt",
     free: true,
   },
   {
     id: "model-gemma-4-31b-free",
     label: "Google Gemma 4 31B",
     description: "Gratuito · modelo aberto do Google",
-    poweredBy: "Google · 262k contexto · pode treinar com o prompt",
+    poweredBy: "Google · via UnoRouter · pode treinar com o prompt",
     free: true,
   },
 ];
 
-export const getFreeModelOptions = (mode: ChatMode): ModelOption[] =>
-  FREE_MODEL_OPTIONS_BASE.map((opt) =>
-    isAgentMode(mode) ? { ...opt, thinking: true } : { ...opt },
-  );
+// B3: os free são servidos via UnoRouter (API OpenAI-compat), que IGNORA o bloco
+// de reasoning do OpenRouter (providerOptions.openrouter). Não anunciamos
+// "thinking" p/ não mentir sobre uma capacidade que o provedor pode não honrar.
+// (`mode` fica p/ compat de assinatura; a UI do free é a mesma nos dois modos.)
+export const getFreeModelOptions = (_mode: ChatMode): ModelOption[] =>
+  FREE_MODEL_OPTIONS_BASE.map((opt) => ({ ...opt }));

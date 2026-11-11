@@ -96,13 +96,13 @@ describe("canonicalizeModelSlug", () => {
     expect(canonicalizeModelSlug("openai/gpt-5")).toBe("openai/gpt-5");
     expect(canonicalizeModelSlug("auto")).toBe("auto");
   });
-  it("gratuitos: nome interno, slug COM e SEM `:free` → slug canônico `:free`", () => {
-    const canon = "qwen/qwen3.8-27b:free";
+  it("gratuitos (UnoRouter): nome interno, slug COM e SEM `:free` → slug canônico `:free`", () => {
+    const canon = "qwen3.8-27b:free";
     expect(canonicalizeModelSlug("model-qwen3.8-27b-free")).toBe(canon);
-    expect(canonicalizeModelSlug("qwen/qwen3.8-27b:free")).toBe(canon);
-    expect(canonicalizeModelSlug("qwen/qwen3.8-27b")).toBe(canon);
+    expect(canonicalizeModelSlug("qwen3.8-27b:free")).toBe(canon);
+    expect(canonicalizeModelSlug("qwen3.8-27b")).toBe(canon);
     expect(canonicalizeModelSlug("model-nemotron-3-ultra-free")).toBe(
-      "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "nemotron-3-ultra-550b-a55b:free",
     );
   });
 });

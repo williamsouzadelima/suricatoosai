@@ -908,17 +908,16 @@ const OPENROUTER_RESPONSE_MODEL_COST_KEYS: Record<string, string> = {
   "x-ai/grok-4.7": "model-grok-4.7",
   "x-ai/grok-4.7-20260916": "model-grok-4.7",
   "deepseek/deepseek-v4.1-flash": "model-deepseek-v4.1-flash",
-  // Gratuitos ($0). O OpenRouter pode reportar o slug servido COM ou SEM o
-  // sufixo `:free`; ambos mapeiam p/ a chave free ($0). Só usamos a variante
-  // free destes modelos — se um dia entrar a paga, separar as chaves.
-  "nvidia/nemotron-3-ultra-550b-a55b:free": "model-nemotron-3-ultra-free",
-  "nvidia/nemotron-3-ultra-550b-a55b": "model-nemotron-3-ultra-free",
-  "nvidia/nemotron-3-super-120b-a12b:free": "model-nemotron-3-super-free",
-  "nvidia/nemotron-3-super-120b-a12b": "model-nemotron-3-super-free",
-  "qwen/qwen3.8-27b:free": "model-qwen3.8-27b-free",
-  "qwen/qwen3.8-27b": "model-qwen3.8-27b-free",
-  "google/gemma-4-31b-it:free": "model-gemma-4-31b-free",
-  "google/gemma-4-31b-it": "model-gemma-4-31b-free",
+  // Gratuitos ($0) — agora servidos pelo UNOROUTER com slug "pelado" (sem prefixo
+  // vendor/), COM ou SEM `:free`. Ambas as variantes mapeiam p/ a chave free ($0).
+  "nemotron-3-ultra-550b-a55b:free": "model-nemotron-3-ultra-free",
+  "nemotron-3-ultra-550b-a55b": "model-nemotron-3-ultra-free",
+  "nemotron-3-super-120b-a12b:free": "model-nemotron-3-super-free",
+  "nemotron-3-super-120b-a12b": "model-nemotron-3-super-free",
+  "qwen3.8-27b:free": "model-qwen3.8-27b-free",
+  "qwen3.8-27b": "model-qwen3.8-27b-free",
+  "gemma-4-31b-it:free": "model-gemma-4-31b-free",
+  "gemma-4-31b-it": "model-gemma-4-31b-free",
   "z-ai/glm-5.2": "model-glm-5.2",
   "z-ai/glm-5.2-20260616": "model-glm-5.2",
   "z-ai/glm-5.3": "model-glm-5.3",

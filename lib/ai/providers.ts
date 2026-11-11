@@ -1,5 +1,6 @@
 import { customProvider } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createUnoRouterProvider } from "./unorouter-provider";
 import type { ChatMode, SelectedModel } from "@/types/chat";
 import { isOperatorModelSelection } from "@/types/chat";
 import { openrouterAttributionHeaders } from "@/lib/ai/openrouter-attribution";
@@ -1034,6 +1035,11 @@ const openrouter = createOpenRouter({
 
 type OpenRouterInstance = typeof openrouter;
 
+// UnoRouter (OpenAI-compat) — serve SÓ os modelos "Gratuitos". Chave do pool
+// (provider "unorouter"), fail-closed sem chave; NÃO usa os transforms OpenRouter.
+const uno = createUnoRouterProvider();
+type UnoRouterInstance = typeof uno;
+
 export const KIMI_K3_SLUG = "moonshotai/kimi-k3";
 export const GLM_5_2_SLUG = "z-ai/glm-5.2";
 export const GLM_5_3_SLUG = "z-ai/glm-5.3";
@@ -1051,17 +1057,28 @@ export const AUXILIARY_VISION_SLUG = MINIMAX_M3_SLUG;
 export const DEEPSEEK_V4_PRO_SLUG = "deepseek/deepseek-v4-pro";
 export const DEEPSEEK_V4_PRO_0813_SLUG = "deepseek/deepseek-v4-pro-0813";
 export const DEEPSEEK_V4_1_FLASH_SLUG = "deepseek/deepseek-v4.1-flash";
-// Modelos GRATUITOS do OpenRouter (custo $0, sufixo `:free`). Todos com tools +
-// reasoning (verificado na API /models em 30/09). POLÍTICA DE DADOS: o provedor
+// Modelos GRATUITOS — agora servidos pelo UNOROUTER (slugs "pelados", sem prefixo
+// vendor/; os MESMOS 4 modelos de antes). Custo $0. POLÍTICA DE DADOS: o provedor
 // pode TREINAR com o prompt → só podem servir tarefas SEM engajamento/cliente
 // (portão duro em lib/chat/free-model-gate.ts). Nunca entram em cadeia de
 // fallback de modelo pago (pago → free vazaria dado de cliente).
-export const NEMOTRON_3_ULTRA_FREE_SLUG =
-  "nvidia/nemotron-3-ultra-550b-a55b:free";
-export const NEMOTRON_3_SUPER_FREE_SLUG =
-  "nvidia/nemotron-3-super-120b-a12b:free";
-export const QWEN_3_8_27B_FREE_SLUG = "qwen/qwen3.8-27b:free";
-export const GEMMA_4_31B_FREE_SLUG = "google/gemma-4-31b-it:free";
+export const NEMOTRON_3_ULTRA_FREE_UNO_SLUG =
+  "nemotron-3-ultra-550b-a55b:free";
+export const NEMOTRON_3_SUPER_FREE_UNO_SLUG =
+  "nemotron-3-super-120b-a12b:free";
+export const QWEN_3_8_27B_FREE_UNO_SLUG = "qwen3.8-27b:free";
+export const GEMMA_4_31B_FREE_UNO_SLUG = "gemma-4-31b-it:free";
+
+// Ids internos roteados p/ o UnoRouter (provedor que pode TREINAR com o prompt).
+// INVARIANTE DE SEGURANÇA: este conjunto DEVE ser idêntico a FREE_MODEL_SELECTIONS
+// (types/chat) — senão o portão "free só sem cliente" fica cego p/ um deles e
+// vaza dado de cliente. Teste de paridade em options-drift garante (H1).
+export const UNOROUTER_FREE_MODEL_IDS = [
+  "model-nemotron-3-ultra-free",
+  "model-nemotron-3-super-free",
+  "model-qwen3.8-27b-free",
+  "model-gemma-4-31b-free",
+] as const;
 export const DEEPSEEK_V4_FLASH_SLUG = "deepseek/deepseek-v4-flash-0731";
 export const DEEPSEEK_V4_FLASH_PREVIOUS_SLUG = "deepseek/deepseek-v4-flash";
 const TITLE_GENERATOR_DEEPSEEK_SLUG = "deepseek/deepseek-v4-flash";
@@ -1083,6 +1100,7 @@ export const getOpenRouterProviderRoutingForModel = (
 
 const buildProviderMap = (
   or: OpenRouterInstance,
+  uno: UnoRouterInstance,
   freeAskModelSlug = GLM_5_3_FLASH_SLUG,
   freeAgentDeepSeekSlug = DEEPSEEK_V4_FLASH_SLUG,
 ) =>
@@ -1094,11 +1112,14 @@ const buildProviderMap = (
     "model-grok-4.6": or(GROK_4_6_SLUG),
     "model-grok-4.7": or(GROK_4_7_SLUG),
     "model-deepseek-v4.1-flash": or(DEEPSEEK_V4_1_FLASH_SLUG),
-    // Gratuitos ($0; treinam com o prompt → só chats sem engajamento).
-    "model-nemotron-3-ultra-free": or(NEMOTRON_3_ULTRA_FREE_SLUG),
-    "model-nemotron-3-super-free": or(NEMOTRON_3_SUPER_FREE_SLUG),
-    "model-qwen3.8-27b-free": or(QWEN_3_8_27B_FREE_SLUG),
-    "model-gemma-4-31b-free": or(GEMMA_4_31B_FREE_SLUG),
+    // Gratuitos ($0; treinam com o prompt → só chats sem engajamento) — via
+    // UnoRouter (slugs pelados). ⚠️ ask-model-free/agent-model-free acima NÃO
+    // entram aqui: são roteadores do PLANO free p/ modelos PAGOS (OpenRouter),
+    // não-gated; repontá-los p/ UnoRouter vazaria dado de cliente (H1).
+    "model-nemotron-3-ultra-free": uno(NEMOTRON_3_ULTRA_FREE_UNO_SLUG),
+    "model-nemotron-3-super-free": uno(NEMOTRON_3_SUPER_FREE_UNO_SLUG),
+    "model-qwen3.8-27b-free": uno(QWEN_3_8_27B_FREE_UNO_SLUG),
+    "model-gemma-4-31b-free": uno(GEMMA_4_31B_FREE_UNO_SLUG),
     // Separate internal keys use the same Grok 4.5 provider model while
     // provider reasoning options distinguish Standard from Pro vision.
     "model-grok-4.5": or(GROK_4_5_SLUG),
@@ -1128,7 +1149,7 @@ const buildProviderMap = (
     "auxiliary-vision-model": or(AUXILIARY_VISION_SLUG),
   }) as Record<string, any>;
 
-const baseProviders = buildProviderMap(openrouter);
+const baseProviders = buildProviderMap(openrouter, uno);
 
 export type ModelName = keyof typeof baseProviders;
 

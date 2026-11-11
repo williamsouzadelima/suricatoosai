@@ -47,10 +47,10 @@ export const CANDIDATES: Candidate[] = [
   { slug: "moonshotai/kimi-k3", label: "Kimi K3", family: "kimi", jurisdiction: "China", tiers: ["max"] },
   // Gratuitos (`:free`, $0): aparecem na tabela do eval-gate p/ medir, mas
   // tiers: [] → jamais recomendados como padrão (treinam com o prompt).
-  { slug: "nvidia/nemotron-3-ultra-550b-a55b:free", label: "Nemotron 3 Ultra (free)", family: "nemotron", jurisdiction: "US", tiers: [], free: true },
-  { slug: "nvidia/nemotron-3-super-120b-a12b:free", label: "Nemotron 3 Super (free)", family: "nemotron", jurisdiction: "US", tiers: [], free: true },
-  { slug: "qwen/qwen3.8-27b:free", label: "Qwen 3.8 27B (free)", family: "qwen", jurisdiction: "China", tiers: [], free: true },
-  { slug: "google/gemma-4-31b-it:free", label: "Gemma 4 31B (free)", family: "gemma", jurisdiction: "US", tiers: [], free: true },
+  { slug: "nemotron-3-ultra-550b-a55b:free", label: "Nemotron 3 Ultra (free)", family: "nemotron", jurisdiction: "US", tiers: [], free: true },
+  { slug: "nemotron-3-super-120b-a12b:free", label: "Nemotron 3 Super (free)", family: "nemotron", jurisdiction: "US", tiers: [], free: true },
+  { slug: "qwen3.8-27b:free", label: "Qwen 3.8 27B (free)", family: "qwen", jurisdiction: "China", tiers: [], free: true },
+  { slug: "gemma-4-31b-it:free", label: "Gemma 4 31B (free)", family: "gemma", jurisdiction: "US", tiers: [], free: true },
 ];
 
 const CANDIDATE_SLUG_SET: ReadonlySet<string> = new Set(
@@ -85,16 +85,16 @@ export const MODEL_SLUG_ALIASES: Record<string, string> = {
   "ask-model-free": "z-ai/glm-5.3-flash",
   "model-kimi-k3": "moonshotai/kimi-k3",
   "model-opus-4.6": "moonshotai/kimi-k3",
-  // Gratuitos: nome interno e slug SEM `:free` (o OpenRouter pode reportar o
-  // servido assim) → slug canônico do candidato (COM `:free`).
-  "model-nemotron-3-ultra-free": "nvidia/nemotron-3-ultra-550b-a55b:free",
-  "nvidia/nemotron-3-ultra-550b-a55b": "nvidia/nemotron-3-ultra-550b-a55b:free",
-  "model-nemotron-3-super-free": "nvidia/nemotron-3-super-120b-a12b:free",
-  "nvidia/nemotron-3-super-120b-a12b": "nvidia/nemotron-3-super-120b-a12b:free",
-  "model-qwen3.8-27b-free": "qwen/qwen3.8-27b:free",
-  "qwen/qwen3.8-27b": "qwen/qwen3.8-27b:free",
-  "model-gemma-4-31b-free": "google/gemma-4-31b-it:free",
-  "google/gemma-4-31b-it": "google/gemma-4-31b-it:free",
+  // Gratuitos (UnoRouter): nome interno e slug "pelado" SEM `:free` → slug
+  // canônico do candidato (bare, COM `:free`).
+  "model-nemotron-3-ultra-free": "nemotron-3-ultra-550b-a55b:free",
+  "nemotron-3-ultra-550b-a55b": "nemotron-3-ultra-550b-a55b:free",
+  "model-nemotron-3-super-free": "nemotron-3-super-120b-a12b:free",
+  "nemotron-3-super-120b-a12b": "nemotron-3-super-120b-a12b:free",
+  "model-qwen3.8-27b-free": "qwen3.8-27b:free",
+  "qwen3.8-27b": "qwen3.8-27b:free",
+  "model-gemma-4-31b-free": "gemma-4-31b-it:free",
+  "gemma-4-31b-it": "gemma-4-31b-it:free",
 };
 
 /**
