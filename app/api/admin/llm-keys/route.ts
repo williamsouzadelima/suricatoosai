@@ -297,10 +297,23 @@ export async function POST(req: NextRequest) {
       const provider = validProvider(body.provider);
       const envVarName =
         provider === "unorouter" ? "UNOROUTER_API_KEY" : "OPENROUTER_API_KEY";
-      const envKey = process.env[envVarName];
-      if (!envKey || envKey.length < 20) {
+      // Trim ANTES de medir/cifrar — casa com o runtime (readUnoRouterEnvKey) e
+      // não armazena a chave com espaços. Mensagem HONESTA: distingue "ausente"
+      // de "curta demais" (NIT credibilidade — GET/runtime já veem uma chave
+      // curta como PRESENTE e a usam; dizer "não configurada" aqui enganaria).
+      const rawEnvKey = process.env[envVarName];
+      const envKey = typeof rawEnvKey === "string" ? rawEnvKey.trim() : "";
+      if (!envKey) {
         return NextResponse.json(
           { error: `${envVarName} não está configurada no servidor.` },
+          { status: 400 },
+        );
+      }
+      if (envKey.length < 20) {
+        return NextResponse.json(
+          {
+            error: `${envVarName} está no ambiente mas parece curta demais (${envKey.length} chars; esperado ≥ 20) — confira se a chave está completa.`,
+          },
           { status: 400 },
         );
       }

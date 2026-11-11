@@ -6,10 +6,14 @@
  * NÃO aplica os transforms específicos do OpenRouter (Kimi/xAI/reasoning/PDF/
  * metadata header) — eles não significam nada para o UnoRouter (L3).
  *
+ * Chave: pool do admin primeiro; sem chave UnoRouter no pool, cai na env var
+ * DEDICADA UNOROUTER_API_KEY (bootstrap/fallback — espelha OPENROUTER_API_KEY).
+ *
  * B1 (vazamento de credencial): o `createOpenAI` recebe um apiKey PLACEHOLDER
  * (jamais o OPENAI_API_KEY que o SDK OpenAI leria por padrão). Este fetch
- * sobrescreve a Authorization com a chave do pool e FALHA FECHADA quando não há
- * chave de pool — o placeholder/segredo nunca sai para a rede.
+ * sobrescreve a Authorization com a chave do pool OU da env dedicada, e FALHA
+ * FECHADA quando não há NEM pool NEM UNOROUTER_API_KEY — o placeholder/segredo
+ * nunca sai para a rede, e nunca cai em OPENAI_API_KEY/OPENROUTER_API_KEY.
  */
 import { createOpenAI } from "@ai-sdk/openai";
 
@@ -47,10 +51,10 @@ function failClosedResponse(): Response {
   return new Response(
     JSON.stringify({
       error: {
-        // Honesto: resolveActivePoolKey devolve null tanto SEM chave quanto
-        // quando TODAS as chaves UnoRouter estão sem crédito/erro (finding #3).
+        // Honesto: só chega aqui sem chave de pool ATIVA (vazio/sem crédito/erro)
+        // E sem UNOROUTER_API_KEY no ambiente.
         message:
-          "Sem chave UnoRouter ATIVA no pool (não configurada, ou todas sem crédito/erro) — verifique no admin (Chaves LLM) para usar os modelos gratuitos.",
+          "Sem chave UnoRouter ATIVA (pool vazio/sem crédito/erro E sem UNOROUTER_API_KEY no ambiente). Configure no admin (Chaves LLM), ou defina UNOROUTER_API_KEY no .env e reinicie o processo web E o worker (trigger). Até lá, os modelos gratuitos ficam indisponíveis.",
         type: "no_active_unorouter_key",
         code: "no_active_unorouter_key",
       },

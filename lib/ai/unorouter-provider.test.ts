@@ -144,6 +144,26 @@ describe("createUnoRouterPatchFetch", () => {
     );
   });
 
+  it("finding A (guard): body NÃO-reenviável + 402 do pool → NÃO rotaciona (underlying 1×, devolve 402)", async () => {
+    // Trava o guard `bodyReusable &&` na rotação: com body não-reenviável, um 402
+    // do pool NÃO pode re-enviar o request (body consumido) — devolve 402, 1 envio.
+    mockResolve.mockResolvedValue({ id: "uno1", plaintext: "POOLKEY" });
+    const underlying = jest
+      .fn()
+      .mockResolvedValue(new Response("no credit", { status: 402 }));
+    const fetchImpl = createUnoRouterPatchFetch(
+      underlying as unknown as typeof fetch,
+    );
+    const res = await fetchImpl(URL, {
+      method: "POST",
+      body: new Uint8Array([1, 2, 3]) as unknown as BodyInit,
+    });
+    expect(res.status).toBe(402);
+    expect(underlying).toHaveBeenCalledTimes(1);
+    expect(mockExhausted).not.toHaveBeenCalled();
+    expect(mockResolve).toHaveBeenCalledTimes(1); // não re-resolveu → não rotacionou
+  });
+
   it("B1 CANARY: OPENAI_API_KEY/OPENROUTER_API_KEY NUNCA viram a Authorization do UnoRouter (pool, env, fail-closed)", async () => {
     process.env.OPENAI_API_KEY = "SENTINEL-OPENAI-MUST-NOT-LEAK";
     process.env.OPENROUTER_API_KEY = "SENTINEL-OPENROUTER-MUST-NOT-LEAK";
