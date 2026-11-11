@@ -413,6 +413,7 @@ export const createChatHandler = () => {
       selectedModelOverride = enforceAgentFreeModelToolGate({
         selectedModelOverride,
         isAgent: isAgentMode(mode),
+        chatId,
       }).override;
       const extraUsageConfig = withExtraUsageBillingForModel(
         baseExtraUsageConfig,

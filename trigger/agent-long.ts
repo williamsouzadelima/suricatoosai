@@ -2575,6 +2575,7 @@ export const agentLongTask = task({
       selectedModelOverride = enforceAgentFreeModelToolGate({
         selectedModelOverride,
         isAgent: true,
+        chatId,
       }).override;
       const extraUsageConfig = withExtraUsageBillingForModel(
         baseExtraUsageConfig,

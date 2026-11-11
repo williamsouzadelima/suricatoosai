@@ -163,12 +163,13 @@ export function createFreeModelStepGuard({
 /**
  * Guarda de TOOL-CALLING p/ free no AGENTE (H2): no agente o modelo PRECISA emitir
  * tool_calls; um free NÃO-verificado narraria/alucinaria em vez de agir → rebaixa
- * p/ o 1º free VERIFICADO (qwen = `AGENT_VERIFIED_FREE_MODELS[0]`), ou "auto" se a
- * allowlist esvaziar. Direção free→free-verificado — NÃO "auto" (pago): não cobra
- * um opt-in $0, e MANTÉM armadas as guardas TOCTOU de engajamento (que no-opam em
- * não-free). Pura (não consulta nada). Ask (isAgent=false) → inalterado.
- * Observável: devolve {downgraded, reason} + warn estruturado (espelha o portão de
- * engajamento — senão o swap nemotron→qwen some em produção).
+ * p/ o 1º free VERIFICADO (qwen = `AGENT_VERIFIED_FREE_MODELS[0]`). Direção
+ * free→free-verificado — NÃO "auto" (pago): não cobra um opt-in $0, e MANTÉM
+ * armadas as guardas TOCTOU de engajamento (que no-opam em não-free; "auto"
+ * DESARMARIA). A allowlist é tupla NÃO-VAZIA (tipo) → `[0]` sempre existe, sem
+ * fallback p/ "auto". Pura (não consulta nada). Ask (isAgent=false) → inalterado.
+ * Observável: {downgraded, reason, chatId} + warn estruturado (senão o swap
+ * nemotron→qwen some/não é triável em produção).
  */
 export interface AgentFreeModelToolGateResult {
   override: SelectedModel | undefined;
@@ -179,14 +180,17 @@ export interface AgentFreeModelToolGateResult {
 export function enforceAgentFreeModelToolGate({
   selectedModelOverride,
   isAgent,
+  chatId,
   log = console,
 }: {
   selectedModelOverride: SelectedModel | undefined;
   isAgent: boolean;
+  chatId?: string;
   log?: Pick<Console, "warn">;
 }): AgentFreeModelToolGateResult {
-  // Só dispara p/ free NÃO-verificado em AGENTE; o resto passa inalterado
-  // (ask não usa tools; free verificado e não-free seguem).
+  // Só dispara p/ free NÃO-verificado em AGENTE; o resto passa inalterado.
+  // (Só o AGENTE é tool-cêntrico; ask — mesmo com notas/busca —, free verificado
+  // e não-free seguem. Risco residual de ask-com-tools: ver ModelSelector/constants.)
   if (
     !isAgent ||
     !isFreeModelSelection(selectedModelOverride) ||
@@ -194,11 +198,12 @@ export function enforceAgentFreeModelToolGate({
   ) {
     return { override: selectedModelOverride, downgraded: false };
   }
-  const target: SelectedModel = AGENT_VERIFIED_FREE_MODELS[0] ?? "auto";
+  const target: SelectedModel = AGENT_VERIFIED_FREE_MODELS[0];
   log.warn(
     JSON.stringify({
       level: "warn",
       event: "agent_free_model_downgraded_unverified_tools",
+      chat_id: chatId,
       selected_model: selectedModelOverride,
       override: target,
     }),

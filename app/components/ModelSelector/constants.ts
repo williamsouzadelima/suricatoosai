@@ -128,10 +128,12 @@ const FREE_MODEL_OPTIONS_BASE: ModelOption[] = [
 // de reasoning do OpenRouter (providerOptions.openrouter). Não anunciamos
 // "thinking" p/ não mentir sobre uma capacidade que o provedor pode não honrar.
 //
-// No AGENTE o modelo PRECISA fazer tool-calling (senão o agente narra/alucina em
-// vez de agir) → filtra aos free VERIFICADOS ao vivo (AGENT_VERIFIED_FREE_MODELS,
-// H2). Ask não usa tools → todos os 4. A guarda do servidor (free-model-gate) é o
-// backstop p/ caminhos não-UI.
+// No AGENTE o modelo PRECISA fazer tool-calling (senão narra/alucina em vez de
+// agir) → filtra aos free VERIFICADOS ao vivo (AGENT_VERIFIED_FREE_MODELS, H2).
+// Ask TAMBÉM tem tools (notas/busca, condicionais — ver lib/ai/tools/index.ts),
+// mas NÃO é tool-CÊNTRICO → mantém os 4 free. ⚠️ Risco residual: um free não-
+// verificado narra num pedido de nota/busca em ask (decisão aberta: filtrar
+// ask-com-tools ou aceitar). A guarda do servidor é o backstop do AGENTE.
 export const getFreeModelOptions = (mode: ChatMode): ModelOption[] =>
   FREE_MODEL_OPTIONS_BASE.filter(
     (opt) => !isAgentMode(mode) || isAgentVerifiedFreeModel(opt.id),

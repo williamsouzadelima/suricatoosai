@@ -154,9 +154,10 @@ describe("ModelSelector — grupo GRATUITO (free)", () => {
   const freeAsk = getFreeModelOptions("ask");
 
   it("ask expõe TODOS os free (FREE_MODEL_SELECTIONS); agent SÓ os AGENT_VERIFIED (default-deny tool-calling)", () => {
-    // Ask não usa tools → os 4. Agent PRECISA de tool-calling → só os verificados
-    // ao vivo (H2). Âncoras EXATAS dos DOIS (M1): afrouxar p/ "agent ⊆ ask" deixaria
-    // um drop silencioso de ask passar verde.
+    // Ask mantém os 4 (não é tool-cêntrico; o filtro de tool-calling é só no
+    // agente). Agent PRECISA de tool-calling → só os verificados ao vivo (H2).
+    // Âncoras EXATAS dos DOIS (M1): afrouxar p/ "agent ⊆ ask" deixaria um drop
+    // silencioso de ask passar verde.
     expect(freeAsk.map((o) => o.id).sort()).toEqual(
       [...FREE_MODEL_SELECTIONS].sort(),
     );
@@ -170,6 +171,13 @@ describe("ModelSelector — grupo GRATUITO (free)", () => {
       expect(isFreeModelSelection(id)).toBe(true);
     // todo item do grupo do agente é um free verificado.
     for (const o of freeAgent) expect(isAgentVerifiedFreeModel(o.id)).toBe(true);
+  });
+
+  it("AGENT_VERIFIED_FREE_MODELS é NÃO-VAZIO (senão o rebaixe da guarda cairia em 'auto' pago)", () => {
+    // Trava o fallback: `[0] ?? \"auto\"` na guarda/UI só resolve p/ \"auto\" num
+    // mundo degenerado (allowlist vazia). Esvaziar exige reconsiderar o alvo do
+    // rebaixe (não mandar um opt-in $0 p/ pago em silêncio).
+    expect(AGENT_VERIFIED_FREE_MODELS.length).toBeGreaterThan(0);
   });
 
   it("NENHUM free aparece na lista paga (ask/agent) e o default segue PAGO", () => {

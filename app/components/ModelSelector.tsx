@@ -598,7 +598,7 @@ export function ModelSelector({
     isAgentMode(mode) &&
     isFreeModelSelection(boundSafeValue) &&
     !isAgentVerifiedFreeModel(boundSafeValue)
-      ? (AGENT_VERIFIED_FREE_MODELS[0] ?? "auto")
+      ? AGENT_VERIFIED_FREE_MODELS[0]
       : boundSafeValue;
   const isAuto = agentToolSafeValue === "auto";
 

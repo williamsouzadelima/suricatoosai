@@ -212,10 +212,11 @@ describe("ModelSelector", () => {
 
   it("AGENTE: um free NÃO-verificado previamente escolhido NÃO mente como pago — exibe o verificado (qwen) (B1)", () => {
     mockSubscription = "ultra";
+    const onChange = jest.fn();
     render(
       <ModelSelector
         value="model-nemotron-3-super-free"
-        onChange={jest.fn()}
+        onChange={onChange}
         mode="agent"
       />,
     );
@@ -228,6 +229,26 @@ describe("ModelSelector", () => {
     expect(
       screen.queryByRole("button", { name: /GLM 5\.3 Flash/i }),
     ).not.toBeInTheDocument();
+    // DISPLAY-only: NÃO persiste (sem onChange — não clobba a preferência de ask).
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("AGENTE: o dropdown free lista só o verificado (qwen); nemotron-super/ultra e gemma AUSENTES", () => {
+    mockSubscription = "ultra";
+    render(<ModelSelector value="auto" onChange={jest.fn()} mode="agent" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
+    expect(
+      screen.getByRole("button", { name: /Qwen 3\.8 27B/i }),
+    ).toBeVisible();
+    for (const absent of [
+      /NVIDIA Nemotron 3 Super/i,
+      /NVIDIA Nemotron 3 Ultra/i,
+      /Google Gemma 4 31B/i,
+    ]) {
+      expect(
+        screen.queryByRole("button", { name: absent }),
+      ).not.toBeInTheDocument();
+    }
   });
 
   it("seleciona um modelo GRATUITO em chat sem engajamento", () => {

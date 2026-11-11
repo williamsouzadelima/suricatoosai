@@ -208,17 +208,23 @@ describe("enforceAgentFreeModelToolGate (agente só com free tool-capable)", () 
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it("agente + free NÃO-verificado → rebaixa p/ o free verificado (qwen), downgraded + warn", () => {
+  it("agente + free NÃO-verificado → rebaixa p/ o verificado (qwen), downgraded + warn triável (chat_id)", () => {
     const warn = jest.fn();
     const r = enforceAgentFreeModelToolGate({
       selectedModelOverride: UNVERIFIED_FREE,
       isAgent: true,
+      chatId: "c1",
       log: { warn },
     });
     expect(r.override).toBe(VERIFIED_FREE);
     expect(r.downgraded).toBe(true);
     expect(r.reason).toBe("agent_tool_unverified_free");
-    expect(warn).toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+    // Warn triável em prod (F1): carrega chat_id + o modelo pedido e o override.
+    const payload = JSON.parse(String(warn.mock.calls[0][0]));
+    expect(payload.chat_id).toBe("c1");
+    expect(payload.selected_model).toBe(UNVERIFIED_FREE);
+    expect(payload.override).toBe(VERIFIED_FREE);
   });
 
   it("agente + free VERIFICADO (qwen) → inalterado, sem downgrade nem warn", () => {
