@@ -3,7 +3,9 @@ import {
   enforceFreeModelEngagementGate,
   assertFreeModelStillAllowed,
   FreeModelEngagementViolationError,
+  enforceAgentFreeModelToolGate,
 } from "../free-model-gate";
+import { AGENT_VERIFIED_FREE_MODELS } from "@/types/chat";
 
 const silent = { warn: jest.fn() };
 const FREE = "model-qwen3.8-27b-free" as const;
@@ -183,5 +185,63 @@ describe("assertFreeModelStillAllowed (re-checagem mid-run)", () => {
         lookupChat: lookup,
       }),
     ).rejects.toBeInstanceOf(FreeModelEngagementViolationError);
+  });
+});
+
+/**
+ * No AGENTE o free PRECISA fazer tool-calling (H2). Um free não-verificado rebaixa
+ * p/ o free verificado (qwen) — NÃO p/ "auto" (não cobra um opt-in $0). Direção:
+ * free→free-verificado. Observável (downgraded + warn). Ask: inalterado.
+ */
+describe("enforceAgentFreeModelToolGate (agente só com free tool-capable)", () => {
+  const UNVERIFIED_FREE = "model-nemotron-3-super-free" as const; // H2: ❌ tools
+  const VERIFIED_FREE = AGENT_VERIFIED_FREE_MODELS[0]; // qwen
+
+  it("NÃO-agente (ask): free não-verificado passa inalterado, sem downgrade nem warn", () => {
+    const warn = jest.fn();
+    const r = enforceAgentFreeModelToolGate({
+      selectedModelOverride: UNVERIFIED_FREE,
+      isAgent: false,
+      log: { warn },
+    });
+    expect(r).toEqual({ override: UNVERIFIED_FREE, downgraded: false });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("agente + free NÃO-verificado → rebaixa p/ o free verificado (qwen), downgraded + warn", () => {
+    const warn = jest.fn();
+    const r = enforceAgentFreeModelToolGate({
+      selectedModelOverride: UNVERIFIED_FREE,
+      isAgent: true,
+      log: { warn },
+    });
+    expect(r.override).toBe(VERIFIED_FREE);
+    expect(r.downgraded).toBe(true);
+    expect(r.reason).toBe("agent_tool_unverified_free");
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it("agente + free VERIFICADO (qwen) → inalterado, sem downgrade nem warn", () => {
+    const warn = jest.fn();
+    const r = enforceAgentFreeModelToolGate({
+      selectedModelOverride: VERIFIED_FREE,
+      isAgent: true,
+      log: { warn },
+    });
+    expect(r).toEqual({ override: VERIFIED_FREE, downgraded: false });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("agente + NÃO-free (auto / pago / undefined) → inalterado, sem warn", () => {
+    const warn = jest.fn();
+    for (const sel of ["auto", "model-grok-4.7", undefined] as const) {
+      const r = enforceAgentFreeModelToolGate({
+        selectedModelOverride: sel,
+        isAgent: true,
+        log: { warn },
+      });
+      expect(r).toEqual({ override: sel, downgraded: false });
+    }
+    expect(warn).not.toHaveBeenCalled();
   });
 });

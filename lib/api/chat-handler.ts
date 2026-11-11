@@ -120,6 +120,7 @@ import {
   assertFreeModelStillAllowed,
   createFreeModelStepGuard,
   enforceFreeModelEngagementGate,
+  enforceAgentFreeModelToolGate,
 } from "@/lib/chat/free-model-gate";
 import { isFreeModelSelection } from "@/types/chat";
 import { cacheAuxiliaryVisionDescription } from "@/lib/utils/file-transform-utils";
@@ -406,6 +407,13 @@ export const createChatHandler = () => {
           chat, // já carregado acima → sem releitura nem caminho de falha
         })
       ).override;
+      // Guarda de tool-calling: no AGENTE, um free NÃO-verificado (não emite
+      // tool_calls) rebaixa p/ o free verificado (qwen). DEPOIS do portão de
+      // engajamento (se já virou "auto", passa inalterado). Servidor decide.
+      selectedModelOverride = enforceAgentFreeModelToolGate({
+        selectedModelOverride,
+        isAgent: isAgentMode(mode),
+      }).override;
       const extraUsageConfig = withExtraUsageBillingForModel(
         baseExtraUsageConfig,
         selectedModelOverride,

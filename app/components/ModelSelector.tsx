@@ -42,6 +42,8 @@ import {
   normalizeMaxModelForSubscription,
   normalizeSelectedModelForSubscription,
   isFreeModelSelection,
+  isAgentVerifiedFreeModel,
+  AGENT_VERIFIED_FREE_MODELS,
   type ChatMode,
   type SelectedModel,
   type SubscriptionTier,
@@ -587,7 +589,18 @@ export function ModelSelector({
     engagementBound && isFreeModelSelection(displayValue)
       ? "auto"
       : displayValue;
-  const isAuto = boundSafeValue === "auto";
+  // Agente: um free NÃO-verificado (tool-calling) escolhido antes cairia no
+  // options[0] (PAGO) no lookup do `selected` abaixo → o rótulo do gatilho
+  // MENTIRIA (mostra pago; o servidor roteia qwen). Espelha a guarda do servidor
+  // SÓ p/ o DISPLAY — não persiste (sem onChange, senão clobbaria a preferência
+  // válida de ask).
+  const agentToolSafeValue: SelectedModel =
+    isAgentMode(mode) &&
+    isFreeModelSelection(boundSafeValue) &&
+    !isAgentVerifiedFreeModel(boundSafeValue)
+      ? (AGENT_VERIFIED_FREE_MODELS[0] ?? "auto")
+      : boundSafeValue;
+  const isAuto = agentToolSafeValue === "auto";
 
   // Exibir "Auto" não basta: o estado REAL (GlobalState/localStorage) seguiria
   // no free e re-armaria a preferência na próxima tarefa nova (opt-in violado
@@ -601,7 +614,7 @@ export function ModelSelector({
 
   const effectiveValue = isAuto
     ? getDefaultModelForMode(mode)
-    : boundSafeValue;
+    : agentToolSafeValue;
   const selected =
     options.find((opt) => opt.id === effectiveValue) ??
     freeOptions.find((opt) => opt.id === effectiveValue) ??

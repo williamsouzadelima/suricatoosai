@@ -1,4 +1,5 @@
 import type { ChatMode, SelectedModel } from "@/types/chat";
+import { isAgentVerifiedFreeModel } from "@/types/chat";
 import { isAgentMode } from "@/lib/utils/mode-helpers";
 
 export interface ModelOption {
@@ -126,6 +127,12 @@ const FREE_MODEL_OPTIONS_BASE: ModelOption[] = [
 // B3: os free são servidos via UnoRouter (API OpenAI-compat), que IGNORA o bloco
 // de reasoning do OpenRouter (providerOptions.openrouter). Não anunciamos
 // "thinking" p/ não mentir sobre uma capacidade que o provedor pode não honrar.
-// (`mode` fica p/ compat de assinatura; a UI do free é a mesma nos dois modos.)
-export const getFreeModelOptions = (_mode: ChatMode): ModelOption[] =>
-  FREE_MODEL_OPTIONS_BASE.map((opt) => ({ ...opt }));
+//
+// No AGENTE o modelo PRECISA fazer tool-calling (senão o agente narra/alucina em
+// vez de agir) → filtra aos free VERIFICADOS ao vivo (AGENT_VERIFIED_FREE_MODELS,
+// H2). Ask não usa tools → todos os 4. A guarda do servidor (free-model-gate) é o
+// backstop p/ caminhos não-UI.
+export const getFreeModelOptions = (mode: ChatMode): ModelOption[] =>
+  FREE_MODEL_OPTIONS_BASE.filter(
+    (opt) => !isAgentMode(mode) || isAgentVerifiedFreeModel(opt.id),
+  ).map((opt) => ({ ...opt }));

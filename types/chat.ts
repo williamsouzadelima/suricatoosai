@@ -84,6 +84,36 @@ export function isFreeModelSelection(
 }
 
 /**
+ * Free VERIFICADOS ao vivo p/ o MODO AGENTE (tool-calling). No agente o modelo
+ * PRECISA emitir tool_calls; senão o agente narra/alucina em vez de agir. H2
+ * (11/11, chave no .env do host):
+ * - `model-qwen3.8-27b-free` → emite tool_calls (auto) ✅ VERIFICADO.
+ * - `model-nemotron-3-super-free` → NÃO emite nem forçando (`required`) ❌ QUEBRADO
+ *   (fica fora do agente mesmo quando volta a responder).
+ * - `model-nemotron-3-ultra-free` / `model-gemma-4-31b-free` → 503 "providers busy"
+ *   no teste = NÃO TESTADOS (indisponibilidade transitória), **não** incapazes.
+ *   Default-deny: fora do agente ATÉ reteste; se verificados, adicionar aqui.
+ * Invariante (compile-time abaixo + teste): ⊆ FREE_MODEL_SELECTIONS. `[0]` = alvo
+ * preferido do rebaixe da guarda do agente (free → free verificado, não pago).
+ */
+export const AGENT_VERIFIED_FREE_MODELS: readonly SelectedModel[] = [
+  "model-qwen3.8-27b-free",
+] as const satisfies readonly (typeof FREE_MODEL_SELECTIONS)[number][];
+
+const AGENT_VERIFIED_FREE_MODEL_SET: ReadonlySet<string> = new Set(
+  AGENT_VERIFIED_FREE_MODELS,
+);
+
+/** True se o free é VERIFICADO p/ tool-calling no AGENTE (H2). Ask ignora isto. */
+export function isAgentVerifiedFreeModel(
+  value: SelectedModel | null | undefined,
+): boolean {
+  return (
+    typeof value === "string" && AGENT_VERIFIED_FREE_MODEL_SET.has(value)
+  );
+}
+
+/**
  * Modelos concretos expostos no seletor do operador (além dos tiers Auto/
  * Standard/Pro/Max). Os PAGOS vêm primeiro (a UI usa o 1º como default do
  * seletor — um free NUNCA pode ser default: é opt-in). Os free ficam num grupo

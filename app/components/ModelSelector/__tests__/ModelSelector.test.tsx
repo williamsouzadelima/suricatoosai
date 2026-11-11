@@ -200,11 +200,33 @@ describe("ModelSelector", () => {
     expect(
       screen.getByText(/Gratuitos · podem treinar com o prompt/i),
     ).toBeVisible();
+    // Agente mostra só os free VERIFICADOS p/ tool-calling (qwen); os demais
+    // ficam em ask. O verificado aparece habilitado.
     expect(
-      screen.getByRole("button", { name: /NVIDIA Nemotron 3 Ultra/i }),
+      screen.getByRole("button", { name: /Qwen 3\.8 27B/i }),
     ).toBeEnabled();
     expect(
       screen.queryByTestId("free-models-blocked-notice"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("AGENTE: um free NÃO-verificado previamente escolhido NÃO mente como pago — exibe o verificado (qwen) (B1)", () => {
+    mockSubscription = "ultra";
+    render(
+      <ModelSelector
+        value="model-nemotron-3-super-free"
+        onChange={jest.fn()}
+        mode="agent"
+      />,
+    );
+    // O servidor rebaixa nemotron-super→qwen no agente; a coerção display-only
+    // espelha isso p/ o rótulo do gatilho NÃO mostrar o pago options[0]
+    // ("Z.ai GLM 5.3 Flash"), e sim o free verificado.
+    expect(
+      screen.getByRole("button", { name: /Qwen 3\.8 27B/i }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: /GLM 5\.3 Flash/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -271,11 +293,19 @@ describe("ModelSelector", () => {
     expect(onChange).toHaveBeenCalledWith("auto");
   });
 
-  it("o grupo GRATUITO exibe o selo 'Grátis' em cada opção", () => {
+  it("o grupo GRATUITO exibe o selo 'Grátis' nas opções (ask: os 4; agent: o verificado)", () => {
     mockSubscription = "ultra";
-    render(<ModelSelector value="auto" onChange={jest.fn()} mode="agent" />);
+    // Ask não filtra → os 4 free aparecem, cada um com o selo "Grátis".
+    const { unmount } = render(
+      <ModelSelector value="auto" onChange={jest.fn()} mode="ask" />,
+    );
     fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
     expect(screen.getAllByText("Grátis").length).toBeGreaterThanOrEqual(4);
+    unmount();
+    // Agent filtra ao verificado (qwen), que também carrega o selo.
+    render(<ModelSelector value="auto" onChange={jest.fn()} mode="agent" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Auto$/i }));
+    expect(screen.getAllByText("Grátis").length).toBeGreaterThanOrEqual(1);
   });
 
   it("usuário de PLANO free não vê o grupo gratuito", () => {

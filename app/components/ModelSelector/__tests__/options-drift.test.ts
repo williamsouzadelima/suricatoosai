@@ -15,7 +15,9 @@ import {
 } from "@/lib/ai/providers";
 import {
   FREE_MODEL_SELECTIONS,
+  AGENT_VERIFIED_FREE_MODELS,
   isFreeModelSelection,
+  isAgentVerifiedFreeModel,
   type ChatMode,
 } from "@/types/chat";
 
@@ -151,11 +153,23 @@ describe("ModelSelector — grupo GRATUITO (free)", () => {
   const freeAgent = getFreeModelOptions("agent");
   const freeAsk = getFreeModelOptions("ask");
 
-  it("expõe exatamente os ids de FREE_MODEL_SELECTIONS (paridade, sem drift)", () => {
-    const ids = freeAgent.map((o) => o.id).sort();
-    expect(ids).toEqual([...FREE_MODEL_SELECTIONS].sort());
-    expect(freeAsk.map((o) => o.id).sort()).toEqual(ids);
-    for (const o of freeAgent) expect(isFreeModelSelection(o.id)).toBe(true);
+  it("ask expõe TODOS os free (FREE_MODEL_SELECTIONS); agent SÓ os AGENT_VERIFIED (default-deny tool-calling)", () => {
+    // Ask não usa tools → os 4. Agent PRECISA de tool-calling → só os verificados
+    // ao vivo (H2). Âncoras EXATAS dos DOIS (M1): afrouxar p/ "agent ⊆ ask" deixaria
+    // um drop silencioso de ask passar verde.
+    expect(freeAsk.map((o) => o.id).sort()).toEqual(
+      [...FREE_MODEL_SELECTIONS].sort(),
+    );
+    expect(freeAgent.map((o) => o.id).sort()).toEqual(
+      [...AGENT_VERIFIED_FREE_MODELS].sort(),
+    );
+    // membership iterada sobre o conjunto COMPLETO (freeAsk), não o reduzido.
+    for (const o of freeAsk) expect(isFreeModelSelection(o.id)).toBe(true);
+    // AGENT_VERIFIED ⊆ FREE_MODEL_SELECTIONS (senão o filtro do agente fica cego).
+    for (const id of AGENT_VERIFIED_FREE_MODELS)
+      expect(isFreeModelSelection(id)).toBe(true);
+    // todo item do grupo do agente é um free verificado.
+    for (const o of freeAgent) expect(isAgentVerifiedFreeModel(o.id)).toBe(true);
   });
 
   it("NENHUM free aparece na lista paga (ask/agent) e o default segue PAGO", () => {

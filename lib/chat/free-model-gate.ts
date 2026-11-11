@@ -1,4 +1,9 @@
-import { isFreeModelSelection, type SelectedModel } from "@/types/chat";
+import {
+  isFreeModelSelection,
+  isAgentVerifiedFreeModel,
+  AGENT_VERIFIED_FREE_MODELS,
+  type SelectedModel,
+} from "@/types/chat";
 import { getChatById } from "@/lib/db/actions";
 
 /**
@@ -152,5 +157,55 @@ export function createFreeModelStepGuard({
     if (now - lastCheckedAt < intervalMs) return;
     lastCheckedAt = now;
     await assertFreeModelStillAllowed({ selectedModelOverride, chatId, lookupChat });
+  };
+}
+
+/**
+ * Guarda de TOOL-CALLING p/ free no AGENTE (H2): no agente o modelo PRECISA emitir
+ * tool_calls; um free NÃO-verificado narraria/alucinaria em vez de agir → rebaixa
+ * p/ o 1º free VERIFICADO (qwen = `AGENT_VERIFIED_FREE_MODELS[0]`), ou "auto" se a
+ * allowlist esvaziar. Direção free→free-verificado — NÃO "auto" (pago): não cobra
+ * um opt-in $0, e MANTÉM armadas as guardas TOCTOU de engajamento (que no-opam em
+ * não-free). Pura (não consulta nada). Ask (isAgent=false) → inalterado.
+ * Observável: devolve {downgraded, reason} + warn estruturado (espelha o portão de
+ * engajamento — senão o swap nemotron→qwen some em produção).
+ */
+export interface AgentFreeModelToolGateResult {
+  override: SelectedModel | undefined;
+  downgraded: boolean;
+  reason?: "agent_tool_unverified_free";
+}
+
+export function enforceAgentFreeModelToolGate({
+  selectedModelOverride,
+  isAgent,
+  log = console,
+}: {
+  selectedModelOverride: SelectedModel | undefined;
+  isAgent: boolean;
+  log?: Pick<Console, "warn">;
+}): AgentFreeModelToolGateResult {
+  // Só dispara p/ free NÃO-verificado em AGENTE; o resto passa inalterado
+  // (ask não usa tools; free verificado e não-free seguem).
+  if (
+    !isAgent ||
+    !isFreeModelSelection(selectedModelOverride) ||
+    isAgentVerifiedFreeModel(selectedModelOverride)
+  ) {
+    return { override: selectedModelOverride, downgraded: false };
+  }
+  const target: SelectedModel = AGENT_VERIFIED_FREE_MODELS[0] ?? "auto";
+  log.warn(
+    JSON.stringify({
+      level: "warn",
+      event: "agent_free_model_downgraded_unverified_tools",
+      selected_model: selectedModelOverride,
+      override: target,
+    }),
+  );
+  return {
+    override: target,
+    downgraded: true,
+    reason: "agent_tool_unverified_free",
   };
 }

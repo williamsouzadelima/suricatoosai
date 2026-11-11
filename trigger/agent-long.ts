@@ -33,6 +33,7 @@ import {
   assertFreeModelStillAllowed,
   createFreeModelStepGuard,
   enforceFreeModelEngagementGate,
+  enforceAgentFreeModelToolGate,
 } from "@/lib/chat/free-model-gate";
 import { isFreeModelSelection } from "@/types/chat";
 import { cacheAuxiliaryVisionDescription } from "@/lib/utils/file-transform-utils";
@@ -2568,6 +2569,13 @@ export const agentLongTask = task({
           chat, // já carregado acima → sem releitura nem caminho de falha
         })
       ).override;
+      // Guarda de tool-calling (esta task É o agente: mode = "agent" as const):
+      // free NÃO-verificado → free verificado (qwen). Defesa em profundidade — a
+      // task re-deriva do payload BRUTO, igual ao portão de engajamento acima.
+      selectedModelOverride = enforceAgentFreeModelToolGate({
+        selectedModelOverride,
+        isAgent: true,
+      }).override;
       const extraUsageConfig = withExtraUsageBillingForModel(
         baseExtraUsageConfig,
         selectedModelOverride,
