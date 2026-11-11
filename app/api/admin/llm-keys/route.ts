@@ -6,6 +6,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { recordAudit } from "@/lib/admin/audit";
 import { decryptSecret, encryptSecret, last4 } from "@/lib/llm-keys/crypto";
 import { invalidatePoolKeyCache } from "@/lib/llm-keys/pool-runtime";
+import { readUnoRouterEnvKey } from "@/lib/ai/unorouter-provider";
 
 /**
  * Admin do pool de chaves de LLM. Superadmin-only. A chave em texto puro é
@@ -158,7 +159,9 @@ export async function GET() {
     keys,
     encConfigured: encConfigured(),
     envKeyPresent: !!process.env.OPENROUTER_API_KEY,
-    unoEnvKeyPresent: !!process.env.UNOROUTER_API_KEY,
+    // Trimmed, p/ casar EXATO com o runtime (readUnoRouterEnvKey): uma var só com
+    // espaços é AUSENTE — senão o painel diria "presente" e o runtime fail-closa.
+    unoEnvKeyPresent: !!readUnoRouterEnvKey(),
   });
 }
 

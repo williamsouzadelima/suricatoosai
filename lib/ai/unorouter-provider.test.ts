@@ -29,9 +29,14 @@ import {
 
 const URL = "https://api.unorouter.com/v1/chat/completions";
 
-// Valor ORIGINAL do env — restaurado após cada teste p/ NÃO vazar
-// UNOROUTER_API_KEY para outras suítes que compartilham o worker do jest.
-const ORIGINAL_UNO_ENV = process.env.UNOROUTER_API_KEY;
+// Valores ORIGINAIS do env — restaurados após CADA teste p/ NÃO vazar para
+// outras suítes do mesmo worker do jest. Cobre as 3 vars que estes testes tocam:
+// a dedicada (UNOROUTER) + o canário B1 (OPENAI/OPENROUTER, usadas por moderação).
+const ORIGINAL_ENV: Record<string, string | undefined> = {
+  UNOROUTER_API_KEY: process.env.UNOROUTER_API_KEY,
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+};
 
 beforeEach(() => {
   mockResolve.mockReset();
@@ -44,8 +49,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  if (ORIGINAL_UNO_ENV === undefined) delete process.env.UNOROUTER_API_KEY;
-  else process.env.UNOROUTER_API_KEY = ORIGINAL_UNO_ENV;
+  for (const [name, val] of Object.entries(ORIGINAL_ENV)) {
+    if (val === undefined) delete process.env[name];
+    else process.env[name] = val;
+  }
 });
 
 describe("createUnoRouterPatchFetch", () => {
@@ -113,6 +120,95 @@ describe("createUnoRouterPatchFetch", () => {
     expect(new Headers(sentInit.headers).get("Authorization")).toBe(
       "Bearer POOLKEY",
     );
+  });
+
+  it("REGRESSÃO (finding A): body NÃO-reenviável COM chave de pool → usa o POOL (não pula p/ env/fail-closed)", async () => {
+    // Só a ROTAÇÃO é insegura com body não-reenviável; o 1º envio é seguro. Um
+    // stream/binário com chave de pool deve USAR o pool (1×), não falhar fechado.
+    mockResolve.mockResolvedValue({ id: "uno1", plaintext: "POOLKEY" });
+    const underlying = jest
+      .fn()
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+    const fetchImpl = createUnoRouterPatchFetch(
+      underlying as unknown as typeof fetch,
+    );
+    const res = await fetchImpl(URL, {
+      method: "POST",
+      body: new Uint8Array([1, 2, 3]) as unknown as BodyInit, // não-string
+    });
+    expect(res.status).toBe(200);
+    expect(underlying).toHaveBeenCalledTimes(1);
+    const sentInit = underlying.mock.calls[0][1] as RequestInit;
+    expect(new Headers(sentInit.headers).get("Authorization")).toBe(
+      "Bearer POOLKEY",
+    );
+  });
+
+  it("B1 CANARY: OPENAI_API_KEY/OPENROUTER_API_KEY NUNCA viram a Authorization do UnoRouter (pool, env, fail-closed)", async () => {
+    process.env.OPENAI_API_KEY = "SENTINEL-OPENAI-MUST-NOT-LEAK";
+    process.env.OPENROUTER_API_KEY = "SENTINEL-OPENROUTER-MUST-NOT-LEAK";
+    const underlying = jest
+      .fn()
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+    const fetchImpl = createUnoRouterPatchFetch(
+      underlying as unknown as typeof fetch,
+    );
+    // (a) caminho do POOL
+    mockResolve.mockResolvedValue({ id: "uno1", plaintext: "POOLKEY" });
+    await fetchImpl(URL, { method: "POST", body: "{}" });
+    // (b) caminho do ENV
+    process.env.UNOROUTER_API_KEY = "ENV-UNO-KEY";
+    mockResolve.mockResolvedValue(null);
+    await fetchImpl(URL, { method: "POST", body: "{}" });
+    const auths = underlying.mock.calls.map((c) =>
+      new Headers((c[1] as RequestInit).headers).get("Authorization"),
+    );
+    expect(auths).toEqual(["Bearer POOLKEY", "Bearer ENV-UNO-KEY"]);
+    for (const a of auths) {
+      expect(a ?? "").not.toContain("SENTINEL-OPENAI");
+      expect(a ?? "").not.toContain("SENTINEL-OPENROUTER");
+    }
+    // (c) fail-closed: sem pool e sem env, NADA é enviado
+    delete process.env.UNOROUTER_API_KEY;
+    underlying.mockClear();
+    mockResolve.mockResolvedValue(null);
+    const res = await fetchImpl(URL, { method: "POST", body: "{}" });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(underlying).not.toHaveBeenCalled();
+  });
+
+  it("WHITESPACE env (finding B): UNOROUTER_API_KEY só com espaços → tratada como AUSENTE (fail-closed)", async () => {
+    process.env.UNOROUTER_API_KEY = "   ";
+    mockResolve.mockResolvedValue(null);
+    const underlying = jest.fn();
+    const fetchImpl = createUnoRouterPatchFetch(
+      underlying as unknown as typeof fetch,
+    );
+    const res = await fetchImpl(URL, { method: "POST", body: "{}" });
+    expect(underlying).not.toHaveBeenCalled();
+    expect(res.status).toBeGreaterThanOrEqual(400);
+  });
+
+  it("POOL esgotado → ENV: 402 do pool rotaciona, pool acaba (null) e cai na env key", async () => {
+    process.env.UNOROUTER_API_KEY = "ENV-UNO-KEY";
+    mockResolve
+      .mockResolvedValueOnce({ id: "uno1", plaintext: "POOLKEY" })
+      .mockResolvedValueOnce(null); // pool esgotado após rotacionar
+    const underlying = jest
+      .fn()
+      .mockResolvedValueOnce(new Response("no credit", { status: 402 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    const fetchImpl = createUnoRouterPatchFetch(
+      underlying as unknown as typeof fetch,
+    );
+    const res = await fetchImpl(URL, { method: "POST", body: "{}" });
+    expect(res.status).toBe(200);
+    expect(mockExhausted).toHaveBeenCalledWith("uno1");
+    expect(underlying).toHaveBeenCalledTimes(2);
+    const secondAuth = new Headers(
+      (underlying.mock.calls[1][1] as RequestInit).headers,
+    ).get("Authorization");
+    expect(secondAuth).toBe("Bearer ENV-UNO-KEY");
   });
 
   it("injeta a chave do pool como Authorization (nunca o placeholder)", async () => {

@@ -77,16 +77,17 @@ export const createUnoRouterPatchFetch =
       init?.body === undefined || typeof init.body === "string";
     const triedKeyIds: string[] = [];
     for (;;) {
-      // Gate em bodyReusable (espelha o OpenRouter): a rotação do pool re-envia
-      // o request, então body não-reenviável não entra no pool — vai direto p/
-      // a env (ou falha fechada), sem risco de re-enviar body consumido.
-      const poolKey = bodyReusable
-        ? await resolveActivePoolKey(triedKeyIds, UNOROUTER_PROVIDER)
-        : null;
+      // Resolve o pool SEMPRE: o 1º envio é seguro mesmo com body não-reenviável
+      // (finding A — gatear a resolução pularia o pool p/ streams, regressão).
+      // Só a ROTAÇÃO re-envia o request e exige body reenviável (gated abaixo).
+      const poolKey = await resolveActivePoolKey(
+        triedKeyIds,
+        UNOROUTER_PROVIDER,
+      );
       if (!poolKey) {
-        // Sem chave de pool (vazio/esgotado, ou body não-reenviável):
-        // BOOTSTRAP/FALLBACK de env (espelha OPENROUTER_API_KEY). A env key é
-        // TERMINAL — último recurso, não rotaciona (402/401 dela sobe honesto).
+        // Sem chave de pool (vazio/esgotado): BOOTSTRAP/FALLBACK de env (espelha
+        // OPENROUTER_API_KEY). A env key é TERMINAL — último recurso, não
+        // rotaciona (402/401 dela sobe honesto).
         const envKey = readUnoRouterEnvKey();
         if (!envKey) {
           // FAIL-CLOSED (B1): sem pool E sem UNOROUTER_API_KEY, não envia nada —
@@ -107,8 +108,12 @@ export const createUnoRouterPatchFetch =
         init,
         poolKey.plaintext,
       );
-      // poolKey só é truthy quando bodyReusable → re-enviar na rotação é seguro.
-      if (response.status === 402 || response.status === 401) {
+      // Só rotaciona com body REENVIÁVEL (string/undefined). Com body não-
+      // reenviável o pool é usado 1× e a resposta (mesmo 402/401) sobe como está.
+      if (
+        bodyReusable &&
+        (response.status === 402 || response.status === 401)
+      ) {
         if (response.status === 402) {
           void markPoolKeyExhausted(poolKey.id);
         } else {
