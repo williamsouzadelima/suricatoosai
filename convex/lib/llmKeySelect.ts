@@ -6,6 +6,7 @@
 
 export type PoolKeyLite = {
   _id: string;
+  provider: string;
   enabled: boolean;
   priority: number;
   status: "untested" | "active" | "exhausted" | "error";
@@ -14,15 +15,17 @@ export type PoolKeyLite = {
 
 export function pickActiveKey<T extends PoolKeyLite>(
   keys: T[],
-  opts?: { excludeIds?: string[] },
+  opts?: { excludeIds?: string[]; provider?: string },
 ): T | null {
   const exclude = new Set(opts?.excludeIds ?? []);
+  const wantProvider = opts?.provider;
   const candidates = keys
     .filter(
       (k) =>
         k.enabled &&
         (k.status === "active" || k.status === "untested") &&
-        !exclude.has(k._id),
+        !exclude.has(k._id) &&
+        (wantProvider === undefined || k.provider === wantProvider),
     )
     .sort((a, b) => a.priority - b.priority || a.created_at - b.created_at);
   return candidates[0] ?? null;

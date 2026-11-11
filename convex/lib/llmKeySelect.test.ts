@@ -2,6 +2,7 @@ import { pickActiveKey, type PoolKeyLite } from "./llmKeySelect";
 
 function k(over: Partial<PoolKeyLite> & { _id: string }): PoolKeyLite {
   return {
+    provider: "openrouter",
     enabled: true,
     priority: 100,
     status: "active",
@@ -44,6 +45,25 @@ describe("pickActiveKey", () => {
       { excludeIds: ["a"] },
     );
     expect(chosen?._id).toBe("b");
+  });
+
+  it("isola por provider: nunca devolve chave de outro provider (mesmo com prioridade menor)", () => {
+    const keys = [
+      k({ _id: "or1", provider: "openrouter", priority: 1 }),
+      k({ _id: "uno1", provider: "unorouter", priority: 100 }),
+    ];
+    expect(pickActiveKey(keys, { provider: "unorouter" })?._id).toBe("uno1");
+    expect(pickActiveKey(keys, { provider: "openrouter" })?._id).toBe("or1");
+  });
+
+  it("provider sem chave usável → null (não cai em outro provider)", () => {
+    const keys = [k({ _id: "or1", provider: "openrouter", priority: 1 })];
+    expect(pickActiveKey(keys, { provider: "unorouter" })).toBeNull();
+  });
+
+  it("sem provider = qualquer provider (back-compat)", () => {
+    const keys = [k({ _id: "or1", provider: "openrouter", priority: 1 })];
+    expect(pickActiveKey(keys)?._id).toBe("or1");
   });
 
   it("null quando não há usável", () => {

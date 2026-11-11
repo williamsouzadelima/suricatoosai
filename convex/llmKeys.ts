@@ -20,6 +20,11 @@ const statusArg = v.union(
   v.literal("error"),
 );
 
+// Provider de roteamento do pool. Conjunto fechado (H3): um valor fora disto
+// viraria chave INVISÍVEL à seleção por provider → pool nulo → caminho
+// pool-vazio (vazamento/throw de B1). Validado também na rota admin.
+const providerArg = v.union(v.literal("openrouter"), v.literal("unorouter"));
+
 export const listKeysForBackend = query({
   args: { serviceKey: v.string() },
   handler: async (ctx, args) => {
@@ -47,7 +52,7 @@ export const createKeyForBackend = mutation({
   args: {
     serviceKey: v.string(),
     label: v.string(),
-    provider: v.string(),
+    provider: providerArg,
     ciphertext: v.string(),
     iv: v.string(),
     authTag: v.string(),
@@ -141,19 +146,25 @@ export const getNextActiveKeyForBackend = query({
   args: {
     serviceKey: v.string(),
     excludeIds: v.optional(v.array(v.id("llm_api_keys"))),
+    provider: v.optional(providerArg),
   },
   handler: async (ctx, args) => {
     validateServiceKey(args.serviceKey);
+    const provider = args.provider ?? "openrouter"; // back-compat: chamador único atual = fetch OpenRouter
     const rows = await ctx.db.query("llm_api_keys").collect();
     const chosen = pickActiveKey(
       rows.map((k) => ({
         _id: k._id as string,
+        provider: k.provider,
         enabled: k.enabled,
         priority: k.priority,
         status: k.status,
         created_at: k.created_at,
       })),
-      { excludeIds: (args.excludeIds ?? []).map((i) => i as string) },
+      {
+        excludeIds: (args.excludeIds ?? []).map((i) => i as string),
+        provider,
+      },
     );
     if (!chosen) return null;
     const row = rows.find((r) => (r._id as string) === chosen._id);

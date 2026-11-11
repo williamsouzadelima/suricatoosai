@@ -1015,7 +1015,7 @@ export default defineSchema({
   // não-sensíveis. O plaintext NUNCA entra no Convex nem volta ao cliente.
   llm_api_keys: defineTable({
     label: v.string(),
-    provider: v.string(), // "openrouter" (preparado p/ outros no futuro)
+    provider: v.string(), // "openrouter" | "unorouter" — conjunto fechado imposto nos args de createKey/getNextActiveKey (H3); coluna fica string p/ não arriscar validação de dados no deploy
     ciphertext: v.string(),
     iv: v.string(),
     auth_tag: v.string(),
