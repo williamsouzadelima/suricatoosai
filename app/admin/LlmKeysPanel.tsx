@@ -55,6 +55,7 @@ export function LlmKeysPanel() {
   const [keys, setKeys] = useState<KeyRow[]>([]);
   const [encConfigured, setEncConfigured] = useState(true);
   const [envKeyPresent, setEnvKeyPresent] = useState(false);
+  const [unoEnvKeyPresent, setUnoEnvKeyPresent] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [label, setLabel] = useState("");
@@ -74,6 +75,7 @@ export function LlmKeysPanel() {
       setKeys((data.keys ?? []) as KeyRow[]);
       setEncConfigured(!!data.encConfigured);
       setEnvKeyPresent(!!data.envKeyPresent);
+      setUnoEnvKeyPresent(!!data.unoEnvKeyPresent);
     } catch {
       toast.error("Falha ao carregar as chaves");
     } finally {
@@ -177,7 +179,7 @@ export function LlmKeysPanel() {
       const res = await fetch("/api/admin/llm-keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "import-env" }),
+        body: JSON.stringify({ action: "import-env", provider }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         skipped?: boolean;
@@ -227,6 +229,14 @@ export function LlmKeysPanel() {
           <strong>bootstrap/fallback</strong>: se o pool estiver vazio ou todas
           sem crédito, ela é usada — então nada quebra enquanto você configura o
           pool.
+        </Callout>
+      )}
+      {unoEnvKeyPresent && (
+        <Callout tone="neutral" icon={ShieldCheck}>
+          A chave do ambiente (<code>UNOROUTER_API_KEY</code>) serve os modelos{" "}
+          <strong>Gratuitos</strong> como <strong>bootstrap/fallback</strong>:
+          sem chave UnoRouter no pool, ela é usada direto. (Requer restart do
+          processo — web <em>e</em> worker — para carregar a env.)
         </Callout>
       )}
 
@@ -281,15 +291,29 @@ export function LlmKeysPanel() {
             4 dígitos. Menor prioridade = tentada primeiro no failover.
           </p>
           <div>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!encConfigured || busy}
-              title="Cifra a OPENROUTER_API_KEY do servidor e traz pro pool"
-              onClick={() => void importEnv()}
-            >
-              Importar a chave do ambiente (env)
-            </Button>
+            {(() => {
+              const envVar =
+                provider === "unorouter"
+                  ? "UNOROUTER_API_KEY"
+                  : "OPENROUTER_API_KEY";
+              const present =
+                provider === "unorouter" ? unoEnvKeyPresent : envKeyPresent;
+              return (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!encConfigured || busy || !present}
+                  title={
+                    present
+                      ? `Cifra a ${envVar} do servidor e traz pro pool (provedor ${provider})`
+                      : `${envVar} não está no env do processo web. Adicione no .env.local e reinicie, ou cole a chave direto acima.`
+                  }
+                  onClick={() => void importEnv()}
+                >
+                  Importar a chave do ambiente ({envVar})
+                </Button>
+              );
+            })()}
           </div>
         </CardContent>
       </Card>

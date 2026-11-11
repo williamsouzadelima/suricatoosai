@@ -12,6 +12,11 @@ import { getConvexClient } from "@/lib/db/convex-client";
 import { decryptSecret } from "./crypto";
 
 type ActiveKey = { id: string; plaintext: string } | null;
+// Conjunto fechado de provedores (casa com o `providerArg` do Convex). Tipar o
+// arg como union faz o `.query(...)` compilar: `string` não é atribuível ao
+// literal gerado "openrouter" | "unorouter" (o `convex deploy` NÃO conserta
+// isto — o codegen já tem o union; quem era largo era este param).
+type LlmProvider = "openrouter" | "unorouter";
 
 // Cache CHAVEADO POR PROVIDER (B2): um slot único vazaria a chave de um provider
 // para o resolve de outro. Cada provider tem sua própria entrada + TTL.
@@ -26,7 +31,7 @@ function serviceKey(): string | null {
 
 async function queryActiveKey(
   excludeIds: string[],
-  provider: string,
+  provider: LlmProvider,
 ): Promise<ActiveKey> {
   const sk = serviceKey();
   if (!sk) {
@@ -72,7 +77,7 @@ async function queryActiveKey(
 
 export async function resolveActivePoolKey(
   triedKeyIds: string[],
-  provider = "openrouter",
+  provider: LlmProvider = "openrouter",
 ): Promise<ActiveKey> {
   if (triedKeyIds.length === 0) {
     const now = Date.now();

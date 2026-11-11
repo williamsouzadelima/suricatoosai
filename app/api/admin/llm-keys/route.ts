@@ -158,6 +158,7 @@ export async function GET() {
     keys,
     encConfigured: encConfigured(),
     envKeyPresent: !!process.env.OPENROUTER_API_KEY,
+    unoEnvKeyPresent: !!process.env.UNOROUTER_API_KEY,
   });
 }
 
@@ -288,10 +289,15 @@ export async function POST(req: NextRequest) {
       if (!encConfigured()) {
         throw new Error("LLM_KEY_ENC_SECRET não configurado no servidor.");
       }
-      const envKey = process.env.OPENROUTER_API_KEY;
+      // Provider-aware (espelha "add"): importa a env var DEDICADA do provedor
+      // selecionado — OPENROUTER_API_KEY ou UNOROUTER_API_KEY. Conjunto fechado.
+      const provider = validProvider(body.provider);
+      const envVarName =
+        provider === "unorouter" ? "UNOROUTER_API_KEY" : "OPENROUTER_API_KEY";
+      const envKey = process.env[envVarName];
       if (!envKey || envKey.length < 20) {
         return NextResponse.json(
-          { error: "OPENROUTER_API_KEY não está configurada no servidor." },
+          { error: `${envVarName} não está configurada no servidor.` },
           { status: 400 },
         );
       }
@@ -299,18 +305,25 @@ export async function POST(req: NextRequest) {
       const existing = await convex.query(api.llmKeys.listKeysForBackend, {
         serviceKey,
       });
-      if (existing.some((k: { last4: string }) => k.last4 === l4)) {
+      // Dedup POR PROVEDOR: a mesma chave pode terminar igual entre provedores;
+      // o skip só vale dentro do mesmo provider (B2 — pools isolados).
+      if (
+        existing.some(
+          (k: { last4: string; provider: string }) =>
+            k.last4 === l4 && k.provider === provider,
+        )
+      ) {
         return NextResponse.json({
           ok: true,
           skipped: true,
-          detail: `Já existe uma chave terminando em ${l4} no pool.`,
+          detail: `Já existe uma chave ${provider} terminando em ${l4} no pool.`,
         });
       }
       const enc = encryptSecret(envKey);
       const res = await convex.mutation(api.llmKeys.createKeyForBackend, {
         serviceKey,
-        label: str(body.label) ?? "Ambiente (OPENROUTER_API_KEY)",
-        provider: "openrouter",
+        label: str(body.label) ?? `Ambiente (${envVarName})`,
+        provider,
         ciphertext: enc.ciphertext,
         iv: enc.iv,
         authTag: enc.authTag,
@@ -318,8 +331,13 @@ export async function POST(req: NextRequest) {
         priority: toNum(body.priority) ?? 50,
         createdBy: actor,
       });
-      invalidatePoolKeyCache("openrouter"); // M2
-      await recordAudit(actor, "llm-chave.importar-env", undefined, `last4=${l4}`);
+      invalidatePoolKeyCache(provider); // M2
+      await recordAudit(
+        actor,
+        "llm-chave.importar-env",
+        undefined,
+        `last4=${l4} provider=${provider}`,
+      );
       return NextResponse.json({ ok: true, id: res.id, last4: l4 });
     }
 

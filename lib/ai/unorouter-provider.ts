@@ -21,11 +21,27 @@ import {
 } from "@/lib/llm-keys/pool-runtime";
 
 export const UNOROUTER_BASE_URL = "https://api.unorouter.com/v1";
-export const UNOROUTER_PROVIDER = "unorouter";
+export const UNOROUTER_PROVIDER = "unorouter" as const;
 
-// Placeholder NÃO-OpenAI entregue ao SDK. A chave real vem do pool via fetch; se
-// o pool estiver vazio o fetch falha fechado, então isto nunca vai para a rede.
+// Placeholder NÃO-OpenAI entregue ao SDK. A chave real vem do pool (ou da env
+// dedicada) via fetch; sem pool E sem env o fetch falha fechado, então o
+// placeholder — e o OPENAI_API_KEY que o SDK leria — nunca vão para a rede.
 const PLACEHOLDER_API_KEY = "pool-managed-no-key";
+
+// Nome da env var DEDICADA do UnoRouter (bootstrap/fallback — espelha
+// OPENROUTER_API_KEY). O fallback cai SÓ nesta var; nunca em OPENAI_API_KEY
+// (moderação) nem OPENROUTER_API_KEY (B1 — sem vazamento de credencial).
+export const UNOROUTER_ENV_KEY_NAME = "UNOROUTER_API_KEY";
+
+/**
+ * Lê a chave UnoRouter do ambiente (bootstrap/fallback). Dinâmico: lê
+ * process.env a cada chamada (sem cache de módulo), p/ o restart do processo e
+ * os testes refletirem na hora. Vazia/ausente → null.
+ */
+export function readUnoRouterEnvKey(): string | null {
+  const v = process.env[UNOROUTER_ENV_KEY_NAME];
+  return typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+}
 
 function failClosedResponse(): Response {
   return new Response(
@@ -61,16 +77,29 @@ export const createUnoRouterPatchFetch =
       init?.body === undefined || typeof init.body === "string";
     const triedKeyIds: string[] = [];
     for (;;) {
-      const poolKey = await resolveActivePoolKey(
-        triedKeyIds,
-        UNOROUTER_PROVIDER,
-      );
+      // Gate em bodyReusable (espelha o OpenRouter): a rotação do pool re-envia
+      // o request, então body não-reenviável não entra no pool — vai direto p/
+      // a env (ou falha fechada), sem risco de re-enviar body consumido.
+      const poolKey = bodyReusable
+        ? await resolveActivePoolKey(triedKeyIds, UNOROUTER_PROVIDER)
+        : null;
       if (!poolKey) {
-        // FAIL-CLOSED (B1): sem chave de pool UnoRouter, não envia nada.
-        console.warn(
-          "[uno-pool] sem chave de pool UnoRouter -> falha fechada (não envia)",
+        // Sem chave de pool (vazio/esgotado, ou body não-reenviável):
+        // BOOTSTRAP/FALLBACK de env (espelha OPENROUTER_API_KEY). A env key é
+        // TERMINAL — último recurso, não rotaciona (402/401 dela sobe honesto).
+        const envKey = readUnoRouterEnvKey();
+        if (!envKey) {
+          // FAIL-CLOSED (B1): sem pool E sem UNOROUTER_API_KEY, não envia nada —
+          // o placeholder/OPENAI_API_KEY nunca vai p/ api.unorouter.com.
+          console.warn(
+            "[uno-pool] sem chave de pool nem UNOROUTER_API_KEY -> falha fechada (não envia)",
+          );
+          return failClosedResponse();
+        }
+        console.info(
+          "[uno-pool] sem chave de pool, usando UNOROUTER_API_KEY do env (bootstrap/fallback)",
         );
-        return failClosedResponse();
+        return sendWithKey(fetchImplementation, url, init, envKey);
       }
       const response = await sendWithKey(
         fetchImplementation,
@@ -78,10 +107,8 @@ export const createUnoRouterPatchFetch =
         init,
         poolKey.plaintext,
       );
-      if (
-        bodyReusable &&
-        (response.status === 402 || response.status === 401)
-      ) {
+      // poolKey só é truthy quando bodyReusable → re-enviar na rotação é seguro.
+      if (response.status === 402 || response.status === 401) {
         if (response.status === 402) {
           void markPoolKeyExhausted(poolKey.id);
         } else {
