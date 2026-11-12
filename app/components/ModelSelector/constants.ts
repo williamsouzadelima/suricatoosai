@@ -132,8 +132,9 @@ const FREE_MODEL_OPTIONS_BASE: ModelOption[] = [
 // agir) → filtra aos free VERIFICADOS ao vivo (AGENT_VERIFIED_FREE_MODELS, H2).
 // Ask TAMBÉM tem tools (notas/busca, condicionais — ver lib/ai/tools/index.ts),
 // mas NÃO é tool-CÊNTRICO → mantém os 4 free. ⚠️ Risco residual: um free não-
-// verificado narra num pedido de nota/busca em ask (decisão aberta: filtrar
-// ask-com-tools ou aceitar). A guarda do servidor é o backstop do AGENTE.
+// verificado narra num pedido de nota/busca em ask. DECISÃO (William, 11/11):
+// ACEITAR — ask é majoritariamente Q&A; reavaliar no reteste de ultra/gemma. A
+// guarda do servidor é o backstop do AGENTE.
 export const getFreeModelOptions = (mode: ChatMode): ModelOption[] =>
   FREE_MODEL_OPTIONS_BASE.filter(
     (opt) => !isAgentMode(mode) || isAgentVerifiedFreeModel(opt.id),
